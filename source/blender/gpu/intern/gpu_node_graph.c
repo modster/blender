@@ -439,7 +439,10 @@ static GPUMaterialTexture *gpu_node_graph_add_texture(GPUNodeGraph *graph,
   if (tex == NULL) {
     tex = MEM_callocN(sizeof(*tex), __func__);
     tex->ima = ima;
-    tex->iuser = iuser;
+    if (iuser != NULL) {
+      tex->iuser = *iuser;
+      tex->iuser_available = true;
+    }
     tex->colorband = colorband;
     tex->sampler_state = sampler_state;
     BLI_snprintf(tex->sampler_name, sizeof(tex->sampler_name), "samp%d", num_textures);
@@ -786,8 +789,6 @@ bool GPU_stack_link(GPUMaterial *material,
   return valid;
 }
 
-/* This is a special function to call the "*_eval" function of a BSDF node.
- * This must be call right after GPU_stack_link() so that out[0] contains a valid link. */
 bool GPU_stack_eval_link(GPUMaterial *material,
                          bNode *bnode,
                          const char *name,
@@ -868,7 +869,6 @@ static void gpu_node_free(GPUNode *node)
   MEM_freeN(node);
 }
 
-/* Free intermediate node graph. */
 void gpu_node_graph_free_nodes(GPUNodeGraph *graph)
 {
   GPUNode *node;
@@ -881,9 +881,9 @@ void gpu_node_graph_free_nodes(GPUNodeGraph *graph)
   graph->outlink_surface = NULL;
   graph->outlink_volume = NULL;
   graph->outlink_displacement = NULL;
+  graph->outlink_thickness = NULL;
 }
 
-/* Free both node graph, requested attributes and textures. */
 void gpu_node_graph_free(GPUNodeGraph *graph)
 {
   BLI_freelistN(&graph->outlink_aovs);
@@ -936,6 +936,7 @@ void gpu_node_graph_prune_unused(GPUNodeGraph *graph)
   gpu_nodes_tag(graph->outlink_surface, GPU_NODE_TAG_SURFACE);
   gpu_nodes_tag(graph->outlink_volume, GPU_NODE_TAG_VOLUME);
   gpu_nodes_tag(graph->outlink_displacement, GPU_NODE_TAG_DISPLACEMENT);
+  gpu_nodes_tag(graph->outlink_thickness, GPU_NODE_TAG_THICKNESS);
 
   LISTBASE_FOREACH (GPUNodeGraphOutputLink *, aovlink, &graph->outlink_aovs) {
     gpu_nodes_tag(aovlink->outlink, GPU_NODE_TAG_AOV);

@@ -22,6 +22,7 @@
  * An instance contains all structures needed to do a complete render.
  */
 
+#include "BKE_global.h"
 #include "BKE_object.h"
 #include "BLI_rect.h"
 #include "DEG_depsgraph_query.h"
@@ -43,7 +44,7 @@ namespace blender::eevee {
  * Any attempt to do so will likely produce use after free situations.
  * \{ */
 
-void Instance::init(const ivec2 &output_res,
+void Instance::init(const int2 &output_res,
                     const rcti *output_rect,
                     RenderEngine *render_,
                     Depsgraph *depsgraph_,
@@ -62,6 +63,8 @@ void Instance::init(const ivec2 &output_res,
   v3d = v3d_;
   rv3d = rv3d_;
   baking_probe = light_probe_;
+
+  debug_mode = (eDebugMode)G.debug_value;
 
   update_eval_members();
 
@@ -125,6 +128,8 @@ void Instance::begin_sync()
   shading_passes.sync();
   main_view.sync();
   world.sync();
+  raytracing.sync();
+  hiz.sync();
 
   lookdev.sync_background();
   lookdev.sync_overlay();
@@ -132,6 +137,7 @@ void Instance::begin_sync()
   materials.begin_sync();
   velocity.begin_sync();
   lights.begin_sync();
+  shadows.begin_sync();
   lightprobes.begin_sync();
 }
 
@@ -225,6 +231,7 @@ void Instance::end_sync(void)
   sampling.end_sync();
   render_passes.end_sync();
   lightprobes.end_sync();
+  subsurface.end_sync();
 }
 
 void Instance::render_sync(void)

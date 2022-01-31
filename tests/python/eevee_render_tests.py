@@ -30,12 +30,6 @@ def setup():
     eevee.use_volumetric_shadows = True
     eevee.volumetric_tile_size = '2'
 
-    for mat in bpy.data.materials:
-        # This needs to be enabled case by case,
-        # otherwise we loose SSR and GTAO everywhere.
-        # mat.use_screen_refraction = True
-        mat.use_sss_translucency = True
-
     cubemap = None
     grid = None
     # Does not work in edit mode

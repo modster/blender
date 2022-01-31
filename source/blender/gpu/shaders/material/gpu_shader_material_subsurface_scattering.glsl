@@ -24,5 +24,6 @@ void node_subsurface_scattering_eval(vec4 color,
     g_diffuse_data.color = color.rgb * weight;
     g_diffuse_data.N = N;
     g_diffuse_data.sss_radius = radius * scale;
+    g_diffuse_data.sss_id = uint(resource_handle + 1);
   }
 }

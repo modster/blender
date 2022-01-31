@@ -25,15 +25,14 @@
 
 /* **************** Posterize ******************** */
 
-static bNodeSocketTemplate cmp_node_posterize_in[] = {
-    {SOCK_RGBA, N_("Image"), 1.0f, 1.0f, 1.0f, 1.0f},
-    {SOCK_FLOAT, N_("Steps"), 8.0f, 8.0f, 8.0f, 8.0f, 2.0f, 1024.0f, PROP_NONE},
-    {-1, ""},
-};
-static bNodeSocketTemplate cmp_node_posterize_out[] = {
-    {SOCK_RGBA, N_("Image")},
-    {-1, ""},
-};
+namespace blender::nodes::node_composite_posterize_cc {
+
+static void cmp_node_posterize_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_input<decl::Float>(N_("Steps")).default_value(8.0f).min(2.0f).max(1024.0f);
+  b.add_output<decl::Color>(N_("Image"));
+}
 
 static int node_composite_gpu_posterize(GPUMaterial *mat,
                                         bNode *node,
@@ -44,13 +43,17 @@ static int node_composite_gpu_posterize(GPUMaterial *mat,
   return GPU_stack_link(mat, node, "node_composite_posterize", in, out);
 }
 
-void register_node_type_cmp_posterize(void)
+}  // namespace blender::nodes::node_composite_posterize_cc
+
+void register_node_type_cmp_posterize()
 {
+  namespace file_ns = blender::nodes::node_composite_posterize_cc;
+
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_POSTERIZE, "Posterize", NODE_CLASS_OP_COLOR, 0);
-  node_type_socket_templates(&ntype, cmp_node_posterize_in, cmp_node_posterize_out);
-  node_type_gpu(&ntype, node_composite_gpu_posterize);
+  cmp_node_type_base(&ntype, CMP_NODE_POSTERIZE, "Posterize", NODE_CLASS_OP_COLOR);
+  ntype.declare = file_ns::cmp_node_posterize_declare;
+  node_type_gpu(&ntype, file_ns::node_composite_gpu_posterize);
 
   nodeRegisterType(&ntype);
 }

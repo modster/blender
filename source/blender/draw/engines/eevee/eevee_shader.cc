@@ -28,9 +28,11 @@
 
 extern "C" {
 extern char datatoc_common_attribute_lib_glsl[];
+extern char datatoc_common_debug_lib_glsl[];
 extern char datatoc_common_fullscreen_vert_glsl[];
 extern char datatoc_common_gpencil_lib_glsl[];
 extern char datatoc_common_hair_lib_glsl[];
+extern char datatoc_common_intersection_lib_glsl[];
 extern char datatoc_common_math_geom_lib_glsl[];
 extern char datatoc_common_math_lib_glsl[];
 extern char datatoc_common_obinfos_lib_glsl[];
@@ -48,7 +50,9 @@ extern char datatoc_eevee_cubemap_lib_glsl[];
 extern char datatoc_eevee_culling_debug_frag_glsl[];
 extern char datatoc_eevee_culling_iter_lib_glsl[];
 extern char datatoc_eevee_culling_lib_glsl[];
-extern char datatoc_eevee_culling_light_frag_glsl[];
+extern char datatoc_eevee_culling_select_comp_glsl[];
+extern char datatoc_eevee_culling_sort_comp_glsl[];
+extern char datatoc_eevee_culling_tile_comp_glsl[];
 extern char datatoc_eevee_deferred_direct_frag_glsl[];
 extern char datatoc_eevee_deferred_holdout_frag_glsl[];
 extern char datatoc_eevee_deferred_transparent_frag_glsl[];
@@ -73,9 +77,11 @@ extern char datatoc_eevee_depth_of_field_tiles_dilate_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_film_filter_frag_glsl[];
 extern char datatoc_eevee_film_lib_glsl[];
-extern char datatoc_eevee_film_resolve_frag_glsl[];
 extern char datatoc_eevee_film_resolve_depth_frag_glsl[];
+extern char datatoc_eevee_film_resolve_frag_glsl[];
 extern char datatoc_eevee_gbuffer_lib_glsl[];
+extern char datatoc_eevee_hiz_copy_frag_glsl[];
+extern char datatoc_eevee_hiz_downsample_frag_glsl[];
 extern char datatoc_eevee_irradiance_lib_glsl[];
 extern char datatoc_eevee_light_eval_lib_glsl[];
 extern char datatoc_eevee_light_lib_glsl[];
@@ -100,8 +106,30 @@ extern char datatoc_eevee_motion_blur_lib_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_dilate_frag_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_nodetree_eval_lib_glsl[];
+extern char datatoc_eevee_raytrace_denoise_comp_glsl[];
+extern char datatoc_eevee_raytrace_raygen_frag_glsl[];
+extern char datatoc_eevee_raytrace_raygen_lib_glsl[];
+extern char datatoc_eevee_raytrace_resolve_frag_glsl[];
+// extern char datatoc_eevee_raytrace_resolve_lib_glsl[];
+extern char datatoc_eevee_raytrace_trace_lib_glsl[];
 extern char datatoc_eevee_sampling_lib_glsl[];
+extern char datatoc_eevee_shadow_debug_frag_glsl[];
 extern char datatoc_eevee_shadow_lib_glsl[];
+extern char datatoc_eevee_shadow_page_alloc_comp_glsl[];
+extern char datatoc_eevee_shadow_page_copy_comp_glsl[];
+extern char datatoc_eevee_shadow_page_debug_comp_glsl[];
+extern char datatoc_eevee_shadow_page_defrag_comp_glsl[];
+extern char datatoc_eevee_shadow_page_free_comp_glsl[];
+extern char datatoc_eevee_shadow_page_init_comp_glsl[];
+extern char datatoc_eevee_shadow_page_lib_glsl[];
+extern char datatoc_eevee_shadow_page_mark_vert_glsl[];
+extern char datatoc_eevee_shadow_tilemap_depth_scan_comp_glsl[];
+extern char datatoc_eevee_shadow_tilemap_lod_mask_comp_glsl[];
+extern char datatoc_eevee_shadow_tilemap_lib_glsl[];
+extern char datatoc_eevee_shadow_tilemap_setup_comp_glsl[];
+extern char datatoc_eevee_shadow_tilemap_tag_comp_glsl[];
+extern char datatoc_eevee_shadow_tilemap_visibility_comp_glsl[];
+extern char datatoc_eevee_subsurface_eval_frag_glsl[];
 extern char datatoc_eevee_surface_background_frag_glsl[];
 extern char datatoc_eevee_surface_deferred_frag_glsl[];
 extern char datatoc_eevee_surface_depth_frag_glsl[];
@@ -147,11 +175,13 @@ ShaderModule::ShaderModule()
 
   shader_lib_ = DRW_shader_library_create();
   /* NOTE: These need to be ordered by dependencies. */
+  DRW_SHADER_LIB_ADD(shader_lib_, common_debug_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_math_lib);
-  DRW_shader_library_add_file(shader_lib_, shared_lib_.c_str(), "eevee_shader_shared.hh");
+  // DRW_shader_library_add_file(shader_lib_, shared_lib_.c_str(), "eevee_shader_shared.hh");
   DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, common_intersection_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_attribute_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_obinfos_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_gpencil_lib);
@@ -167,6 +197,8 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_nodetree_eval_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_sampling_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_ltc_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_page_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_tilemap_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_camera_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_lib);
@@ -185,6 +217,9 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_scatter_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_film_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_motion_blur_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_trace_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_raygen_lib);
+  // DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_resolve_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_velocity_lib);
 
@@ -197,13 +232,19 @@ ShaderModule::ShaderModule()
   shader_descriptions_[enum_].geometry_shader_code = datatoc_##geom_##_glsl; \
   shader_descriptions_[enum_].fragment_shader_code = datatoc_##frag_##_glsl; \
   shader_descriptions_[enum_].defines_shader_code = defs_;
+#define SHADER_COMPUTE(enum_, comp_, defs_) \
+  shader_descriptions_[enum_].name = STRINGIFY(enum_); \
+  shader_descriptions_[enum_].compute_shader_code = datatoc_##comp_##_glsl; \
+  shader_descriptions_[enum_].defines_shader_code = defs_;
 
 #define SHADER_FULLSCREEN_DEFINES(enum_, frag_, defs_) \
   SHADER(enum_, common_fullscreen_vert, nullptr, frag_, defs_)
 #define SHADER_FULLSCREEN(enum_, frag_) SHADER_FULLSCREEN_DEFINES(enum_, frag_, nullptr)
 
   SHADER_FULLSCREEN(CULLING_DEBUG, eevee_culling_debug_frag);
-  SHADER_FULLSCREEN(CULLING_LIGHT, eevee_culling_light_frag);
+  SHADER_COMPUTE(CULLING_SELECT, eevee_culling_select_comp, nullptr);
+  SHADER_COMPUTE(CULLING_SORT, eevee_culling_sort_comp, nullptr);
+  SHADER_COMPUTE(CULLING_TILE, eevee_culling_tile_comp, nullptr);
   SHADER_FULLSCREEN(FILM_FILTER, eevee_film_filter_frag);
   SHADER_FULLSCREEN(FILM_RESOLVE, eevee_film_resolve_frag);
   SHADER_FULLSCREEN(FILM_RESOLVE_DEPTH, eevee_film_resolve_depth_frag);
@@ -213,6 +254,8 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN(DEFERRED_EVAL_VOLUME, eevee_deferred_volume_frag);
   SHADER(DEFERRED_MESH, eevee_surface_mesh_vert, nullptr, eevee_surface_deferred_frag, nullptr);
   SHADER(DEFERRED_VOLUME, eevee_volume_vert, nullptr, eevee_volume_deferred_frag, nullptr);
+  SHADER_FULLSCREEN(HIZ_COPY, eevee_hiz_copy_frag);
+  SHADER_FULLSCREEN(HIZ_DOWNSAMPLE, eevee_hiz_downsample_frag);
   SHADER_FULLSCREEN(DOF_BOKEH_LUT, eevee_depth_of_field_bokeh_lut_frag);
   SHADER_FULLSCREEN(DOF_FILTER, eevee_depth_of_field_filter_frag);
   SHADER_FULLSCREEN_DEFINES(DOF_GATHER_BACKGROUND_LUT,
@@ -327,7 +370,49 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN(MOTION_BLUR_TILE_DILATE, eevee_motion_blur_tiles_dilate_frag);
   SHADER_FULLSCREEN(MOTION_BLUR_TILE_FLATTEN, eevee_motion_blur_tiles_flatten_frag);
 
-  SHADER_FULLSCREEN(SHADOW_CLEAR, eevee_depth_clear_frag);
+  SHADER_FULLSCREEN_DEFINES(RAYTRACE_DIFFUSE, eevee_raytrace_raygen_frag, "#define DIFFUSE\n");
+  SHADER_FULLSCREEN_DEFINES(RAYTRACE_DIFFUSE_FALLBACK,
+                            eevee_raytrace_raygen_frag,
+                            "#define DIFFUSE\n"
+                            "#define SKIP_TRACE\n");
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_REFLECTION, eevee_raytrace_raygen_frag, "#define REFLECTION\n");
+  SHADER_FULLSCREEN_DEFINES(RAYTRACE_REFLECTION_FALLBACK,
+                            eevee_raytrace_raygen_frag,
+                            "#define REFLECTION\n"
+                            "#define SKIP_TRACE\n");
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_REFRACTION, eevee_raytrace_raygen_frag, "#define REFRACTION\n");
+  SHADER_FULLSCREEN_DEFINES(RAYTRACE_REFRACTION_FALLBACK,
+                            eevee_raytrace_raygen_frag,
+                            "#define REFRACTION\n"
+                            "#define SKIP_TRACE\n");
+  SHADER_COMPUTE(RAYTRACE_DENOISE_DIFFUSE, eevee_raytrace_denoise_comp, "#define DIFFUSE\n");
+  SHADER_COMPUTE(RAYTRACE_DENOISE_REFLECTION, eevee_raytrace_denoise_comp, "#define REFLECTION\n");
+  SHADER_COMPUTE(RAYTRACE_DENOISE_REFRACTION, eevee_raytrace_denoise_comp, "#define REFRACTION\n");
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_RESOLVE_DIFFUSE, eevee_raytrace_resolve_frag, "#define DIFFUSE\n");
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_RESOLVE_REFLECTION, eevee_raytrace_resolve_frag, "#define REFLECTION\n");
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_RESOLVE_REFRACTION, eevee_raytrace_resolve_frag, "#define REFRACTION\n");
+
+  SHADER_FULLSCREEN(SHADOW_DEBUG, eevee_shadow_debug_frag);
+  SHADER_COMPUTE(SHADOW_PAGE_ALLOC, eevee_shadow_page_alloc_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_COPY, eevee_shadow_page_copy_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_DEBUG, eevee_shadow_page_debug_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_DEFRAG, eevee_shadow_page_defrag_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_FREE, eevee_shadow_page_free_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_INIT, eevee_shadow_page_init_comp, nullptr);
+  SHADER(SHADOW_PAGE_MARK, eevee_shadow_page_mark_vert, nullptr, eevee_depth_clear_frag, nullptr);
+  SHADER_COMPUTE(SHADOW_TILE_DEPTH_SCAN, eevee_shadow_tilemap_depth_scan_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_TILE_LOD_MASK, eevee_shadow_tilemap_lod_mask_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_TILE_SETUP, eevee_shadow_tilemap_setup_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_TILE_TAG_UPDATE, eevee_shadow_tilemap_tag_comp, "#define TAG_UPDATE\n");
+  SHADER_COMPUTE(SHADOW_TILE_TAG_USAGE, eevee_shadow_tilemap_tag_comp, "#define TAG_USAGE\n");
+  SHADER_COMPUTE(SHADOW_TILE_TAG_VISIBILITY, eevee_shadow_tilemap_visibility_comp, nullptr);
+
+  SHADER_FULLSCREEN(SUBSURFACE_EVAL, eevee_subsurface_eval_frag);
 
   SHADER(VELOCITY_MESH,
          eevee_surface_velocity_mesh_vert,
@@ -338,13 +423,17 @@ ShaderModule::ShaderModule()
 
 #undef SHADER
 #undef SHADER_FULLSCREEN
+#undef SHADER_FULLSCREEN_DEFINES
+#undef SHADER_COMPUTE
 
 #ifdef DEBUG
   /* Ensure all shader are described. */
   for (ShaderDescription &desc : shader_descriptions_) {
-    BLI_assert(desc.name != nullptr);
-    BLI_assert(desc.vertex_shader_code != nullptr);
-    BLI_assert(desc.fragment_shader_code != nullptr);
+    BLI_assert_msg(desc.name != nullptr, "EEVEE: Mising shader definition.");
+    if (desc.compute_shader_code == nullptr) {
+      BLI_assert(desc.vertex_shader_code != nullptr);
+      BLI_assert(desc.fragment_shader_code != nullptr);
+    }
   }
 #endif
 }
@@ -361,12 +450,23 @@ GPUShader *ShaderModule::static_shader_get(eShaderType shader_type)
 {
   if (shaders_[shader_type] == nullptr) {
     ShaderDescription &desc = shader_descriptions_[shader_type];
-    shaders_[shader_type] = DRW_shader_create_with_shaderlib_ex(desc.vertex_shader_code,
-                                                                desc.geometry_shader_code,
-                                                                desc.fragment_shader_code,
-                                                                shader_lib_,
-                                                                desc.defines_shader_code,
-                                                                desc.name);
+    if (desc.compute_shader_code != nullptr) {
+      char *comp_with_lib = DRW_shader_library_create_shader_string(shader_lib_,
+                                                                    desc.compute_shader_code);
+
+      shaders_[shader_type] = GPU_shader_create_compute(
+          comp_with_lib, nullptr, desc.defines_shader_code, desc.name);
+
+      MEM_SAFE_FREE(comp_with_lib);
+    }
+    else {
+      shaders_[shader_type] = DRW_shader_create_with_shaderlib_ex(desc.vertex_shader_code,
+                                                                  desc.geometry_shader_code,
+                                                                  desc.fragment_shader_code,
+                                                                  shader_lib_,
+                                                                  desc.defines_shader_code,
+                                                                  desc.name);
+    }
     if (shaders_[shader_type] == nullptr) {
       fprintf(stderr, "EEVEE: error: Could not compile static shader \"%s\"\n", desc.name);
     }
@@ -457,7 +557,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
       switch (geometry_type) {
         case MAT_GEOM_MESH:
           /* Example print:
-           * in vec2 u015684; */
+           * in float2 u015684; */
           output += "in ";
           output += sub.substr(0, pos + delimiter.length());
           break;
@@ -470,7 +570,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
           break;
         case MAT_GEOM_GPENCIL:
           /* Example print:
-           * vec2 u015684;
+           * float2 u015684;
            * These are not used and just here to make the attribs_load functions call valids.
            * Only one uv and one color attribute layer is supported by gpencil objects. */
           output += sub.substr(0, pos + delimiter.length());
@@ -511,13 +611,13 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
       output += "\n";
     }
 
-    output += "vec3 nodetree_displacement(void)\n";
+    output += "float3 nodetree_displacement(void)\n";
     output += "{\n";
     if (codegen->displacement) {
       output += codegen->displacement;
     }
     else {
-      output += "return vec3(0);\n";
+      output += "return float3(0);\n";
     }
     output += "}\n\n";
   }
@@ -622,7 +722,7 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
       size_t pos = 0;
       while ((pos = sub.find(delimiter)) != std::string::npos) {
         /* Example print:
-         * vec2 u015684;
+         * float2 u015684;
          * These are not used and just here to make the attribs_load functions call valids.
          * Only orco layer is supported by world. */
         output += sub.substr(0, pos + delimiter.length());
@@ -680,6 +780,17 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
   }
   else {
     output += "return CLOSURE_DEFAULT;\n";
+  }
+  output += "}\n\n";
+
+  output += "float nodetree_thickness(void)\n";
+  output += "{\n";
+  if (codegen->thickness) {
+    output += codegen->thickness;
+  }
+  else {
+    /* TODO(fclem): Better default. */
+    output += "return 0.1;\n";
   }
   output += "}\n\n";
 

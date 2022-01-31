@@ -213,7 +213,7 @@ typedef struct Material {
 
   /* Transparency. */
   float alpha_threshold;
-  float refract_depth;
+  char _pad4[4];
   char blend_method;
   char blend_shadow;
   char blend_flag;
@@ -293,7 +293,7 @@ typedef struct Material {
 /* #define TEXCO_STRESS    (1 << 14) */ /* deprecated */
 /* #define TEXCO_SPEED     (1 << 15) */ /* deprecated */
 
-/* mapto */
+/** #MTex.mapto */
 #define MAP_COL (1 << 0)
 #define MAP_ALPHA (1 << 7)
 
@@ -331,7 +331,7 @@ enum {
   MA_BL_HIDE_BACKFACE = (1 << 0),
   MA_BL_SS_REFRACTION = (1 << 1),
   MA_BL_CULL_BACKFACE = (1 << 2),
-  MA_BL_TRANSLUCENCY = (1 << 3),
+  // MA_BL_TRANSLUCENCY = (1 << 3), /* deprecated */
 };
 
 /* blend_shadow */

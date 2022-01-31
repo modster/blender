@@ -48,7 +48,7 @@ void ShadingView::init()
   mb_.init();
 }
 
-void ShadingView::sync(ivec2 render_extent_)
+void ShadingView::sync(int2 render_extent_)
 {
   if (inst_.camera.is_panoramic()) {
     int64_t render_pixel_count = render_extent_.x * (int64_t)render_extent_.y;
@@ -70,20 +70,20 @@ void ShadingView::sync(ivec2 render_extent_)
   /* Create views. */
   const CameraData &data = inst_.camera.data_get();
 
-  float viewmat[4][4], winmat[4][4];
-  const float(*viewmat_p)[4] = viewmat, (*winmat_p)[4] = winmat;
+  float4x4 viewmat, winmat;
+  const float(*viewmat_p)[4] = viewmat.ptr(), (*winmat_p)[4] = winmat.ptr();
   if (inst_.camera.is_panoramic()) {
     /* TODO(fclem) Overscans. */
     /* For now a mandatory 5% overscan for DoF. */
     float side = data.clip_near * 1.05f;
     float near = data.clip_near;
     float far = data.clip_far;
-    perspective_m4(winmat, -side, side, -side, side, near, far);
-    mul_m4_m4m4(viewmat, face_matrix_, data.viewmat);
+    perspective_m4(winmat.ptr(), -side, side, -side, side, near, far);
+    viewmat = face_matrix_ * data.viewmat;
   }
   else {
-    viewmat_p = data.viewmat;
-    winmat_p = data.winmat;
+    viewmat_p = data.viewmat.ptr();
+    winmat_p = data.winmat.ptr();
   }
 
   main_view_ = DRW_view_create(viewmat_p, winmat_p, nullptr, nullptr, nullptr);
@@ -93,6 +93,8 @@ void ShadingView::sync(ivec2 render_extent_)
   dof_.sync(winmat_p, extent_);
   mb_.sync(extent_);
   velocity_.sync(extent_);
+  rt_buffer_opaque_.sync(extent_);
+  rt_buffer_refract_.sync(extent_);
 
   {
     /* Query temp textures and create framebuffers. */
@@ -106,9 +108,6 @@ void ShadingView::sync(ivec2 render_extent_)
     postfx_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
 
     view_fb_.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx_), GPU_ATTACHMENT_TEXTURE(combined_tx_));
-
-    /* Reuse postfx_tx_. */
-    debug_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(postfx_tx_));
 
     gbuffer_.sync(depth_tx_, combined_tx_, owner);
   }
@@ -134,13 +133,22 @@ void ShadingView::render(void)
     inst_.shading_passes.background.render();
   }
 
-  inst_.shading_passes.deferred.render(gbuffer_, view_fb_);
+  inst_.shading_passes.deferred.render(render_view_,
+                                       gbuffer_,
+                                       hiz_front_,
+                                       hiz_back_,
+                                       rt_buffer_opaque_,
+                                       rt_buffer_refract_,
+                                       view_fb_);
 
   inst_.lightprobes.draw_cache_display();
 
   inst_.lookdev.render_overlay(view_fb_);
 
-  inst_.shading_passes.forward.render();
+  inst_.shading_passes.forward.render(render_view_, gbuffer_, hiz_front_, view_fb_);
+
+  inst_.lights.debug_draw(view_fb_, hiz_front_);
+  inst_.shadows.debug_draw(view_fb_, hiz_front_);
 
   velocity_.render(depth_tx_);
 
@@ -150,15 +158,7 @@ void ShadingView::render(void)
 
   GPUTexture *final_radiance_tx = render_post(combined_tx_);
 
-  /* TODO(fclem) Have a special renderpass for this. */
-  if (G.debug_value == 3) {
-    GPU_framebuffer_bind(debug_fb_);
-    inst_.shading_passes.debug_culling.render(depth_tx_);
-
-    // inst_.render_passes.debug_culling->accumulate(debug_tx_, sub_view_);
-    inst_.render_passes.combined->accumulate(postfx_tx_, sub_view_);
-  }
-  else if (inst_.render_passes.combined) {
+  if (inst_.render_passes.combined) {
     inst_.render_passes.combined->accumulate(final_radiance_tx, sub_view_);
   }
 
@@ -209,16 +209,15 @@ void ShadingView::update_view(void)
 
 void LightProbeView::sync(Texture &color_tx,
                           Texture &depth_tx,
-                          const mat4 winmat,
-                          const mat4 viewmat,
+                          const float4x4 winmat,
+                          const float4x4 viewmat,
                           bool is_only_background)
 {
-  mat4 facemat;
-  mul_m4_m4m4(facemat, face_matrix_, viewmat);
+  float4x4 facemat = face_matrix_ * viewmat;
 
   is_only_background_ = is_only_background;
-  extent_ = ivec2(color_tx.width());
-  view_ = DRW_view_create(facemat, winmat, nullptr, nullptr, nullptr);
+  extent_ = int2(color_tx.width());
+  view_ = DRW_view_create(facemat.ptr(), winmat.ptr(), nullptr, nullptr, nullptr);
   view_fb_.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer_),
                   GPU_ATTACHMENT_TEXTURE_LAYER(color_tx, layer_));
 
@@ -228,6 +227,8 @@ void LightProbeView::sync(Texture &color_tx,
      * With this, we can reuse the same texture across views. */
     DrawEngineType *owner = (DrawEngineType *)name_;
     gbuffer_.sync(depth_tx, color_tx, owner, layer_);
+    rt_buffer_opaque_.sync(extent_);
+    rt_buffer_refract_.sync(extent_);
   }
 }
 
@@ -248,8 +249,9 @@ void LightProbeView::render(void)
   if (!is_only_background_) {
     GPU_framebuffer_clear_depth(view_fb_, 1.0f);
 
-    inst_.shading_passes.deferred.render(gbuffer_, view_fb_);
-    inst_.shading_passes.forward.render();
+    inst_.shading_passes.deferred.render(
+        view_, gbuffer_, hiz_front_, hiz_back_, rt_buffer_opaque_, rt_buffer_refract_, view_fb_);
+    inst_.shading_passes.forward.render(view_, gbuffer_, hiz_front_, view_fb_);
   }
   DRW_stats_group_end();
 }

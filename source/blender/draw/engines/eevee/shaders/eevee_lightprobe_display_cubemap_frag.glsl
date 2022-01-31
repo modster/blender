@@ -6,7 +6,7 @@
 
 uniform samplerCubeArray lightprobe_cube_tx;
 
-out vec4 out_color;
+layout(location = 0) out vec4 out_color;
 
 void main()
 {

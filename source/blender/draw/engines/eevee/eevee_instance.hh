@@ -29,17 +29,20 @@
 #include "DRW_render.h"
 
 #include "eevee_film.hh"
+#include "eevee_hizbuffer.hh"
 #include "eevee_id_map.hh"
 #include "eevee_light.hh"
 #include "eevee_lightprobe.hh"
 #include "eevee_lookdev.hh"
 #include "eevee_material.hh"
 #include "eevee_motion_blur.hh"
+#include "eevee_raytracing.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
 #include "eevee_shading.hh"
 #include "eevee_shadow.hh"
+#include "eevee_subsurface.hh"
 #include "eevee_view.hh"
 #include "eevee_world.hh"
 
@@ -68,8 +71,11 @@ class Instance {
   MotionBlurModule motion_blur;
   LightModule lights;
   LightProbeModule lightprobes;
+  RaytracingModule raytracing;
+  HiZBufferModule hiz;
   /* TODO(fclem) Move it to scene layer data. */
   ShadowModule shadows;
+  SubsurfaceModule subsurface;
   SyncModule sync;
   MaterialModule materials;
   /** Lookdev own lightweight instance. May not be allocated. */
@@ -93,6 +99,8 @@ class Instance {
   /** Can be null. Used to exclude objects during baking. */
   const struct LightProbe *baking_probe = nullptr;
 
+  eDebugMode debug_mode = SHADOW_DEBUG_NONE;
+
   /* Info string displayed at the top of the render / viewport. */
   char info[64];
 
@@ -108,13 +116,16 @@ class Instance {
         motion_blur(*this),
         lights(*this),
         lightprobes(*this),
+        raytracing(*this),
+        hiz(*this),
         shadows(*this),
+        subsurface(*this),
         sync(*this),
         materials(*this),
         lookdev(*this){};
   ~Instance(){};
 
-  void init(const ivec2 &output_res,
+  void init(const int2 &output_res,
             const rcti *output_rect,
             RenderEngine *render,
             Depsgraph *depsgraph,

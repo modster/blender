@@ -161,7 +161,7 @@ void MotionBlur::sync(int extent[2])
     GPUShader *sh = inst_.shaders.static_shader_get(MOTION_BLUR_TILE_FLATTEN);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tiles_flatten_ps_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "velocity_tx", &input_velocity_tx_, no_filter);
-    DRW_shgroup_uniform_block(grp, "motion_blur_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "motion_blur_block", data_);
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     tiles_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
@@ -174,7 +174,7 @@ void MotionBlur::sync(int extent[2])
     GPUShader *sh = inst_.shaders.static_shader_get(MOTION_BLUR_TILE_DILATE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tiles_dilate_ps_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "tiles_tx", &tiles_tx_, no_filter);
-    DRW_shgroup_uniform_block(grp, "motion_blur_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "motion_blur_block", data_);
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     tiles_dilated_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
@@ -190,7 +190,7 @@ void MotionBlur::sync(int extent[2])
     GPUShader *sh = inst_.shaders.static_shader_get(MOTION_BLUR_GATHER);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, gather_ps_);
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
-    DRW_shgroup_uniform_block(grp, "motion_blur_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "motion_blur_block", data_);
     DRW_shgroup_uniform_texture_ref(grp, "color_tx", &input_color_tx_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "velocity_tx", &input_velocity_tx_, no_filter);
@@ -225,11 +225,11 @@ void MotionBlur::render(GPUTexture *depth_tx,
     GPU_framebuffer_bind(tiles_dilate_fb_);
     DRW_draw_pass(tiles_dilate_ps_);
     SWAP(GPUTexture *, tiles_tx_, tiles_dilated_tx_);
-    SWAP(Framebuffer, tiles_flatten_fb_, tiles_dilate_fb_);
+    Framebuffer::swap(tiles_flatten_fb_, tiles_dilate_fb_);
   }
   /* Swap again so result is in tiles_dilated_tx_. */
   SWAP(GPUTexture *, tiles_tx_, tiles_dilated_tx_);
-  SWAP(Framebuffer, tiles_flatten_fb_, tiles_dilate_fb_);
+  Framebuffer::swap(tiles_flatten_fb_, tiles_dilate_fb_);
 
   gather_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(*output_tx));
 

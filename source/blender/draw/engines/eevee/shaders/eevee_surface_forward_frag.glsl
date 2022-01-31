@@ -14,25 +14,35 @@
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_surface_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_raytrace_raygen_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_raytrace_trace_lib.glsl)
+
+/* TODO(fclem) Option. */
+#define USE_RAYTRACING
 
 layout(std140) uniform sampling_block
 {
   SamplingData sampling;
 };
 
-layout(std140) uniform lights_block
+layout(std430, binding = 0) readonly restrict buffer lights_buf
 {
-  LightData lights[CULLING_ITEM_BATCH];
+  LightData lights[];
 };
 
-layout(std140) uniform lights_culling_block
+layout(std430, binding = 1) readonly restrict buffer lights_zbins_buf
+{
+  CullingZBin lights_zbins[];
+};
+
+layout(std430, binding = 2) readonly restrict buffer lights_culling_buf
 {
   CullingData light_culling;
 };
 
-layout(std140) uniform shadows_punctual_block
+layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
 {
-  ShadowPunctualData shadows_punctual[CULLING_ITEM_BATCH];
+  CullingWord lights_culling_words[];
 };
 
 layout(std140) uniform grids_block
@@ -50,14 +60,37 @@ layout(std140) uniform lightprobes_info_block
   LightProbeInfoData probes_info;
 };
 
-uniform usampler2D lights_culling_tx;
+layout(std140) uniform rt_diffuse_block
+{
+  RaytraceData raytrace_diffuse;
+};
+
+layout(std140) uniform rt_reflection_block
+{
+  RaytraceData raytrace_reflection;
+};
+
+layout(std140) uniform rt_refraction_block
+{
+  RaytraceData raytrace_refraction;
+};
+
+layout(std140) uniform hiz_block
+{
+  HiZData hiz;
+};
+
 uniform sampler2DArray utility_tx;
-uniform sampler2DShadow shadow_atlas_tx;
+uniform sampler2D shadow_atlas_tx;
+uniform usampler2D shadow_tilemaps_tx;
+uniform sampler1D sss_transmittance_tx;
 uniform sampler2DArray lightprobe_grid_tx;
 uniform samplerCubeArray lightprobe_cube_tx;
+uniform sampler2D hiz_tx;
+uniform sampler2D radiance_tx;
 
-utility_tx_fetch_define(utility_tx)
-utility_tx_sample_define(utility_tx)
+utility_tx_fetch_define(utility_tx);
+utility_tx_sample_define(utility_tx);
 
 layout(location = 0, index = 0) out vec4 out_radiance;
 layout(location = 0, index = 1) out vec4 out_transmittance;
@@ -68,6 +101,7 @@ void light_eval(ClosureDiffuse diffuse,
                 vec3 P,
                 vec3 V,
                 float vP_z,
+                float thickness,
                 inout vec3 out_diffuse,
                 inout vec3 out_specular);
 vec3 lightprobe_grid_eval(vec3 P, vec3 N, float random_threshold);
@@ -80,6 +114,8 @@ void main(void)
   float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
   g_data.closure_rand = fract(noise + sampling_rng_1D_get(sampling, SAMPLING_CLOSURE));
   g_data.transmit_rand = -1.0;
+
+  float thickness = nodetree_thickness();
 
   nodetree_surface();
 
@@ -94,17 +130,95 @@ void main(void)
     g_refraction_data.ior = safe_rcp(g_refraction_data.ior);
   }
 
+  g_reflection_data.N = ensure_valid_reflection(g_data.Ng, V, g_reflection_data.N);
+
   vec3 radiance_diffuse = vec3(0);
   vec3 radiance_reflection = vec3(0);
   vec3 radiance_refraction = vec3(0);
-  vec3 R = -reflect(V, g_reflection_data.N);
-  vec3 T = refract(-V, g_refraction_data.N, g_refraction_data.ior);
 
-  light_eval(g_diffuse_data, g_reflection_data, P, V, vP_z, radiance_diffuse, radiance_reflection);
-  radiance_diffuse += lightprobe_grid_eval(P, g_diffuse_data.N, random_probe);
-  radiance_reflection += lightprobe_cubemap_eval(P, R, g_reflection_data.roughness, random_probe);
-  radiance_refraction += lightprobe_cubemap_eval(
-      P, T, sqr(g_refraction_data.roughness), random_probe);
+  light_eval(g_diffuse_data,
+             g_reflection_data,
+             P,
+             V,
+             vP_z,
+             thickness,
+             radiance_diffuse,
+             radiance_reflection);
+
+  vec4 noise_rt = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).rgba;
+  vec2 noise_offset = sampling_rng_2D_get(sampling, SAMPLING_RAYTRACE_W);
+  noise_rt.zw = fract(noise_rt.zw + noise_offset);
+
+  {
+    float pdf; /* UNUSED */
+    bool hit = false;
+    Ray ray = raytrace_create_diffuse_ray(sampling, noise_rt.xy, g_diffuse_data, P, pdf);
+    ray = raytrace_world_ray_to_view(ray);
+#ifdef USE_RAYTRACING
+    /* Extend the ray to cover the whole view. */
+    ray.direction *= 1e16;
+    hit = raytrace_screen(raytrace_diffuse, hiz, hiz_tx, noise_rt.w, 1.0, false, true, ray);
+#endif
+    if (hit) {
+      vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);
+      radiance_diffuse += textureLod(radiance_tx, hit_uv, 0.0).rgb;
+    }
+    else {
+      ray = raytrace_view_ray_to_world(ray);
+      radiance_diffuse += lightprobe_cubemap_eval(P, ray.direction, 1.0, random_probe);
+    }
+  }
+
+  {
+    float pdf; /* UNUSED */
+    bool hit = false;
+    float roughness = g_reflection_data.roughness;
+    Ray ray = raytrace_create_reflection_ray(sampling, noise_rt.xy, g_reflection_data, V, P, pdf);
+    ray = raytrace_world_ray_to_view(ray);
+#ifdef USE_RAYTRACING
+    if (roughness - noise_rt.z * 0.2 < raytrace_reflection.max_roughness) {
+      /* Extend the ray to cover the whole view. */
+      ray.direction *= 1e16;
+      hit = raytrace_screen(
+          raytrace_reflection, hiz, hiz_tx, noise_rt.w, roughness, false, true, ray);
+    }
+#endif
+    if (hit) {
+      vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);
+      radiance_reflection += textureLod(radiance_tx, hit_uv, 0.0).rgb;
+    }
+    else {
+      ray = raytrace_view_ray_to_world(ray);
+      radiance_reflection += lightprobe_cubemap_eval(
+          P, ray.direction, sqr(roughness), random_probe);
+    }
+  }
+
+  {
+    float pdf; /* UNUSED */
+    bool hit = false;
+    float roughness = g_refraction_data.roughness;
+    Ray ray = raytrace_create_refraction_ray(sampling, noise_rt.xy, g_refraction_data, V, P, pdf);
+    ray = raytrace_world_ray_to_view(ray);
+#ifdef USE_RAYTRACING
+    if (roughness - noise_rt.z * 0.2 < raytrace_refraction.max_roughness) {
+      /* Extend the ray to cover the whole view. */
+      ray.direction *= 1e16;
+      /* TODO(fclem): Take IOR into account in the roughness LOD bias. */
+      hit = raytrace_screen(
+          raytrace_refraction, hiz, hiz_tx, noise_rt.w, roughness, false, true, ray);
+    }
+#endif
+    if (hit) {
+      vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);
+      radiance_refraction += textureLod(radiance_tx, hit_uv, 0.0).rgb;
+    }
+    else {
+      ray = raytrace_view_ray_to_world(ray);
+      radiance_refraction += lightprobe_cubemap_eval(
+          P, ray.direction, sqr(roughness), random_probe);
+    }
+  }
 
   // volume_eval(ray, volume_radiance, volume_transmittance, volume_depth);
 

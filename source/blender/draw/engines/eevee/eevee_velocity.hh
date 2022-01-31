@@ -53,7 +53,7 @@ class VelocityModule {
   Map<ObjectKey, VelocityObjectBuf *> objects_steps;
   struct {
     /** Copies of camera data. One for previous and one for next time step. */
-    StructBuffer<CameraData> prev, next;
+    draw::UniformBuffer<CameraData> prev, next;
   } camera_step;
 
  private:
@@ -139,8 +139,8 @@ class Velocity {
   StringRefNull view_name_;
 
   /** Owned resources. */
-  eevee::Framebuffer velocity_fb_;
-  eevee::Framebuffer velocity_only_fb_;
+  Framebuffer velocity_fb_;
+  Framebuffer velocity_only_fb_;
   /** Draw resources. Not owned. */
   GPUTexture *velocity_camera_tx_ = nullptr;
   GPUTexture *velocity_view_tx_ = nullptr;

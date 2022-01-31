@@ -77,7 +77,8 @@ void DepsgraphRelationBuilder::build_scene_compositor(Scene *scene)
   build_nodetree(scene->nodetree);
 
   OperationKey scene_key(&scene->id, NodeType::SHADING, OperationCode::COMPOSITOR_EVAL);
-  OperationKey ntree_key(&scene->nodetree->id, NodeType::SHADING, OperationCode::MATERIAL_UPDATE);
+  OperationKey ntree_key(
+      &scene->nodetree->id, NodeType::NTREE_OUTPUT, OperationCode::NTREE_OUTPUT);
   add_relation(ntree_key, scene_key, "Compositor's NTree");
 
   build_nested_nodetree(&scene->id, scene->nodetree);

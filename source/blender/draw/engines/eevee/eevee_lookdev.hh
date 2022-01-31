@@ -83,7 +83,7 @@ class LookDev {
   /** Screen space radius in pixels. */
   int sphere_size_ = 0;
   /** Lower right corner of the area where we can start drawing. */
-  ivec2 anchor_;
+  int2 anchor_;
 
  public:
   LookDev(Instance &inst) : inst_(inst){};
@@ -92,7 +92,7 @@ class LookDev {
     GPU_material_free(&material);
   };
 
-  void init(const ivec2 &output_res, const rcti *render_border);
+  void init(const int2 &output_res, const rcti *render_border);
 
   void sync_background(void);
   bool sync_world(void);
@@ -101,10 +101,10 @@ class LookDev {
   bool render_background(void);
   void render_overlay(GPUFrameBuffer *view_fb);
 
-  void rotation_get(mat4 r_mat);
+  void rotation_get(float4x4 r_mat);
 
  private:
-  bool do_overlay(const ivec2 &output_res, const rcti *render_border);
+  bool do_overlay(const int2 &output_res, const rcti *render_border);
 };
 
 /** \} */

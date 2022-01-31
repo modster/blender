@@ -78,11 +78,11 @@ inline bool operator!=(const FilmData &a, const FilmData &b)
 /** \name Film
  * \{ */
 
-void Film::init(const ivec2 &full_extent, const rcti *output_rect)
+void Film::init(const int2 &full_extent, const rcti *output_rect)
 {
   FilmData data = data_;
-  data.extent = ivec2(BLI_rcti_size_x(output_rect), BLI_rcti_size_y(output_rect));
-  data.offset = ivec2(output_rect->xmin, output_rect->ymin);
+  data.extent = int2(BLI_rcti_size_x(output_rect), BLI_rcti_size_y(output_rect));
+  data.offset = int2(output_rect->xmin, output_rect->ymin);
 
   has_changed_ = data_ != data;
 
@@ -92,9 +92,9 @@ void Film::init(const ivec2 &full_extent, const rcti *output_rect)
   }
 
   data_.opacity = 1.0f;
-  data_.uv_scale = 1.0f / vec2(full_extent);
-  data_.uv_scale_inv = full_extent;
-  data_.uv_bias = data_.offset / vec2(full_extent);
+  data_.uv_scale_inv = float2(full_extent);
+  data_.uv_scale = 1.0f / data_.uv_scale_inv;
+  data_.uv_bias = float2(data_.offset) * data_.uv_scale;
 }
 
 void Film::sync(void)
@@ -103,11 +103,9 @@ void Film::sync(void)
   for (int i = 0; i < 2; i++) {
     if (data_tx_[i] == nullptr) {
       eGPUTextureFormat tex_format = to_gpu_texture_format(data_.data_type);
-      SNPRINTF(full_name, "Film.%s.data", name_.c_str());
-      data_tx_[i].ensure(full_name, UNPACK2(data_.extent), 1, tex_format);
+      data_tx_[i].ensure_2d(tex_format, data_.extent);
       /* TODO(fclem) The weight texture could be shared between all similar accumulators. */
-      SNPRINTF(full_name, "Film.%s.weight", name_.c_str());
-      weight_tx_[i].ensure(full_name, UNPACK2(data_.extent), 1, GPU_R16F);
+      weight_tx_[i].ensure_2d(GPU_R16F, data_.extent);
 
       accumulation_fb_[i].ensure(GPU_ATTACHMENT_NONE,
                                  GPU_ATTACHMENT_TEXTURE(data_tx_[i]),
@@ -121,7 +119,7 @@ void Film::sync(void)
     accumulate_ps_ = DRW_pass_create(full_name, DRW_STATE_WRITE_COLOR);
     GPUShader *sh = inst_.shaders.static_shader_get(FILM_FILTER);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, accumulate_ps_);
-    DRW_shgroup_uniform_block(grp, "film_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "film_block", data_);
     DRW_shgroup_uniform_block(grp, "camera_block", inst_.camera.ubo_get());
     DRW_shgroup_uniform_texture_ref_ex(grp, "input_tx", &input_tx_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
@@ -139,7 +137,7 @@ void Film::sync(void)
     resolve_ps_ = DRW_pass_create(full_name, state);
     GPUShader *sh = inst_.shaders.static_shader_get(sh_type);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_ps_);
-    DRW_shgroup_uniform_block(grp, "film_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "film_block", data_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "first_sample_tx", &first_sample_ref_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);
@@ -164,15 +162,15 @@ void Film::end_sync()
 
   const bool is_first_sample = (inst_.sampling.sample_get() == 1);
   if (do_smooth_viewport_smooth_transition() && (data_.opacity < 1.0f || is_first_sample)) {
-    char full_name[32];
-    SNPRINTF(full_name, "Film.%s.first_sample", name_.c_str());
-    eGPUTextureFormat tex_format = GPU_texture_format(DRW_viewport_texture_list_get()->color);
-    first_sample_tx_.ensure(full_name, UNPACK2(data_.extent), 1, tex_format);
+    GPUTexture *dtxl_color = DRW_viewport_texture_list_get()->color;
+    eGPUTextureFormat tex_format = GPU_texture_format(dtxl_color);
+    int extent[2] = {GPU_texture_width(dtxl_color), GPU_texture_height(dtxl_color)};
+    first_sample_tx_.ensure_2d(tex_format, extent);
     first_sample_ref_ = first_sample_tx_;
   }
   else {
     /* Reuse the data_tx since there is no need to blend. */
-    first_sample_tx_.release();
+    first_sample_tx_.free();
     first_sample_ref_ = data_tx_[0];
   }
 }
@@ -186,9 +184,9 @@ void Film::accumulate(GPUTexture *input, const DRWView *view)
   GPU_framebuffer_bind(accumulation_fb_[1]);
   DRW_draw_pass(accumulate_ps_);
 
-  SWAP(Framebuffer, accumulation_fb_[0], accumulation_fb_[1]);
-  SWAP(Texture, data_tx_[0], data_tx_[1]);
-  SWAP(Texture, weight_tx_[0], weight_tx_[1]);
+  Framebuffer::swap(accumulation_fb_[0], accumulation_fb_[1]);
+  Texture::swap(data_tx_[0], data_tx_[1]);
+  Texture::swap(weight_tx_[0], weight_tx_[1]);
 
   /* Use history after first sample. */
   if (data_.use_history == 0) {

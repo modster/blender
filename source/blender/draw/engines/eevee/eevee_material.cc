@@ -277,6 +277,10 @@ Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeomet
     mat.prepass = material_pass_get(blender_mat, prepass_pipe, geometry_type);
     mat.shading = material_pass_get(blender_mat, surface_pipe, geometry_type);
     mat.shadow = material_pass_get(blender_mat, MAT_PIPE_SHADOW, geometry_type);
+
+    mat.is_alpha_blend_transparent = (blender_mat->blend_method == MA_BM_BLEND) &&
+                                     GPU_material_flag_get(mat.prepass.gpumat,
+                                                           GPU_MATFLAG_TRANSPARENT);
   }
   return mat;
 }
@@ -306,7 +310,9 @@ MaterialArray &MaterialModule::material_array_get(Object *ob)
   material_array_.materials.clear();
   material_array_.gpu_materials.clear();
 
-  for (auto i : IndexRange(max_ii(1, ob->totcol))) {
+  const int materials_len = DRW_cache_object_material_count_get(ob);
+
+  for (auto i : IndexRange(materials_len)) {
     ::Material *blender_mat = material_from_slot(ob, i);
     Material &mat = material_sync(blender_mat, to_material_geometry(ob));
     material_array_.materials.append(&mat);

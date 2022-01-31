@@ -86,7 +86,7 @@ bNodeTree *LookDevWorldNodeTree::nodetree_get(float strength)
  * use custom shader to draw the background.
  * \{ */
 
-void LookDev::init(const ivec2 &output_res, const rcti *render_border)
+void LookDev::init(const int2 &output_res, const rcti *render_border)
 {
   StudioLight *studiolight = nullptr;
   if (inst_.v3d) {
@@ -142,7 +142,7 @@ void LookDev::init(const ivec2 &output_res, const rcti *render_border)
      * Scale between 1000px and 2000px. */
     float viewport_scale = clamp_f(BLI_rcti_size_x(&rect) / (2000.0f * U.dpi_fac), 0.5f, 1.0f);
     int sphere_size = U.lookdev_sphere_size * U.dpi_fac * viewport_scale;
-    ivec2 anchor = ivec2(rect.xmax, rect.ymin);
+    int2 anchor = int2(rect.xmax, rect.ymin);
 
     if (sphere_size != sphere_size_ || anchor != anchor_) {
       /* Make sphere resolution adaptive to viewport_scale, dpi and lookdev_sphere_size */
@@ -167,7 +167,7 @@ void LookDev::init(const ivec2 &output_res, const rcti *render_border)
   }
 }
 
-bool LookDev::do_overlay(const ivec2 &output_res, const rcti *render_border)
+bool LookDev::do_overlay(const int2 &output_res, const rcti *render_border)
 {
   const View3D *v3d = inst_.v3d;
   /* Only show the HDRI Preview in Shading Preview in the Viewport. */
@@ -187,7 +187,7 @@ bool LookDev::do_overlay(const ivec2 &output_res, const rcti *render_border)
   if (inst_.camera.is_panoramic()) {
     return false;
   }
-  if (output_res != ivec2(BLI_rcti_size_x(render_border), BLI_rcti_size_y(render_border))) {
+  if (output_res != int2(BLI_rcti_size_x(render_border), BLI_rcti_size_y(render_border))) {
     /* TODO(fclem) support this case. */
     return false;
   }
@@ -214,21 +214,20 @@ bool LookDev::sync_world(void)
   return true;
 }
 
-void LookDev::rotation_get(mat4 r_mat)
+void LookDev::rotation_get(float4x4 r_mat)
 {
   if (studiolight_ == nullptr) {
-    unit_m4(r_mat);
+    r_mat.identity();
   }
   else {
-    axis_angle_to_mat4_single(r_mat, 'Z', rotation_);
+    axis_angle_to_mat4_single(r_mat.ptr(), 'Z', rotation_);
   }
 
   if (view_rotation_) {
-    float x_rot_matrix[4][4];
+    float4x4 x_rot_matrix;
     const CameraData &cam = inst_.camera.data_get();
-    axis_angle_to_mat4_single(x_rot_matrix, 'X', M_PI / 2.0f);
-    mul_m4_m4m4(x_rot_matrix, x_rot_matrix, cam.viewmat);
-    mul_m4_m4m4(r_mat, r_mat, x_rot_matrix);
+    axis_angle_to_mat4_single(x_rot_matrix.ptr(), 'X', M_PI / 2.0f);
+    r_mat = r_mat * (x_rot_matrix * cam.viewmat);
   }
 }
 
@@ -285,16 +284,15 @@ void LookDev::sync_overlay(void)
   LightProbeModule &lightprobes = inst_.lightprobes;
 
   /* Jitter for AA. */
-  vec2 jitter = -0.5f + vec2(inst_.sampling.rng_get(SAMPLING_FILTER_U),
-                             inst_.sampling.rng_get(SAMPLING_FILTER_V));
+  float2 jitter = -0.5f + float2(inst_.sampling.rng_get(SAMPLING_FILTER_U),
+                                 inst_.sampling.rng_get(SAMPLING_FILTER_V));
 
   /* Matrix used to position the spheres in viewport space. */
-  mat4 sphere_mat;
-  copy_m4_m4(sphere_mat, cam.viewmat);
+  float4x4 sphere_mat = cam.viewmat;
 
   const float *viewport_size = DRW_viewport_size_get();
   const int sphere_margin = sphere_size_ / 6;
-  vec2 offset = vec2(0, sphere_margin);
+  float2 offset = float2(0, sphere_margin);
 
   std::array<::Material *, 2> materials = {inst_.materials.diffuse_mat_,
                                            inst_.materials.glossy_mat_};
@@ -302,26 +300,22 @@ void LookDev::sync_overlay(void)
     GPUMaterial *gpumat = inst_.shaders.material_shader_get(
         mat, mat->nodetree, MAT_PIPE_FORWARD, MAT_GEOM_LOOKDEV, false);
     DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, overlay_ps_);
-    DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
-    DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
-    DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
+    lights.shgroup_resources(grp);
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
     DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
     DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
     DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
-    DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
-    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
-    DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
 
     offset.x -= sphere_size_ + sphere_margin;
 
     /* Pass 2D scale and bias factor in the last column. */
-    vec2 scale = sphere_size_ / vec2(viewport_size);
-    vec2 bias = -1.0f + scale + 2.0f * (anchor_ + offset + jitter) / vec2(viewport_size);
+    float2 scale = sphere_size_ / float2(viewport_size);
+    float2 bias = -1.0f + scale +
+                  2.0f * (float2(anchor_) + offset + jitter) / float2(viewport_size);
     copy_v4_fl4(sphere_mat[3], UNPACK2(scale), UNPACK2(bias));
-    DRW_shgroup_call_obmat(grp, sphere, sphere_mat);
+    DRW_shgroup_call_obmat(grp, sphere, sphere_mat.ptr());
 
     offset.x -= sphere_margin;
   }
@@ -338,19 +332,18 @@ void LookDev::render_overlay(GPUFrameBuffer *fb)
 
   const DRWView *active_view = DRW_view_get_active();
 
-  inst_.lightprobes.set_view(active_view, ivec2(0));
-  inst_.lights.set_view(active_view, ivec2(0));
-  inst_.lights.bind_batch(0);
+  inst_.lightprobes.set_view(active_view, int2(0));
+  inst_.lights.set_view(active_view, int2(0));
 
   /* Create subview for correct shading. Sub because we don not care about culling. */
   const CameraData &cam = inst_.camera.data_get();
-  mat4 winmat;
-  orthographic_m4(winmat, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+  float4x4 winmat;
+  orthographic_m4(winmat.ptr(), -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
   if (view_) {
-    DRW_view_update_sub(view_, cam.viewmat, winmat);
+    DRW_view_update_sub(view_, cam.viewmat.ptr(), winmat.ptr());
   }
   else {
-    view_ = DRW_view_create_sub(active_view, cam.viewmat, winmat);
+    view_ = DRW_view_create_sub(active_view, cam.viewmat.ptr(), winmat.ptr());
   }
 
   DRW_view_set_active(view_);

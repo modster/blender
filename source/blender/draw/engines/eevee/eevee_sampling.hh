@@ -64,7 +64,7 @@ class Sampling {
   /** Tag to reset sampling for the next sample. */
   bool reset_ = false;
 
-  StructBuffer<SamplingData> data_;
+  draw::UniformBuffer<SamplingData> data_;
 
  public:
   Sampling(){};
@@ -141,6 +141,7 @@ class Sampling {
       /* TODO decorelate. */
       data_.dimensions[SAMPLING_TIME][0] = r[0];
       data_.dimensions[SAMPLING_CLOSURE][0] = r[1];
+      data_.dimensions[SAMPLING_RAYTRACE_X][0] = r[0];
     }
     {
       double r[2], offset[2] = {0, 0};
@@ -161,6 +162,10 @@ class Sampling {
       data_.dimensions[SAMPLING_SHADOW_U][0] = r[0];
       data_.dimensions[SAMPLING_SHADOW_V][0] = r[1];
       data_.dimensions[SAMPLING_SHADOW_W][0] = r[2];
+      /* TODO decorelate. */
+      data_.dimensions[SAMPLING_RAYTRACE_U][0] = r[0];
+      data_.dimensions[SAMPLING_RAYTRACE_V][0] = r[1];
+      data_.dimensions[SAMPLING_RAYTRACE_W][0] = r[2];
     }
     {
       /* Using leaped halton sequence so we can reused the same primes. */
@@ -170,6 +175,9 @@ class Sampling {
       BLI_halton_2d(primes, offset, (sample_ - 1) * leap, r);
       data_.dimensions[SAMPLING_SHADOW_X][0] = r[0];
       data_.dimensions[SAMPLING_SHADOW_Y][0] = r[1];
+      /* TODO decorelate. */
+      data_.dimensions[SAMPLING_SSS_U][0] = r[0];
+      data_.dimensions[SAMPLING_SSS_V][0] = r[1];
     }
 
     data_.push_update();
@@ -209,7 +217,7 @@ class Sampling {
   }
   const GPUUniformBuf *ubo_get(void) const
   {
-    return data_.ubo_get();
+    return data_;
   }
   /* Returns a pseudo random number in [0..1] range. Each dimension are uncorrelated. */
   float rng_get(eSamplingDimension dimension) const
@@ -325,9 +333,9 @@ class Sampling {
    * projected into any plane, the resulting distribution is (close to)
    * a uniform disc distribution.
    */
-  vec3 sample_ball(const float rand[3])
+  float3 sample_ball(const float rand[3])
   {
-    vec3 sample;
+    float3 sample;
     sample.z = rand[0] * 2.0f - 1.0f; /* cos theta */
 
     float r = sqrtf(fmaxf(0.0f, 1.0f - square_f(sample.z))); /* sin theta */
@@ -340,10 +348,10 @@ class Sampling {
     return sample;
   }
 
-  vec2 sample_disk(const float rand[2])
+  float2 sample_disk(const float rand[2])
   {
     float omega = rand[1] * 2.0f * M_PI;
-    return sqrtf(rand[0]) * vec2(cosf(omega), sinf(omega));
+    return sqrtf(rand[0]) * float2(cosf(omega), sinf(omega));
   }
 };
 

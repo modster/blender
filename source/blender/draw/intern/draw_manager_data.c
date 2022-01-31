@@ -307,6 +307,7 @@ void DRW_shgroup_uniform_bool(DRWShadingGroup *shgroup,
                               const int *value,
                               int arraysize)
 {
+  /* Boolean are expected to be 4bytes longs for OpenGL! */
   drw_shgroup_uniform(shgroup, name, DRW_UNIFORM_INT, value, 1, arraysize);
 }
 
@@ -384,7 +385,6 @@ void DRW_shgroup_uniform_mat4(DRWShadingGroup *shgroup, const char *name, const 
   drw_shgroup_uniform(shgroup, name, DRW_UNIFORM_FLOAT, (float *)value, 16, 1);
 }
 
-/* Stores the int instead of a pointer. */
 void DRW_shgroup_uniform_int_copy(DRWShadingGroup *shgroup, const char *name, const int value)
 {
   drw_shgroup_uniform(shgroup, name, DRW_UNIFORM_INT_COPY, &value, 1, 1);
@@ -461,6 +461,19 @@ void DRW_shgroup_vertex_buffer(DRWShadingGroup *shgroup,
   }
   drw_shgroup_uniform_create_ex(
       shgroup, location, DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE, vertex_buffer, 0, 0, 1);
+}
+
+void DRW_shgroup_vertex_buffer_ref(DRWShadingGroup *shgroup,
+                                   const char *name,
+                                   GPUVertBuf **vertex_buffer)
+{
+  int location = GPU_shader_get_ssbo(shgroup->shader, name);
+  if (location == -1) {
+    BLI_assert_msg(0, "Unable to locate binding of shader storage buffer objects.");
+    return;
+  }
+  drw_shgroup_uniform_create_ex(
+      shgroup, location, DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE_REF, vertex_buffer, 0, 0, 1);
 }
 
 /** \} */
@@ -544,7 +557,7 @@ static void drw_call_obinfos_init(DRWObjectInfos *ob_infos, Object *ob)
   drw_call_calc_orco(ob, ob_infos->orcotexfac);
   /* Random float value. */
   uint random = (DST.dupli_source) ?
-                     DST.dupli_source->random_id :
+                    DST.dupli_source->random_id :
                      /* TODO(fclem): this is rather costly to do at runtime. Maybe we can
                       * put it in ob->runtime and make depsgraph ensure it is up to date. */
                      BLI_hash_int_2d(BLI_hash_string(ob->id.name + 2), 0);
@@ -554,7 +567,12 @@ static void drw_call_obinfos_init(DRWObjectInfos *ob_infos, Object *ob)
   ob_infos->ob_flag += (ob->base_flag & BASE_SELECTED) ? (1 << 1) : 0;
   ob_infos->ob_flag += (ob->base_flag & BASE_FROM_DUPLI) ? (1 << 2) : 0;
   ob_infos->ob_flag += (ob->base_flag & BASE_FROM_SET) ? (1 << 3) : 0;
-  ob_infos->ob_flag += (ob == DST.draw_ctx.obact) ? (1 << 4) : 0;
+  if (ob->base_flag & BASE_FROM_DUPLI) {
+    ob_infos->ob_flag += (DRW_object_get_dupli_parent(ob) == DST.draw_ctx.obact) ? (1 << 4) : 0;
+  }
+  else {
+    ob_infos->ob_flag += (ob == DST.draw_ctx.obact) ? (1 << 4) : 0;
+  }
   /* Negative scaling. */
   ob_infos->ob_flag *= (ob->transflag & OB_NEG_SCALE) ? -1.0f : 1.0f;
   /* Object Color. */
@@ -750,6 +768,18 @@ static void drw_command_compute(DRWShadingGroup *shgroup,
   cmd->groups_z_len = groups_z_len;
 }
 
+static void drw_command_compute_ref(DRWShadingGroup *shgroup, int groups_ref[3])
+{
+  DRWCommandComputeRef *cmd = drw_command_create(shgroup, DRW_CMD_COMPUTE_REF);
+  cmd->groups_ref = groups_ref;
+}
+
+static void drw_command_barrier(DRWShadingGroup *shgroup, eGPUBarrier type)
+{
+  DRWCommandBarrier *cmd = drw_command_create(shgroup, DRW_CMD_BARRIER);
+  cmd->type = type;
+}
+
 static void drw_command_draw_procedural(DRWShadingGroup *shgroup,
                                         GPUBatch *batch,
                                         DRWResourceHandle handle,
@@ -853,7 +883,6 @@ void DRW_shgroup_call_range(
   drw_command_draw_range(shgroup, geom, handle, v_sta, v_ct);
 }
 
-/* A count of 0 instance will use the default number of instance in the batch. */
 void DRW_shgroup_call_instance_range(
     DRWShadingGroup *shgroup, Object *ob, struct GPUBatch *geom, uint i_sta, uint i_ct)
 {
@@ -874,6 +903,20 @@ void DRW_shgroup_call_compute(DRWShadingGroup *shgroup,
   BLI_assert(GPU_compute_shader_support());
 
   drw_command_compute(shgroup, groups_x_len, groups_y_len, groups_z_len);
+}
+
+void DRW_shgroup_call_compute_ref(DRWShadingGroup *shgroup, int groups_ref[3])
+{
+  BLI_assert(GPU_compute_shader_support());
+
+  drw_command_compute_ref(shgroup, groups_ref);
+}
+
+void DRW_shgroup_barrier(DRWShadingGroup *shgroup, eGPUBarrier type)
+{
+  BLI_assert(GPU_compute_shader_support());
+
+  drw_command_barrier(shgroup, type);
 }
 
 static void drw_shgroup_call_procedural_add_ex(DRWShadingGroup *shgroup,
@@ -908,7 +951,6 @@ void DRW_shgroup_call_procedural_triangles(DRWShadingGroup *shgroup, Object *ob,
   drw_shgroup_call_procedural_add_ex(shgroup, geom, ob, tri_count * 3);
 }
 
-/* Should be removed */
 void DRW_shgroup_call_instances(DRWShadingGroup *shgroup,
                                 Object *ob,
                                 struct GPUBatch *geom,
@@ -1146,6 +1188,33 @@ void DRW_shgroup_call_sculpt_with_materials(DRWShadingGroup **shgroups,
 
 static GPUVertFormat inst_select_format = {0};
 
+DRWCallBuffer *DRW_call_buffer_create(struct GPUVertFormat *format)
+{
+  BLI_assert(format != NULL);
+
+  DRWCallBuffer *callbuf = BLI_memblock_alloc(DST.vmempool->callbuffers);
+  callbuf->buf = DRW_temp_buffer_request(DST.vmempool->idatalist, format, &callbuf->count);
+  callbuf->buf_select = NULL;
+  callbuf->count = 0;
+
+  if (G.f & G_FLAG_PICKSEL) {
+    /* Not actually used for rendering but alloced in one chunk. */
+    if (inst_select_format.attr_len == 0) {
+      GPU_vertformat_attr_add(&inst_select_format, "selectId", GPU_COMP_I32, 1, GPU_FETCH_INT);
+    }
+    callbuf->buf_select = DRW_temp_buffer_request(
+        DST.vmempool->idatalist, &inst_select_format, &callbuf->count);
+  }
+
+  return callbuf;
+}
+
+GPUVertBuf *DRW_call_buffer_as_vertbuf(DRWCallBuffer *callbuf)
+{
+  GPU_vertbuf_data_len_set(callbuf->buf, callbuf->count);
+  return callbuf->buf;
+}
+
 DRWCallBuffer *DRW_shgroup_call_buffer(DRWShadingGroup *shgroup,
                                        struct GPUVertFormat *format,
                                        GPUPrimType prim_type)
@@ -1270,6 +1339,17 @@ static void drw_shgroup_init(DRWShadingGroup *shgroup, GPUShader *shader)
   int chunkid_location = GPU_shader_get_builtin_uniform(shader, GPU_UNIFORM_RESOURCE_CHUNK);
   int resourceid_location = GPU_shader_get_builtin_uniform(shader, GPU_UNIFORM_RESOURCE_ID);
 
+  /* TODO(fclem) Will take the place of the above after the GPUShaderCreateInfo port. */
+  if (view_ubo_location == -1) {
+    view_ubo_location = GPU_shader_get_builtin_block(shader, GPU_UNIFORM_BLOCK_DRW_VIEW);
+  }
+  if (model_ubo_location == -1) {
+    model_ubo_location = GPU_shader_get_builtin_block(shader, GPU_UNIFORM_BLOCK_DRW_MODEL);
+  }
+  if (info_ubo_location == -1) {
+    info_ubo_location = GPU_shader_get_builtin_block(shader, GPU_UNIFORM_BLOCK_DRW_INFOS);
+  }
+
   if (chunkid_location != -1) {
     drw_shgroup_uniform_create_ex(
         shgroup, chunkid_location, DRW_UNIFORM_RESOURCE_CHUNK, NULL, 0, 0, 1);
@@ -1302,6 +1382,15 @@ static void drw_shgroup_init(DRWShadingGroup *shgroup, GPUShader *shader)
           shgroup, modelinverse, DRW_UNIFORM_MODEL_MATRIX_INVERSE, NULL, 0, 0, 1);
     }
   }
+
+#ifdef DEBUG
+  int debugbuf_location = GPU_shader_get_builtin_ssbo(shader, GPU_BUFFER_BLOCK_DEBUG);
+  if (debugbuf_location != -1) {
+    GPUVertBuf *vertbuf = drw_debug_line_buffer_get();
+    drw_shgroup_uniform_create_ex(
+        shgroup, debugbuf_location, DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE, vertbuf, 0, 0, 1);
+  }
+#endif
 
   if (info_ubo_location != -1) {
     drw_shgroup_uniform_create_ex(
@@ -1386,14 +1475,15 @@ void DRW_shgroup_add_material_resources(DRWShadingGroup *grp, struct GPUMaterial
     if (tex->ima) {
       /* Image */
       GPUTexture *gputex;
+      ImageUser *iuser = tex->iuser_available ? &tex->iuser : NULL;
       if (tex->tiled_mapping_name[0]) {
-        gputex = BKE_image_get_gpu_tiles(tex->ima, tex->iuser, NULL);
+        gputex = BKE_image_get_gpu_tiles(tex->ima, iuser, NULL);
         drw_shgroup_material_texture(grp, gputex, tex->sampler_name, tex->sampler_state);
-        gputex = BKE_image_get_gpu_tilemap(tex->ima, tex->iuser, NULL);
+        gputex = BKE_image_get_gpu_tilemap(tex->ima, iuser, NULL);
         drw_shgroup_material_texture(grp, gputex, tex->tiled_mapping_name, tex->sampler_state);
       }
       else {
-        gputex = BKE_image_get_gpu_texture(tex->ima, tex->iuser, NULL);
+        gputex = BKE_image_get_gpu_texture(tex->ima, iuser, NULL);
         drw_shgroup_material_texture(grp, gputex, tex->sampler_name, tex->sampler_state);
       }
     }
@@ -1461,10 +1551,6 @@ DRWShadingGroup *DRW_shgroup_transform_feedback_create(struct GPUShader *shader,
   return shgroup;
 }
 
-/**
- * State is added to #Pass.state while drawing.
- * Use to temporarily enable draw options.
- */
 void DRW_shgroup_state_enable(DRWShadingGroup *shgroup, DRWState state)
 {
   drw_command_set_mutable_state(shgroup, state, 0x0);
@@ -1483,7 +1569,6 @@ void DRW_shgroup_stencil_set(DRWShadingGroup *shgroup,
   drw_command_set_stencil_mask(shgroup, write_mask, reference, compare_mask);
 }
 
-/* TODO: remove this function. */
 void DRW_shgroup_stencil_mask(DRWShadingGroup *shgroup, uint mask)
 {
   drw_command_set_stencil_mask(shgroup, 0xFF, mask, 0xFF);
@@ -1709,10 +1794,12 @@ static void draw_frustum_bound_sphere_calc(const BoundBox *bbox,
     bsphere->center[0] = farcenter[0] * z / e;
     bsphere->center[1] = farcenter[1] * z / e;
     bsphere->center[2] = z;
-    bsphere->radius = len_v3v3(bsphere->center, farpoint);
 
-    /* Transform to world space. */
-    mul_m4_v3(viewinv, bsphere->center);
+    /* For XR, the view matrix may contain a scale factor. Then, transforming only the center
+     * into world space after calculating the radius will result in incorrect behavior. */
+    mul_m4_v3(viewinv, bsphere->center); /* Transform to world space. */
+    mul_m4_v3(viewinv, farpoint);
+    bsphere->radius = len_v3v3(bsphere->center, farpoint);
   }
 }
 
@@ -1776,7 +1863,6 @@ static void draw_view_matrix_state_update(DRWViewUboStorage *storage,
   storage->viewvecs[1][2] = view_vecs[3][2] - view_vecs[0][2];
 }
 
-/* Create a view with culling. */
 DRWView *DRW_view_create(const float viewmat[4][4],
                          const float winmat[4][4],
                          const float (*culling_viewmat)[4],
@@ -1803,7 +1889,6 @@ DRWView *DRW_view_create(const float viewmat[4][4],
   return view;
 }
 
-/* Create a view with culling done by another view. */
 DRWView *DRW_view_create_sub(const DRWView *parent_view,
                              const float viewmat[4][4],
                              const float winmat[4][4])
@@ -1825,13 +1910,10 @@ DRWView *DRW_view_create_sub(const DRWView *parent_view,
   return view;
 }
 
-/**
- * DRWView Update:
+/* DRWView Update:
  * This is meant to be done on existing views when rendering in a loop and there is no
- * need to allocate more DRWViews.
- */
+ * need to allocate more DRWViews. */
 
-/* Update matrices of a view created with DRW_view_create_sub. */
 void DRW_view_update_sub(DRWView *view, const float viewmat[4][4], const float winmat[4][4])
 {
   BLI_assert(view->parent != NULL);
@@ -1842,7 +1924,6 @@ void DRW_view_update_sub(DRWView *view, const float viewmat[4][4], const float w
   draw_view_matrix_state_update(&view->storage, viewmat, winmat);
 }
 
-/* Update matrices of a view created with DRW_view_create. */
 void DRW_view_update(DRWView *view,
                      const float viewmat[4][4],
                      const float winmat[4][4],
@@ -1902,6 +1983,14 @@ void DRW_view_update(DRWView *view,
   draw_frustum_bound_sphere_calc(
       &view->frustum_corners, viewinv, winmat, wininv, &view->frustum_bsphere);
 
+  /* TODO(fclem): Deduplicate. */
+  for (int i = 0; i < 8; i++) {
+    copy_v3_v3(view->storage.frustum_corners[i], view->frustum_corners.vec[i]);
+  }
+  for (int i = 0; i < 6; i++) {
+    copy_v4_v4(view->storage.frustum_planes[i], view->frustum_planes[i]);
+  }
+
 #ifdef DRW_DEBUG_CULLING
   if (G.debug_value != 0) {
     DRW_debug_sphere(
@@ -1911,13 +2000,11 @@ void DRW_view_update(DRWView *view,
 #endif
 }
 
-/* Return default view if it is a viewport render. */
 const DRWView *DRW_view_default_get(void)
 {
   return DST.view_default;
 }
 
-/* WARNING: Only use in render AND only if you are going to set view_default again. */
 void DRW_view_reset(void)
 {
   DST.view_default = NULL;
@@ -1925,18 +2012,12 @@ void DRW_view_reset(void)
   DST.view_previous = NULL;
 }
 
-/* MUST only be called once per render and only in render mode. Sets default view. */
-void DRW_view_default_set(DRWView *view)
+void DRW_view_default_set(const DRWView *view)
 {
   BLI_assert(DST.view_default == NULL);
-  DST.view_default = view;
+  DST.view_default = (DRWView *)view;
 }
 
-/**
- * This only works if DRWPasses have been tagged with DRW_STATE_CLIP_PLANES,
- * and if the shaders have support for it (see usage of gl_ClipDistance).
- * NOTE: planes must be in world space.
- */
 void DRW_view_clip_planes_set(DRWView *view, float (*planes)[4], int plane_len)
 {
   BLI_assert(plane_len <= MAX_CLIP_PLANES);
@@ -1956,14 +2037,11 @@ void DRW_view_camtexco_get(const DRWView *view, float r_texco[4])
   copy_v4_v4(r_texco, view->storage.viewcamtexcofac);
 }
 
-/* Return world space frustum corners. */
 void DRW_view_frustum_corners_get(const DRWView *view, BoundBox *corners)
 {
   memcpy(corners, &view->frustum_corners, sizeof(view->frustum_corners));
 }
 
-/* Return world space frustum sides as planes.
- * See draw_frustum_culling_planes_calc() for the plane order. */
 void DRW_view_frustum_planes_get(const DRWView *view, float planes[6][4])
 {
   memcpy(planes, &view->frustum_planes, sizeof(view->frustum_planes));
@@ -2051,8 +2129,6 @@ DRWPass *DRW_pass_create(const char *name, DRWState state)
   return pass;
 }
 
-/* Create an instance of the original pass that will execute the same drawcalls but with its own
- * DRWState. */
 DRWPass *DRW_pass_create_instance(const char *name, DRWPass *original, DRWState state)
 {
   DRWPass *pass = DRW_pass_create(name, state);
@@ -2061,7 +2137,6 @@ DRWPass *DRW_pass_create_instance(const char *name, DRWPass *original, DRWState 
   return pass;
 }
 
-/* Link two passes so that they are both rendered if the first one is being drawn. */
 void DRW_pass_link(DRWPass *first, DRWPass *second)
 {
   BLI_assert(first != second);
@@ -2122,10 +2197,6 @@ static int pass_shgroup_dist_sort(const void *a, const void *b)
 
 #undef SORT_IMPL_LINKTYPE
 
-/**
- * Sort Shading groups by decreasing Z of their first draw call.
- * This is useful for order dependent effect such as alpha-blending.
- */
 void DRW_pass_sort_shgroup_z(DRWPass *pass)
 {
   const float(*viewinv)[4] = DST.view_active->storage.viewinv;
@@ -2176,9 +2247,6 @@ void DRW_pass_sort_shgroup_z(DRWPass *pass)
   pass->shgroups.last = last;
 }
 
-/**
- * Reverse Shading group submission order.
- */
 void DRW_pass_sort_shgroup_reverse(DRWPass *pass)
 {
   pass->shgroups.last = pass->shgroups.first;

@@ -12,7 +12,7 @@ uniform samplerCube input_tx;
 uniform sampler2DArray input_tx;
 #endif
 
-out vec4 out_color;
+layout(location = 0) out vec4 out_color;
 
 void main(void)
 {

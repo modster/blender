@@ -21,24 +21,32 @@
  * \ingroup cmpnodes
  */
 
+#include "UI_interface.h"
+#include "UI_resources.h"
+
 #include "node_composite_util.hh"
 
 /* **************** SET ALPHA ******************** */
-static bNodeSocketTemplate cmp_node_setalpha_in[] = {
-    {SOCK_RGBA, N_("Image"), 0.0f, 0.0f, 0.0f, 1.0f},
-    {SOCK_FLOAT, N_("Alpha"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_NONE},
-    {-1, ""},
-};
-static bNodeSocketTemplate cmp_node_setalpha_out[] = {
-    {SOCK_RGBA, N_("Image")},
-    {-1, ""},
-};
+
+namespace blender::nodes::node_composite_setalpha_cc {
+
+static void cmp_node_setalpha_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_input<decl::Float>(N_("Alpha")).default_value(1.0f).min(0.0f).max(1.0f);
+  b.add_output<decl::Color>(N_("Image"));
+}
 
 static void node_composit_init_setalpha(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeSetAlpha *settings = (NodeSetAlpha *)MEM_callocN(sizeof(NodeSetAlpha), __func__);
+  NodeSetAlpha *settings = MEM_cnew<NodeSetAlpha>(__func__);
   node->storage = settings;
   settings->mode = CMP_NODE_SETALPHA_MODE_APPLY;
+}
+
+static void node_composit_buts_set_alpha(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "mode", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
 static int node_composite_gpu_set_alpha(GPUMaterial *mat,
@@ -56,16 +64,21 @@ static int node_composite_gpu_set_alpha(GPUMaterial *mat,
   return GPU_stack_link(mat, node, "node_composite_set_alpha_replace", in, out);
 }
 
-void register_node_type_cmp_setalpha(void)
+}  // namespace blender::nodes::node_composite_setalpha_cc
+
+void register_node_type_cmp_setalpha()
 {
+  namespace file_ns = blender::nodes::node_composite_setalpha_cc;
+
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_SETALPHA, "Set Alpha", NODE_CLASS_CONVERTER, 0);
-  node_type_socket_templates(&ntype, cmp_node_setalpha_in, cmp_node_setalpha_out);
-  node_type_init(&ntype, node_composit_init_setalpha);
+  cmp_node_type_base(&ntype, CMP_NODE_SETALPHA, "Set Alpha", NODE_CLASS_CONVERTER);
+  ntype.declare = file_ns::cmp_node_setalpha_declare;
+  ntype.draw_buttons = file_ns::node_composit_buts_set_alpha;
+  node_type_init(&ntype, file_ns::node_composit_init_setalpha);
   node_type_storage(
       &ntype, "NodeSetAlpha", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, node_composite_gpu_set_alpha);
+  node_type_gpu(&ntype, file_ns::node_composite_gpu_set_alpha);
 
   nodeRegisterType(&ntype);
 }

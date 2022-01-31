@@ -72,6 +72,7 @@ struct MaterialPass {
 
 struct Material {
   bool init = false;
+  bool is_alpha_blend_transparent;
   MaterialPass shadow, shading, prepass;
 };
 

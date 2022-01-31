@@ -24,16 +24,19 @@
 #include "node_composite_util.hh"
 
 /* **************** NORMAL  ******************** */
-static bNodeSocketTemplate cmp_node_normal_in[] = {
-    {SOCK_VECTOR, N_("Normal"), 0.0f, 0.0f, 1.0f, 0.0f, -1.0f, 1.0f, PROP_DIRECTION},
-    {-1, ""},
-};
 
-static bNodeSocketTemplate cmp_node_normal_out[] = {
-    {SOCK_VECTOR, N_("Normal"), 0.0f, 0.0f, 1.0f, 0.0f, -1.0f, 1.0f, PROP_DIRECTION},
-    {SOCK_FLOAT, N_("Dot")},
-    {-1, ""},
-};
+namespace blender::nodes::node_composite_normal_cc {
+
+static void cmp_node_normal_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Vector>(N_("Normal"))
+      .default_value({1.0f, 1.0f, 1.0f})
+      .min(-1.0f)
+      .max(1.0f)
+      .subtype(PROP_DIRECTION);
+  b.add_output<decl::Vector>(N_("Normal"));
+  b.add_output<decl::Float>(N_("Dot"));
+}
 
 static int node_composite_gpu_normal(GPUMaterial *mat,
                                      bNode *node,
@@ -44,13 +47,17 @@ static int node_composite_gpu_normal(GPUMaterial *mat,
   return GPU_stack_link(mat, node, "node_composite_normal", in, out, GPU_uniform(out[0].vec));
 }
 
-void register_node_type_cmp_normal(void)
+}  // namespace blender::nodes::node_composite_normal_cc
+
+void register_node_type_cmp_normal()
 {
+  namespace file_ns = blender::nodes::node_composite_normal_cc;
+
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_NORMAL, "Normal", NODE_CLASS_OP_VECTOR, 0);
-  node_type_socket_templates(&ntype, cmp_node_normal_in, cmp_node_normal_out);
-  node_type_gpu(&ntype, node_composite_gpu_normal);
+  cmp_node_type_base(&ntype, CMP_NODE_NORMAL, "Normal", NODE_CLASS_OP_VECTOR);
+  ntype.declare = file_ns::cmp_node_normal_declare;
+  node_type_gpu(&ntype, file_ns::node_composite_gpu_normal);
 
   nodeRegisterType(&ntype);
 }

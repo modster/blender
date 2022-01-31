@@ -98,6 +98,17 @@ struct Object;
 
 /* ------------ Data Structure --------------- */
 /**
+ * Data structure to for registered draw engines that can store draw manager
+ * specific data.
+ */
+typedef struct DRWRegisteredDrawEngine {
+  void /*DRWRegisteredDrawEngine*/ *next, *prev;
+  DrawEngineType *draw_engine;
+  /** Index of the type in the lists. Index is used for dupli data. */
+  int index;
+} DRWRegisteredDrawEngine;
+
+/**
  * Data structure containing all drawcalls organized by passes and materials.
  * DRWPass > DRWShadingGroup > DRWCall > DRWCallState
  *                           > DRWUniform
@@ -194,8 +205,10 @@ typedef enum {
 
   /* Compute Commands. */
   DRW_CMD_COMPUTE = 8,
+  DRW_CMD_COMPUTE_REF = 9,
 
   /* Other Commands */
+  DRW_CMD_BARRIER = 11,
   DRW_CMD_CLEAR = 12,
   DRW_CMD_DRWSTATE = 13,
   DRW_CMD_STENCIL = 14,
@@ -238,6 +251,14 @@ typedef struct DRWCommandCompute {
   int groups_z_len;
 } DRWCommandCompute;
 
+typedef struct DRWCommandComputeRef {
+  int *groups_ref;
+} DRWCommandComputeRef;
+
+typedef struct DRWCommandBarrier {
+  eGPUBarrier type;
+} DRWCommandBarrier;
+
 typedef struct DRWCommandDrawProcedural {
   GPUBatch *batch;
   DRWResourceHandle handle;
@@ -275,6 +296,8 @@ typedef union DRWCommand {
   DRWCommandDrawInstanceRange instance_range;
   DRWCommandDrawProcedural procedural;
   DRWCommandCompute compute;
+  DRWCommandComputeRef compute_ref;
+  DRWCommandBarrier barrier;
   DRWCommandSetMutableState state;
   DRWCommandSetStencil stencil;
   DRWCommandSetSelectID select_id;
@@ -303,6 +326,7 @@ typedef enum {
   DRW_UNIFORM_BLOCK_REF,
   DRW_UNIFORM_TFEEDBACK_TARGET,
   DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE,
+  DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE_REF,
   /** Per drawcall uniforms/UBO */
   DRW_UNIFORM_BLOCK_OBMATS,
   DRW_UNIFORM_BLOCK_OBINFOS,
@@ -333,6 +357,11 @@ struct DRWUniform {
     union {
       GPUUniformBuf *block;
       GPUUniformBuf **block_ref;
+    };
+    /* DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE */
+    union {
+      GPUVertBuf *vertbuf;
+      GPUVertBuf **vertbuf_ref;
     };
     /* DRW_UNIFORM_FLOAT_COPY */
     float fvalue[4];
@@ -413,6 +442,11 @@ typedef struct DRWViewUboStorage {
   float viewcamtexcofac[4];
   float viewport_size[2];
   float viewport_size_inv[2];
+
+  /** Frustum culling data. */
+  /** NOTE: vec3 arrays are paded to vec4. */
+  float frustum_corners[8][4];
+  float frustum_planes[6][4];
 } DRWViewUboStorage;
 
 BLI_STATIC_ASSERT_ALIGN(DRWViewUboStorage, 16)
@@ -497,13 +531,18 @@ typedef struct DRWDebugSphere {
   float color[4];
 } DRWDebugSphere;
 
+typedef struct DRWDebugBuffer {
+  struct DRWDebugBuffer *next; /* linked list */
+  struct GPUVertBuf *verts;
+} DRWDebugBuffer;
+
 /* ------------- Memory Pools ------------ */
 
 /* Contains memory pools information */
 typedef struct DRWData {
   /** Instance data. */
   DRWInstanceDataList *idatalist;
-  /** Mempools for drawcalls. */
+  /** Memory-pools for draw-calls. */
   struct BLI_memblock *commands;
   struct BLI_memblock *commands_small;
   struct BLI_memblock *callbuffers;
@@ -565,7 +604,7 @@ typedef struct DRWManager {
   struct Object *dupli_origin;
   /** Object-data referenced by the current dupli object. */
   struct ID *dupli_origin_data;
-  /** Ghash: #DupliKey -> void pointer for each enabled engine. */
+  /** Hash-map: #DupliKey -> void pointer for each enabled engine. */
   struct GHash *dupli_ghash;
   /** TODO(fclem): try to remove usage of this. */
   DRWInstanceData *object_instance_data[MAX_INSTANCE_DATA_SIZE];
@@ -639,6 +678,7 @@ typedef struct DRWManager {
     /* TODO(fclem): optimize: use chunks. */
     DRWDebugLine *lines;
     DRWDebugSphere *spheres;
+    DRWDebugBuffer *line_buffers;
   } debug;
 } DRWManager;
 
@@ -652,6 +692,7 @@ void *drw_viewport_engine_data_ensure(void *engine_type);
 
 void drw_state_set(DRWState state);
 
+GPUVertBuf *drw_debug_line_buffer_get(void);
 void drw_debug_draw(void);
 void drw_debug_init(void);
 
@@ -659,7 +700,12 @@ eDRWCommandType command_type_get(const uint64_t *command_type_bits, int index);
 
 void drw_batch_cache_validate(Object *ob);
 void drw_batch_cache_generate_requested(struct Object *ob);
+
+/**
+ * \warning Only evaluated mesh data is handled by this delayed generation.
+ */
 void drw_batch_cache_generate_requested_delayed(Object *ob);
+void drw_batch_cache_generate_requested_evaluated_mesh(Object *ob);
 
 void drw_resource_buffer_finish(DRWData *vmempool);
 

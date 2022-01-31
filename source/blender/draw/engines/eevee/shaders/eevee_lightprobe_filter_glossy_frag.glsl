@@ -19,7 +19,7 @@ layout(std140) uniform filter_block
   LightProbeFilterData probe;
 };
 
-out vec4 out_irradiance;
+layout(location = 0) out vec4 out_irradiance;
 
 void main()
 {
@@ -38,12 +38,12 @@ void main()
     vec3 Xi = sample_cylinder(hammersley_2d(i, probe.sample_count));
 
     float pdf;
-    /* Microfacet normal. */
-    vec3 H = sample_ggx(Xi, probe.roughness, V, N, T, B, pdf);
-    vec3 L = -reflect(V, H);
-    float NL = dot(N, L);
+    vec3 L = sample_ggx_reflect(Xi, probe.roughness, V, N, T, B, pdf);
 
-    if (NL > 0.0) {
+    if (pdf > 0.0) {
+      /* Microfacet normal. */
+      vec3 H = normalize(V + L);
+      float NL = dot(N, L);
       float NH = max(1e-8, dot(N, H));
 
       /* Coarse Approximation of the mapping distortion.

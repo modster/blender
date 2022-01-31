@@ -49,13 +49,13 @@ class LightProbeModule {
 
   /* Used for rendering probes. */
   /* OPTI(fclem) Share for the whole scene? Only allocate temporary? */
-  Texture cube_depth_tx_ = Texture("CubemapDepth");
-  Texture cube_color_tx_ = Texture("CubemapColor");
+  Texture cube_depth_tx_ = {"CubemapDepth"};
+  Texture cube_color_tx_ = {"CubemapColor"};
   LightProbeView probe_views_[6];
 
-  Framebuffer cube_downsample_fb_ = Framebuffer("cube_downsample");
-  Framebuffer filter_cube_fb_ = Framebuffer("filter_cube");
-  Framebuffer filter_grid_fb_ = Framebuffer("filter_grid");
+  Framebuffer cube_downsample_fb_ = {"cube_downsample"};
+  Framebuffer filter_cube_fb_ = {"filter_cube"};
+  Framebuffer filter_grid_fb_ = {"filter_grid"};
 
   std::array<DRWView *, 6> face_view_ = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
@@ -89,8 +89,8 @@ class LightProbeModule {
 
   ~LightProbeModule()
   {
-    OBJECT_GUARDED_SAFE_DELETE(lightcache_lookdev_, LightCache);
-    OBJECT_GUARDED_SAFE_DELETE(lightcache_baking_, LightCache);
+    MEM_delete(lightcache_lookdev_);
+    MEM_delete(lightcache_baking_);
   }
 
   void init();
@@ -98,7 +98,7 @@ class LightProbeModule {
   void begin_sync();
   void end_sync();
 
-  void set_view(const DRWView *view, const ivec2 extent);
+  void set_view(const DRWView *view, const int2 extent);
 
   void set_world_dirty(void)
   {
@@ -114,15 +114,15 @@ class LightProbeModule {
 
   const GPUUniformBuf *grid_ubo_get() const
   {
-    return grid_data_.ubo_get();
+    return grid_data_;
   }
   const GPUUniformBuf *cube_ubo_get() const
   {
-    return cube_data_.ubo_get();
+    return cube_data_;
   }
   const GPUUniformBuf *info_ubo_get() const
   {
-    return info_data_.ubo_get();
+    return info_data_;
   }
   GPUTexture **grid_tx_ref_get()
   {
@@ -150,11 +150,9 @@ class LightProbeModule {
   void sync_grid(const DRWView *view, const struct LightGridCache &grid_cache, int grid_index);
   void sync_cubemap(const DRWView *view, const struct LightProbeCache &cube_cache, int cube_index);
 
-  void cubeface_winmat_get(mat4 &winmat, float near, float far);
-
   LightCache *baking_cache_get(void);
 
-  void cubemap_prepare(vec3 position, float near, float far, bool background_only);
+  void cubemap_prepare(float3 position, float near, float far, bool background_only);
 
   void filter_glossy(int cube_index, float intensity);
   void filter_diffuse(int sample_index, float intensity);

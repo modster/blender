@@ -809,12 +809,18 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but, const wmEvent *ev
       else {
         if (is_array_component) {
           ot = WM_operatortype_find("UI_OT_override_type_set_button", false);
-          uiItemFullO_ptr(
-              layout, ot, "Define Overrides", ICON_NONE, NULL, WM_OP_INVOKE_DEFAULT, 0, &op_ptr);
+          uiItemFullO_ptr(layout,
+                          ot,
+                          CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Define Overrides"),
+                          ICON_NONE,
+                          NULL,
+                          WM_OP_INVOKE_DEFAULT,
+                          0,
+                          &op_ptr);
           RNA_boolean_set(&op_ptr, "all", true);
           uiItemFullO_ptr(layout,
                           ot,
-                          "Define Single Override",
+                          CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Define Single Override"),
                           ICON_NONE,
                           NULL,
                           WM_OP_INVOKE_DEFAULT,
@@ -825,7 +831,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but, const wmEvent *ev
         else {
           uiItemFullO(layout,
                       "UI_OT_override_type_set_button",
-                      "Define Override",
+                      CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Define Override"),
                       ICON_NONE,
                       NULL,
                       WM_OP_INVOKE_DEFAULT,
@@ -925,8 +931,19 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but, const wmEvent *ev
     }
   }
 
+  {
+    const ARegion *region = CTX_wm_menu(C) ? CTX_wm_menu(C) : CTX_wm_region(C);
+    uiButTreeRow *treerow_but = (uiButTreeRow *)ui_tree_row_find_mouse_over(region, event->xy);
+    if (treerow_but) {
+      BLI_assert(treerow_but->but.type == UI_BTYPE_TREEROW);
+      UI_tree_view_item_context_menu_build(
+          C, treerow_but->tree_item, uiLayoutColumn(layout, false));
+      uiItemS(layout);
+    }
+  }
+
   /* If the button represents an id, it can set the "id" context pointer. */
-  if (U.experimental.use_extended_asset_browser && ED_asset_can_mark_single_from_context(C)) {
+  if (ED_asset_can_mark_single_from_context(C)) {
     ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
 
     /* Gray out items depending on if data-block is an asset. Preferably this could be done via
@@ -1201,11 +1218,10 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but, const wmEvent *ev
   }
 
   /* UI List item context menu. Scripts can add items to it, by default there's nothing shown. */
-  ARegion *region = CTX_wm_region(C);
+  const ARegion *region = CTX_wm_menu(C) ? CTX_wm_menu(C) : CTX_wm_region(C);
   const bool is_inside_listbox = ui_list_find_mouse_over(region, event) != NULL;
   const bool is_inside_listrow = is_inside_listbox ?
-                                     ui_list_row_find_mouse_over(region, event->x, event->y) !=
-                                         NULL :
+                                     ui_list_row_find_mouse_over(region, event->xy) != NULL :
                                      false;
   if (is_inside_listrow) {
     MenuType *mt = WM_menutype_find("UI_MT_list_item_context_menu", true);
@@ -1232,9 +1248,6 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but, const wmEvent *ev
 /** \name Panel Context Menu
  * \{ */
 
-/**
- * menu to show when right clicking on the panel header
- */
 void ui_popup_context_menu_for_panel(bContext *C, ARegion *region, Panel *panel)
 {
   bScreen *screen = CTX_wm_screen(C);
@@ -1245,6 +1258,9 @@ void ui_popup_context_menu_for_panel(bContext *C, ARegion *region, Panel *panel)
     return;
   }
   if (panel->type->parent != NULL) {
+    return;
+  }
+  if (!UI_panel_can_be_pinned(panel)) {
     return;
   }
 

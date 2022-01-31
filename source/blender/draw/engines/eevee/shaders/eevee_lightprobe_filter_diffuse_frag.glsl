@@ -21,7 +21,7 @@ layout(std140) uniform filter_block
   LightProbeFilterData probe;
 };
 
-out vec4 out_irradiance;
+layout(location = 0) out vec4 out_irradiance;
 
 void main()
 {

@@ -40,7 +40,9 @@ namespace blender::eevee {
 /* Keep alphabetical order and clean prefix. */
 enum eShaderType {
   CULLING_DEBUG = 0,
-  CULLING_LIGHT,
+  CULLING_SELECT,
+  CULLING_SORT,
+  CULLING_TILE,
 
   DEFERRED_EVAL_DIRECT,
   DEFERRED_EVAL_HOLDOUT,
@@ -77,6 +79,9 @@ enum eShaderType {
   FILM_RESOLVE,
   FILM_RESOLVE_DEPTH,
 
+  HIZ_COPY,
+  HIZ_DOWNSAMPLE,
+
   LIGHTPROBE_DISPLAY_CUBEMAP,
   LIGHTPROBE_DISPLAY_IRRADIANCE,
 
@@ -91,7 +96,35 @@ enum eShaderType {
   MOTION_BLUR_TILE_DILATE,
   MOTION_BLUR_TILE_FLATTEN,
 
-  SHADOW_CLEAR,
+  RAYTRACE_DIFFUSE,
+  RAYTRACE_DIFFUSE_FALLBACK,
+  RAYTRACE_REFLECTION,
+  RAYTRACE_REFLECTION_FALLBACK,
+  RAYTRACE_REFRACTION,
+  RAYTRACE_REFRACTION_FALLBACK,
+  RAYTRACE_DENOISE_DIFFUSE,
+  RAYTRACE_DENOISE_REFLECTION,
+  RAYTRACE_DENOISE_REFRACTION,
+  RAYTRACE_RESOLVE_DIFFUSE,
+  RAYTRACE_RESOLVE_REFLECTION,
+  RAYTRACE_RESOLVE_REFRACTION,
+
+  SHADOW_DEBUG,
+  SHADOW_PAGE_ALLOC,
+  SHADOW_PAGE_COPY,
+  SHADOW_PAGE_DEBUG,
+  SHADOW_PAGE_DEFRAG,
+  SHADOW_PAGE_FREE,
+  SHADOW_PAGE_INIT,
+  SHADOW_PAGE_MARK,
+  SHADOW_TILE_DEPTH_SCAN,
+  SHADOW_TILE_LOD_MASK,
+  SHADOW_TILE_SETUP,
+  SHADOW_TILE_TAG_UPDATE,
+  SHADOW_TILE_TAG_USAGE,
+  SHADOW_TILE_TAG_VISIBILITY,
+
+  SUBSURFACE_EVAL,
 
   VELOCITY_CAMERA,
   VELOCITY_MESH,
@@ -105,11 +138,12 @@ enum eShaderType {
 class ShaderModule {
  private:
   struct ShaderDescription {
-    const char *name;
-    const char *vertex_shader_code;
-    const char *geometry_shader_code;
-    const char *fragment_shader_code;
-    const char *defines_shader_code;
+    const char *name = nullptr;
+    const char *vertex_shader_code = nullptr;
+    const char *geometry_shader_code = nullptr;
+    const char *fragment_shader_code = nullptr;
+    const char *compute_shader_code = nullptr;
+    const char *defines_shader_code = nullptr;
   };
 
   DRWShaderLibrary *shader_lib_ = nullptr;

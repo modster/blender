@@ -25,6 +25,7 @@
 #include "DNA_defaults.h"
 #include "DNA_lightprobe_types.h"
 
+#include "eevee_camera.hh"
 #include "eevee_instance.hh"
 
 namespace blender::eevee {
@@ -37,7 +38,7 @@ void LightProbeModule::init()
 
   bool use_lookdev = inst_.use_studio_light();
   if (!use_lookdev && lightcache_ && lightcache_->load()) {
-    OBJECT_GUARDED_SAFE_DELETE(lightcache_lookdev_, LightCache);
+    MEM_delete(lightcache_lookdev_);
   }
   else {
     if (lightcache_ && (lightcache_->flag & LIGHTCACHE_NOT_USABLE)) {
@@ -50,7 +51,7 @@ void LightProbeModule::init()
       int grid_len = 1;
       int irr_samples_len = 1;
 
-      ivec3 irr_size;
+      int3 irr_size;
       LightCache::irradiance_cache_size_get(
           sce_eevee.gi_visibility_resolution, irr_samples_len, irr_size);
 
@@ -97,7 +98,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DOWNSAMPLE_CUBE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, cube_downsample_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "input_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
   }
   {
@@ -106,7 +107,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_GLOSSY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_glossy_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
   }
   {
@@ -115,7 +116,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DIFFUSE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_diffuse_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
   {
@@ -124,7 +125,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_VISIBILITY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_visibility_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 
@@ -185,29 +186,26 @@ void LightProbeModule::begin_sync()
 void LightProbeModule::end_sync()
 {
   if (lightcache_->flag & LIGHTCACHE_UPDATE_WORLD) {
-    cubemap_prepare(vec3(0.0f), 0.01f, 1.0f, true);
+    cubemap_prepare(float3(0.0f), 0.01f, 1.0f, true);
   }
 }
 
-void LightProbeModule::cubeface_winmat_get(mat4 &winmat, float near, float far)
-{
-  /* Simple 90° FOV projection. */
-  perspective_m4(winmat, -near, near, -near, near, near, far);
-}
-
-void LightProbeModule::cubemap_prepare(vec3 position, float near, float far, bool background_only)
+void LightProbeModule::cubemap_prepare(float3 position,
+                                       float near,
+                                       float far,
+                                       bool background_only)
 {
   SceneEEVEE &sce_eevee = inst_.scene->eevee;
   int cube_res = sce_eevee.gi_cubemap_resolution;
   int cube_mip_count = (int)log2_ceil_u(cube_res);
 
-  mat4 viewmat;
-  unit_m4(viewmat);
+  float4x4 viewmat;
+  viewmat.identity();
   negate_v3_v3(viewmat[3], position);
 
   /* TODO(fclem) We might want to have theses as temporary textures. */
-  cube_depth_tx_.ensure_cubemap("CubemapDepth", cube_res, cube_mip_count, GPU_DEPTH24_STENCIL8);
-  cube_color_tx_.ensure_cubemap("CubemapColor", cube_res, cube_mip_count, GPU_RGBA16F);
+  cube_depth_tx_.ensure_cube(GPU_DEPTH24_STENCIL8, cube_res, nullptr, cube_mip_count);
+  cube_color_tx_.ensure_cube(GPU_RGBA16F, cube_res, nullptr, cube_mip_count);
   GPU_texture_mipmap_mode(cube_color_tx_, true, true);
 
   cube_downsample_fb_.ensure(GPU_ATTACHMENT_TEXTURE(cube_depth_tx_),
@@ -216,7 +214,7 @@ void LightProbeModule::cubemap_prepare(vec3 position, float near, float far, boo
   filter_cube_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(lightcache_->cube_tx.tex));
   filter_grid_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(lightcache_->grid_tx.tex));
 
-  mat4 winmat;
+  float4x4 winmat;
   cubeface_winmat_get(winmat, near, far);
 
   for (auto i : IndexRange(ARRAY_SIZE(probe_views_))) {
@@ -305,8 +303,8 @@ void LightProbeModule::filter_diffuse(int sample_index, float intensity)
 
   filter_data_.push_update();
 
-  ivec2 extent = ivec2(3, 2);
-  ivec2 offset = extent;
+  int2 extent = int2(3, 2);
+  int2 offset = extent;
   offset.x *= sample_index % info_data_.grids.irradiance_cells_per_row;
   offset.y *= sample_index / info_data_.grids.irradiance_cells_per_row;
 
@@ -320,8 +318,8 @@ void LightProbeModule::filter_visibility(int sample_index,
                                          float visibility_blur,
                                          float visibility_range)
 {
-  ivec2 extent = ivec2(info_data_.grids.visibility_size);
-  ivec2 offset = extent;
+  int2 extent = int2(info_data_.grids.visibility_size);
+  int2 offset = extent;
   offset.x *= sample_index % info_data_.grids.visibility_cells_per_row;
   offset.y *= (sample_index / info_data_.grids.visibility_cells_per_row) %
               info_data_.grids.visibility_cells_per_layer;
@@ -412,9 +410,9 @@ void LightProbeModule::bake(Depsgraph *depsgraph,
 
   /* Disable screenspace effects. */
   SceneEEVEE &sce_eevee = DEG_get_evaluated_scene(depsgraph)->eevee;
-  sce_eevee.flag &= ~(SCE_EEVEE_GTAO_ENABLED | SCE_EEVEE_SSR_ENABLED);
+  sce_eevee.flag &= ~(SCE_EEVEE_GTAO_ENABLED | SCE_EEVEE_RAYTRACING_ENABLED);
 
-  inst_.init(ivec2(1), &rect, nullptr, depsgraph, probe);
+  inst_.init(int2(1), &rect, nullptr, depsgraph, probe);
   inst_.sampling.reset();
   inst_.render_sync();
   inst_.sampling.step();
@@ -467,12 +465,11 @@ void LightProbeModule::sync_world(const DRWView *view)
   CubemapData &cube = cube_data_[0];
   GridData &grid = grid_data_[0];
 
-  scale_m4_fl(grid.local_mat, view_bounds.radius);
+  scale_m4_fl(grid.local_mat.ptr(), view_bounds.radius);
   negate_v3_v3(grid.local_mat[3], view_bounds.center);
-  copy_m4_m4(cube.influence_mat, grid.local_mat);
-  copy_m4_m4(cube.parallax_mat, cube.influence_mat);
+  cube.parallax_mat = cube.influence_mat = grid.local_mat;
 
-  grid.resolution = ivec3(1);
+  grid.resolution = int3(1);
   grid.offset = 0;
   grid.level_skip = 1;
   grid.attenuation_bias = 0.001f;
@@ -480,10 +477,10 @@ void LightProbeModule::sync_world(const DRWView *view)
   grid.visibility_range = 1.0f;
   grid.visibility_bleed = 0.001f;
   grid.visibility_bias = 0.0f;
-  grid.increment_x = vec3(0.0f);
-  grid.increment_y = vec3(0.0f);
-  grid.increment_z = vec3(0.0f);
-  grid.corner = vec3(0.0f);
+  grid.increment_x = float3(0.0f);
+  grid.increment_y = float3(0.0f);
+  grid.increment_z = float3(0.0f);
+  grid.corner = float3(0.0f);
 
   cube._parallax_type = CUBEMAP_SHAPE_SPHERE;
   cube._layer = 0.0;
@@ -498,8 +495,8 @@ void LightProbeModule::sync_grid(const DRWView *UNUSED(view),
     return;
   }
   GridData &grid = grid_data_[info_data_.grids.grid_count];
-  copy_m4_m4(grid.local_mat, grid_cache.mat);
-  grid.resolution = ivec3(grid_cache.resolution);
+  copy_m4_m4(grid.local_mat.ptr(), grid_cache.mat);
+  grid.resolution = int3(grid_cache.resolution);
   grid.offset = grid_cache.offset;
   grid.level_skip = grid_cache.level_bias;
   grid.attenuation_bias = grid_cache.attenuation_bias;
@@ -507,10 +504,10 @@ void LightProbeModule::sync_grid(const DRWView *UNUSED(view),
   grid.visibility_range = grid_cache.visibility_range;
   grid.visibility_bleed = grid_cache.visibility_bleed;
   grid.visibility_bias = grid_cache.visibility_bias;
-  grid.increment_x = vec3(grid_cache.increment_x);
-  grid.increment_y = vec3(grid_cache.increment_y);
-  grid.increment_z = vec3(grid_cache.increment_z);
-  grid.corner = vec3(grid_cache.corner);
+  grid.increment_x = float3(grid_cache.increment_x);
+  grid.increment_y = float3(grid_cache.increment_y);
+  grid.increment_z = float3(grid_cache.increment_z);
+  grid.corner = float3(grid_cache.corner);
 
   info_data_.grids.grid_count++;
 }
@@ -524,8 +521,8 @@ void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
     return;
   }
   CubemapData &cube = cube_data_[info_data_.cubes.cube_count];
-  copy_m4_m4(cube.parallax_mat, cube_cache.parallaxmat);
-  copy_m4_m4(cube.influence_mat, cube_cache.attenuationmat);
+  copy_m4_m4(cube.parallax_mat.ptr(), cube_cache.parallaxmat);
+  copy_m4_m4(cube.influence_mat.ptr(), cube_cache.attenuationmat);
   cube._attenuation_factor = cube_cache.attenuation_fac;
   cube._attenuation_type = cube_cache.attenuation_type;
   cube._parallax_type = cube_cache.parallax_type;
@@ -538,7 +535,7 @@ void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
 }
 
 /* Only enables world light probe if extent is invalid (no culling possible). */
-void LightProbeModule::set_view(const DRWView *view, const ivec2 extent)
+void LightProbeModule::set_view(const DRWView *view, const int2 extent)
 {
   if (lightcache_->flag & LIGHTCACHE_UPDATE_WORLD) {
     /* Set before update to avoid infinite recursion. */

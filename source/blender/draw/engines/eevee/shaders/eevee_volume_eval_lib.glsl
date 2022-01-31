@@ -27,7 +27,7 @@ vec3 volume_eval_light(vec3 P, float anisotropy)
 
   //   if (light.shadow_id != LIGHT_NO_SHADOW && visibility > 0.0) {
   //     vec3 lL = light_world_to_local(light, -L) * dist;
-  //     vec3 shadow_co = shadow_punctual_coordinates_get(shadows_punctual[l_idx], lL);
+  //     vec3 shadow_co = shadow_punctual_coordinates_get(shadows[l_idx], lL);
   //     visibility *= texture(shadow_atlas_tx, shadow_co);
   //   }
 

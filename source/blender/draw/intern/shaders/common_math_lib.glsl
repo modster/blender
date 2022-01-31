@@ -104,12 +104,50 @@ float pow8(float x) { return sqr(sqr(sqr(x))); }
 float len_squared(vec3 a) { return dot(a, a); }
 float len_squared(vec2 a) { return dot(a, a); }
 
+bool flag_test(uint flag, uint val) { return (flag & val) != 0u; }
+bool flag_test(int flag, int val) { return (flag & val) != 0; }
+
+void set_flag_from_test(inout uint value, bool test, uint flag) { if (test) { value |= flag; } else { value &= ~flag; } }
+void set_flag_from_test(inout int value, bool test, int flag) { if (test) { value |= flag; } else { value &= ~flag; } }
+
 #define weighted_sum(val0, val1, val2, val3, weights) ((val0 * weights[0] + val1 * weights[1] + val2 * weights[2] + val3 * weights[3]) * safe_rcp(sum(weights)));
 #define weighted_sum_array(val, weights) ((val[0] * weights[0] + val[1] * weights[1] + val[2] * weights[2] + val[3] * weights[3]) * safe_rcp(sum(weights)));
 
 /* clang-format on */
 
 #define saturate(a) clamp(a, 0.0, 1.0)
+
+#define in_range_inclusive(val, min_v, max_v) \
+  (all(greaterThanEqual(val, min_v)) && all(lessThanEqual(val, max_v)))
+#define in_range_exclusive(val, min_v, max_v) \
+  (all(greaterThan(val, min_v)) && all(lessThan(val, max_v)))
+
+uint divide_ceil_u(uint visible_count, uint divisor)
+{
+  return (visible_count + (divisor - 1u)) / divisor;
+}
+
+int divide_ceil_i(int visible_count, int divisor)
+{
+  return (visible_count + (divisor - 1)) / divisor;
+}
+
+uint bit_field_mask(uint bit_width, uint bit_min)
+{
+  /* Cannot bit shift more than 31 positions. */
+  uint mask = (bit_width > 31u) ? 0x0u : (0xFFFFFFFFu << bit_width);
+  return ~mask << bit_min;
+}
+
+uvec2 unpackUvec2x16(uint data)
+{
+  return uvec2(data >> 16u, data & 0xFFFFu);
+}
+
+uint packUvec2x16(uvec2 data)
+{
+  return (data.x << 16u) | (data.y & 0xFFFFu);
+}
 
 float distance_squared(vec2 a, vec2 b)
 {
@@ -215,4 +253,9 @@ vec3 heatmap_gradient(float t)
   return saturate((pow(t, 1.5) * 0.8 + 0.2) * vec3(smoothstep(0.0, 0.35, t) + t * 0.5,
                                                    smoothstep(0.5, 1.0, t),
                                                    max(1.0 - t * 1.7, t * 7.0 - 6.0)));
+}
+vec3 hue_gradient(float t)
+{
+  vec3 p = abs(fract(t + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+  return (clamp(p - 1.0, 0.0, 1.0));
 }

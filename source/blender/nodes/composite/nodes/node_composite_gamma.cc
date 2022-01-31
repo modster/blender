@@ -25,17 +25,18 @@
 
 /* **************** Gamma Tools  ******************** */
 
-namespace blender::nodes {
+namespace blender::nodes::node_composite_gamma_cc {
 
 static void cmp_node_gamma_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Color>("Image").default_value({1.0f, 1.0f, 1.0f, 1.0f});
-  b.add_input<decl::Float>("Gamma").default_value(1.0f).min(0.001f).max(10.0f).subtype(
-      PROP_UNSIGNED);
-  b.add_output<decl::Color>("Image");
+  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_input<decl::Float>(N_("Gamma"))
+      .default_value(1.0f)
+      .min(0.001f)
+      .max(10.0f)
+      .subtype(PROP_UNSIGNED);
+  b.add_output<decl::Color>(N_("Image"));
 }
-
-}  // namespace blender::nodes
 
 static int node_composite_gpu_gamma(GPUMaterial *mat,
                                     bNode *node,
@@ -46,13 +47,17 @@ static int node_composite_gpu_gamma(GPUMaterial *mat,
   return GPU_stack_link(mat, node, "node_composite_gamma", in, out);
 }
 
-void register_node_type_cmp_gamma(void)
+}  // namespace blender::nodes::node_composite_gamma_cc
+
+void register_node_type_cmp_gamma()
 {
+  namespace file_ns = blender::nodes::node_composite_gamma_cc;
+
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_GAMMA, "Gamma", NODE_CLASS_OP_COLOR, 0);
-  ntype.declare = blender::nodes::cmp_node_gamma_declare;
-  node_type_gpu(&ntype, node_composite_gpu_gamma);
+  cmp_node_type_base(&ntype, CMP_NODE_GAMMA, "Gamma", NODE_CLASS_OP_COLOR);
+  ntype.declare = file_ns::cmp_node_gamma_declare;
+  node_type_gpu(&ntype, file_ns::node_composite_gpu_gamma);
 
   nodeRegisterType(&ntype);
 }

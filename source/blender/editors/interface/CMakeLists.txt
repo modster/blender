@@ -24,10 +24,12 @@ set(INC
   ../../blentranslation
   ../../depsgraph
   ../../draw
+  ../../functions
   ../../gpu
   ../../imbuf
   ../../makesdna
   ../../makesrna
+  ../../nodes
   ../../python
   ../../render
   ../../windowmanager
@@ -41,7 +43,9 @@ set(SRC
   interface_anim.c
   interface_button_group.c
   interface_context_menu.c
+  interface_context_path.cc
   interface_draw.c
+  interface_dropboxes.cc
   interface_eyedropper.c
   interface_eyedropper_color.c
   interface_eyedropper_colorband.c
@@ -62,13 +66,14 @@ set(SRC
   interface_region_menu_popup.c
   interface_region_popover.c
   interface_region_popup.c
-  interface_region_search.c
+  interface_region_search.cc
   interface_region_tooltip.c
   interface_regions.c
   interface_style.c
   interface_template_asset_view.cc
+  interface_template_attribute_search.cc
   interface_template_list.cc
-  interface_template_search_menu.c
+  interface_template_search_menu.cc
   interface_template_search_operator.c
   interface_templates.c
   interface_undo.c

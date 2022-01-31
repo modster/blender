@@ -168,8 +168,6 @@ static int voxel_remesh_exec(bContext *C, wmOperator *op)
     new_mesh = mesh_fixed_poles;
   }
 
-  BKE_mesh_calc_normals(new_mesh);
-
   if (mesh->flag & ME_REMESH_REPROJECT_VOLUME || mesh->flag & ME_REMESH_REPROJECT_PAINT_MASK ||
       mesh->flag & ME_REMESH_REPROJECT_SCULPT_FACE_SETS) {
     BKE_mesh_runtime_clear_geometry(mesh);
@@ -463,8 +461,8 @@ static int voxel_size_edit_invoke(bContext *C, wmOperator *op, const wmEvent *ev
   Object *active_object = CTX_data_active_object(C);
   Mesh *mesh = (Mesh *)active_object->data;
 
-  VoxelSizeEditCustomData *cd = (VoxelSizeEditCustomData *)MEM_callocN(
-      sizeof(VoxelSizeEditCustomData), "Voxel Size Edit OP Custom Data");
+  VoxelSizeEditCustomData *cd = MEM_cnew<VoxelSizeEditCustomData>(
+      "Voxel Size Edit OP Custom Data");
 
   /* Initial operator Custom Data setup. */
   cd->draw_handle = ED_region_draw_cb_activate(
@@ -708,9 +706,16 @@ static bool mesh_is_manifold_consistent(Mesh *mesh)
   }
 
   if (is_manifold_consistent) {
-    /* check for wire edges */
     for (uint i = 0; i < mesh->totedge; i++) {
+      /* Check for wire edges. */
       if (edge_faces[i] == 0) {
+        is_manifold_consistent = false;
+        break;
+      }
+      /* Check for zero length edges */
+      MVert *v1 = &mesh->mvert[mesh->medge[i].v1];
+      MVert *v2 = &mesh->mvert[mesh->medge[i].v2];
+      if (compare_v3v3(v1->co, v2->co, 1e-4f)) {
         is_manifold_consistent = false;
         break;
       }
@@ -814,7 +819,8 @@ static Mesh *remesh_symmetry_mirror(Object *ob, Mesh *mesh, eSymmetryAxes symmet
       mmd.flag = 0;
       mmd.flag &= MOD_MIR_AXIS_X << i;
       mesh_mirror_temp = mesh_mirror;
-      mesh_mirror = BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(&mmd, ob, mesh_mirror, axis);
+      mesh_mirror = BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(
+          &mmd, ob, mesh_mirror, axis, true);
       if (mesh_mirror_temp != mesh_mirror) {
         BKE_id_free(nullptr, mesh_mirror_temp);
       }

@@ -76,8 +76,9 @@ typedef enum {
   GPU_NODE_TAG_SURFACE = (1 << 0),
   GPU_NODE_TAG_VOLUME = (1 << 1),
   GPU_NODE_TAG_DISPLACEMENT = (1 << 2),
-  GPU_NODE_TAG_AOV = (1 << 3),
-  GPU_NODE_TAG_EVAL = (1 << 4),
+  GPU_NODE_TAG_THICKNESS = (1 << 3),
+  GPU_NODE_TAG_AOV = (1 << 4),
+  GPU_NODE_TAG_EVAL = (1 << 5),
 } eGPUNodeTag;
 
 struct GPUNode {
@@ -174,6 +175,7 @@ typedef struct GPUNodeGraph {
   GPUNodeLink *outlink_surface;
   GPUNodeLink *outlink_volume;
   GPUNodeLink *outlink_displacement;
+  GPUNodeLink *outlink_thickness;
   /* List of GPUNodeGraphOutputLink */
   ListBase outlink_aovs;
   /* List of GPUNodeGraphEvalNode. */
@@ -196,12 +198,21 @@ typedef struct GPUNodeGraph {
 
 void gpu_node_graph_prune_unused(GPUNodeGraph *graph);
 void gpu_node_graph_finalize_uniform_attrs(GPUNodeGraph *graph);
+/**
+ * Free intermediate node graph.
+ */
 void gpu_node_graph_free_nodes(GPUNodeGraph *graph);
+/**
+ * Free both node graph and requested attributes and textures.
+ */
 void gpu_node_graph_free(GPUNodeGraph *graph);
 
 /* Material calls */
 
 struct GPUNodeGraph *gpu_material_node_graph(struct GPUMaterial *material);
+/**
+ * Returns the address of the future pointer to coba_tex.
+ */
 struct GPUTexture **gpu_material_ramp_texture_row_set(struct GPUMaterial *mat,
                                                       int size,
                                                       float *pixels,

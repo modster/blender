@@ -33,7 +33,7 @@ uniform sampler2D tiles_tx;
 
 in vec4 uvcoordsvar;
 
-out vec4 out_color;
+layout(location = 0) out vec4 out_color;
 
 const int gather_sample_count = 8;
 

@@ -99,33 +99,33 @@ void Camera::sync(void)
   data.filter_size = inst_.scene->r.gauss;
 
   if (inst_.drw_view) {
-    DRW_view_viewmat_get(inst_.drw_view, data.viewmat, false);
-    DRW_view_viewmat_get(inst_.drw_view, data.viewinv, true);
-    DRW_view_winmat_get(inst_.drw_view, data.winmat, false);
-    DRW_view_winmat_get(inst_.drw_view, data.wininv, true);
-    DRW_view_persmat_get(inst_.drw_view, data.persmat, false);
-    DRW_view_persmat_get(inst_.drw_view, data.persinv, true);
+    DRW_view_viewmat_get(inst_.drw_view, data.viewmat.ptr(), false);
+    DRW_view_viewmat_get(inst_.drw_view, data.viewinv.ptr(), true);
+    DRW_view_winmat_get(inst_.drw_view, data.winmat.ptr(), false);
+    DRW_view_winmat_get(inst_.drw_view, data.wininv.ptr(), true);
+    DRW_view_persmat_get(inst_.drw_view, data.persmat.ptr(), false);
+    DRW_view_persmat_get(inst_.drw_view, data.persinv.ptr(), true);
     DRW_view_camtexco_get(inst_.drw_view, data.uv_scale);
   }
   else if (inst_.render) {
     /* TODO(fclem) Overscan */
     // RE_GetCameraWindowWithOverscan(inst_.render->re, g_data->overscan, data.winmat);
-    RE_GetCameraWindow(inst_.render->re, camera_eval, data.winmat);
-    RE_GetCameraModelMatrix(inst_.render->re, camera_eval, data.viewinv);
-    invert_m4_m4(data.viewmat, data.viewinv);
-    invert_m4_m4(data.wininv, data.winmat);
-    mul_m4_m4m4(data.persmat, data.winmat, data.viewmat);
-    invert_m4_m4(data.persinv, data.persmat);
-    data.uv_scale = vec2(1.0f);
-    data.uv_bias = vec2(0.0f);
+    RE_GetCameraWindow(inst_.render->re, camera_eval, data.winmat.ptr());
+    RE_GetCameraModelMatrix(inst_.render->re, camera_eval, data.viewinv.ptr());
+    invert_m4_m4(data.viewmat.ptr(), data.viewinv.ptr());
+    invert_m4_m4(data.wininv.ptr(), data.winmat.ptr());
+    mul_m4_m4m4(data.persmat.ptr(), data.winmat.ptr(), data.viewmat.ptr());
+    invert_m4_m4(data.persinv.ptr(), data.persmat.ptr());
+    data.uv_scale = float2(1.0f);
+    data.uv_bias = float2(0.0f);
   }
   else {
-    unit_m4(data.viewmat);
-    unit_m4(data.viewinv);
-    perspective_m4(data.winmat, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 1.0f);
-    invert_m4_m4(data.wininv, data.winmat);
-    mul_m4_m4m4(data.persmat, data.winmat, data.viewmat);
-    invert_m4_m4(data.persinv, data.persmat);
+    data.viewmat.identity();
+    data.viewinv.identity();
+    perspective_m4(data.winmat.ptr(), -0.1f, 0.1f, -0.1f, 0.1f, 0.1f, 1.0f);
+    data.wininv = data.winmat.inverted();
+    data.persmat = data.winmat * data.viewmat;
+    data.persinv = data.persmat.inverted();
   }
 
   if (camera_eval) {
@@ -148,8 +148,8 @@ void Camera::sync(void)
     data.clip_near = DRW_view_near_distance_get(inst_.drw_view);
     data.clip_far = DRW_view_far_distance_get(inst_.drw_view);
     data.fisheye_fov = data.fisheye_lens = -1.0f;
-    data.equirect_bias = vec2(0.0f);
-    data.equirect_scale = vec2(0.0f);
+    data.equirect_bias = float2(0.0f);
+    data.equirect_scale = float2(0.0f);
   }
 
   data_[data_id_].push_update();

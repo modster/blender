@@ -25,14 +25,12 @@
 
 /* **************** RGB ******************** */
 
-namespace blender::nodes {
+namespace blender::nodes::node_composite_rgb_cc {
 
 static void cmp_node_rgb_declare(NodeDeclarationBuilder &b)
 {
-  b.add_output<decl::Color>("RGBA").default_value({0.5f, 0.5f, 0.5f, 1.0f});
+  b.add_output<decl::Color>(N_("RGBA")).default_value({0.5f, 0.5f, 0.5f, 1.0f});
 }
-
-}  // namespace blender::nodes
 
 static int node_composite_gpu_rgb(GPUMaterial *mat,
                                   bNode *node,
@@ -44,14 +42,18 @@ static int node_composite_gpu_rgb(GPUMaterial *mat,
   return GPU_stack_link(mat, node, "set_rgba", in, out, link);
 }
 
-void register_node_type_cmp_rgb(void)
+}  // namespace blender::nodes::node_composite_rgb_cc
+
+void register_node_type_cmp_rgb()
 {
+  namespace file_ns = blender::nodes::node_composite_rgb_cc;
+
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_RGB, "RGB", NODE_CLASS_INPUT, 0);
-  ntype.declare = blender::nodes::cmp_node_rgb_declare;
+  cmp_node_type_base(&ntype, CMP_NODE_RGB, "RGB", NODE_CLASS_INPUT);
+  ntype.declare = file_ns::cmp_node_rgb_declare;
   node_type_size_preset(&ntype, NODE_SIZE_SMALL);
-  node_type_gpu(&ntype, node_composite_gpu_rgb);
+  node_type_gpu(&ntype, file_ns::node_composite_gpu_rgb);
 
   nodeRegisterType(&ntype);
 }

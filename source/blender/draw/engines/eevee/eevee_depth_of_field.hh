@@ -69,8 +69,8 @@ class DepthOfField {
   GPUTexture *weight_fg_tx_ = nullptr;
   GPUTexture *weight_holefill_tx_ = nullptr;
   /** Allocated textures. Owned. */
-  eevee::Texture reduced_coc_tx_ = Texture("dof_reduced_coc");
-  eevee::Texture reduced_color_tx_ = Texture("dof_reduced_color");
+  Texture reduced_coc_tx_ = {"dof_reduced_coc"};
+  Texture reduced_color_tx_ = {"dof_reduced_color"};
   /** Input texture. Not owned. */
   GPUTexture *input_color_tx_;
   GPUTexture *input_depth_tx_;
@@ -91,21 +91,21 @@ class DepthOfField {
   DRWPass *tiles_dilate_minmax_ps_ = nullptr;
   DRWPass *tiles_flatten_ps_ = nullptr;
   /** Framebuffers. Owned.  */
-  eevee::Framebuffer bokeh_lut_fb_ = Framebuffer("bokeh_lut_fb_");
-  eevee::Framebuffer filter_bg_fb_ = Framebuffer("filter_bg_fb_");
-  eevee::Framebuffer filter_fg_fb_ = Framebuffer("filter_fg_fb_");
-  eevee::Framebuffer gather_fb_ = Framebuffer("gather_fb_");
-  eevee::Framebuffer gather_filter_bg_fb_ = Framebuffer("gather_filter_bg_fb_");
-  eevee::Framebuffer gather_holefill_fb_ = Framebuffer("gather_holefill_fb_");
-  eevee::Framebuffer reduce_copy_fb_ = Framebuffer("reduce_copy_fb_");
-  eevee::Framebuffer reduce_downsample_fb_ = Framebuffer("reduce_downsample_fb_");
-  eevee::Framebuffer reduce_fb_ = Framebuffer("reduce_fb_");
-  eevee::Framebuffer resolve_fb_ = Framebuffer("resolve_fb_");
-  eevee::Framebuffer scatter_bg_fb_ = Framebuffer("scatter_bg_fb_");
-  eevee::Framebuffer scatter_fg_fb_ = Framebuffer("scatter_fg_fb_");
-  eevee::Framebuffer setup_fb_ = Framebuffer("setup_fb_");
-  eevee::Framebuffer tiles_dilate_fb_ = Framebuffer("tiles_dilate_fb_");
-  eevee::Framebuffer tiles_flatten_fb_ = Framebuffer("tiles_flatten_fb_");
+  Framebuffer bokeh_lut_fb_ = {"bokeh_lut_fb_"};
+  Framebuffer filter_bg_fb_ = {"filter_bg_fb_"};
+  Framebuffer filter_fg_fb_ = {"filter_fg_fb_"};
+  Framebuffer gather_fb_ = {"gather_fb_"};
+  Framebuffer gather_filter_bg_fb_ = {"gather_filter_bg_fb_"};
+  Framebuffer gather_holefill_fb_ = {"gather_holefill_fb_"};
+  Framebuffer reduce_copy_fb_ = {"reduce_copy_fb_"};
+  Framebuffer reduce_downsample_fb_ = {"reduce_downsample_fb_"};
+  Framebuffer reduce_fb_ = {"reduce_fb_"};
+  Framebuffer resolve_fb_ = {"resolve_fb_"};
+  Framebuffer scatter_bg_fb_ = {"scatter_bg_fb_"};
+  Framebuffer scatter_fg_fb_ = {"scatter_fg_fb_"};
+  Framebuffer setup_fb_ = {"setup_fb_"};
+  Framebuffer tiles_dilate_fb_ = {"tiles_dilate_fb_"};
+  Framebuffer tiles_flatten_fb_ = {"tiles_flatten_fb_"};
 
   /** Scene settings that are immutable. */
   float user_overblur_;
@@ -122,7 +122,7 @@ class DepthOfField {
   /** Focus distance in view space. */
   float focus_distance_;
   /** Extent of the input buffer. */
-  ivec2 extent_;
+  int2 extent_;
 
   /** Tile dilation uniforms. */
   int tiles_dilate_slight_focus_;
@@ -132,7 +132,7 @@ class DepthOfField {
   /** Reduce pass info. */
   int reduce_steps_;
 
-  /** Static srting pointer. Used as debug name and as UUID for texture pool. */
+  /** Static string pointer. Used as debug name and as UUID for texture pool. */
   StringRefNull view_name_;
 
  public:
@@ -141,10 +141,10 @@ class DepthOfField {
 
   void init();
 
-  void sync(const mat4 winmat, ivec2 input_extent);
+  void sync(const float4x4 winmat, int2 input_extent);
 
   /** Apply Depth Of Field jittering to the view and projection matrices.. */
-  void jitter_apply(mat4 winmat, mat4 viewmat);
+  void jitter_apply(float4x4 winmat, float4x4 viewmat);
 
   /** Will swap input and output texture if rendering happens. The actual output of this function
    * is in intput_tx. */

@@ -55,7 +55,8 @@ namespace blender::eevee {
 
 void DepthOfField::init(void)
 {
-  const SceneEEVEE &sce_eevee = inst_.scene->eevee;
+  const Instance &inst = inst_;
+  const SceneEEVEE &sce_eevee = inst.scene->eevee;
   do_hq_slight_focus_ = (sce_eevee.flag & SCE_EEVEE_DOF_HQ_SLIGHT_FOCUS) != 0;
   do_jitter_ = (sce_eevee.flag & SCE_EEVEE_DOF_JITTER) != 0;
   user_overblur_ = sce_eevee.bokeh_overblur / 100.0f;
@@ -68,7 +69,7 @@ void DepthOfField::init(void)
   jitter_radius_ = 0.0f;
 }
 
-void DepthOfField::sync(const mat4 winmat, ivec2 input_extent)
+void DepthOfField::sync(const float4x4 winmat, int2 input_extent)
 {
   const Object *camera_object_eval = inst_.camera_eval_object;
   const ::Camera *cam = (camera_object_eval) ?
@@ -135,8 +136,8 @@ void DepthOfField::sync(const mat4 winmat, ivec2 input_extent)
     /* OPTI(fclem) Could be optimized. */
     float jitter[3] = {fx_radius_, 0.0f, -focus_distance_};
     float center[3] = {0.0f, 0.0f, -focus_distance_};
-    mul_project_m4_v3(winmat, jitter);
-    mul_project_m4_v3(winmat, center);
+    mul_project_m4_v3(winmat.ptr(), jitter);
+    mul_project_m4_v3(winmat.ptr(), center);
     /* Simplify CoC calculation to a simple MADD. */
     if (data_.camera_type != CAMERA_ORTHO) {
       data_.coc_bias = -(center[0] - jitter[0]) * 0.5f * extent_[0];
@@ -168,7 +169,7 @@ void DepthOfField::sync(const mat4 winmat, ivec2 input_extent)
   }
 }
 
-void DepthOfField::jitter_apply(mat4 winmat, mat4 viewmat)
+void DepthOfField::jitter_apply(float4x4 winmat, float4x4 viewmat)
 {
   if (jitter_radius_ == 0.0f) {
     return;
@@ -184,13 +185,13 @@ void DepthOfField::jitter_apply(mat4 winmat, mat4 viewmat)
   theta += data_.bokeh_rotation;
 
   /* Sample in View Space. */
-  vec2 sample = vec2(radius * cosf(theta), radius * sinf(theta));
+  float2 sample = float2(radius * cosf(theta), radius * sinf(theta));
   sample *= data_.bokeh_anisotropic_scale;
   /* Convert to NDC Space. */
-  vec3 jitter = vec3(UNPACK2(sample), -focus_distance_);
-  vec3 center = vec3(0.0f, 0.0f, -focus_distance_);
-  mul_project_m4_v3(winmat, jitter);
-  mul_project_m4_v3(winmat, center);
+  float3 jitter = float3(UNPACK2(sample), -focus_distance_);
+  float3 center = float3(0.0f, 0.0f, -focus_distance_);
+  mul_project_m4_v3(winmat.ptr(), jitter);
+  mul_project_m4_v3(winmat.ptr(), center);
 
   const bool is_ortho = (winmat[2][3] != -1.0f);
   if (is_ortho) {
@@ -235,7 +236,7 @@ void DepthOfField::render(GPUTexture *depth_tx, GPUTexture **input_tx, GPUTextur
  **/
 void DepthOfField::bokeh_lut_pass_sync(void)
 {
-  const bool has_anisotropy = data_.bokeh_anisotropic_scale != vec2(1.0f);
+  const bool has_anisotropy = data_.bokeh_anisotropic_scale != float2(1.0f);
   if (has_anisotropy && (data_.bokeh_blades == 0.0)) {
     bokeh_gather_lut_tx_ = nullptr;
     bokeh_scatter_lut_tx_ = nullptr;
@@ -250,7 +251,7 @@ void DepthOfField::bokeh_lut_pass_sync(void)
   DRW_PASS_CREATE(bokeh_lut_ps_, DRW_STATE_WRITE_COLOR);
   GPUShader *sh = inst_.shaders.static_shader_get(DOF_BOKEH_LUT);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, bokeh_lut_ps_);
-  DRW_shgroup_uniform_block(grp, "dof_block", data_.ubo_get());
+  DRW_shgroup_uniform_block(grp, "dof_block", data_);
   DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
   bokeh_gather_lut_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
@@ -286,7 +287,7 @@ void DepthOfField::setup_pass_sync(void)
   eGPUSamplerState no_filter = GPU_SAMPLER_DEFAULT;
   DRW_shgroup_uniform_texture_ref_ex(grp, "color_tx", &input_color_tx_, no_filter);
   DRW_shgroup_uniform_texture_ref_ex(grp, "depth_tx", &input_depth_tx_, no_filter);
-  DRW_shgroup_uniform_block(grp, "dof_block", data_.ubo_get());
+  DRW_shgroup_uniform_block(grp, "dof_block", data_);
   DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
   setup_color_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
@@ -391,13 +392,13 @@ void DepthOfField::tiles_prepare_pass_render(void)
       GPU_framebuffer_bind(tiles_dilate_fb_);
       DRW_draw_pass((pass == 0) ? tiles_dilate_minmax_ps_ : tiles_dilate_minabs_ps_);
 
-      SWAP(eevee::Framebuffer, tiles_dilate_fb_, tiles_flatten_fb_);
+      Framebuffer::swap(tiles_dilate_fb_, tiles_flatten_fb_);
       SWAP(GPUTexture *, tiles_dilated_bg_tx_, tiles_bg_tx_);
       SWAP(GPUTexture *, tiles_dilated_fg_tx_, tiles_fg_tx_);
     }
   }
   /* Swap again so that final textures are tiles_dilated_*_tx_. */
-  SWAP(eevee::Framebuffer, tiles_dilate_fb_, tiles_flatten_fb_);
+  Framebuffer::swap(tiles_dilate_fb_, tiles_flatten_fb_);
   SWAP(GPUTexture *, tiles_dilated_bg_tx_, tiles_bg_tx_);
   SWAP(GPUTexture *, tiles_dilated_fg_tx_, tiles_fg_tx_);
 }
@@ -419,18 +420,19 @@ void DepthOfField::reduce_pass_sync(void)
   /* This ensure the mipmaps are aligned for the needed 4 mip levels.
    * Starts at 2 because already at half resolution. */
   int multiple = 2 << (mip_count - 1);
-  uint res[2] = {(multiple * divide_ceil_u(extent_[0], multiple)) / 2,
-                 (multiple * divide_ceil_u(extent_[1], multiple)) / 2};
+  int2 res = (int2(divide_ceil_u(extent_[0], multiple), divide_ceil_u(extent_[1], multiple)) *
+              multiple) /
+             2;
 
-  uint quater_res[2] = {divide_ceil_u(extent_[0], 4), divide_ceil_u(extent_[1], 4)};
+  int2 quater_res = int2(divide_ceil_u(extent_[0], 4), divide_ceil_u(extent_[1], 4));
 
   /* TODO(fclem): Make this dependent of the quality of the gather pass. */
   data_.scatter_coc_threshold = 4.0f;
 
   /* Color needs to be signed format here. See note in shader for explanation. */
   /* Do not use texture pool because of needs mipmaps. */
-  reduced_color_tx_.ensure(UNPACK2(res), mip_count, GPU_RGBA16F);
-  reduced_coc_tx_.ensure(UNPACK2(res), mip_count, GPU_R16F);
+  reduced_color_tx_.ensure_2d(GPU_RGBA16F, res, nullptr, mip_count);
+  reduced_coc_tx_.ensure_2d(GPU_R16F, res, nullptr, mip_count);
 
   {
     DRW_PASS_CREATE(reduce_downsample_ps_, DRW_STATE_WRITE_COLOR);
@@ -452,7 +454,7 @@ void DepthOfField::reduce_pass_sync(void)
     DRW_shgroup_uniform_texture_ref_ex(grp, "color_tx", &setup_color_tx_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "coc_tx", &setup_coc_tx_, no_filter);
     DRW_shgroup_uniform_texture_ex(grp, "downsampled_tx", reduce_downsample_tx_, no_filter);
-    DRW_shgroup_uniform_block(grp, "dof_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "dof_block", data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
     scatter_src_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R11F_G11F_B10F, owner);
@@ -528,7 +530,7 @@ void DepthOfField::convolve_pass_sync(void)
     DRW_shgroup_uniform_texture_ex(grp, "coc_tx", reduced_coc_tx_, no_filter);
     DRW_shgroup_uniform_texture(grp, "tiles_bg_tx", tiles_dilated_bg_tx_);
     DRW_shgroup_uniform_texture(grp, "tiles_fg_tx", tiles_dilated_fg_tx_);
-    DRW_shgroup_uniform_block(grp, "dof_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "dof_block", data_);
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
@@ -555,7 +557,7 @@ void DepthOfField::convolve_pass_sync(void)
     if (bokeh_gather_lut_tx_) {
       DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_gather_lut_tx_);
     }
-    DRW_shgroup_uniform_block(grp, "dof_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "dof_block", data_);
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
@@ -575,7 +577,7 @@ void DepthOfField::convolve_pass_sync(void)
     if (bokeh_gather_lut_tx_) {
       DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_gather_lut_tx_);
     }
-    DRW_shgroup_uniform_block(grp, "dof_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "dof_block", data_);
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
@@ -628,7 +630,7 @@ void DepthOfField::convolve_pass_sync(void)
     if (bokeh_scatter_lut_tx_) {
       DRW_shgroup_uniform_texture(grp, "bokehLut", bokeh_scatter_lut_tx_);
     }
-    DRW_shgroup_uniform_block(grp, "dof_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "dof_block", data_);
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
     scatter_fg_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(color_fg_tx_));
@@ -644,7 +646,7 @@ void DepthOfField::convolve_pass_sync(void)
     if (bokeh_scatter_lut_tx_) {
       DRW_shgroup_uniform_texture(grp, "bokehLut", bokeh_scatter_lut_tx_);
     }
-    DRW_shgroup_uniform_block(grp, "dof_block", data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "dof_block", data_);
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
     scatter_bg_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(color_bg_tx_));
@@ -709,7 +711,7 @@ void DepthOfField::resolve_pass_sync(void)
   DRW_shgroup_uniform_texture_ex(grp, "weight_bg_tx", weight_bg_tx_, with_filter);
   DRW_shgroup_uniform_texture_ex(grp, "weight_fg_tx", weight_fg_tx_, with_filter);
   DRW_shgroup_uniform_texture_ex(grp, "weight_holefill_tx", weight_holefill_tx_, with_filter);
-  DRW_shgroup_uniform_block(grp, "dof_block", data_.ubo_get());
+  DRW_shgroup_uniform_block(grp, "dof_block", data_);
   DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
   if (bokeh_resolve_lut_tx_) {
     DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_resolve_lut_tx_);

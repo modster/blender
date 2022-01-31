@@ -67,13 +67,19 @@ static const float cubeface_mat[6][4][4] = {
      {0.0f, 0.0f, 0.0f, 1.0f}},
 };
 
+inline void cubeface_winmat_get(float4x4 &winmat, float near, float far)
+{
+  /* Simple 90° FOV projection. */
+  perspective_m4(winmat.ptr(), -near, near, -near, near, near, far);
+}
+
 /* -------------------------------------------------------------------- */
 /** \name CameraData operators
  * \{ */
 
 inline bool operator==(const CameraData &a, const CameraData &b)
 {
-  return compare_m4m4(a.persmat, b.persmat, FLT_MIN) && (a.uv_scale == b.uv_scale) &&
+  return compare_m4m4(a.persmat.ptr(), b.persmat.ptr(), FLT_MIN) && (a.uv_scale == b.uv_scale) &&
          (a.uv_bias == b.uv_bias) && (a.equirect_scale == b.equirect_scale) &&
          (a.equirect_bias == b.equirect_bias) && (a.fisheye_fov == b.fisheye_fov) &&
          (a.fisheye_lens == b.fisheye_lens) && (a.filter_size == b.filter_size) &&
@@ -122,11 +128,19 @@ class Camera {
   }
   const GPUUniformBuf *ubo_get(void) const
   {
-    return data_[data_id_].ubo_get();
+    return data_[data_id_];
   }
   bool is_panoramic(void) const
   {
     return eevee::is_panoramic(data_[data_id_].type);
+  }
+  bool is_orthographic(void) const
+  {
+    return data_[data_id_].type == CAMERA_ORTHO;
+  }
+  float3 position(void) const
+  {
+    return float3(data_[data_id_].viewinv[3]);
   }
 };
 

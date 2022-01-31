@@ -131,11 +131,11 @@ class MotionBlur {
   DRWPass *tiles_dilate_ps_ = nullptr;
   DRWPass *gather_ps_ = nullptr;
   /** Framebuffers. Owned.  */
-  eevee::Framebuffer tiles_flatten_fb_;
-  eevee::Framebuffer tiles_dilate_fb_;
-  eevee::Framebuffer gather_fb_;
+  Framebuffer tiles_flatten_fb_;
+  Framebuffer tiles_dilate_fb_;
+  Framebuffer gather_fb_;
 
-  StructBuffer<MotionBlurData> data_;
+  draw::UniformBuffer<MotionBlurData> data_;
 
   bool enabled_;
 

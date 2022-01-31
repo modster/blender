@@ -15,31 +15,35 @@
 #pragma BLENDER_REQUIRE(eevee_volume_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(std140) uniform lights_block
+layout(std430, binding = 0) readonly restrict buffer lights_buf
 {
-  LightData lights[CULLING_ITEM_BATCH];
+  LightData lights[];
 };
 
-layout(std140) uniform lights_culling_block
+layout(std430, binding = 1) readonly restrict buffer lights_zbins_buf
+{
+  CullingZBin lights_zbins[];
+};
+
+layout(std430, binding = 2) readonly restrict buffer lights_culling_buf
 {
   CullingData light_culling;
 };
 
-layout(std140) uniform shadows_punctual_block
+layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
 {
-  ShadowPunctualData shadows_punctual[CULLING_ITEM_BATCH];
+  CullingWord lights_culling_words[];
 };
 
 uniform sampler2D transparency_data_tx;
 uniform usampler2D volume_data_tx;
-uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
 uniform sampler2DShadow shadow_atlas_tx;
+uniform usampler2D shadow_tilemaps_tx;
 
-utility_tx_fetch_define(utility_tx)
-utility_tx_sample_define(utility_tx)
+utility_tx_fetch_define(utility_tx) utility_tx_sample_define(utility_tx)
 
-in vec4 uvcoordsvar;
+    in vec4 uvcoordsvar;
 
 layout(location = 0) out vec4 out_combined;
 layout(location = 1) out vec3 out_volume;

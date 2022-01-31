@@ -177,7 +177,7 @@ bool LightCache::validate(const int cube_len,
     return false;
   }
   /* See if we need the same amount of texture space. */
-  if ((ivec3(irr_size) == ivec3(grid_tx.tex_size)) && (grid_len == this->grid_len)) {
+  if ((int3(irr_size) == int3(grid_tx.tex_size)) && (grid_len == this->grid_len)) {
     int mip_len = log2_floor_u(cube_res) - min_cube_lod_level;
     if ((cube_res == cube_tx.tex_size[0]) && (cube_len == cube_tx.tex_size[2] / 6) &&
         (cube_len == this->cube_len) && (mip_len == this->mips_len)) {
@@ -502,9 +502,10 @@ class LightBake {
         bake.inst_->lightprobes.swap_irradiance_cache();
       }
 
-      ivec3 cell_co = grid_cell_index_to_coordinate(sample_index, grid->resolution);
-      vec3 position = vec3(grid->corner) + vec3(grid->increment_x) * cell_co.x +
-                      vec3(grid->increment_y) * cell_co.y + vec3(grid->increment_z) * cell_co.z;
+      int3 cell_co = grid_cell_index_to_coordinate(sample_index, grid->resolution);
+      float3 position = float3(grid->corner) + float3(grid->increment_x) * cell_co.x +
+                        float3(grid->increment_y) * cell_co.y +
+                        float3(grid->increment_z) * cell_co.z;
 
       bake.inst_->lightprobes.bake(bake.depsgraph_,
                                    LIGHTPROBE_TYPE_GRID,
@@ -751,8 +752,8 @@ class LightBake {
     grid.attenuation_bias = fac;
 
     /* Update transforms */
-    vec3 half_cell_dim = vec3(1.0f) / vec3(UNPACK3(grid.resolution));
-    vec3 cell_dim = half_cell_dim * 2.0f;
+    float3 half_cell_dim = float3(1.0f) / float3(UNPACK3(grid.resolution));
+    float3 cell_dim = half_cell_dim * 2.0f;
 
     /* Matrix converting world space to cell ranges. */
     invert_m4_m4(grid.mat, ob->obmat);
@@ -760,15 +761,15 @@ class LightBake {
     float4x4 obmat(ob->obmat);
 
     /* First cell. */
-    vec3 corner = obmat * (half_cell_dim - vec3(1.0f));
+    float3 corner = obmat * (half_cell_dim - float3(1.0f));
     copy_v3_v3(grid.corner, corner);
 
     /* Opposite neighbor cell. */
-    vec3 increment_x = (obmat * vec3(cell_dim.x, 0.0f, 0.0f)) - vec3(obmat.values[3]);
+    float3 increment_x = (obmat * float3(cell_dim.x, 0.0f, 0.0f)) - float3(obmat.values[3]);
     copy_v3_v3(grid.increment_x, increment_x);
-    vec3 increment_y = (obmat * vec3(0.0f, cell_dim.y, 0.0f)) - vec3(obmat.values[3]);
+    float3 increment_y = (obmat * float3(0.0f, cell_dim.y, 0.0f)) - float3(obmat.values[3]);
     copy_v3_v3(grid.increment_y, increment_y);
-    vec3 increment_z = (obmat * vec3(0.0f, 0.0f, cell_dim.z)) - vec3(obmat.values[3]);
+    float3 increment_z = (obmat * float3(0.0f, 0.0f, cell_dim.z)) - float3(obmat.values[3]);
     copy_v3_v3(grid.increment_z, increment_z);
 
     grid.probe_index = probe_index;
@@ -886,7 +887,7 @@ class LightBake {
     grid_len_ = grids_data.size();
     cube_len_ = cubes_data.size();
 
-    ivec3 irradiance_tx_size;
+    int3 irradiance_tx_size;
     LightCache::irradiance_cache_size_get(
         sce_eevee.gi_visibility_resolution, irradiance_samples_count, irradiance_tx_size);
 
@@ -1104,7 +1105,7 @@ void EEVEE_lightbake_job(void *custom_data, short *stop, short *do_update, float
 void EEVEE_lightcache_free(struct LightCache *lcache_)
 {
   eevee::LightCache *lcache = reinterpret_cast<eevee::LightCache *>(lcache_);
-  OBJECT_GUARDED_SAFE_DELETE(lcache, eevee::LightCache);
+  MEM_delete(lcache);
 }
 
 void EEVEE_lightcache_info_update(struct SceneEEVEE *eevee)

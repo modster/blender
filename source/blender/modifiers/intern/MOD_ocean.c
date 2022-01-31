@@ -376,7 +376,7 @@ static Mesh *doOcean(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mes
 
   if (omd->geometry_mode == MOD_OCEAN_GEOM_GENERATE) {
     result = generate_ocean_geometry(omd, mesh, resolution);
-    BKE_mesh_ensure_normals(result);
+    BKE_mesh_normals_tag_dirty(result);
   }
   else if (omd->geometry_mode == MOD_OCEAN_GEOM_DISPLACE) {
     result = (Mesh *)BKE_id_copy_ex(NULL, &mesh->id, NULL, LIB_ID_COPY_LOCALIZE);
@@ -552,7 +552,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   modifier_panel_end(layout, ptr);
 
 #else  /* WITH_OCEANSIM */
-  uiItemL(layout, IFACE_("Built without Ocean modifier"), ICON_NONE);
+  uiItemL(layout, TIP_("Built without Ocean modifier"), ICON_NONE);
 #endif /* WITH_OCEANSIM */
 }
 
