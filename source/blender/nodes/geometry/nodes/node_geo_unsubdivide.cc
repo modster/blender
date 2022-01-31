@@ -23,27 +23,28 @@
 #include "bmesh_tools.h"
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_unsubdivide_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_INT, N_("Iterations"), 1, 0, 0, 0, 0, 10},
-    {SOCK_STRING, N_("Selection")},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_unsubdivide {
 
-static bNodeSocketTemplate geo_node_unsubdivide_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
+static void node_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>(N_("Mesh")).supported_type(GEO_COMPONENT_TYPE_MESH);
+  b.add_input<decl::Int>(N_("Iterations")).default_value(1).min(0).max(10);
+  b.add_input<decl::Bool>(N_("Selection")).default_value(true).supports_field().hide_value();
+  b.add_output<decl::Geometry>(N_("Mesh"));
+}
 
-namespace blender::nodes {
-
-static Mesh *unsubdivide_mesh(const int iterations, const Array<bool> &selection, const Mesh *mesh)
+static Mesh *unsubdivide_mesh(const int iterations, const IndexMask selection, const Mesh *mesh)
 {
   const BMeshCreateParams bmesh_create_params = {0};
   const BMeshFromMeshParams bmesh_from_mesh_params = {
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
-  BM_tag_vertices(bm, selection.data());
+
+  BM_mesh_elem_table_ensure(bm, BM_VERT);
+  for (int i_point : selection) {
+    BM_elem_flag_set(BM_vert_at_index(bm, i_point), BM_ELEM_TAG, true);
+  }
+
   BM_mesh_decimate_unsubdivide_ex(bm, iterations, true);
 
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
@@ -53,35 +54,41 @@ static Mesh *unsubdivide_mesh(const int iterations, const Array<bool> &selection
   return result;
 }
 
-static void geo_node_unsubdivide_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
   const int iterations = params.extract_input<int>("Iterations");
   if (iterations > 0 && geometry_set.has_mesh()) {
     const MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
     const Mesh *input_mesh = mesh_component.get_for_read();
 
-    const bool default_selection = true;
-    GVArray_Typed<bool> selection_attribute = params.get_input_attribute<bool>(
-        "Selection", mesh_component, ATTR_DOMAIN_POINT, default_selection);
-    VArray_Span<bool> selection{selection_attribute};
+    Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
+    const int domain_size = mesh_component.attribute_domain_size(ATTR_DOMAIN_POINT);
+    GeometryComponentFieldContext context{mesh_component, ATTR_DOMAIN_POINT};
+    FieldEvaluator evaluator{context, domain_size};
+    evaluator.add(selection_field);
+    evaluator.evaluate();
+    const IndexMask selection = evaluator.get_evaluated_as_mask(0);
 
-    Mesh *result = unsubdivide_mesh(iterations, selection, input_mesh);
-    if (result != input_mesh) {
-      geometry_set.replace_mesh(result);
-    }
+    geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+      Mesh *result = unsubdivide_mesh(iterations, selection, input_mesh);
+      if (result != input_mesh) {
+        geometry_set.replace_mesh(result);
+      }
+    });
   }
-  params.set_output("Geometry", std::move(geometry_set));
+  params.set_output("Mesh", std::move(geometry_set));
 }
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_unsubdivide
 
 void register_node_type_geo_unsubdivide()
 {
+  namespace file_ns = blender::nodes::node_geo_unsubdivide;
+
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_UNSUBDIVIDE, "Unsubdivide", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_unsubdivide_in, geo_node_unsubdivide_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_unsubdivide_exec;
-  ntype.width = 165;
+  geo_node_type_base(&ntype, GEO_NODE_UNSUBDIVIDE, "Unsubdivide", NODE_CLASS_GEOMETRY);
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
   nodeRegisterType(&ntype);
 }

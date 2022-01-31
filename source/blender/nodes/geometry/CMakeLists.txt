@@ -87,6 +87,7 @@ set(SRC
   nodes/node_geo_attribute_statistic.cc
   nodes/node_geo_boolean.cc
   nodes/node_geo_bounding_box.cc
+  nodes/node_geo_collapse.cc
   nodes/node_geo_collection_info.cc
   nodes/node_geo_common.cc
   nodes/node_geo_convex_hull.cc
@@ -114,6 +115,7 @@ set(SRC
   nodes/node_geo_curve_to_points.cc
   nodes/node_geo_curve_trim.cc
   nodes/node_geo_delete_geometry.cc
+  nodes/node_geo_dissolve.cc
   nodes/node_geo_distribute_points_on_faces.cc
   nodes/node_geo_dual_mesh.cc
   nodes/node_geo_edge_split.cc
@@ -192,6 +194,7 @@ set(SRC
   nodes/node_geo_transform.cc
   nodes/node_geo_translate_instances.cc
   nodes/node_geo_triangulate.cc
+  nodes/node_geo_unsubdivide.cc
   nodes/node_geo_viewer.cc
   nodes/node_geo_volume_to_mesh.cc
 

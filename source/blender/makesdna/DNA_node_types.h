@@ -2380,6 +2380,18 @@ typedef enum GeometryNodeScaleElementsMode {
   GEO_NODE_SCALE_ELEMENTS_SINGLE_AXIS = 1,
 } GeometryNodeScaleElementsMode;
 
+typedef enum GeometryNodeCollapseSymmetryAxis {
+  GEO_NODE_COLLAPSE_SYMMETRY_AXIS_NONE = -1,
+  GEO_NODE_COLLAPSE_SYMMETRY_AXIS_X = 0,
+  GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Y = 1,
+  GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Z = 2,
+} GeometryNodeCollapseSymmetryAxis;
+
+typedef enum GeometryNodeDissolveDelimiter {
+  GEO_NODE_DISSOLVE_DELIMITTER_UNSELECTED = 0,
+  GEO_NODE_DISSOLVE_DELIMITTER_LIMIT = 1,
+  GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER = 2,
+} GeometryNodeDissolveDelimiter;
 #ifdef __cplusplus
 }
 #endif
