@@ -83,9 +83,11 @@ typedef struct GPencilUpdateCacheNode {
 } GPencilUpdateCacheNode;
 
 /**
- *
+ * Callback that is called in BKE_gpencil_traverse_update_cache at each level.
+ * \param cache: The cache at this level.
+ * \param user_data: Pointer to the user_data passed to BKE_gpencil_traverse_update_cache.
  */
-typedef bool (*GPencilUpdateCacheIter_Cb)(struct GPencilUpdateCache *cache, void *user_data);
+typedef bool (*GPencilUpdateCacheIter_Cb)(GPencilUpdateCache *cache, void *user_data);
 
 typedef struct GPencilUpdateCacheTraverseSettings {
   /* Callbacks for the update cache traversal. Callback with index 0 is for layers, 1 for frames
@@ -93,28 +95,54 @@ typedef struct GPencilUpdateCacheTraverseSettings {
   GPencilUpdateCacheIter_Cb update_cache_cb[3];
 } GPencilUpdateCacheTraverseSettings;
 
-struct GPencilUpdateCache *BKE_gpencil_create_update_cache_data(void *data, bool full_copy);
+/**
+ * Allocates a new GPencilUpdateCache and populates it.
+ * \param data: A data pointer to populate the initial cache with.
+ * \param full_copy: If true, will mark this update cache as a full copy
+ * (GP_UPDATE_NODE_FULL_COPY). If false, it will be marked as a struct copy
+ * (GP_UPDATE_NODE_STRUCT_COPY).
+ */
+GPencilUpdateCache *BKE_gpencil_create_update_cache(void *data, bool full_copy);
 
 /**
- * Traverse an update cache and execute callbacks at each level.
+ * Traverses an update cache and executes callbacks at each level.
  * \param cache: The update cache to traverse.
  * \param ts: The traversal settings. This stores the callbacks that are called at each level.
  * \param user_data: Custom data passed to each callback.
  */
-void BKE_gpencil_traverse_update_cache(struct GPencilUpdateCache *cache,
+void BKE_gpencil_traverse_update_cache(GPencilUpdateCache *cache,
                                        GPencilUpdateCacheTraverseSettings *ts,
                                        void *user_data);
 
+/**
+ * Tags an element (bGPdata, bGPDlayer, bGPDframe, or bGPDstroke) and all of its containing data to
+ * be updated in the next update-on-write operation.
+ *
+ * The function assumes that when a parameter is NULL all of the following parameters are NULL too.
+ * E.g. in order to tag a layer (gpl), the parameters would *have* to be (gpd, gpl, NULL, NULL).
+ */
 void BKE_gpencil_tag_full_update(struct bGPdata *gpd,
                                  struct bGPDlayer *gpl,
                                  struct bGPDframe *gpf,
                                  struct bGPDstroke *gps);
 
+/**
+ * Tags an element (bGPdata, bGPDlayer, bGPDframe, or bGPDstroke) to be updated in the next
+ * update-on-write operation. This function will not update any of the containing data, only the
+ * struct itself.
+ *
+ * The function assumes that when a parameter is NULL all of the following parameters are NULL too.
+ * E.g. in order to tag a layer (gpl), the parameters would *have* to be (gpd, gpl, NULL, NULL).
+ */
 void BKE_gpencil_tag_struct_update(struct bGPdata *gpd,
                                    struct bGPDlayer *gpl,
                                    struct bGPDframe *gpf,
                                    struct bGPDstroke *gps);
 
+/**
+ * Frees the GPencilUpdateCache on the gpd->runtime. This will not free the data that the cache
+ * node might point to. It assumes that the cache does not own the data.
+ */
 void BKE_gpencil_free_update_cache(struct bGPdata *gpd);
 
 #ifdef __cplusplus

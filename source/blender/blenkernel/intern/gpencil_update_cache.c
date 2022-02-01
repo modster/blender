@@ -240,7 +240,7 @@ static void gpencil_traverse_update_cache_ex(GPencilUpdateCache *parent_cache,
  *
  * \{ */
 
-GPencilUpdateCache *BKE_gpencil_create_update_cache_data(void *data, bool full_copy)
+GPencilUpdateCache *BKE_gpencil_create_update_cache(void *data, bool full_copy)
 {
   return update_cache_alloc(
       0, full_copy ? GP_UPDATE_NODE_FULL_COPY : GP_UPDATE_NODE_STRUCT_COPY, data);
