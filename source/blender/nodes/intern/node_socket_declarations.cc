@@ -66,7 +66,13 @@ static bool sockets_can_connect(const SocketDeclaration &socket_decl,
 static bool basic_types_can_connect(const SocketDeclaration &UNUSED(socket_decl),
                                     const bNodeSocket &other_socket)
 {
-  return ELEM(other_socket.type, SOCK_FLOAT, SOCK_INT, SOCK_BOOLEAN, SOCK_VECTOR, SOCK_RGBA);
+  return ELEM(other_socket.type,
+              SOCK_FLOAT,
+              SOCK_INT,
+              SOCK_BOOLEAN,
+              SOCK_VECTOR,
+              SOCK_VECTOR2D,
+              SOCK_RGBA);
 }
 
 static void modify_subtype_except_for_storage(bNodeSocket &socket, int new_subtype)

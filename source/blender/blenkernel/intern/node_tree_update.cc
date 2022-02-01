@@ -618,6 +618,18 @@ static int get_internal_link_type_priority(const bNodeSocketType *from, const bN
           return 1;
       }
       return -1;
+    // case SOCK_VECTOR2D:
+    //   switch (from->type) {
+    //     case SOCK_VECTOR2D:
+    //       return 4;
+    //     case SOCK_FLOAT:
+    //       return 3;
+    //     case SOCK_INT:
+    //       return 2;
+    //     case SOCK_BOOLEAN:
+    //       return 1;
+    //   }
+    //   return -1;
     case SOCK_FLOAT:
       switch (from->type) {
         case SOCK_FLOAT:

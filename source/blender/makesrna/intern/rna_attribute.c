@@ -123,6 +123,8 @@ static StructRNA *srna_by_custom_data_layer_type(const CustomDataType type)
       return &RNA_IntAttribute;
     case CD_PROP_FLOAT3:
       return &RNA_FloatVectorAttribute;
+    case CD_PROP_FLOAT2:
+      return &RNA_Float2Attribute;
     case CD_PROP_COLOR:
       return &RNA_FloatColorAttribute;
     case CD_MLOOPCOL:
@@ -131,8 +133,6 @@ static StructRNA *srna_by_custom_data_layer_type(const CustomDataType type)
       return &RNA_StringAttribute;
     case CD_PROP_BOOL:
       return &RNA_BoolAttribute;
-    case CD_PROP_FLOAT2:
-      return &RNA_Float2Attribute;
     default:
       return NULL;
   }
@@ -238,6 +238,9 @@ static void rna_Attribute_data_begin(CollectionPropertyIterator *iter, PointerRN
     case CD_PROP_FLOAT3:
       struct_size = sizeof(float[3]);
       break;
+    case CD_PROP_FLOAT2:
+      struct_size = sizeof(float[2]);
+      break;
     case CD_PROP_COLOR:
       struct_size = sizeof(MPropCol);
       break;
@@ -249,9 +252,6 @@ static void rna_Attribute_data_begin(CollectionPropertyIterator *iter, PointerRN
       break;
     case CD_PROP_BOOL:
       struct_size = sizeof(MBoolProperty);
-      break;
-    case CD_PROP_FLOAT2:
-      struct_size = sizeof(float[2]);
       break;
     default:
       struct_size = 0;

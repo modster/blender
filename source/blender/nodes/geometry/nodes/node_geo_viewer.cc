@@ -60,6 +60,8 @@ static eNodeSocketDatatype custom_data_type_to_socket_type(const CustomDataType 
       return SOCK_FLOAT;
     case CD_PROP_INT32:
       return SOCK_INT;
+    case CD_PROP_FLOAT2:
+      return SOCK_VECTOR2D;
     case CD_PROP_FLOAT3:
       return SOCK_VECTOR;
     case CD_PROP_BOOL:
@@ -109,8 +111,13 @@ static void node_gather_link_searches(GatherLinkSearchOpParams &params)
       set_active_fn(params, node);
     });
   }
-  if (type &&
-      ELEM(type, CD_PROP_FLOAT, CD_PROP_BOOL, CD_PROP_INT32, CD_PROP_FLOAT3, CD_PROP_COLOR)) {
+  if (type && ELEM(type,
+                   CD_PROP_FLOAT,
+                   CD_PROP_BOOL,
+                   CD_PROP_INT32,
+                   CD_PROP_FLOAT3,
+                   CD_PROP_FLOAT2,
+                   CD_PROP_COLOR)) {
     params.add_item(IFACE_("Value"), [type, set_active_fn](LinkSearchOpParams &params) {
       bNode &node = params.add_node("GeometryNodeViewer");
       node_storage(node).data_type = *type;

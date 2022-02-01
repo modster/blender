@@ -38,7 +38,8 @@
 static int node_exec_socket_use_stack(bNodeSocket *sock)
 {
   /* NOTE: INT supported as FLOAT. Only for EEVEE. */
-  return ELEM(sock->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_SHADER);
+  return ELEM(
+      sock->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_VECTOR2D, SOCK_RGBA, SOCK_SHADER);
 }
 
 bNodeStack *node_get_socket_stack(bNodeStack *stack, bNodeSocket *sock)
@@ -143,6 +144,9 @@ static struct bNodeStack *setup_stack(bNodeStack *stack,
       break;
     case SOCK_VECTOR:
       node_socket_get_vector(ntree, node, sock, ns->vec);
+      break;
+    case SOCK_VECTOR2D:
+      node_socket_get_vector2d(ntree, node, sock, ns->vec);
       break;
     case SOCK_RGBA:
       node_socket_get_color(ntree, node, sock, ns->vec);

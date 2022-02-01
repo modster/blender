@@ -1434,6 +1434,13 @@ static void std_node_socket_interface_draw(bContext *UNUSED(C), uiLayout *layout
       uiItemR(sub, ptr, "max_value", DEFAULT_FLAGS, IFACE_("Max"), ICON_NONE);
       break;
     }
+    case SOCK_VECTOR2D: {
+      uiItemR(col, ptr, "default_value", UI_ITEM_R_EXPAND, IFACE_("Default"), ICON_NONE);
+      uiLayout *sub = uiLayoutColumn(col, true);
+      uiItemR(sub, ptr, "min_value", DEFAULT_FLAGS, IFACE_("Min"), ICON_NONE);
+      uiItemR(sub, ptr, "max_value", DEFAULT_FLAGS, IFACE_("Max"), ICON_NONE);
+      break;
+    }
     case SOCK_BOOLEAN:
     case SOCK_RGBA:
     case SOCK_STRING: {
