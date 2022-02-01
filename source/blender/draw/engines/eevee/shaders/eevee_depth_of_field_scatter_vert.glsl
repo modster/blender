@@ -19,7 +19,8 @@ uniform sampler2D coc_tx;
 /* Load 4 Circle of confusion values. texel_co is centered around the 4 taps. */
 vec4 fetch_cocs(vec2 texel_co)
 {
-  /* TODO(fclem) The textureGather(sampler, co, comp) variant isn't here on some implementations.
+  /* TODO(@fclem): The `textureGather(sampler, co, comp)` variant isn't here on some
+   * implementations.
    */
 #if 0  // GPU_ARB_texture_gather
   vec2 uvs = texel_co / vec2(textureSize(coc_tx, 0));

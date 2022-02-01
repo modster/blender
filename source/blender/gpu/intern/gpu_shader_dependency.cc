@@ -59,7 +59,6 @@ struct GPUSource {
     /* Scan for builtins. */
     /* FIXME: This can trigger false positive caused by disabled #if blocks. */
     /* TODO(fclem): Could be made faster by scanning once. */
-    /* TODO(fclem): BARYCENTRIC_COORD. */
     if (source.find("gl_FragCoord", 0)) {
       builtins |= shader::BuiltinBits::FRAG_COORD;
     }
@@ -71,9 +70,6 @@ struct GPUSource {
     }
     if (source.find("gl_InstanceID", 0)) {
       builtins |= shader::BuiltinBits::INSTANCE_ID;
-    }
-    if (source.find("gl_Layer", 0)) {
-      builtins |= shader::BuiltinBits::LAYER;
     }
     if (source.find("gl_LocalInvocationID", 0)) {
       builtins |= shader::BuiltinBits::LOCAL_INVOCATION_ID;
@@ -119,7 +115,7 @@ struct GPUSource {
   template<bool check_whole_word = true, bool reversed = false, typename T>
   int64_t find_str(const StringRef &input, const T keyword, int64_t offset = 0)
   {
-    while (1) {
+    while (true) {
       if constexpr (reversed) {
         offset = input.rfind(keyword, offset);
       }
@@ -199,13 +195,13 @@ struct GPUSource {
    *
    * IMPORTANT: This has some requirements:
    * - Enums needs to have underlying types specified to uint32_t to make them usable in UBO/SSBO.
-   * - All values needs to be specified using constant literals to avoid compiler differencies.
+   * - All values needs to be specified using constant literals to avoid compiler differences.
    * - All values needs to have the 'u' suffix to avoid GLSL compiler errors.
    */
-  void enum_preprocess(void)
+  void enum_preprocess()
   {
     const StringRefNull input = source;
-    std::string output = "";
+    std::string output;
     int64_t cursor = 0;
     int64_t last_pos = 0;
     const bool is_cpp = filename.endswith(".hh");
@@ -220,7 +216,7 @@ struct GPUSource {
     continue; \
   }
 
-    while (1) {
+    while (true) {
       cursor = find_keyword(input, "enum ", cursor);
       if (cursor == -1) {
         break;
@@ -336,13 +332,23 @@ struct GPUSource {
   }
 
   /* Returns the final string with all includes done. */
-  void build(std::string &str, shader::BuiltinBits &out_builtins)
+  std::string build() const
   {
+    std::string str;
     for (auto *dep : dependencies) {
-      out_builtins |= builtins;
       str += dep->source;
     }
     str += source;
+    return str;
+  }
+
+  shader::BuiltinBits builtins_get() const
+  {
+    shader::BuiltinBits out_builtins = shader::BuiltinBits::NONE;
+    for (auto *dep : dependencies) {
+      out_builtins |= dep->builtins;
+    }
+    return out_builtins;
   }
 };
 
@@ -377,14 +383,19 @@ void gpu_shader_dependency_exit()
   delete g_sources;
 }
 
-char *gpu_shader_dependency_get_resolved_source(const char *shader_source_name, uint32_t *builtins)
+uint32_t gpu_shader_dependency_get_builtins(const char *shader_source_name)
+{
+  if (shader_source_name[0] == '\0') {
+    return 0;
+  }
+  GPUSource *source = g_sources->lookup(shader_source_name);
+  return static_cast<uint32_t>(source->builtins_get());
+}
+
+char *gpu_shader_dependency_get_resolved_source(const char *shader_source_name)
 {
   GPUSource *source = g_sources->lookup(shader_source_name);
-  std::string str;
-  shader::BuiltinBits out_builtins;
-  source->build(str, out_builtins);
-  *builtins |= (uint32_t)out_builtins;
-  return strdup(str.c_str());
+  return strdup(source->build().c_str());
 }
 
 char *gpu_shader_dependency_get_source(const char *shader_source_name)

@@ -1486,10 +1486,7 @@ bool BKE_object_support_modifier_type_check(const Object *ob, int modifier_type)
   }
 
   /* Only geometry objects should be able to get modifiers T25291. */
-  if (ob->type == OB_HAIR) {
-    return (mti->modifyHair != nullptr) || (mti->flags & eModifierTypeFlag_AcceptsVertexCosOnly);
-  }
-  if (ELEM(ob->type, OB_POINTCLOUD, OB_VOLUME)) {
+  if (ELEM(ob->type, OB_POINTCLOUD, OB_VOLUME, OB_HAIR)) {
     return (mti->modifyGeometrySet != nullptr);
   }
   if (ELEM(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_LATTICE)) {
@@ -4189,7 +4186,11 @@ bool BKE_object_minmax_dupli(Depsgraph *depsgraph,
       /* pass */
     }
     else {
-      BoundBox *bb = BKE_object_boundbox_get(dob->ob);
+      Object temp_ob = *dob->ob;
+      /* Do not modify the original boundbox. */
+      temp_ob.runtime.bb = nullptr;
+      BKE_object_replace_data_on_shallow_copy(&temp_ob, dob->ob_data);
+      BoundBox *bb = BKE_object_boundbox_get(&temp_ob);
 
       if (bb) {
         int i;
@@ -4201,6 +4202,8 @@ bool BKE_object_minmax_dupli(Depsgraph *depsgraph,
 
         ok = true;
       }
+
+      MEM_SAFE_FREE(temp_ob.runtime.bb);
     }
   }
   free_object_duplilist(lb); /* does restore */

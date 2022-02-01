@@ -1081,7 +1081,7 @@ static int wm_operator_exec(bContext *C, wmOperator *op, const bool repeat, cons
     }
   }
 
-  /* XXX(mont29) Disabled the repeat check to address part 2 of T31840.
+  /* XXX(@mont29): Disabled the repeat check to address part 2 of T31840.
    * Carefully checked all calls to wm_operator_exec and WM_operator_repeat, don't see any reason
    * why this was needed, but worth to note it in case something turns bad. */
   if (retval & (OPERATOR_FINISHED | OPERATOR_CANCELLED) /* && repeat == 0 */) {
@@ -3075,6 +3075,8 @@ static int wm_handlers_do_intern(bContext *C, wmWindow *win, wmEvent *event, Lis
 
                   event->customdata = NULL;
                   event->custom = 0;
+
+                  wm_drop_end(C, drag, drop);
 
                   /* XXX fileread case. */
                   if (CTX_wm_window(C) == NULL) {
