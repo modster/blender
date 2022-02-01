@@ -1166,7 +1166,7 @@ static const float std_node_socket_colors[][4] = {
     {0.96, 0.96, 0.96, 1.0}, /* SOCK_COLLECTION */
     {0.62, 0.31, 0.64, 1.0}, /* SOCK_TEXTURE */
     {0.92, 0.46, 0.51, 1.0}, /* SOCK_MATERIAL */
-    {0.49, 0.49, 0.88, 1.0}, /* SOCK_VECTOR2D */
+    {0.59, 0.59, 0.98, 1.0}, /* SOCK_VECTOR2D */
 };
 
 /* common color callbacks for standard types */

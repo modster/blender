@@ -574,6 +574,10 @@ static EnumPropertyItem rna_node_geometry_mesh_circle_fill_type_items[] = {
   { \
     GEO_NODE_ATTRIBUTE_INPUT_VECTOR, "VECTOR", 0, "Vector", "" \
   }
+#define ITEM_VECTOR2D \
+  { \
+    GEO_NODE_ATTRIBUTE_INPUT_VECTOR2D, "VECTOR2D", 0, "Vector2d", "" \
+  }
 #define ITEM_COLOR \
   { \
     GEO_NODE_ATTRIBUTE_INPUT_COLOR, "COLOR", 0, "Color", "" \

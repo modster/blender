@@ -38,6 +38,7 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Color>(N_("Value"), "Value_002").supports_field().hide_value();
   b.add_input<decl::Int>(N_("Value"), "Value_003").supports_field().hide_value();
   b.add_input<decl::Bool>(N_("Value"), "Value_004").supports_field().hide_value();
+  b.add_input<decl::Vector2d>(N_("Value"), "Value_005").supports_field().hide_value();
 }
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)

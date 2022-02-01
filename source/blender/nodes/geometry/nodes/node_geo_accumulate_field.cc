@@ -148,8 +148,6 @@ static std::optional<CustomDataType> node_type_from_other_socket(const bNodeSock
     case SOCK_VECTOR:
     case SOCK_RGBA:
       return CD_PROP_FLOAT3;
-    case SOCK_VECTOR2D:
-      return CD_PROP_FLOAT2;
     default:
       return {};
   }

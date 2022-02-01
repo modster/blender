@@ -45,7 +45,7 @@ void update_attribute_input_socket_availabilities(bNodeTree &ntree,
            (socket->type == SOCK_FLOAT && mode_ == GEO_NODE_ATTRIBUTE_INPUT_FLOAT) ||
            (socket->type == SOCK_INT && mode_ == GEO_NODE_ATTRIBUTE_INPUT_INTEGER) ||
            (socket->type == SOCK_VECTOR && mode_ == GEO_NODE_ATTRIBUTE_INPUT_VECTOR) ||
-           (socket->type == SOCK_VECTOR2D && mode_ == GEO_NODE_ATTRIBUTE_INPUT_VECTOR) ||
+           (socket->type == SOCK_VECTOR2D && mode_ == GEO_NODE_ATTRIBUTE_INPUT_VECTOR2D) ||
            (socket->type == SOCK_RGBA && mode_ == GEO_NODE_ATTRIBUTE_INPUT_COLOR));
       nodeSetSocketAvailability(&ntree, socket, socket_is_available);
     }
