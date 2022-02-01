@@ -565,7 +565,7 @@ static int drw_shader_library_search(const DRWShaderLibrary *lib, const char *na
 static uint64_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
                                             const char *pragma_str,
                                             const char *lib_code,
-                                            const char *lib_name)
+                                            const char *UNUSED(lib_name))
 {
   /* Search dependencies. */
   uint pragma_len = strlen(pragma_str);
