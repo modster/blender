@@ -7,28 +7,15 @@
 #pragma BLENDER_REQUIRE(eevee_lightprobe_display_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(std140) uniform grids_block
-{
-  GridData grids[GRID_MAX];
-};
-
-layout(std140) uniform lightprobes_info_block
-{
-  LightProbeInfoData probes_info;
-};
-
-uniform int grid_id;
-
-const vec2 pos[6] = vec2[6](vec2(-1.0, -1.0),
-                            vec2(1.0, -1.0),
-                            vec2(-1.0, 1.0),
-
-                            vec2(1.0, -1.0),
-                            vec2(1.0, 1.0),
-                            vec2(-1.0, 1.0));
-
 void main(void)
 {
+  const vec2 pos[6] = vec2[6](vec2(-1.0, -1.0),
+                              vec2(1.0, -1.0),
+                              vec2(-1.0, 1.0),
+
+                              vec2(1.0, -1.0),
+                              vec2(1.0, 1.0),
+                              vec2(-1.0, 1.0));
 
   interp.sample = gl_VertexID / 6;
   interp.coord = pos[gl_VertexID % 6];

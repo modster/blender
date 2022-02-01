@@ -4,13 +4,7 @@
  * This uses layered rendering to filter all cubeface / layers in one drawcall.
  */
 
-#pragma BLENDER_REQUIRE(eevee_lightprobe_filter_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(std140) uniform filter_block
-{
-  LightProbeFilterData probe;
-};
 
 void main(void)
 {

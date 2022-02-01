@@ -12,17 +12,6 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
-layout(local_size_x = 8, local_size_y = 8) in;
-
-layout(std430, binding = 1) readonly restrict buffer pages_free_buf
-{
-  uint free_page_owners[];
-};
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
-
-layout(r32ui) restrict uniform uimage2D debug_img;
-
 /* Use this as custom channel viewer in renderdoc to inspect debug_img. */
 #if 0
 

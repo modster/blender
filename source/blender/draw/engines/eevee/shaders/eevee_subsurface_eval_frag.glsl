@@ -18,27 +18,6 @@
 #pragma BLENDER_REQUIRE(eevee_closure_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(std140) uniform subsurface_block
-{
-  SubsurfaceData sss;
-};
-
-layout(std140) uniform hiz_block
-{
-  HiZData hiz;
-};
-
-uniform sampler2D hiz_tx;
-uniform sampler2D radiance_tx;
-uniform sampler2D transmit_color_tx;
-uniform sampler2D transmit_normal_tx;
-uniform sampler2D transmit_data_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_combined;
-/* TODO(fclem) Output to diffuse pass without feedback loop. */
-
 vec3 burley_setup(vec3 radius, vec3 albedo)
 {
   /* Scale albedo because we can have HDR value caused by BSDF sampling. */

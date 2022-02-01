@@ -10,32 +10,6 @@
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 
-layout(std430, binding = 0) readonly restrict buffer lights_buf
-{
-  LightData lights[];
-};
-
-layout(std430, binding = 1) readonly restrict buffer lights_zbins_buf
-{
-  CullingZBin lights_zbins[];
-};
-
-layout(std430, binding = 2) readonly restrict buffer lights_culling_buf
-{
-  CullingData light_culling;
-};
-
-layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
-{
-  CullingWord lights_culling_words[];
-};
-
-uniform sampler2D depth_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_debug_color;
-
 void main(void)
 {
   float depth = texelFetch(depth_tx, ivec2(gl_FragCoord.xy), 0).r;

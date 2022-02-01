@@ -16,25 +16,6 @@
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(std140) uniform sampling_block
-{
-  SamplingData sampling;
-};
-
-layout(std140) uniform motion_blur_block
-{
-  MotionBlurData mb;
-};
-
-uniform sampler2D color_tx;
-uniform sampler2D depth_tx;
-uniform sampler2D velocity_tx;
-uniform sampler2D tiles_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_color;
-
 const int gather_sample_count = 8;
 
 vec2 spread_compare(float center_motion_length, float sample_motion_length, float offset_length)

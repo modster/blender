@@ -14,15 +14,6 @@
 #pragma BLENDER_REQUIRE(eevee_motion_blur_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(std140) uniform motion_blur_block
-{
-  MotionBlurData mb;
-};
-
-uniform sampler2D velocity_tx;
-
-layout(location = 0) out vec4 out_max_motion;
-
 void main()
 {
   ivec2 texture_bounds = textureSize(velocity_tx, 0) - 1;

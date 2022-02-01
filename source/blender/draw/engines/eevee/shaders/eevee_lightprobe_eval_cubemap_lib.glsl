@@ -68,7 +68,7 @@ vec3 lightprobe_cubemap_evaluate(CubemapInfoData info,
     R = transform_direction(info.lookdev_rotation, R);
   }
   float lod = linear_roughness * info.roughness_max_lod;
-  return cubemap_array_sample(cubemap_tx, vec4(R, cube._layer), lod).rgb;
+  return textureLod(cubemap_tx, vec4(R, cube._layer), lod).rgb;
 }
 
 vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold)

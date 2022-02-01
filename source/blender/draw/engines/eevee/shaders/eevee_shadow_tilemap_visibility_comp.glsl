@@ -11,18 +11,6 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(local_size_x = SHADOW_TILEMAP_RES, local_size_y = SHADOW_TILEMAP_RES) in;
-
-layout(std430, binding = 0) readonly buffer tilemaps_buf
-{
-  ShadowTileMapData tilemaps[];
-};
-
-uniform float tilemap_pixel_radius;
-uniform float screen_pixel_radius_inv;
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
-
 void main()
 {
   ShadowTileMapData tilemap = tilemaps[gl_GlobalInvocationID.z];

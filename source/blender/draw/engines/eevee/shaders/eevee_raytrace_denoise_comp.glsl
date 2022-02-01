@@ -21,35 +21,6 @@
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(local_size_x = 8, local_size_y = 8) in;
-
-layout(std140) uniform raytrace_block
-{
-  RaytraceData raytrace;
-};
-
-layout(std140) uniform rtbuffer_block
-{
-  RaytraceBufferData rtbuffer;
-};
-
-layout(std140) uniform hiz_block
-{
-  HiZData hiz;
-};
-
-uniform sampler2D hiz_tx;
-uniform sampler2D ray_data_tx;
-uniform sampler2D ray_radiance_tx;
-uniform sampler2D cl_color_tx;
-uniform sampler2D cl_normal_tx;
-uniform sampler2D cl_data_tx;
-uniform sampler2D ray_history_tx;
-uniform sampler2D ray_variance_tx;
-
-layout(rgba16f) restrict uniform image2D out_history_img;
-layout(r8) restrict uniform image2D out_variance_img;
-
 //#define USE_HISTORY
 
 void history_weigh_and_accumulate(vec3 rgb_history,

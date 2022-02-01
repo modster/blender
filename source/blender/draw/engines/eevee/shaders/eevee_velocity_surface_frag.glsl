@@ -9,26 +9,7 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_velocity_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_surface_velocity_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(std140) uniform camera_prev_block
-{
-  CameraData cam_prev;
-};
-
-layout(std140) uniform camera_curr_block
-{
-  CameraData cam_curr;
-};
-
-layout(std140) uniform camera_next_block
-{
-  CameraData cam_next;
-};
-
-layout(location = 0) out vec4 out_velocity_camera;
-layout(location = 1) out vec4 out_velocity_view;
 
 void main(void)
 {

@@ -5,12 +5,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
-uniform sampler2D color_tx;
-uniform sampler2D coc_tx;
-
-layout(location = 0) out vec4 out_color;
-layout(location = 1) out float out_coc;
-
 /* Downsample pass done for each mip starting from mip1. */
 void main()
 {

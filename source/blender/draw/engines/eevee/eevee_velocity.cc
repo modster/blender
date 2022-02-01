@@ -212,9 +212,9 @@ void VelocityPass::sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(VELOCITY_CAMERA);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, camera_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
-    DRW_shgroup_uniform_block(grp, "camera_prev_block", velocity.camera_step.prev);
-    DRW_shgroup_uniform_block(grp, "camera_next_block", velocity.camera_step.next);
-    DRW_shgroup_uniform_block(grp, "camera_curr_block", inst_.camera.ubo_get());
+    DRW_shgroup_uniform_block(grp, "cam_prev", velocity.camera_step.prev);
+    DRW_shgroup_uniform_block(grp, "cam_next", velocity.camera_step.next);
+    DRW_shgroup_uniform_block(grp, "cam_curr", inst_.camera.ubo_get());
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
   {
@@ -224,9 +224,9 @@ void VelocityPass::sync(void)
     {
       GPUShader *sh = inst_.shaders.static_shader_get(VELOCITY_MESH);
       DRWShadingGroup *grp = mesh_grp_ = DRW_shgroup_create(sh, object_ps_);
-      DRW_shgroup_uniform_block(grp, "camera_prev_block", velocity.camera_step.prev);
-      DRW_shgroup_uniform_block(grp, "camera_next_block", velocity.camera_step.next);
-      DRW_shgroup_uniform_block(grp, "camera_curr_block", inst_.camera.ubo_get());
+      DRW_shgroup_uniform_block(grp, "cam_prev", velocity.camera_step.prev);
+      DRW_shgroup_uniform_block(grp, "cam_next", velocity.camera_step.next);
+      DRW_shgroup_uniform_block(grp, "cam_curr", inst_.camera.ubo_get());
     }
   }
 }
@@ -294,7 +294,7 @@ void VelocityPass::mesh_add(Object *ob, ObjectHandle &handle)
   /* TODO(fclem) Use the same layout as modelBlock from draw so we can reuse the same offset
    * and avoid the overhead of 1 shading group and one UBO per object. */
   DRWShadingGroup *grp = DRW_shgroup_create_sub(mesh_grp_);
-  DRW_shgroup_uniform_block(grp, "object_block", *data);
+  DRW_shgroup_uniform_block(grp, "velocity", *data);
   DRW_shgroup_call(grp, geom, ob);
 }
 

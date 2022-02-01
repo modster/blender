@@ -10,20 +10,6 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
-layout(local_size_x = 1) in;
-
-layout(std430, binding = 1) restrict buffer pages_free_buf
-{
-  uint free_page_owners[];
-};
-
-layout(std430, binding = 3) restrict buffer pages_infos_buf
-{
-  ShadowPagesInfoData infos;
-};
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
-
 void find_last_valid(inout uint last_valid)
 {
   for (uint i = last_valid; i > 0u; i--) {

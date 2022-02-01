@@ -13,36 +13,6 @@
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
 
-layout(local_size_x = SHADOW_DEPTH_SCAN_GROUP_SIZE,
-       local_size_y = SHADOW_DEPTH_SCAN_GROUP_SIZE) in;
-
-layout(std430, binding = 0) readonly restrict buffer lights_buf
-{
-  LightData lights[];
-};
-
-layout(std430, binding = 1) readonly restrict buffer lights_zbins_buf
-{
-  CullingZBin lights_zbins[];
-};
-
-layout(std430, binding = 2) readonly restrict buffer lights_culling_buf
-{
-  CullingData light_culling;
-};
-
-layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
-{
-  CullingWord lights_culling_words[];
-};
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
-
-uniform sampler2D depth_tx;
-
-uniform float tilemap_pixel_radius;
-uniform float screen_pixel_radius_inv;
-
 void tag_tilemap(uint l_idx, vec3 P, float dist_to_cam, const bool is_directional)
 {
   LightData light = lights[l_idx];

@@ -12,23 +12,6 @@
 #pragma BLENDER_REQUIRE(eevee_culling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 
-layout(local_size_x = 1024) in;
-
-layout(std430, binding = 0) readonly restrict buffer lights_buf
-{
-  LightData lights[];
-};
-
-layout(std430, binding = 1) readonly restrict buffer culling_buf
-{
-  CullingData culling;
-};
-
-layout(std430, binding = 2) writeonly restrict buffer culling_tile_buf
-{
-  CullingWord culling_words[];
-};
-
 void main(void)
 {
   uint word_idx = gl_GlobalInvocationID.x % culling.tile_word_len;

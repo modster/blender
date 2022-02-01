@@ -6,16 +6,6 @@
  * invocations and overdraw.
  **/
 
-#pragma BLENDER_REQUIRE(eevee_depth_of_field_scatter_lib.glsl)
-
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-uniform sampler2D color_tx;
-uniform sampler2D coc_tx;
-
 /* Load 4 Circle of confusion values. texel_co is centered around the 4 taps. */
 vec4 fetch_cocs(vec2 texel_co)
 {

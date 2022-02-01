@@ -18,23 +18,6 @@
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(std140) uniform hiz_block
-{
-  HiZData hiz;
-};
-
-uniform sampler2D ray_radiance_tx;
-uniform sampler2D ray_variance_tx;
-uniform sampler2D cl_color_tx;
-uniform sampler2D cl_normal_tx;
-uniform sampler2D cl_data_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_combined;
-layout(location = 1) out vec4 out_diffuse;
-layout(location = 2) out vec3 out_specular;
-
 #if defined(DIFFUSE)
 #  define RADIUS 4
 #elif defined(REFRACTION)

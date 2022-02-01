@@ -7,8 +7,6 @@
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(location = 0) out vec4 out_background;
-
 void main(void)
 {
   g_data = init_globals();

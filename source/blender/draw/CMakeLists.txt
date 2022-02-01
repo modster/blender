@@ -283,9 +283,7 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_bsdf_sampling_lib.glsl
   engines/eevee/shaders/eevee_bsdf_stubs_lib.glsl
   engines/eevee/shaders/eevee_camera_lib.glsl
-  engines/eevee/shaders/eevee_camera_velocity_frag.glsl
   engines/eevee/shaders/eevee_closure_lib.glsl
-  engines/eevee/shaders/eevee_cubemap_lib.glsl
   engines/eevee/shaders/eevee_culling_debug_frag.glsl
   engines/eevee/shaders/eevee_culling_iter_lib.glsl
   engines/eevee/shaders/eevee_culling_lib.glsl
@@ -310,7 +308,6 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_depth_of_field_reduce_recursive_frag.glsl
   engines/eevee/shaders/eevee_depth_of_field_resolve_frag.glsl
   engines/eevee/shaders/eevee_depth_of_field_scatter_frag.glsl
-  engines/eevee/shaders/eevee_depth_of_field_scatter_lib.glsl
   engines/eevee/shaders/eevee_depth_of_field_scatter_vert.glsl
   engines/eevee/shaders/eevee_depth_of_field_setup_frag.glsl
   engines/eevee/shaders/eevee_depth_of_field_tiles_dilate_frag.glsl
@@ -332,9 +329,7 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_lightprobe_eval_grid_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_diffuse_frag.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_downsample_frag.glsl
-  engines/eevee/shaders/eevee_lightprobe_filter_geom.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_glossy_frag.glsl
-  engines/eevee/shaders/eevee_lightprobe_filter_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_vert.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_visibility_frag.glsl
   engines/eevee/shaders/eevee_lookdev_background_frag.glsl
@@ -378,14 +373,13 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_surface_lookdev_vert.glsl
   engines/eevee/shaders/eevee_surface_mesh_geom.glsl
   engines/eevee/shaders/eevee_surface_mesh_vert.glsl
-  engines/eevee/shaders/eevee_surface_velocity_frag.glsl
-  engines/eevee/shaders/eevee_surface_velocity_lib.glsl
-  engines/eevee/shaders/eevee_surface_velocity_mesh_vert.glsl
   engines/eevee/shaders/eevee_surface_world_vert.glsl
   engines/eevee/shaders/eevee_velocity_lib.glsl
+  engines/eevee/shaders/eevee_velocity_camera_frag.glsl
+  engines/eevee/shaders/eevee_velocity_surface_mesh_vert.glsl
+  engines/eevee/shaders/eevee_velocity_surface_frag.glsl
   engines/eevee/shaders/eevee_volume_deferred_frag.glsl
   engines/eevee/shaders/eevee_volume_eval_lib.glsl
-  engines/eevee/shaders/eevee_volume_lib.glsl
   engines/eevee/shaders/eevee_volume_vert.glsl
 
   engines/eevee/eevee_shader_shared.hh

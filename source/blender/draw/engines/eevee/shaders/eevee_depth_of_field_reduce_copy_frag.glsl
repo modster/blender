@@ -14,19 +14,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-uniform sampler2D color_tx;
-uniform sampler2D coc_tx;
-uniform sampler2D downsampled_tx;
-
-layout(location = 0) out vec4 out_color_gather;
-layout(location = 1) out float out_coc;
-layout(location = 2) out vec3 out_color_scatter;
-
 /* NOTE: Do not compare alpha as it is not scattered by the scatter pass. */
 float dof_scatter_neighborhood_rejection(vec3 color)
 {

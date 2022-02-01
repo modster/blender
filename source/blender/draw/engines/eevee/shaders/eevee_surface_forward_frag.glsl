@@ -20,80 +20,8 @@
 /* TODO(fclem) Option. */
 #define USE_RAYTRACING
 
-layout(std140) uniform sampling_block
-{
-  SamplingData sampling;
-};
-
-layout(std430, binding = 0) readonly restrict buffer lights_buf
-{
-  LightData lights[];
-};
-
-layout(std430, binding = 1) readonly restrict buffer lights_zbins_buf
-{
-  CullingZBin lights_zbins[];
-};
-
-layout(std430, binding = 2) readonly restrict buffer lights_culling_buf
-{
-  CullingData light_culling;
-};
-
-layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
-{
-  CullingWord lights_culling_words[];
-};
-
-layout(std140) uniform grids_block
-{
-  GridData grids[GRID_MAX];
-};
-
-layout(std140) uniform cubes_block
-{
-  CubemapData cubes[CULLING_ITEM_BATCH];
-};
-
-layout(std140) uniform lightprobes_info_block
-{
-  LightProbeInfoData probes_info;
-};
-
-layout(std140) uniform rt_diffuse_block
-{
-  RaytraceData raytrace_diffuse;
-};
-
-layout(std140) uniform rt_reflection_block
-{
-  RaytraceData raytrace_reflection;
-};
-
-layout(std140) uniform rt_refraction_block
-{
-  RaytraceData raytrace_refraction;
-};
-
-layout(std140) uniform hiz_block
-{
-  HiZData hiz;
-};
-
-uniform sampler2DArray utility_tx;
-uniform sampler2D shadow_atlas_tx;
-uniform usampler2D shadow_tilemaps_tx;
-uniform sampler1D sss_transmittance_tx;
-uniform sampler2DArray lightprobe_grid_tx;
-uniform samplerCubeArray lightprobe_cube_tx;
-uniform sampler2D hiz_tx;
-uniform sampler2D radiance_tx;
-
 utility_tx_fetch_define(utility_tx);
 utility_tx_sample_define(utility_tx);
-
-layout(location = 0, index = 0) out vec4 out_radiance;
-layout(location = 0, index = 1) out vec4 out_transmittance;
 
 /* Prototypes. */
 void light_eval(ClosureDiffuse diffuse,

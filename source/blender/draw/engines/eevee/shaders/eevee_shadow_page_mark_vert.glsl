@@ -9,11 +9,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
-uniform usampler2D tilemaps_tx;
-
-uniform int tilemap_index;
-uniform int tilemap_lod;
-
 void main()
 {
   int tile_index = gl_VertexID / 6;

@@ -9,17 +9,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec2 out_gather_lut;
-layout(location = 1) out float out_scatter_Lut;
-layout(location = 2) out float outResolveLut;
-
 void main()
 {
   /* Center uv in range [-1..1]. */

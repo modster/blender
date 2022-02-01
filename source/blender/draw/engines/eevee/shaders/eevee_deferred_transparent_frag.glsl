@@ -11,18 +11,6 @@
 #pragma BLENDER_REQUIRE(eevee_volume_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 
-uniform usampler2D volume_data_tx;
-uniform sampler2D transparency_data_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_combined;
-layout(location = 1) out vec3 out_diffuse;
-layout(location = 2) out vec3 out_specular;
-layout(location = 3) out vec3 out_volume;
-layout(location = 4) out vec3 out_background;
-layout(location = 5) out vec3 out_holdout;
-
 void main(void)
 {
   ClosureVolume volume_data = gbuffer_load_volume_data(volume_data_tx, uvcoordsvar.xy);

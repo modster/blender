@@ -13,15 +13,6 @@
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(std140) uniform motion_blur_block
-{
-  MotionBlurData mb;
-};
-
-uniform sampler2D tiles_tx;
-
-layout(location = 0) out vec4 out_max_motion;
-
 bool neighbor_affect_this_tile(ivec2 offset, vec2 velocity)
 {
   /* Manhattan distance to the tiles, which is used for

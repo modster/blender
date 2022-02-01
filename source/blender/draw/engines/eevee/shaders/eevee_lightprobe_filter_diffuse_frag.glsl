@@ -11,17 +11,7 @@
 #pragma BLENDER_REQUIRE(eevee_irradiance_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_bsdf_sampling_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_lightprobe_filter_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-uniform samplerCube radiance_tx;
-
-layout(std140) uniform filter_block
-{
-  LightProbeFilterData probe;
-};
-
-layout(location = 0) out vec4 out_irradiance;
 
 void main()
 {

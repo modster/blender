@@ -20,26 +20,6 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
-layout(local_size_x = SHADOW_TILEMAP_RES, local_size_y = SHADOW_TILEMAP_RES) in;
-
-layout(std430, binding = 0) restrict readonly buffer tilemaps_buf
-{
-  ShadowTileMapData tilemaps[];
-};
-
-layout(std430, binding = 1) restrict buffer pages_free_buf
-{
-  uint free_page_owners[];
-};
-
-layout(std430, binding = 3) restrict buffer pages_infos_buf
-{
-  ShadowPagesInfoData infos;
-};
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
-layout(r32i) writeonly restrict uniform iimage2D tilemap_rects_img;
-
 void main()
 {
   ShadowTileMapData tilemap_data = tilemaps[gl_GlobalInvocationID.z];

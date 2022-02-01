@@ -26,136 +26,6 @@
 #include "eevee_shader.hh"
 #include "eevee_material.hh"
 
-extern "C" {
-extern char datatoc_common_attribute_lib_glsl[];
-extern char datatoc_common_debug_lib_glsl[];
-extern char datatoc_common_fullscreen_vert_glsl[];
-extern char datatoc_common_gpencil_lib_glsl[];
-extern char datatoc_common_hair_lib_glsl[];
-extern char datatoc_common_intersection_lib_glsl[];
-extern char datatoc_common_math_geom_lib_glsl[];
-extern char datatoc_common_math_lib_glsl[];
-extern char datatoc_common_obinfos_lib_glsl[];
-extern char datatoc_common_uniform_attribute_lib_glsl[];
-extern char datatoc_common_view_lib_glsl[];
-
-extern char datatoc_eevee_bsdf_lib_glsl[];
-extern char datatoc_eevee_bsdf_microfacet_lib_glsl[];
-extern char datatoc_eevee_bsdf_sampling_lib_glsl[];
-extern char datatoc_eevee_bsdf_stubs_lib_glsl[];
-extern char datatoc_eevee_camera_lib_glsl[];
-extern char datatoc_eevee_camera_velocity_frag_glsl[];
-extern char datatoc_eevee_closure_lib_glsl[];
-extern char datatoc_eevee_cubemap_lib_glsl[];
-extern char datatoc_eevee_culling_debug_frag_glsl[];
-extern char datatoc_eevee_culling_iter_lib_glsl[];
-extern char datatoc_eevee_culling_lib_glsl[];
-extern char datatoc_eevee_culling_select_comp_glsl[];
-extern char datatoc_eevee_culling_sort_comp_glsl[];
-extern char datatoc_eevee_culling_tile_comp_glsl[];
-extern char datatoc_eevee_deferred_direct_frag_glsl[];
-extern char datatoc_eevee_deferred_holdout_frag_glsl[];
-extern char datatoc_eevee_deferred_transparent_frag_glsl[];
-extern char datatoc_eevee_deferred_volume_frag_glsl[];
-extern char datatoc_eevee_depth_clear_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_accumulator_lib_glsl[];
-extern char datatoc_eevee_depth_of_field_bokeh_lut_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_downsample_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_filter_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_gather_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_gather_holefill_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_lib_glsl[];
-extern char datatoc_eevee_depth_of_field_reduce_copy_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_reduce_downsample_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_reduce_recursive_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_resolve_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_scatter_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_scatter_lib_glsl[];
-extern char datatoc_eevee_depth_of_field_scatter_vert_glsl[];
-extern char datatoc_eevee_depth_of_field_setup_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_tiles_dilate_frag_glsl[];
-extern char datatoc_eevee_depth_of_field_tiles_flatten_frag_glsl[];
-extern char datatoc_eevee_film_filter_frag_glsl[];
-extern char datatoc_eevee_film_lib_glsl[];
-extern char datatoc_eevee_film_resolve_depth_frag_glsl[];
-extern char datatoc_eevee_film_resolve_frag_glsl[];
-extern char datatoc_eevee_gbuffer_lib_glsl[];
-extern char datatoc_eevee_hiz_copy_frag_glsl[];
-extern char datatoc_eevee_hiz_downsample_frag_glsl[];
-extern char datatoc_eevee_irradiance_lib_glsl[];
-extern char datatoc_eevee_light_eval_lib_glsl[];
-extern char datatoc_eevee_light_lib_glsl[];
-extern char datatoc_eevee_lightprobe_display_cubemap_frag_glsl[];
-extern char datatoc_eevee_lightprobe_display_cubemap_vert_glsl[];
-extern char datatoc_eevee_lightprobe_display_grid_frag_glsl[];
-extern char datatoc_eevee_lightprobe_display_grid_vert_glsl[];
-extern char datatoc_eevee_lightprobe_display_lib_glsl[];
-extern char datatoc_eevee_lightprobe_eval_cubemap_lib_glsl[];
-extern char datatoc_eevee_lightprobe_eval_grid_lib_glsl[];
-extern char datatoc_eevee_lightprobe_filter_diffuse_frag_glsl[];
-extern char datatoc_eevee_lightprobe_filter_downsample_frag_glsl[];
-extern char datatoc_eevee_lightprobe_filter_geom_glsl[];
-extern char datatoc_eevee_lightprobe_filter_glossy_frag_glsl[];
-extern char datatoc_eevee_lightprobe_filter_lib_glsl[];
-extern char datatoc_eevee_lightprobe_filter_vert_glsl[];
-extern char datatoc_eevee_lightprobe_filter_visibility_frag_glsl[];
-extern char datatoc_eevee_lookdev_background_frag_glsl[];
-extern char datatoc_eevee_ltc_lib_glsl[];
-extern char datatoc_eevee_motion_blur_gather_frag_glsl[];
-extern char datatoc_eevee_motion_blur_lib_glsl[];
-extern char datatoc_eevee_motion_blur_tiles_dilate_frag_glsl[];
-extern char datatoc_eevee_motion_blur_tiles_flatten_frag_glsl[];
-extern char datatoc_eevee_nodetree_eval_lib_glsl[];
-extern char datatoc_eevee_raytrace_denoise_comp_glsl[];
-extern char datatoc_eevee_raytrace_raygen_frag_glsl[];
-extern char datatoc_eevee_raytrace_raygen_lib_glsl[];
-extern char datatoc_eevee_raytrace_resolve_frag_glsl[];
-// extern char datatoc_eevee_raytrace_resolve_lib_glsl[];
-extern char datatoc_eevee_raytrace_trace_lib_glsl[];
-extern char datatoc_eevee_sampling_lib_glsl[];
-extern char datatoc_eevee_shadow_debug_frag_glsl[];
-extern char datatoc_eevee_shadow_lib_glsl[];
-extern char datatoc_eevee_shadow_page_alloc_comp_glsl[];
-extern char datatoc_eevee_shadow_page_copy_comp_glsl[];
-extern char datatoc_eevee_shadow_page_debug_comp_glsl[];
-extern char datatoc_eevee_shadow_page_defrag_comp_glsl[];
-extern char datatoc_eevee_shadow_page_free_comp_glsl[];
-extern char datatoc_eevee_shadow_page_init_comp_glsl[];
-extern char datatoc_eevee_shadow_page_lib_glsl[];
-extern char datatoc_eevee_shadow_page_mark_vert_glsl[];
-extern char datatoc_eevee_shadow_tilemap_depth_scan_comp_glsl[];
-extern char datatoc_eevee_shadow_tilemap_lod_mask_comp_glsl[];
-extern char datatoc_eevee_shadow_tilemap_lib_glsl[];
-extern char datatoc_eevee_shadow_tilemap_setup_comp_glsl[];
-extern char datatoc_eevee_shadow_tilemap_tag_comp_glsl[];
-extern char datatoc_eevee_shadow_tilemap_visibility_comp_glsl[];
-extern char datatoc_eevee_subsurface_eval_frag_glsl[];
-extern char datatoc_eevee_surface_background_frag_glsl[];
-extern char datatoc_eevee_surface_deferred_frag_glsl[];
-extern char datatoc_eevee_surface_depth_frag_glsl[];
-extern char datatoc_eevee_surface_depth_simple_frag_glsl[];
-extern char datatoc_eevee_surface_forward_frag_glsl[];
-extern char datatoc_eevee_surface_gpencil_vert_glsl[];
-extern char datatoc_eevee_surface_hair_vert_glsl[];
-extern char datatoc_eevee_surface_lib_glsl[];
-extern char datatoc_eevee_surface_lookdev_vert_glsl[];
-extern char datatoc_eevee_surface_mesh_geom_glsl[];
-extern char datatoc_eevee_surface_mesh_vert_glsl[];
-extern char datatoc_eevee_surface_velocity_frag_glsl[];
-extern char datatoc_eevee_surface_velocity_lib_glsl[];
-extern char datatoc_eevee_surface_velocity_mesh_vert_glsl[];
-extern char datatoc_eevee_surface_world_vert_glsl[];
-extern char datatoc_eevee_velocity_lib_glsl[];
-extern char datatoc_eevee_volume_deferred_frag_glsl[];
-extern char datatoc_eevee_volume_eval_lib_glsl[];
-extern char datatoc_eevee_volume_lib_glsl[];
-extern char datatoc_eevee_volume_vert_glsl[];
-
-extern char datatoc_eevee_shader_shared_hh[];
-
-extern char datatoc_gpu_shader_codegen_lib_glsl[];
-}
-
 namespace blender::eevee {
 
 /** \} */
@@ -171,269 +41,17 @@ ShaderModule::ShaderModule()
     shader = nullptr;
   }
 
-  shared_lib_ = enum_preprocess(datatoc_eevee_shader_shared_hh);
-
-  shader_lib_ = DRW_shader_library_create();
-  /* NOTE: These need to be ordered by dependencies. */
-  DRW_SHADER_LIB_ADD(shader_lib_, common_debug_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, common_math_lib);
-  // DRW_shader_library_add_file(shader_lib_, shared_lib_.c_str(), "eevee_shader_shared.hh");
-  DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, common_intersection_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, common_attribute_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, common_obinfos_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, common_gpencil_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, gpu_shader_codegen_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_microfacet_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_sampling_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_stubs_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_irradiance_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_closure_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_cubemap_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_gbuffer_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_nodetree_eval_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_sampling_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_ltc_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_page_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_tilemap_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_camera_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_iter_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_light_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_light_eval_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_filter_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_display_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_eval_cubemap_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_eval_grid_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_volume_eval_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_volume_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_velocity_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_accumulator_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_scatter_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_film_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_motion_blur_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_trace_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_raygen_lib);
-  // DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_resolve_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_velocity_lib);
-
-  /* Meh ¯\_(ツ)_/¯. */
-  char *datatoc_nullptr_glsl = nullptr;
-
-#define SHADER(enum_, vert_, geom_, frag_, defs_) \
-  shader_descriptions_[enum_].name = STRINGIFY(enum_); \
-  shader_descriptions_[enum_].vertex_shader_code = datatoc_##vert_##_glsl; \
-  shader_descriptions_[enum_].geometry_shader_code = datatoc_##geom_##_glsl; \
-  shader_descriptions_[enum_].fragment_shader_code = datatoc_##frag_##_glsl; \
-  shader_descriptions_[enum_].defines_shader_code = defs_;
-#define SHADER_COMPUTE(enum_, comp_, defs_) \
-  shader_descriptions_[enum_].name = STRINGIFY(enum_); \
-  shader_descriptions_[enum_].compute_shader_code = datatoc_##comp_##_glsl; \
-  shader_descriptions_[enum_].defines_shader_code = defs_;
-
-#define SHADER_FULLSCREEN_DEFINES(enum_, frag_, defs_) \
-  SHADER(enum_, common_fullscreen_vert, nullptr, frag_, defs_)
-#define SHADER_FULLSCREEN(enum_, frag_) SHADER_FULLSCREEN_DEFINES(enum_, frag_, nullptr)
-
-  SHADER_FULLSCREEN(CULLING_DEBUG, eevee_culling_debug_frag);
-  SHADER_COMPUTE(CULLING_SELECT, eevee_culling_select_comp, nullptr);
-  SHADER_COMPUTE(CULLING_SORT, eevee_culling_sort_comp, nullptr);
-  SHADER_COMPUTE(CULLING_TILE, eevee_culling_tile_comp, nullptr);
-  SHADER_FULLSCREEN(FILM_FILTER, eevee_film_filter_frag);
-  SHADER_FULLSCREEN(FILM_RESOLVE, eevee_film_resolve_frag);
-  SHADER_FULLSCREEN(FILM_RESOLVE_DEPTH, eevee_film_resolve_depth_frag);
-  SHADER_FULLSCREEN(DEFERRED_EVAL_DIRECT, eevee_deferred_direct_frag);
-  SHADER_FULLSCREEN(DEFERRED_EVAL_HOLDOUT, eevee_deferred_holdout_frag);
-  SHADER_FULLSCREEN(DEFERRED_EVAL_TRANSPARENT, eevee_deferred_transparent_frag);
-  SHADER_FULLSCREEN(DEFERRED_EVAL_VOLUME, eevee_deferred_volume_frag);
-  SHADER(DEFERRED_MESH, eevee_surface_mesh_vert, nullptr, eevee_surface_deferred_frag, nullptr);
-  SHADER(DEFERRED_VOLUME, eevee_volume_vert, nullptr, eevee_volume_deferred_frag, nullptr);
-  SHADER_FULLSCREEN(HIZ_COPY, eevee_hiz_copy_frag);
-  SHADER_FULLSCREEN(HIZ_DOWNSAMPLE, eevee_hiz_downsample_frag);
-  SHADER_FULLSCREEN(DOF_BOKEH_LUT, eevee_depth_of_field_bokeh_lut_frag);
-  SHADER_FULLSCREEN(DOF_FILTER, eevee_depth_of_field_filter_frag);
-  SHADER_FULLSCREEN_DEFINES(DOF_GATHER_BACKGROUND_LUT,
-                            eevee_depth_of_field_gather_frag,
-                            "#define DOF_FOREGROUND_PASS false\n"
-                            "#define DOF_BOKEH_TEXTURE true\n");
-  SHADER_FULLSCREEN_DEFINES(DOF_GATHER_BACKGROUND,
-                            eevee_depth_of_field_gather_frag,
-                            "#define DOF_FOREGROUND_PASS false\n"
-                            "#define DOF_BOKEH_TEXTURE false\n");
-  SHADER_FULLSCREEN_DEFINES(DOF_GATHER_FOREGROUND_LUT,
-                            eevee_depth_of_field_gather_frag,
-                            "#define DOF_FOREGROUND_PASS true\n"
-                            "#define DOF_BOKEH_TEXTURE true\n");
-  SHADER_FULLSCREEN_DEFINES(DOF_GATHER_FOREGROUND,
-                            eevee_depth_of_field_gather_frag,
-                            "#define DOF_FOREGROUND_PASS true\n"
-                            "#define DOF_BOKEH_TEXTURE false\n");
-  SHADER_FULLSCREEN_DEFINES(DOF_GATHER_HOLEFILL,
-                            eevee_depth_of_field_gather_holefill_frag,
-                            "#define DOF_HOLEFILL_PASS true\n"
-                            "#define DOF_FOREGROUND_PASS false\n"
-                            "#define DOF_BOKEH_TEXTURE false\n");
-  SHADER_FULLSCREEN(DOF_REDUCE_COPY, eevee_depth_of_field_reduce_copy_frag);
-  SHADER_FULLSCREEN(DOF_REDUCE_DOWNSAMPLE, eevee_depth_of_field_reduce_downsample_frag);
-  SHADER_FULLSCREEN(DOF_REDUCE_RECURSIVE, eevee_depth_of_field_reduce_recursive_frag);
-  SHADER_FULLSCREEN_DEFINES(DOF_RESOLVE_LUT,
-                            eevee_depth_of_field_resolve_frag,
-                            "#define DOF_RESOLVE_PASS true\n"
-                            "#define DOF_BOKEH_TEXTURE true\n"
-                            "#define DOF_SLIGHT_FOCUS_DENSITY 2\n");
-  SHADER_FULLSCREEN_DEFINES(DOF_RESOLVE_LUT_HQ,
-                            eevee_depth_of_field_resolve_frag,
-                            "#define DOF_RESOLVE_PASS true\n"
-                            "#define DOF_BOKEH_TEXTURE true\n"
-                            "#define DOF_SLIGHT_FOCUS_DENSITY 4\n");
-  SHADER_FULLSCREEN_DEFINES(DOF_RESOLVE,
-                            eevee_depth_of_field_resolve_frag,
-                            "#define DOF_RESOLVE_PASS true\n"
-                            "#define DOF_BOKEH_TEXTURE false\n"
-                            "#define DOF_SLIGHT_FOCUS_DENSITY 2\n");
-  SHADER_FULLSCREEN_DEFINES(DOF_RESOLVE_HQ,
-                            eevee_depth_of_field_resolve_frag,
-                            "#define DOF_RESOLVE_PASS true\n"
-                            "#define DOF_BOKEH_TEXTURE false\n"
-                            "#define DOF_SLIGHT_FOCUS_DENSITY 4\n");
-  SHADER(DOF_SCATTER_BACKGROUND_LUT,
-         eevee_depth_of_field_scatter_vert,
-         nullptr,
-         eevee_depth_of_field_scatter_frag,
-         "#define DOF_FOREGROUND_PASS false\n"
-         "#define DOF_BOKEH_TEXTURE true\n");
-  SHADER(DOF_SCATTER_BACKGROUND,
-         eevee_depth_of_field_scatter_vert,
-         nullptr,
-         eevee_depth_of_field_scatter_frag,
-         "#define DOF_FOREGROUND_PASS false\n"
-         "#define DOF_BOKEH_TEXTURE false\n");
-  SHADER(DOF_SCATTER_FOREGROUND_LUT,
-         eevee_depth_of_field_scatter_vert,
-         nullptr,
-         eevee_depth_of_field_scatter_frag,
-         "#define DOF_FOREGROUND_PASS true\n"
-         "#define DOF_BOKEH_TEXTURE true\n");
-  SHADER(DOF_SCATTER_FOREGROUND,
-         eevee_depth_of_field_scatter_vert,
-         nullptr,
-         eevee_depth_of_field_scatter_frag,
-         "#define DOF_FOREGROUND_PASS true\n"
-         "#define DOF_BOKEH_TEXTURE false\n");
-  SHADER_FULLSCREEN(DOF_SETUP, eevee_depth_of_field_setup_frag);
-  SHADER_FULLSCREEN_DEFINES(DOF_TILES_DILATE_MINABS,
-                            eevee_depth_of_field_tiles_dilate_frag,
-                            "#define DILATE_MODE_MIN_MAX false\n");
-  SHADER_FULLSCREEN_DEFINES(DOF_TILES_DILATE_MINMAX,
-                            eevee_depth_of_field_tiles_dilate_frag,
-                            "#define DILATE_MODE_MIN_MAX true\n");
-  SHADER_FULLSCREEN(DOF_TILES_FLATTEN, eevee_depth_of_field_tiles_flatten_frag);
-  SHADER(LIGHTPROBE_DISPLAY_CUBEMAP,
-         eevee_lightprobe_display_cubemap_vert,
-         nullptr,
-         eevee_lightprobe_display_cubemap_frag,
-         nullptr);
-  SHADER(LIGHTPROBE_DISPLAY_IRRADIANCE,
-         eevee_lightprobe_display_grid_vert,
-         nullptr,
-         eevee_lightprobe_display_grid_frag,
-         nullptr);
-  SHADER(LIGHTPROBE_FILTER_DOWNSAMPLE_CUBE,
-         eevee_lightprobe_filter_vert,
-         eevee_lightprobe_filter_geom,
-         eevee_lightprobe_filter_downsample_frag,
-         "#define CUBEMAP\n");
-  SHADER(LIGHTPROBE_FILTER_GLOSSY,
-         eevee_lightprobe_filter_vert,
-         eevee_lightprobe_filter_geom,
-         eevee_lightprobe_filter_glossy_frag,
-         "#define CUBEMAP\n");
-  SHADER(LIGHTPROBE_FILTER_DIFFUSE,
-         eevee_lightprobe_filter_vert,
-         eevee_lightprobe_filter_geom,
-         eevee_lightprobe_filter_diffuse_frag,
-         nullptr);
-  SHADER(LIGHTPROBE_FILTER_VISIBILITY,
-         eevee_lightprobe_filter_vert,
-         eevee_lightprobe_filter_geom,
-         eevee_lightprobe_filter_visibility_frag,
-         nullptr);
-
-  SHADER_FULLSCREEN(LOOKDEV_BACKGROUND, eevee_lookdev_background_frag);
-  SHADER_FULLSCREEN(MOTION_BLUR_GATHER, eevee_motion_blur_gather_frag);
-  SHADER_FULLSCREEN(MOTION_BLUR_TILE_DILATE, eevee_motion_blur_tiles_dilate_frag);
-  SHADER_FULLSCREEN(MOTION_BLUR_TILE_FLATTEN, eevee_motion_blur_tiles_flatten_frag);
-
-  SHADER_FULLSCREEN_DEFINES(RAYTRACE_DIFFUSE, eevee_raytrace_raygen_frag, "#define DIFFUSE\n");
-  SHADER_FULLSCREEN_DEFINES(RAYTRACE_DIFFUSE_FALLBACK,
-                            eevee_raytrace_raygen_frag,
-                            "#define DIFFUSE\n"
-                            "#define SKIP_TRACE\n");
-  SHADER_FULLSCREEN_DEFINES(
-      RAYTRACE_REFLECTION, eevee_raytrace_raygen_frag, "#define REFLECTION\n");
-  SHADER_FULLSCREEN_DEFINES(RAYTRACE_REFLECTION_FALLBACK,
-                            eevee_raytrace_raygen_frag,
-                            "#define REFLECTION\n"
-                            "#define SKIP_TRACE\n");
-  SHADER_FULLSCREEN_DEFINES(
-      RAYTRACE_REFRACTION, eevee_raytrace_raygen_frag, "#define REFRACTION\n");
-  SHADER_FULLSCREEN_DEFINES(RAYTRACE_REFRACTION_FALLBACK,
-                            eevee_raytrace_raygen_frag,
-                            "#define REFRACTION\n"
-                            "#define SKIP_TRACE\n");
-  SHADER_COMPUTE(RAYTRACE_DENOISE_DIFFUSE, eevee_raytrace_denoise_comp, "#define DIFFUSE\n");
-  SHADER_COMPUTE(RAYTRACE_DENOISE_REFLECTION, eevee_raytrace_denoise_comp, "#define REFLECTION\n");
-  SHADER_COMPUTE(RAYTRACE_DENOISE_REFRACTION, eevee_raytrace_denoise_comp, "#define REFRACTION\n");
-  SHADER_FULLSCREEN_DEFINES(
-      RAYTRACE_RESOLVE_DIFFUSE, eevee_raytrace_resolve_frag, "#define DIFFUSE\n");
-  SHADER_FULLSCREEN_DEFINES(
-      RAYTRACE_RESOLVE_REFLECTION, eevee_raytrace_resolve_frag, "#define REFLECTION\n");
-  SHADER_FULLSCREEN_DEFINES(
-      RAYTRACE_RESOLVE_REFRACTION, eevee_raytrace_resolve_frag, "#define REFRACTION\n");
-
-  SHADER_FULLSCREEN(SHADOW_DEBUG, eevee_shadow_debug_frag);
-  SHADER_COMPUTE(SHADOW_PAGE_ALLOC, eevee_shadow_page_alloc_comp, nullptr);
-  SHADER_COMPUTE(SHADOW_PAGE_COPY, eevee_shadow_page_copy_comp, nullptr);
-  SHADER_COMPUTE(SHADOW_PAGE_DEBUG, eevee_shadow_page_debug_comp, nullptr);
-  SHADER_COMPUTE(SHADOW_PAGE_DEFRAG, eevee_shadow_page_defrag_comp, nullptr);
-  SHADER_COMPUTE(SHADOW_PAGE_FREE, eevee_shadow_page_free_comp, nullptr);
-  SHADER_COMPUTE(SHADOW_PAGE_INIT, eevee_shadow_page_init_comp, nullptr);
-  SHADER(SHADOW_PAGE_MARK, eevee_shadow_page_mark_vert, nullptr, eevee_depth_clear_frag, nullptr);
-  SHADER_COMPUTE(SHADOW_TILE_DEPTH_SCAN, eevee_shadow_tilemap_depth_scan_comp, nullptr);
-  SHADER_COMPUTE(SHADOW_TILE_LOD_MASK, eevee_shadow_tilemap_lod_mask_comp, nullptr);
-  SHADER_COMPUTE(SHADOW_TILE_SETUP, eevee_shadow_tilemap_setup_comp, nullptr);
-  SHADER_COMPUTE(SHADOW_TILE_TAG_UPDATE, eevee_shadow_tilemap_tag_comp, "#define TAG_UPDATE\n");
-  SHADER_COMPUTE(SHADOW_TILE_TAG_USAGE, eevee_shadow_tilemap_tag_comp, "#define TAG_USAGE\n");
-  SHADER_COMPUTE(SHADOW_TILE_TAG_VISIBILITY, eevee_shadow_tilemap_visibility_comp, nullptr);
-
-  SHADER_FULLSCREEN(SUBSURFACE_EVAL, eevee_subsurface_eval_frag);
-
-  SHADER(VELOCITY_MESH,
-         eevee_surface_velocity_mesh_vert,
-         nullptr,
-         eevee_surface_velocity_frag,
-         nullptr);
-  SHADER_FULLSCREEN(VELOCITY_CAMERA, eevee_camera_velocity_frag);
-
-#undef SHADER
-#undef SHADER_FULLSCREEN
-#undef SHADER_FULLSCREEN_DEFINES
-#undef SHADER_COMPUTE
-
 #ifdef DEBUG
   /* Ensure all shader are described. */
-  for (ShaderDescription &desc : shader_descriptions_) {
-    BLI_assert_msg(desc.name != nullptr, "EEVEE: Mising shader definition.");
-    if (desc.compute_shader_code == nullptr) {
-      BLI_assert(desc.vertex_shader_code != nullptr);
-      BLI_assert(desc.fragment_shader_code != nullptr);
+  for (auto i : IndexRange(MAX_SHADER_TYPE)) {
+    const char *name = static_shader_create_info_name_get(eShaderType(i));
+    if (name == nullptr) {
+      std::cerr << "EEVEE: Missing case for eShaderType(" << i
+                << ") in static_shader_create_info_name_get().";
+      BLI_assert(0);
     }
+    const GPUShaderCreateInfo *create_info = GPU_shader_create_info_get(name);
+    BLI_assert_msg(create_info != nullptr, "EEVEE: Missing create info for static shader.");
   }
 #endif
 }
@@ -443,7 +61,178 @@ ShaderModule::~ShaderModule()
   for (GPUShader *&shader : shaders_) {
     DRW_SHADER_FREE_SAFE(shader);
   }
-  DRW_SHADER_LIB_FREE_SAFE(shader_lib_);
+}
+
+const char *ShaderModule::static_shader_create_info_name_get(eShaderType shader_type)
+{
+  switch (shader_type) {
+    case CULLING_DEBUG:
+      return "eevee_culling_debug";
+    case CULLING_SELECT:
+      return "eevee_culling_select";
+    case CULLING_SORT:
+      return "eevee_culling_sort";
+    case CULLING_TILE:
+      return "eevee_culling_tile";
+
+    case FILM_FILTER:
+      return "eevee_film_filter";
+    case FILM_RESOLVE:
+      return "eevee_film_resolve";
+    case FILM_RESOLVE_DEPTH:
+      return "eevee_film_resolve_depth";
+
+    case DEFERRED_EVAL_DIRECT:
+      return "eevee_deferred_direct";
+    case DEFERRED_EVAL_HOLDOUT:
+      return "eevee_deferred_holdout";
+    case DEFERRED_EVAL_TRANSPARENT:
+      return "eevee_deferred_transparent";
+    case DEFERRED_EVAL_VOLUME:
+      return "eevee_deferred_volume";
+
+    case DEFERRED_VOLUME:
+      return "eevee_volume_deferred";
+
+    case HIZ_COPY:
+      return "eevee_hiz_copy";
+    case HIZ_DOWNSAMPLE:
+      return "eevee_hiz_downsample";
+
+    case DOF_BOKEH_LUT:
+      return "eevee_depth_of_field_bokeh_lut";
+    case DOF_FILTER:
+      return "eevee_depth_of_field_filter";
+    case DOF_GATHER_BACKGROUND_LUT:
+      return "eevee_depth_of_field_gather_background_lut";
+    case DOF_GATHER_BACKGROUND:
+      return "eevee_depth_of_field_gather_background";
+    case DOF_GATHER_FOREGROUND_LUT:
+      return "eevee_depth_of_field_gather_foreground_lut";
+    case DOF_GATHER_FOREGROUND:
+      return "eevee_depth_of_field_gather_foreground";
+    case DOF_GATHER_HOLEFILL:
+      return "eevee_depth_of_field_gather_holefill";
+    case DOF_REDUCE_COPY:
+      return "eevee_depth_of_field_reduce_copy";
+    case DOF_REDUCE_DOWNSAMPLE:
+      return "eevee_depth_of_field_reduce_downsample";
+    case DOF_REDUCE_RECURSIVE:
+      return "eevee_depth_of_field_reduce_recursive";
+    case DOF_RESOLVE_LUT:
+      return "eevee_depth_of_field_resolve_lut";
+    case DOF_RESOLVE_LUT_HQ:
+      return "eevee_depth_of_field_resolve_lut_hq";
+    case DOF_RESOLVE:
+      return "eevee_depth_of_field_resolve";
+    case DOF_RESOLVE_HQ:
+      return "eevee_depth_of_field_resolve_hq";
+    case DOF_SCATTER_BACKGROUND_LUT:
+      return "eevee_depth_of_field_scatter_background_lut";
+    case DOF_SCATTER_BACKGROUND:
+      return "eevee_depth_of_field_scatter_background";
+    case DOF_SCATTER_FOREGROUND_LUT:
+      return "eevee_depth_of_field_scatter_foreground_lut";
+    case DOF_SCATTER_FOREGROUND:
+      return "eevee_depth_of_field_scatter_foreground";
+    case DOF_SETUP:
+      return "eevee_depth_of_field_setup";
+    case DOF_TILES_DILATE_MINABS:
+      return "eevee_depth_of_field_tiles_dilate_minabs";
+    case DOF_TILES_DILATE_MINMAX:
+      return "eevee_depth_of_field_tiles_dilate_minmax";
+    case DOF_TILES_FLATTEN:
+      return "eevee_depth_of_field_tiles_flatten";
+
+    case LIGHTPROBE_DISPLAY_CUBEMAP:
+      return "eevee_lightprobe_display_cubemap";
+    case LIGHTPROBE_DISPLAY_IRRADIANCE:
+      return "eevee_lightprobe_display_grid";
+    case LIGHTPROBE_FILTER_DOWNSAMPLE_CUBE:
+      return "eevee_lightprobe_filter_downsample";
+    case LIGHTPROBE_FILTER_GLOSSY:
+      return "eevee_lightprobe_filter_glossy";
+    case LIGHTPROBE_FILTER_DIFFUSE:
+      return "eevee_lightprobe_filter_diffuse";
+    case LIGHTPROBE_FILTER_VISIBILITY:
+      return "eevee_lightprobe_filter_visibility";
+
+    case LOOKDEV_BACKGROUND:
+      return "eevee_background_lookdev";
+
+    case MOTION_BLUR_GATHER:
+      return "eevee_motion_blur_gather";
+    case MOTION_BLUR_TILE_DILATE:
+      return "eevee_motion_blur_tiles_dilate";
+    case MOTION_BLUR_TILE_FLATTEN:
+      return "eevee_motion_blur_tiles_flatten";
+
+    case RAYTRACE_DIFFUSE:
+      return "eevee_raytrace_raygen_diffuse";
+    case RAYTRACE_REFLECTION:
+      return "eevee_raytrace_raygen_reflection";
+    case RAYTRACE_REFRACTION:
+      return "eevee_raytrace_raygen_refraction";
+    case RAYTRACE_DIFFUSE_FALLBACK:
+      return "eevee_raytrace_raygen_fallback_diffuse";
+    case RAYTRACE_REFLECTION_FALLBACK:
+      return "eevee_raytrace_raygen_fallback_reflection";
+    case RAYTRACE_REFRACTION_FALLBACK:
+      return "eevee_raytrace_raygen_fallback_refraction";
+    case RAYTRACE_DENOISE_DIFFUSE:
+      return "eevee_raytrace_denoise_diffuse";
+    case RAYTRACE_DENOISE_REFLECTION:
+      return "eevee_raytrace_denoise_reflection";
+    case RAYTRACE_DENOISE_REFRACTION:
+      return "eevee_raytrace_denoise_refraction";
+    case RAYTRACE_RESOLVE_DIFFUSE:
+      return "eevee_raytrace_resolve_diffuse";
+    case RAYTRACE_RESOLVE_REFLECTION:
+      return "eevee_raytrace_resolve_reflection";
+    case RAYTRACE_RESOLVE_REFRACTION:
+      return "eevee_raytrace_resolve_refraction";
+
+    case SHADOW_DEBUG:
+      return "eevee_shadow_debug";
+    case SHADOW_PAGE_ALLOC:
+      return "eevee_shadow_page_alloc";
+    case SHADOW_PAGE_COPY:
+      return "eevee_shadow_page_copy";
+    case SHADOW_PAGE_DEBUG:
+      return "eevee_shadow_page_debug";
+    case SHADOW_PAGE_DEFRAG:
+      return "eevee_shadow_page_defrag";
+    case SHADOW_PAGE_FREE:
+      return "eevee_shadow_page_free";
+    case SHADOW_PAGE_INIT:
+      return "eevee_shadow_page_init";
+    case SHADOW_PAGE_MARK:
+      return "eevee_shadow_page_mark";
+    case SHADOW_TILE_DEPTH_SCAN:
+      return "eevee_shadow_tilemap_depth_scan";
+    case SHADOW_TILE_LOD_MASK:
+      return "eevee_shadow_tilemap_lod_mask";
+    case SHADOW_TILE_SETUP:
+      return "eevee_shadow_tilemap_setup";
+    case SHADOW_TILE_TAG_UPDATE:
+      return "eevee_shadow_tilemap_tag_update";
+    case SHADOW_TILE_TAG_USAGE:
+      return "eevee_shadow_tilemap_tag_usage";
+    case SHADOW_TILE_TAG_VISIBILITY:
+      return "eevee_shadow_tilemap_visibility";
+
+    case SUBSURFACE_EVAL:
+      return "eevee_subsurface_eval";
+
+    case VELOCITY_MESH:
+      return "eevee_velocity_surface_mesh";
+    case VELOCITY_CAMERA:
+      return "eevee_velocity_camera";
+    /* To avoid compiler warning about missing case. */
+    case MAX_SHADER_TYPE:
+      return "";
+  }
+  return "";
 }
 
 GPUShader *ShaderModule::static_shader_get(eShaderType shader_type)
@@ -451,10 +240,10 @@ GPUShader *ShaderModule::static_shader_get(eShaderType shader_type)
   if (shaders_[shader_type] == nullptr) {
     ShaderDescription &desc = shader_descriptions_[shader_type];
     if (desc.compute_shader_code != nullptr) {
-      char *comp_with_lib = DRW_shader_library_create_shader_string(shader_lib_,
-                                                                    desc.compute_shader_code);
+      const GPUShaderCreateInfo *create_info = static_shader_create_info_name_get(shader_type);
+      char *comp_with_lib = DRW_shader_library_create_shader_string(shader_lib_, create_info);
 
-      shaders_[shader_type] = GPU_shader_create_compute(
+      shaders_[shader_type] = GPU_shader_create_from_info_name(
           comp_with_lib, nullptr, desc.defines_shader_code, desc.name);
 
       MEM_SAFE_FREE(comp_with_lib);
@@ -473,42 +262,6 @@ GPUShader *ShaderModule::static_shader_get(eShaderType shader_type)
     BLI_assert(shaders_[shader_type] != nullptr);
   }
   return shaders_[shader_type];
-}
-
-/* Run some custom preprocessor shader rewrite and returns a new string. */
-std::string ShaderModule::enum_preprocess(const char *input)
-{
-  std::string output = "";
-  /* Not failure safe but this only runs on static data. */
-  const char *cursor = input;
-  while ((cursor = strstr(cursor, "enum "))) {
-    output += StringRef(input, cursor - input);
-
-    /* Skip "enum" keyword. */
-    cursor = strstr(cursor, " ");
-
-    const char *enum_name = cursor;
-    cursor = strstr(cursor, " :");
-
-    output += "#define " + StringRef(enum_name, cursor - enum_name) + " uint\n";
-    output += "const uint ";
-
-    const char *enum_values = strstr(cursor, "{") + 1;
-    cursor = strstr(cursor, "}");
-    output += StringRef(enum_values, cursor - enum_values);
-
-    if (cursor != nullptr) {
-      /* Skip the curly bracket but not the semicolon. */
-      input = cursor + 1;
-    }
-    else {
-      input = nullptr;
-    }
-  }
-  if (input != nullptr) {
-    output += input;
-  }
-  return output;
 }
 
 /** \} */

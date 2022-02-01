@@ -10,49 +10,6 @@
 #pragma BLENDER_REQUIRE(eevee_raytrace_trace_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 
-layout(std140) uniform sampling_block
-{
-  SamplingData sampling;
-};
-
-layout(std140) uniform raytrace_block
-{
-  RaytraceData raytrace;
-};
-
-layout(std140) uniform hiz_block
-{
-  HiZData hiz;
-};
-
-layout(std140) uniform cubes_block
-{
-  CubemapData cubes[CULLING_ITEM_BATCH];
-};
-
-layout(std140) uniform lightprobes_info_block
-{
-  LightProbeInfoData probes_info;
-};
-
-uniform sampler2D hiz_tx;
-uniform sampler2D hiz_front_tx;
-uniform samplerCubeArray lightprobe_cube_tx;
-uniform sampler2D radiance_tx;
-uniform sampler2D combined_tx;
-uniform sampler2D cl_color_tx;
-uniform sampler2D cl_normal_tx;
-uniform sampler2D cl_data_tx;
-uniform sampler2DArray utility_tx;
-
-utility_tx_fetch_define(utility_tx);
-utility_tx_sample_define(utility_tx);
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_ray_data;
-layout(location = 1) out vec4 out_ray_radiance;
-
 /* Prototypes. */
 vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold);
 

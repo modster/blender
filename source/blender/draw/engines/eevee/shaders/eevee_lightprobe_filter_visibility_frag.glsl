@@ -12,15 +12,6 @@
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-uniform samplerCube depth_tx;
-
-layout(std140) uniform filter_block
-{
-  LightProbeFilterData probe;
-};
-
-layout(location = 0) out vec4 out_irradiance;
-
 vec3 octahedral_to_cubemap_proj(vec2 co)
 {
   co = co * 2.0 - 1.0;
@@ -74,5 +65,5 @@ void main()
     accum += vec2(depth, depth * depth);
   }
 
-  out_irradiance = visibility_encode(abs(accum / probe.sample_count), probe.visibility_range);
+  out_visibility = visibility_encode(abs(accum / probe.sample_count), probe.visibility_range);
 }

@@ -9,8 +9,6 @@
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_volume_lib.glsl)
 
-in vec3 pos;
-
 void main(void)
 {
   /* TODO(fclem) Make the quad cover only the bounding box. */

@@ -15,26 +15,6 @@
 /** Control the scaling of the tilemap splat. */
 const float pixel_scale = 4.0;
 
-layout(std140) uniform debug_block
-{
-  ShadowDebugData debug;
-};
-
-layout(std430, binding = 0) readonly buffer tilemaps_buf
-{
-  ShadowTileMapData tilemaps[];
-};
-
-uniform usampler2D debug_page_tx;
-uniform usampler2D tilemaps_tx;
-uniform sampler2D depth_tx;
-uniform sampler2D atlas_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 0, index = 0) out vec4 out_color_add;
-layout(location = 0, index = 1) out vec4 out_color_mul;
-
 vec3 debug_random_color(ivec2 v)
 {
   float r = interlieved_gradient_noise(vec2(v), 0.0, 0.0);

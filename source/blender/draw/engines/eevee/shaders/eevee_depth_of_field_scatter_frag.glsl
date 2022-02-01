@@ -6,18 +6,6 @@
  * invocations and overdraw.
  */
 
-#pragma BLENDER_REQUIRE(eevee_depth_of_field_scatter_lib.glsl)
-
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-uniform sampler2D occlusion_tx;
-uniform sampler2D bokeh_lut_tx;
-
-layout(location = 0) out vec4 fragColor;
-
 float bokeh_shape(vec2 center)
 {
   vec2 co = gl_FragCoord.xy - center;

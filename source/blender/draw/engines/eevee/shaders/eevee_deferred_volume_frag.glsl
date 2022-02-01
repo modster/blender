@@ -41,12 +41,8 @@ uniform sampler2DArray utility_tx;
 uniform sampler2DShadow shadow_atlas_tx;
 uniform usampler2D shadow_tilemaps_tx;
 
-utility_tx_fetch_define(utility_tx) utility_tx_sample_define(utility_tx)
-
-    in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_combined;
-layout(location = 1) out vec3 out_volume;
+utility_tx_fetch_define(utility_tx);
+utility_tx_sample_define(utility_tx);
 
 void main(void)
 {

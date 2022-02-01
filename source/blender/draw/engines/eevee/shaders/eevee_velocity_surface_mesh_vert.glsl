@@ -3,17 +3,6 @@
 #pragma BLENDER_REQUIRE(eevee_surface_velocity_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(std140) uniform object_block
-{
-  VelocityObjectData velocity;
-};
-
-uniform int data_offset;
-
-in vec3 pos;
-in vec3 prv;
-in vec3 nxt;
-
 vec3 velocity_object_to_world_prev(VelocityObjectData data, vec3 prev_pos, vec3 current_pos)
 {
   /* Encoded use_deform inside the matrix to save up space. */

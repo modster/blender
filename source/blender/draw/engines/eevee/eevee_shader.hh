@@ -49,7 +49,6 @@ enum eShaderType {
   DEFERRED_EVAL_TRANSPARENT,
   DEFERRED_EVAL_VOLUME,
 
-  DEFERRED_MESH,
   DEFERRED_VOLUME,
 
   DOF_BOKEH_LUT,
@@ -137,19 +136,7 @@ enum eShaderType {
  */
 class ShaderModule {
  private:
-  struct ShaderDescription {
-    const char *name = nullptr;
-    const char *vertex_shader_code = nullptr;
-    const char *geometry_shader_code = nullptr;
-    const char *fragment_shader_code = nullptr;
-    const char *compute_shader_code = nullptr;
-    const char *defines_shader_code = nullptr;
-  };
-
-  DRWShaderLibrary *shader_lib_ = nullptr;
   std::array<GPUShader *, MAX_SHADER_TYPE> shaders_;
-  std::array<ShaderDescription, MAX_SHADER_TYPE> shader_descriptions_;
-  std::string shared_lib_;
 
  public:
   ShaderModule();

@@ -11,33 +11,6 @@
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(local_size_x = CULLING_BATCH_SIZE) in;
-
-layout(std430, binding = 0) readonly restrict buffer lights_buf
-{
-  LightData lights[];
-};
-
-layout(std430, binding = 1) restrict buffer culling_buf
-{
-  CullingData culling;
-};
-
-layout(std430, binding = 2) readonly restrict buffer key_buf
-{
-  uint keys[];
-};
-
-layout(std430, binding = 3) writeonly restrict buffer out_zbins_buf
-{
-  CullingZBin out_zbins[];
-};
-
-layout(std430, binding = 4) writeonly restrict buffer out_items_buf
-{
-  LightData out_lights[];
-};
-
 void main()
 {
   uint src_index = gl_GlobalInvocationID.x;

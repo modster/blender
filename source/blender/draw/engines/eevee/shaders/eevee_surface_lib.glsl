@@ -4,20 +4,6 @@
 #pragma BLENDER_REQUIRE(gpu_shader_codegen_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
 
-IN_OUT SurfaceInterface
-{
-  vec3 P;
-  vec3 N;
-  vec2 barycentric_coords;
-  flat vec3 barycentric_dists;
-  vec3 hair_binormal;
-  float hair_time;
-  float hair_time_width;
-  float hair_thickness;
-  flat int hair_strand_id;
-}
-interp;
-
 #if defined(GPU_FRAGMENT_SHADER) || defined(GPU_VERTEX_SHADER)
 GlobalData init_globals(void)
 {
