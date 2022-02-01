@@ -60,7 +60,6 @@
 #include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
-#include "DNA_gpencil_types.h"
 #include "DNA_particle_types.h"
 #include "DNA_rigidbody_types.h"
 #include "DNA_scene_types.h"
@@ -764,12 +763,6 @@ void update_id_after_copy(const Depsgraph *depsgraph,
         }
         BKE_pose_pchan_index_rebuild(object_cow->pose);
       }
-      /* TODO: Make sure this is needed and understand why sometimes there is a populated
-       * update_cache pointer on the eval object */
-      if (object_cow->type == OB_GPENCIL) {
-        bGPdata *gpd_eval = (bGPdata *)object_cow->data;
-        gpd_eval->runtime.update_cache = NULL;
-      }
       update_particles_after_copy(depsgraph, object_orig, object_cow);
       update_modifiers_orig_pointers(object_orig, object_cow);
       update_proxy_pointers_after_copy(depsgraph, object_orig, object_cow);
@@ -938,10 +931,11 @@ ID *deg_update_copy_on_write_datablock(const Depsgraph *depsgraph, const IDNode 
         BKE_gpencil_update_on_write((bGPdata *)id_orig, (bGPdata *)id_cow);
       }
       else {
+        /* Free gpd update cache and set it to null so that it's not copied to the eval data. */
+        BKE_gpencil_free_update_cache((bGPdata *)id_orig);
         deg_free_copy_on_write_datablock(id_cow);
         deg_expand_copy_on_write_datablock(depsgraph, id_node);
         BKE_gpencil_data_update_orig_pointers((bGPdata *)id_orig, (bGPdata *)id_cow);
-        BKE_gpencil_free_update_cache((bGPdata *)id_orig);
       }
       break;
     }
