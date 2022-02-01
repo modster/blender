@@ -2110,7 +2110,8 @@ static void gpencil_session_cleanup(tGPsdata *p)
   gpd->runtime.sbuffer_used = 0;
   gpd->runtime.sbuffer_size = 0;
   gpd->runtime.sbuffer_sflag = 0;
-  /* TODO: This fixes an issue where visual glitches can occur. */
+  /* This update is required for update-on-write because the sbuffer data is not longer overwritten
+   * by a copy-on-write. */
   ED_gpencil_sbuffer_update_eval(gpd, p->ob_eval);
   p->inittime = 0.0;
 }
