@@ -2043,6 +2043,7 @@ static int get_main_socket_priority(const bNodeSocket *socket)
     case SOCK_COLLECTION:
     case SOCK_TEXTURE:
     case SOCK_MATERIAL:
+    case SOCK_VECTOR2D:
       return 6;
   }
   return -1;

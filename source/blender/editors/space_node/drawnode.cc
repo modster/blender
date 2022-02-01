@@ -1166,6 +1166,7 @@ static const float std_node_socket_colors[][4] = {
     {0.96, 0.96, 0.96, 1.0}, /* SOCK_COLLECTION */
     {0.62, 0.31, 0.64, 1.0}, /* SOCK_TEXTURE */
     {0.92, 0.46, 0.51, 1.0}, /* SOCK_MATERIAL */
+    {0.49, 0.49, 0.88, 1.0}, /* SOCK_VECTOR2D */
 };
 
 /* common color callbacks for standard types */
@@ -1275,6 +1276,20 @@ static void std_node_socket_draw(
       uiItemR(layout, ptr, "default_value", DEFAULT_FLAGS, text, 0);
       break;
     case SOCK_VECTOR:
+      if (sock->flag & SOCK_COMPACT) {
+        uiTemplateComponentMenu(layout, ptr, "default_value", text);
+      }
+      else {
+        if (sock->typeinfo->subtype == PROP_DIRECTION) {
+          uiItemR(layout, ptr, "default_value", DEFAULT_FLAGS, "", ICON_NONE);
+        }
+        else {
+          uiLayout *column = uiLayoutColumn(layout, true);
+          uiItemR(column, ptr, "default_value", DEFAULT_FLAGS, text, ICON_NONE);
+        }
+      }
+      break;
+    case SOCK_VECTOR2D:
       if (sock->flag & SOCK_COMPACT) {
         uiTemplateComponentMenu(layout, ptr, "default_value", text);
       }

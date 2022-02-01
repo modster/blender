@@ -322,6 +322,7 @@ static void library_foreach_node_socket(LibraryForeachIDData *data, bNodeSocket 
     }
     case SOCK_FLOAT:
     case SOCK_VECTOR:
+    case SOCK_VECTOR2D:
     case SOCK_RGBA:
     case SOCK_BOOLEAN:
     case SOCK_INT:
@@ -456,6 +457,9 @@ static void write_node_socket_default_value(BlendWriter *writer, bNodeSocket *so
       break;
     case SOCK_VECTOR:
       BLO_write_struct(writer, bNodeSocketValueVector, sock->default_value);
+      break;
+    case SOCK_VECTOR2D:
+      BLO_write_struct(writer, bNodeSocketValueVector2d, sock->default_value);
       break;
     case SOCK_RGBA:
       BLO_write_struct(writer, bNodeSocketValueRGBA, sock->default_value);
@@ -881,6 +885,7 @@ static void lib_link_node_socket(BlendLibReader *reader, Library *lib, bNodeSock
     }
     case SOCK_FLOAT:
     case SOCK_VECTOR:
+    case SOCK_VECTOR2D:
     case SOCK_RGBA:
     case SOCK_BOOLEAN:
     case SOCK_INT:
@@ -976,6 +981,7 @@ static void expand_node_socket(BlendExpander *expander, bNodeSocket *sock)
       }
       case SOCK_FLOAT:
       case SOCK_VECTOR:
+      case SOCK_VECTOR2D:
       case SOCK_RGBA:
       case SOCK_BOOLEAN:
       case SOCK_INT:
@@ -1578,6 +1584,7 @@ static void socket_id_user_increment(bNodeSocket *sock)
     }
     case SOCK_FLOAT:
     case SOCK_VECTOR:
+    case SOCK_VECTOR2D:
     case SOCK_RGBA:
     case SOCK_BOOLEAN:
     case SOCK_INT:
@@ -1631,6 +1638,7 @@ static void socket_id_user_decrement(bNodeSocket *sock)
     }
     case SOCK_FLOAT:
     case SOCK_VECTOR:
+    case SOCK_VECTOR2D:
     case SOCK_RGBA:
     case SOCK_BOOLEAN:
     case SOCK_INT:
@@ -1764,6 +1772,24 @@ const char *nodeStaticSocketType(int type, int subtype)
         default:
           return "NodeSocketVector";
       }
+    case SOCK_VECTOR2D:
+      switch (subtype) {
+        // case PROP_TRANSLATION:
+        //   return "NodeSocketVectorTranslation";
+        // case PROP_DIRECTION:
+        //   return "NodeSocketVectorDirection";
+        // case PROP_VELOCITY:
+        //   return "NodeSocketVectorVelocity";
+        // case PROP_ACCELERATION:
+        //   return "NodeSocketVectorAcceleration";
+        // case PROP_EULER:
+        //   return "NodeSocketVectorEuler";
+        // case PROP_XYZ:
+        //   return "NodeSocketVectorXYZ";
+        // case PROP_NONE:
+        default:
+          return "NodeSocketVector2d";
+      }
     case SOCK_RGBA:
       return "NodeSocketColor";
     case SOCK_STRING:
@@ -1841,6 +1867,8 @@ const char *nodeStaticSocketInterfaceType(int type, int subtype)
         default:
           return "NodeSocketInterfaceVector";
       }
+    case SOCK_VECTOR2D:
+      return "NodeSocketInterfaceVector2d";
     case SOCK_RGBA:
       return "NodeSocketInterfaceColor";
     case SOCK_STRING:
@@ -1874,6 +1902,8 @@ const char *nodeStaticSocketLabel(int type, int UNUSED(subtype))
       return "Boolean";
     case SOCK_VECTOR:
       return "Vector";
+    case SOCK_VECTOR2D:
+      return "Vector2d";
     case SOCK_RGBA:
       return "Color";
     case SOCK_STRING:

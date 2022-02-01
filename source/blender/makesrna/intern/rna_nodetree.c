@@ -73,6 +73,7 @@ static const EnumPropertyItem node_socket_data_type_items[] = {
     {SOCK_INT, "INT", 0, "Integer", ""},
     {SOCK_BOOLEAN, "BOOLEAN", 0, "Boolean", ""},
     {SOCK_VECTOR, "VECTOR", 0, "Vector", ""},
+    {SOCK_VECTOR2D, "VECTOR2D", 0, "Vector2d", ""},
     {SOCK_STRING, "STRING", 0, "String", ""},
     {SOCK_RGBA, "RGBA", 0, "Color", ""},
     {SOCK_OBJECT, "OBJECT", 0, "Object", ""},
@@ -100,6 +101,7 @@ static const EnumPropertyItem node_socket_type_items[] = {
     {SOCK_INT, "INT", 0, "Integer", ""},
     {SOCK_BOOLEAN, "BOOLEAN", 0, "Boolean", ""},
     {SOCK_VECTOR, "VECTOR", 0, "Vector", ""},
+    {SOCK_VECTOR2D, "VECTOR2D", 0, "Vector2d", ""},
     {SOCK_STRING, "STRING", 0, "String", ""},
     {SOCK_RGBA, "RGBA", 0, "RGBA", ""},
     {SOCK_SHADER, "SHADER", 0, "Shader", ""},
@@ -2099,6 +2101,7 @@ static bool switch_type_supported(const EnumPropertyItem *item)
               SOCK_INT,
               SOCK_BOOLEAN,
               SOCK_VECTOR,
+              SOCK_VECTOR2D,
               SOCK_STRING,
               SOCK_RGBA,
               SOCK_GEOMETRY,
@@ -12120,6 +12123,69 @@ static void rna_def_node_socket_vector(BlenderRNA *brna,
   RNA_def_struct_sdna_from(srna, "bNodeSocket", NULL);
 }
 
+static void rna_def_node_socket_vector2d(BlenderRNA *brna,
+                                         const char *identifier,
+                                         const char *interface_idname,
+                                         PropertySubType subtype)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+  const float *value_default;
+
+  /* choose sensible common default based on subtype */
+  switch (subtype) {
+    default: {
+      static const float default_vector[2] = {0.0f, 0.0f};
+      value_default = default_vector;
+      break;
+    }
+  }
+
+  srna = RNA_def_struct(brna, identifier, "NodeSocketStandard");
+  RNA_def_struct_ui_text(srna, "Vector Node Socket", "2D vector socket of a node");
+  RNA_def_struct_sdna(srna, "bNodeSocket");
+
+  RNA_def_struct_sdna_from(srna, "bNodeSocketValueVector2d", "default_value");
+
+  prop = RNA_def_property(srna, "default_value", PROP_FLOAT, subtype);
+  RNA_def_property_float_sdna(prop, NULL, "value");
+  RNA_def_property_float_array_default(prop, value_default);
+  RNA_def_property_float_funcs(prop, NULL, NULL, "rna_NodeSocketStandard_vector_range");
+  RNA_def_property_ui_text(prop, "Default Value", "Input value used for unconnected socket");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketStandard_value_update");
+  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+
+  RNA_def_struct_sdna_from(srna, "bNodeSocket", NULL);
+
+  /* socket interface */
+  srna = RNA_def_struct(brna, interface_idname, "NodeSocketInterfaceStandard");
+  RNA_def_struct_ui_text(srna, "Vector2d Node Socket Interface", "2D vector socket of a node");
+  RNA_def_struct_sdna(srna, "bNodeSocket");
+
+  RNA_def_struct_sdna_from(srna, "bNodeSocketValueVector2d", "default_value");
+
+  prop = RNA_def_property(srna, "default_value", PROP_FLOAT, subtype);
+  RNA_def_property_float_sdna(prop, NULL, "value");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  // RNA_def_property_float_funcs(prop, NULL, NULL, "line_ending");
+  RNA_def_property_ui_text(prop, "Default Value", "Input value used for unconnected socket");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
+
+  prop = RNA_def_property(srna, "min_value", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "min");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_ui_text(prop, "Minimum Value", "Minimum value");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
+
+  prop = RNA_def_property(srna, "max_value", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "max");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_ui_text(prop, "Maximum Value", "Maximum value");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
+
+  RNA_def_struct_sdna_from(srna, "bNodeSocket", NULL);
+}
+
 static void rna_def_node_socket_color(BlenderRNA *brna,
                                       const char *identifier,
                                       const char *interface_idname)
@@ -12550,6 +12616,9 @@ static void rna_def_node_socket_standard_types(BlenderRNA *brna)
       brna, "NodeSocketVectorEuler", "NodeSocketInterfaceVectorEuler", PROP_EULER);
   rna_def_node_socket_vector(
       brna, "NodeSocketVectorXYZ", "NodeSocketInterfaceVectorXYZ", PROP_XYZ);
+
+  rna_def_node_socket_vector2d(
+      brna, "NodeSocketVector2d", "NodeSocketInterfaceVector2d", PROP_NONE);
 
   rna_def_node_socket_color(brna, "NodeSocketColor", "NodeSocketInterfaceColor");
 

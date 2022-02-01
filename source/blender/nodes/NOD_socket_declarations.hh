@@ -110,6 +110,35 @@ class VectorBuilder : public SocketDeclarationBuilder<Vector> {
   VectorBuilder &compact();
 };
 
+class Vector2dBuilder;
+
+class Vector2d : public SocketDeclaration {
+ private:
+  float2 default_value_ = {0, 0};
+  float soft_min_value_ = -FLT_MAX;
+  float soft_max_value_ = FLT_MAX;
+  PropertySubType subtype_ = PROP_NONE;
+
+  friend Vector2dBuilder;
+
+ public:
+  using Builder = Vector2dBuilder;
+
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
+  bool matches(const bNodeSocket &socket) const override;
+  bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
+};
+
+class Vector2dBuilder : public SocketDeclarationBuilder<Vector2d> {
+ public:
+  Vector2dBuilder &default_value(const float2 value);
+  Vector2dBuilder &subtype(PropertySubType subtype);
+  Vector2dBuilder &min(float min);
+  Vector2dBuilder &max(float max);
+  Vector2dBuilder &compact();
+};
+
 class BoolBuilder;
 
 class Bool : public SocketDeclaration {
@@ -326,6 +355,42 @@ inline VectorBuilder &VectorBuilder::max(const float max)
 }
 
 inline VectorBuilder &VectorBuilder::compact()
+{
+  decl_->compact_ = true;
+  return *this;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #Vector2dBuilder Inline Methods
+ * \{ */
+
+inline Vector2dBuilder &Vector2dBuilder::default_value(const float2 value)
+{
+  decl_->default_value_ = value;
+  return *this;
+}
+
+inline Vector2dBuilder &Vector2dBuilder::subtype(PropertySubType subtype)
+{
+  decl_->subtype_ = subtype;
+  return *this;
+}
+
+inline Vector2dBuilder &Vector2dBuilder::min(const float min)
+{
+  decl_->soft_min_value_ = min;
+  return *this;
+}
+
+inline Vector2dBuilder &Vector2dBuilder::max(const float max)
+{
+  decl_->soft_max_value_ = max;
+  return *this;
+}
+
+inline Vector2dBuilder &Vector2dBuilder::compact()
 {
   decl_->compact_ = true;
   return *this;
