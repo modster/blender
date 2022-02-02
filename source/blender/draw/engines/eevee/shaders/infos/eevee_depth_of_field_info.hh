@@ -7,37 +7,38 @@
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_bokeh_lut)
     .do_static_compilation(true)
+    .additional_info("eevee_shared")
     .uniform_buf(0, "DepthOfFieldData", "dof")
-    .fragment_out(0, Type::VEC4, "out_color")
-    .fragment_out(1, Type::FLOAT, "out_weight")
+    .fragment_out(0, Type::VEC2, "out_gather_lut")
+    .fragment_out(1, Type::FLOAT, "out_scatter_lut")
     .fragment_out(2, Type::FLOAT, "out_resolve_lut")
-    .typedef_source("eevee_shader_shared.hh")
     .fragment_source("eevee_depth_of_field_bokeh_lut_frag.glsl")
     .additional_info("draw_fullscreen");
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_setup)
     .do_static_compilation(true)
+    .additional_info("eevee_shared")
     .uniform_buf(0, "DepthOfFieldData", "dof")
     .sampler(0, ImageType::FLOAT_2D, "color_tx", Frequency::PASS)
     .sampler(1, ImageType::DEPTH_2D, "depth_tx", Frequency::PASS)
     .fragment_out(0, Type::VEC4, "out_color")
     .fragment_out(1, Type::VEC2, "out_coc")
-    .typedef_source("eevee_shader_shared.hh")
     .fragment_source("eevee_depth_of_field_setup_frag.glsl")
     .additional_info("draw_fullscreen");
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_filter)
     .do_static_compilation(true)
+    .additional_info("eevee_shared")
     .sampler(0, ImageType::FLOAT_2D, "color_tx", Frequency::PASS)
     .sampler(1, ImageType::FLOAT_2D, "weight_tx", Frequency::PASS)
     .fragment_out(0, Type::VEC4, "out_color")
     .fragment_out(1, Type::FLOAT, "out_weight")
-    .typedef_source("eevee_shader_shared.hh")
     .fragment_source("eevee_depth_of_field_filter_frag.glsl")
     .additional_info("draw_fullscreen");
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_reduce_copy)
     .do_static_compilation(true)
+    .additional_info("eevee_shared")
     .uniform_buf(0, "DepthOfFieldData", "dof")
     .sampler(0, ImageType::FLOAT_2D, "color_tx", Frequency::PASS)
     .sampler(1, ImageType::FLOAT_2D, "coc_tx", Frequency::PASS)
@@ -45,28 +46,27 @@ GPU_SHADER_CREATE_INFO(eevee_depth_of_field_reduce_copy)
     .fragment_out(0, Type::VEC4, "out_color_gather")
     .fragment_out(1, Type::FLOAT, "out_coc")
     .fragment_out(2, Type::VEC3, "out_color_scatter")
-    .typedef_source("eevee_shader_shared.hh")
     .fragment_source("eevee_depth_of_field_reduce_copy_frag.glsl")
     .additional_info("draw_fullscreen");
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_reduce_downsample)
     .do_static_compilation(true)
+    .additional_info("eevee_shared")
     .sampler(0, ImageType::FLOAT_2D, "color_tx", Frequency::PASS)
     .sampler(1, ImageType::FLOAT_2D, "coc_tx", Frequency::PASS)
     .fragment_out(0, Type::VEC4, "out_color")
-    .typedef_source("eevee_shader_shared.hh")
     .fragment_source("eevee_depth_of_field_reduce_downsample_frag.glsl")
     .additional_info("draw_fullscreen");
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_reduce_recursive)
     .do_static_compilation(true)
+    .additional_info("eevee_shared")
     .uniform_buf(0, "DepthOfFieldData", "dof")
     .uniform_buf(1, "SamplingData", "sampling")
     .sampler(0, ImageType::DEPTH_2D, "color_tx", Frequency::PASS)
     .sampler(1, ImageType::FLOAT_2D, "coc_tx", Frequency::PASS)
     .fragment_out(0, Type::VEC4, "out_color")
     .fragment_out(1, Type::FLOAT, "out_coc")
-    .typedef_source("eevee_shader_shared.hh")
     .fragment_source("eevee_depth_of_field_reduce_recursive_frag.glsl")
     .additional_info("draw_fullscreen");
 
@@ -76,7 +76,13 @@ GPU_SHADER_CREATE_INFO(eevee_depth_of_field_reduce_recursive)
 /** \name Variations
  * \{ */
 
-GPU_SHADER_CREATE_INFO(eevee_depth_of_field_no_lut).define("DOF_BOKEH_TEXTURE", "false");
+GPU_SHADER_CREATE_INFO(eevee_depth_of_field_no_lut)
+    .define("DOF_BOKEH_TEXTURE", "false")
+    /**
+     * WORKAROUND(@fclem): This is to keep the code as is for now. The bokeh_lut_tx is referenced
+     * even if not used after optimisation. But we don't want to include it in the create infos.
+     */
+    .define("bokeh_lut_tx", "color_tx");
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_lut)
     .define("DOF_BOKEH_TEXTURE", "true")
@@ -100,7 +106,7 @@ GPU_SHADER_CREATE_INFO(eevee_depth_of_field_lq).define("DOF_SLIGHT_FOCUS_DENSITY
 
 #define EEVEE_DOF_HQ_VARIATIONS(name, ...) \
   EEVEE_DOF_LUT_VARIATIONS(name##_hq, "eevee_depth_of_field_hq", __VA_ARGS__) \
-  EEVEE_DOF_LUT_VARIATIONS(name, "eevee_depth_of_field_lq", __VA_ARGS__)
+  EEVEE_DOF_LUT_VARIATIONS(name##_lq, "eevee_depth_of_field_lq", __VA_ARGS__)
 
 /** \} */
 
@@ -109,7 +115,7 @@ GPU_SHADER_CREATE_INFO(eevee_depth_of_field_lq).define("DOF_SLIGHT_FOCUS_DENSITY
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_gather)
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .uniform_buf(0, "DepthOfFieldData", "dof")
     .uniform_buf(1, "SamplingData", "sampling")
     .sampler(0, ImageType::FLOAT_2D, "color_tx", Frequency::PASS)
@@ -120,6 +126,7 @@ GPU_SHADER_CREATE_INFO(eevee_depth_of_field_gather)
     .fragment_out(0, Type::VEC4, "out_color")
     .fragment_out(1, Type::FLOAT, "out_weight")
     .fragment_out(2, Type::VEC2, "out_occlusion")
+    .fragment_source("eevee_depth_of_field_gather_frag.glsl")
     .additional_info("draw_fullscreen");
 
 EEVEE_DOF_GROUND_VARIATIONS(eevee_depth_of_field_gather, "eevee_depth_of_field_gather")
@@ -131,7 +138,7 @@ EEVEE_DOF_GROUND_VARIATIONS(eevee_depth_of_field_gather, "eevee_depth_of_field_g
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_gather_holefill)
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .uniform_buf(0, "DepthOfFieldData", "dof")
     .uniform_buf(1, "SamplingData", "sampling")
     .sampler(0, ImageType::FLOAT_2D, "color_tx", Frequency::PASS)
@@ -150,7 +157,7 @@ GPU_SHADER_CREATE_INFO(eevee_depth_of_field_gather_holefill)
 /** \name Scatter
  * \{ */
 
-GPU_SHADER_INTERFACE_INFO(eevee_depth_of_field_scatter_iface)
+GPU_SHADER_INTERFACE_INFO(eevee_depth_of_field_scatter_iface, "")
     /** Colors, weights, and Circle of confusion radii for the 4 pixels to scatter. */
     .flat(Type::VEC4, "color1")
     .flat(Type::VEC4, "color2")
@@ -164,11 +171,12 @@ GPU_SHADER_INTERFACE_INFO(eevee_depth_of_field_scatter_iface)
     .flat(Type::FLOAT, "spritesize");
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_scatter)
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .uniform_buf(0, "DepthOfFieldData", "dof")
-    .sampler(0, ImageType::FLOAT_2D, "color_tx", Frequency::PASS)
-    .sampler(1, ImageType::DEPTH_2D, "depth_tx", Frequency::PASS)
-    .sampler(2, ImageType::FLOAT_2D, "occlusion_tx", Frequency::PASS)
+    .sampler(0, ImageType::FLOAT_2D, "color_tx")
+    .sampler(1, ImageType::DEPTH_2D, "depth_tx")
+    .sampler(2, ImageType::FLOAT_2D, "occlusion_tx")
+    .sampler(3, ImageType::FLOAT_2D, "coc_tx")
     .fragment_out(0, Type::VEC4, "fragColor")
     .vertex_out(eevee_depth_of_field_scatter_iface)
     .vertex_source("eevee_depth_of_field_scatter_vert.glsl")
@@ -183,22 +191,20 @@ EEVEE_DOF_GROUND_VARIATIONS(eevee_depth_of_field_scatter, "eevee_depth_of_field_
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_resolve)
-    .do_static_compilation(true)
     .define("DOF_RESOLVE_PASS", "true")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .uniform_buf(0, "DepthOfFieldData", "dof")
     .uniform_buf(1, "SamplingData", "sampling")
-    .sampler(0, ImageType::DEPTH_2D, "depth_tx", Frequency::PASS)
-    .sampler(1, ImageType::FLOAT_2D, "color_tx", Frequency::PASS)
-    .sampler(2, ImageType::FLOAT_2D, "color_bg_tx", Frequency::PASS)
-    .sampler(3, ImageType::FLOAT_2D, "color_fg_tx", Frequency::PASS)
-    .sampler(4, ImageType::FLOAT_2D, "color_holefill_tx", Frequency::PASS)
-    .sampler(5, ImageType::FLOAT_2D, "tiles_bg_tx", Frequency::PASS)
-    .sampler(6, ImageType::FLOAT_2D, "tiles_fg_tx", Frequency::PASS)
-    .sampler(7, ImageType::FLOAT_2D, "weight_bg_tx", Frequency::PASS)
-    .sampler(8, ImageType::FLOAT_2D, "weight_fg_tx", Frequency::PASS)
-    .sampler(9, ImageType::FLOAT_2D, "weight_holefill_tx", Frequency::PASS)
-    .sampler(10, ImageType::FLOAT_2D, "bokeh_lut_tx", Frequency::PASS)
+    .sampler(0, ImageType::DEPTH_2D, "depth_tx")
+    .sampler(1, ImageType::FLOAT_2D, "color_tx")
+    .sampler(2, ImageType::FLOAT_2D, "color_bg_tx")
+    .sampler(3, ImageType::FLOAT_2D, "color_fg_tx")
+    .sampler(4, ImageType::FLOAT_2D, "color_holefill_tx")
+    .sampler(7, ImageType::FLOAT_2D, "tiles_bg_tx")
+    .sampler(8, ImageType::FLOAT_2D, "tiles_fg_tx")
+    .sampler(9, ImageType::FLOAT_2D, "weight_bg_tx")
+    .sampler(10, ImageType::FLOAT_2D, "weight_fg_tx")
+    .sampler(11, ImageType::FLOAT_2D, "weight_holefill_tx")
     .fragment_out(0, Type::VEC4, "out_color")
     .fragment_source("eevee_depth_of_field_resolve_frag.glsl")
     .additional_info("draw_fullscreen");
@@ -212,7 +218,7 @@ EEVEE_DOF_HQ_VARIATIONS(eevee_depth_of_field_resolve, "eevee_depth_of_field_reso
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_tiles_dilate)
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .sampler(0, ImageType::FLOAT_2D, "tiles_fg_tx", Frequency::PASS)
     .sampler(1, ImageType::FLOAT_2D, "tiles_bg_tx", Frequency::PASS)
     .fragment_out(0, Type::VEC4, "out_tile_fg")
@@ -235,7 +241,7 @@ GPU_SHADER_CREATE_INFO(eevee_depth_of_field_tiles_dilate_minmax)
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_tiles_flatten)
     .do_static_compilation(true)
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .sampler(0, ImageType::FLOAT_2D, "coc_tx", Frequency::PASS)
     .fragment_out(0, Type::VEC4, "out_tile_fg")
     .fragment_out(1, Type::VEC3, "out_tile_bg")

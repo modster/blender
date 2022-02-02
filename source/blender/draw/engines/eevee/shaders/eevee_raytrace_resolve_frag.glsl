@@ -16,7 +16,6 @@
 #pragma BLENDER_REQUIRE(eevee_bsdf_microfacet_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 #if defined(DIFFUSE)
 #  define RADIUS 4

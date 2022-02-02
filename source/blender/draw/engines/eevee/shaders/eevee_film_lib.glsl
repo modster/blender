@@ -3,7 +3,6 @@
  * Film accumulation utils functions.
  **/
 
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_camera_lib.glsl)
 
 bool film_is_color_data(FilmData film)

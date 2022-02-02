@@ -9,23 +9,10 @@
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
-
-utility_tx_fetch_define(utility_tx);
-utility_tx_sample_define(utility_tx);
-
-/* Prototypes. */
-void light_eval(ClosureDiffuse diffuse,
-                ClosureReflection reflection,
-                vec3 P,
-                vec3 V,
-                float vP_z,
-                float thickness,
-                inout vec3 out_diffuse,
-                inout vec3 out_specular);
-vec3 lightprobe_grid_eval(vec3 P, vec3 N, float random_threshold);
-vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold);
+#pragma BLENDER_REQUIRE(eevee_light_eval_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_lightprobe_eval_cubemap_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_lightprobe_eval_grid_lib.glsl)
 
 void main(void)
 {
@@ -49,7 +36,7 @@ void main(void)
   gbuffer_load_global_data(tra_nor_in, thickness);
 
   float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE);
-  float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
+  float noise = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
   float random_probe = fract(noise + noise_offset);
 
   vec3 radiance_diffuse = vec3(0);
@@ -70,7 +57,3 @@ void main(void)
   out_specular = radiance_reflection * reflection.color;
   out_combined.rgb += out_specular;
 }
-
-#pragma BLENDER_REQUIRE_POST(eevee_light_eval_lib.glsl)
-#pragma BLENDER_REQUIRE_POST(eevee_lightprobe_eval_cubemap_lib.glsl)
-#pragma BLENDER_REQUIRE_POST(eevee_lightprobe_eval_grid_lib.glsl)

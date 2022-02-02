@@ -6,6 +6,8 @@
  * invocations and overdraw.
  */
 
+#pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
+
 float bokeh_shape(vec2 center)
 {
   vec2 co = gl_FragCoord.xy - center;

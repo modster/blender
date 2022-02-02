@@ -1,8 +1,5 @@
 
 /**
- * This is an eval function that needs to be added after main fragment shader.
- * A prototype needs to be declared before main in order to use it.
- *
  * The resources expected to be defined are:
  * - lights
  * - lights_zbins
@@ -12,9 +9,6 @@
  * - shadow_tilemaps_tx
  * - sss_transmittance_tx
  * - utility_tx
- *
- * All of this is needed to avoid using macros and performance issues with large
- * arrays as function arguments.
  */
 
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)

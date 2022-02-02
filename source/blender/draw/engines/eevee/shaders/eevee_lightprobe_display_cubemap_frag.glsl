@@ -1,7 +1,6 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_cubemap_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
+#pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
 void main()
 {
@@ -16,6 +15,6 @@ void main()
   vec3 V = cameraVec(interp.P);
   vec3 R = -reflect(V, N);
 
-  out_color.rgb = textureLod(lightprobe_cube_tx, vec4(R, interp.sample), 0.0).rgb;
+  out_color.rgb = textureLod(lightprobe_cube_tx, vec4(R, interp.samp), 0.0).rgb;
   out_color.a = 0.0;
 }

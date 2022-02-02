@@ -4,8 +4,6 @@
  * This uses layered rendering to filter all cubeface / layers in one drawcall.
  */
 
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
 void main(void)
 {
   /* Fullscreen triangle. */

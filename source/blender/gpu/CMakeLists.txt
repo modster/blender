@@ -400,6 +400,18 @@ list(APPEND SRC ${glsl_source_list_file})
 list(APPEND INC ${CMAKE_CURRENT_BINARY_DIR})
 
 set(SHADER_CREATE_INFOS
+  ../draw/engines/eevee/shaders/infos/eevee_culling_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_deferred_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_depth_of_field_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_film_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_hiz_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_lightprobe_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_material_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_motion_blur.hh
+  ../draw/engines/eevee/shaders/infos/eevee_raytrace_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_shadow_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_subsurface_info.hh
+  ../draw/engines/eevee/shaders/infos/eevee_velocity_info.hh
   ../draw/engines/workbench/shaders/infos/workbench_composite_info.hh
   ../draw/engines/workbench/shaders/infos/workbench_effect_antialiasing_info.hh
   ../draw/engines/workbench/shaders/infos/workbench_effect_cavity_info.hh

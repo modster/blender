@@ -156,23 +156,10 @@ class ShaderModule {
                                    eMaterialGeometry geometry_type,
                                    bool is_lookdev);
 
-  GPUShaderSource material_shader_code_generate(GPUMaterial *mat, const GPUCodegenOutput *codegen);
+  void material_create_info_ammend(GPUMaterial *mat, GPUCodegenOutput *codegen);
 
  private:
-  /* Run some custom preprocessor shader rewrite and returns a new string. */
-  std::string enum_preprocess(const char *input);
-
-  char *material_shader_code_defs_get(eMaterialGeometry geometry_type);
-  char *material_shader_code_vert_get(const GPUCodegenOutput *codegen,
-                                      GPUMaterial *mat,
-                                      eMaterialGeometry geometry_type);
-  char *material_shader_code_geom_get(const GPUCodegenOutput *codegen,
-                                      GPUMaterial *mat,
-                                      eMaterialGeometry geometry_type);
-  char *material_shader_code_frag_get(const GPUCodegenOutput *codegen,
-                                      GPUMaterial *mat,
-                                      eMaterialGeometry geometry_type,
-                                      eMaterialPipeline pipeline_type);
+  const char *static_shader_create_info_name_get(eShaderType shader_type);
 };
 
 }  // namespace blender::eevee

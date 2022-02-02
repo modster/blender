@@ -1,5 +1,4 @@
 
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
 {

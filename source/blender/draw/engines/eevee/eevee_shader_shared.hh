@@ -8,6 +8,7 @@
 #ifndef USE_GPU_SHADER_CREATE_INFO
 #  pragma once
 
+#  include "eevee_defines.hh"
 #  include "eevee_wrapper.hh"
 
 #  include "GPU_shader_shared.h"
@@ -248,6 +249,12 @@ struct DepthOfFieldData {
 };
 BLI_STATIC_ASSERT_ALIGN(DepthOfFieldData, 16)
 
+/** WORKAROUND(@fclem): This is because this file is included before common_math_lib.glsl. */
+#ifndef M_PI
+#  define EEVEE_PI
+#  define M_PI 3.14159265358979323846 /* pi */
+#endif
+
 static inline float coc_radius_from_camera_depth(DepthOfFieldData dof, float depth)
 {
   depth = (dof.camera_type != CAMERA_ORTHO) ? 1.0f / depth : depth;
@@ -293,6 +300,10 @@ static inline float circle_to_polygon_angle(float sides_count, float theta)
   return side * side_angle + final_local_theta;
 }
 
+#ifdef EEVEE_PI
+#  undef M_PI
+#endif
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -336,10 +347,6 @@ BLI_STATIC_ASSERT_ALIGN(MotionBlurData, 16)
 #define CULLING_ITEM_BATCH 128
 /* Number of items we can cull. Limited by how we store CullingZBin. */
 #define CULLING_MAX_ITEM 65536
-/* Number of items in a culling batch. Needs to be Power of 2. Must be <= to 65536. */
-/* Current limiting factor is the sorting phase which is single pass and only sort within a
- * threadgroup which maximum size is 1024. */
-#define CULLING_BATCH_SIZE 1024
 /* Maximum number of 32 bit uint stored per tile. */
 #define CULLING_MAX_WORD (CULLING_BATCH_SIZE / 32)
 /* Fine grained subdivision in the Z direction (Must be multiple of CULLING_BATCH_SIZE). */
@@ -423,22 +430,6 @@ struct ShadowData {
   int2 base_offset;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
-
-/**
- * IMPORTANT: Some data packing are tweaked for these values.
- * Be sure to update them accordingly.
- * SHADOW_TILEMAP_RES max is 32 because of the shared bitmaps used for LOD tagging.
- * It is also limited by the maximum thread group size (1024).
- */
-#define SHADOW_TILEMAP_RES 16
-#define SHADOW_TILEMAP_LOD 4 /* LOG2(SHADOW_TILEMAP_RES) */
-#define SHADOW_TILEMAP_PER_ROW 64
-#define SHADOW_PAGE_COPY_GROUP_SIZE 32
-#define SHADOW_DEPTH_SCAN_GROUP_SIZE 32
-#define SHADOW_AABB_TAG_GROUP_SIZE 64
-#define SHADOW_MAX_TILEMAP 4096
-#define SHADOW_MAX_PAGE 4096
-#define SHADOW_PAGE_PER_ROW 64
 
 #define SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED
 #define SHADOW_DEBUG_TILE_ALLOCATION_ENABLED
@@ -716,8 +707,8 @@ struct CubemapData {
 BLI_STATIC_ASSERT_ALIGN(CubemapData, 16)
 
 struct LightProbeInfoData {
-  GridInfoData grids;
-  CubemapInfoData cubes;
+  GridInfoData grids_info;
+  CubemapInfoData cubes_info;
 };
 BLI_STATIC_ASSERT_ALIGN(LightProbeInfoData, 16)
 
@@ -822,35 +813,17 @@ BLI_STATIC_ASSERT_ALIGN(SubsurfaceData, 16)
 #define UTIL_DISK_INTEGRAL_COMP 2
 
 #ifndef __cplusplus
-/* For codestyle reasons, we do not declare samplers in lib files. Use a prototype instead. */
-float4 utility_tx_fetch(float2 texel, float layer);
-float4 utility_tx_sample(float2 uv, float layer);
-
 /* Fetch texel. Wrapping if above range. */
-#  define utility_tx_fetch_define(utility_tx_) \
-    float4 utility_tx_fetch(float2 texel, float layer) \
-    { \
-      return texelFetch(utility_tx_, int3(int2(texel) % UTIL_TEX_SIZE, layer), 0); \
-    }
+float4 utility_tx_fetch(sampler2DArray util_tx, float2 texel, float layer)
+{
+  return texelFetch(util_tx, int3(int2(texel) % UTIL_TEX_SIZE, layer), 0);
+}
 
 /* Sample at uv position. Filtered & Wrapping enabled. */
-#  define utility_tx_sample_define(utility_tx_) \
-    float4 utility_tx_sample(float2 uv, float layer) \
-    { \
-      return textureLod(utility_tx_, float3(uv, layer), 0.0); \
-    }
-
-/* Stubs declarations if not using it. */
-#  define utility_tx_fetch_define_stub(utility_tx_) \
-    float4 utility_tx_fetch(float2 texel, float layer) \
-    { \
-      return float4(0); \
-    }
-#  define utility_tx_sample_define_stub(utility_tx_) \
-    float4 utility_tx_sample(float2 uv, float layer) \
-    { \
-      return float4(0); \
-    }
+float4 utility_tx_sample(sampler2DArray util_tx, float2 uv, float layer)
+{
+  return textureLod(util_tx, float3(uv, layer), 0.0);
+}
 #endif
 
 /** \} */

@@ -9,6 +9,7 @@
 #pragma BLENDER_REQUIRE(eevee_raytrace_raygen_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_raytrace_trace_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_lightprobe_eval_cubemap_lib.glsl)
 
 /* Prototypes. */
 vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold);
@@ -20,7 +21,7 @@ void main()
   vec3 P = get_world_space_from_depth(uv, gbuffer_depth);
   vec3 V = cameraVec(P);
 
-  vec4 noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).gbar;
+  vec4 noise = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).gbar;
 
   out_ray_data = vec4(0.0);
   out_ray_radiance = vec4(0.0);
@@ -136,5 +137,3 @@ void main()
   out_ray_data = vec4(ray.direction, inv_pdf);
   out_ray_radiance = vec4(radiance, hit_depth);
 }
-
-#pragma BLENDER_REQUIRE_POST(eevee_lightprobe_eval_cubemap_lib.glsl)

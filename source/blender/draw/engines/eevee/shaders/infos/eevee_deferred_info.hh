@@ -19,7 +19,7 @@ GPU_SHADER_CREATE_INFO(eevee_deferred_direct)
     .fragment_out(0, Type::VEC4, "out_combined")
     .fragment_out(1, Type::VEC4, "out_diffuse")
     .fragment_out(2, Type::VEC3, "out_specular")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .fragment_source("eevee_deferred_direct_frag.glsl")
     .additional_info("draw_fullscreen",
                      "eevee_transmittance_data",
@@ -38,7 +38,7 @@ GPU_SHADER_CREATE_INFO(eevee_deferred_holdout)
     .sampler(0, ImageType::FLOAT_2D, "combined_tx")
     .sampler(1, ImageType::FLOAT_2D, "transparency_data_tx")
     .fragment_out(5, Type::VEC3, "out_holdout")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .fragment_source("eevee_deferred_holdout_frag.glsl")
     .additional_info("draw_fullscreen");
 
@@ -57,7 +57,7 @@ GPU_SHADER_CREATE_INFO(eevee_deferred_transparent)
     .fragment_out(3, Type::VEC3, "out_volume")
     .fragment_out(4, Type::VEC3, "out_background")
     .fragment_out(5, Type::VEC3, "out_holdout")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .fragment_source("eevee_deferred_transparent_frag.glsl")
     .additional_info("draw_fullscreen", "eevee_light_data");
 
@@ -72,7 +72,7 @@ GPU_SHADER_CREATE_INFO(eevee_deferred_volume)
     .sampler(1, ImageType::UINT_2D, "volume_data_tx")
     .fragment_out(0, Type::VEC4, "out_combined")
     .fragment_out(1, Type::VEC3, "out_volume")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .fragment_source("eevee_deferred_volume_frag.glsl")
     .additional_info("draw_fullscreen",
                      "eevee_utility_texture",

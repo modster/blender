@@ -29,7 +29,7 @@ GPU_SHADER_CREATE_INFO(eevee_raytrace_fallback).define("SKIP_TRACE");
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_raytrace_raygen)
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .uniform_buf(0, "RaytraceData", "raytrace")
     .uniform_buf(1, "HiZData", "hiz")
     .uniform_buf(2, "CubemapData", "cubes[CULLING_ITEM_BATCH]")
@@ -51,7 +51,7 @@ GPU_SHADER_CREATE_INFO(eevee_raytrace_raygen)
 EEVEE_RAYTRACE_SKIP_VARIATIONS(eevee_raytrace_raygen, "eevee_raytrace_raygen");
 
 GPU_SHADER_CREATE_INFO(eevee_raytrace_denoise)
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .local_group_size(8, 8)
     .uniform_buf(0, "RaytraceData", "raytrace")
     .uniform_buf(1, "HiZData", "hiz")
@@ -64,14 +64,14 @@ GPU_SHADER_CREATE_INFO(eevee_raytrace_denoise)
     .sampler(5, ImageType::FLOAT_2D, "cl_data_tx")
     .sampler(6, ImageType::FLOAT_2D, "ray_history_tx")
     .sampler(7, ImageType::FLOAT_2D, "ray_variance_tx")
-    .image(0, GPU_RGBA16F, Qualifier::RESTRICT, ImageType::FLOAT_2D, "out_history_img")
-    .image(1, GPU_R8, Qualifier::RESTRICT, ImageType::FLOAT_2D, "out_variance_img")
+    .image(0, GPU_RGBA16F, Qualifier::READ_WRITE, ImageType::FLOAT_2D, "out_history_img")
+    .image(1, GPU_R8, Qualifier::READ_WRITE, ImageType::FLOAT_2D, "out_variance_img")
     .compute_source("eevee_raytrace_denoise_comp.glsl");
 
 EEVEE_RAYTRACE_BSDF_VARIATIONS(eevee_raytrace_denoise, "eevee_raytrace_denoise");
 
 GPU_SHADER_CREATE_INFO(eevee_raytrace_resolve)
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .uniform_buf(1, "HiZData", "hiz")
     .sampler(2, ImageType::FLOAT_2D, "ray_radiance_tx")
     .sampler(3, ImageType::FLOAT_2D, "cl_color_tx")
@@ -85,5 +85,19 @@ GPU_SHADER_CREATE_INFO(eevee_raytrace_resolve)
     .additional_info("draw_fullscreen");
 
 EEVEE_RAYTRACE_BSDF_VARIATIONS(eevee_raytrace_resolve, "eevee_raytrace_resolve");
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Data
+ * \{ */
+
+GPU_SHADER_CREATE_INFO(eevee_raytrace_data)
+    .uniform_buf(0, "RaytraceData", "raytrace_diffuse")
+    .uniform_buf(1, "RaytraceData", "raytrace_reflection")
+    .uniform_buf(2, "RaytraceData", "raytrace_refraction")
+    .sampler(0, ImageType::FLOAT_2D, "hiz_tx")
+    .sampler(1, ImageType::FLOAT_2D, "radiance_tx")
+    .additional_info("eevee_sampling_data");
 
 /** \} */

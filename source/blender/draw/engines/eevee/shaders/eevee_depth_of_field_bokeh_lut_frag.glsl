@@ -46,7 +46,7 @@ void main()
   /* For gather store the normalized UV. */
   out_gather_lut = uv;
   /* For scatter store distance. */
-  out_scatter_Lut = radius;
+  out_scatter_lut = radius;
   /* For slight focus gather store pixel perfect distance. */
-  outResolveLut = length(texel);
+  out_resolve_lut = length(texel);
 }

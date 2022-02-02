@@ -1,7 +1,5 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_surface_velocity_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 vec3 velocity_object_to_world_prev(VelocityObjectData data, vec3 prev_pos, vec3 current_pos)
 {

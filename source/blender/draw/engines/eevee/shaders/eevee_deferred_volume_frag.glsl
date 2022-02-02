@@ -13,36 +13,6 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_volume_eval_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(std430, binding = 0) readonly restrict buffer lights_buf
-{
-  LightData lights[];
-};
-
-layout(std430, binding = 1) readonly restrict buffer lights_zbins_buf
-{
-  CullingZBin lights_zbins[];
-};
-
-layout(std430, binding = 2) readonly restrict buffer lights_culling_buf
-{
-  CullingData light_culling;
-};
-
-layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
-{
-  CullingWord lights_culling_words[];
-};
-
-uniform sampler2D transparency_data_tx;
-uniform usampler2D volume_data_tx;
-uniform sampler2DArray utility_tx;
-uniform sampler2DShadow shadow_atlas_tx;
-uniform usampler2D shadow_tilemaps_tx;
-
-utility_tx_fetch_define(utility_tx);
-utility_tx_sample_define(utility_tx);
 
 void main(void)
 {

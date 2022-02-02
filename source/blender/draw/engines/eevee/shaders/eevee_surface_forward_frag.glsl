@@ -11,17 +11,16 @@
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_surface_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_raytrace_raygen_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_raytrace_trace_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_light_eval_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_lightprobe_eval_cubemap_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_lightprobe_eval_grid_lib.glsl)
 
 /* TODO(fclem) Option. */
 #define USE_RAYTRACING
-
-utility_tx_fetch_define(utility_tx);
-utility_tx_sample_define(utility_tx);
 
 /* Prototypes. */
 void light_eval(ClosureDiffuse diffuse,
@@ -39,7 +38,7 @@ void main(void)
 {
   g_data = init_globals();
 
-  float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
+  float noise = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
   g_data.closure_rand = fract(noise + sampling_rng_1D_get(sampling, SAMPLING_CLOSURE));
   g_data.transmit_rand = -1.0;
 
@@ -51,7 +50,7 @@ void main(void)
   vec3 V = cameraVec(g_data.P);
   vec3 P = g_data.P;
 
-  float noise_probe = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).g;
+  float noise_probe = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).g;
   float random_probe = fract(noise_probe + sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE));
 
   if (gl_FrontFacing) {
@@ -73,7 +72,7 @@ void main(void)
              radiance_diffuse,
              radiance_reflection);
 
-  vec4 noise_rt = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).rgba;
+  vec4 noise_rt = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).rgba;
   vec2 noise_offset = sampling_rng_2D_get(sampling, SAMPLING_RAYTRACE_W);
   noise_rt.zw = fract(noise_rt.zw + noise_offset);
 
@@ -159,7 +158,3 @@ void main(void)
   out_transmittance.rgb = g_transparency_data.transmittance;
   out_transmittance.a = saturate(avg(out_transmittance.rgb));
 }
-
-#pragma BLENDER_REQUIRE_POST(eevee_light_eval_lib.glsl)
-#pragma BLENDER_REQUIRE_POST(eevee_lightprobe_eval_cubemap_lib.glsl)
-#pragma BLENDER_REQUIRE_POST(eevee_lightprobe_eval_grid_lib.glsl)

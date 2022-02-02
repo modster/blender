@@ -2,33 +2,33 @@
 #include "gpu_shader_create_info.hh"
 
 /* -------------------------------------------------------------------- */
+/** \name Common
+ * \{ */
+
+/* TODO(@fclem): This is a bit out of place at the moment. */
+GPU_SHADER_CREATE_INFO(eevee_shared)
+    .typedef_source("eevee_defines.hh")
+    .typedef_source("eevee_shader_shared.hh");
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Surface Mesh Type
  * \{ */
 
-GPU_SHADER_CREATE_INFO(draw_gpencil)
-    .vertex_in(0, Type::IVEC4, "ma")
-    .vertex_in(1, Type::IVEC4, "ma1")
-    .vertex_in(2, Type::IVEC4, "ma2")
-    .vertex_in(3, Type::IVEC4, "ma3")
-    .vertex_in(4, Type::VEC4, "pos")
-    .vertex_in(5, Type::VEC4, "pos1")
-    .vertex_in(6, Type::VEC4, "pos2")
-    .vertex_in(7, Type::VEC4, "pos3")
-    .vertex_in(8, Type::VEC4, "uv1")
-    .vertex_in(9, Type::VEC4, "uv2")
-    .vertex_in(10, Type::VEC4, "col1")
-    .vertex_in(11, Type::VEC4, "col2")
-    .vertex_in(12, Type::VEC4, "fcol1");
-
 GPU_SHADER_CREATE_INFO(eevee_surface_mesh)
     .vertex_in(0, Type::VEC3, "pos")
-    .vertex_in(1, Type::VEC3, "nor");
+    .vertex_in(1, Type::VEC3, "nor")
+    .vertex_source("eevee_surface_mesh_vert.glsl")
+    .additional_info("draw_mesh");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_gpencil)
+    .define("MAT_GEOM_GPENCIL")
     .vertex_source("eevee_surface_gpencil_vert.glsl")
     .additional_info("draw_gpencil");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_hair)
+    .define("MAT_GEOM_HAIR")
     .vertex_source("eevee_surface_hair_vert.glsl")
     .additional_info("draw_hair");
 
@@ -38,7 +38,7 @@ GPU_SHADER_CREATE_INFO(eevee_surface_hair)
 /** \name Surface
  * \{ */
 
-GPU_SHADER_CREATE_INTERFACE(eevee_surface_iface, "interp")
+GPU_SHADER_INTERFACE_INFO(eevee_surface_iface, "interp")
     .smooth(Type::VEC3, "P")
     .smooth(Type::VEC3, "N")
     .smooth(Type::VEC3, "hair_binormal")
@@ -71,14 +71,6 @@ GPU_SHADER_CREATE_INFO(eevee_surface_deferred)
     .additional_info("eevee_sampling_data", "eevee_utility_texture");
 
 GPU_SHADER_CREATE_INFO(eevee_sampling_data).uniform_buf(0, "SamplingData", "sampling");
-
-GPU_SHADER_CREATE_INFO(eevee_raytracing_data)
-    .uniform_buf(0, "RaytraceData", "raytrace_diffuse")
-    .uniform_buf(1, "RaytraceData", "raytrace_reflection")
-    .uniform_buf(2, "RaytraceData", "raytrace_refraction")
-    .sampler(0, ImageType::FLOAT_2D, "hiz_tx")
-    .sampler(1, ImageType::FLOAT_2D, "radiance_tx")
-    .additional_info("eevee_sampling_data");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_forward)
     .uniform_buf(0, "HiZData", "hiz")
@@ -139,7 +131,7 @@ GPU_SHADER_CREATE_INFO(eevee_background_lookdev)
 /** \name Volume
  * \{ */
 
-GPU_SHADER_CREATE_INTERFACE(eevee_volume_iface, "interp")
+GPU_SHADER_INTERFACE_INFO(eevee_volume_iface, "interp")
     .smooth(Type::VEC3, "P_start")
     .smooth(Type::VEC3, "P_end");
 
@@ -149,7 +141,7 @@ GPU_SHADER_CREATE_INFO(eevee_volume_deferred)
     .vertex_out(eevee_volume_iface)
     .fragment_out(0, Type::UVEC4, "out_volume_data")
     .fragment_out(1, Type::VEC4, "out_transparency_data")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .vertex_source("eevee_volume_vert.glsl")
     .fragment_source("eevee_volume_deferred_frag.glsl")
     .additional_info("draw_fullscreen");

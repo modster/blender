@@ -9,7 +9,6 @@
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_velocity_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 void main(void)
 {

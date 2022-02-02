@@ -4,7 +4,6 @@
  **/
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 /* -------------------------------------------------------------------- */
 /** \name Panoramic Projections

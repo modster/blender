@@ -13,7 +13,7 @@ GPU_SHADER_CREATE_INFO(eevee_film_filter)
     .sampler(2, ImageType::FLOAT_2D, "weight_tx")
     .fragment_out(0, Type::VEC4, "out_data")
     .fragment_out(1, Type::FLOAT, "out_weight")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .fragment_source("eevee_film_filter_frag.glsl")
     .additional_info("draw_fullscreen");
 
@@ -25,7 +25,7 @@ GPU_SHADER_CREATE_INFO(eevee_film_filter_depth)
     .sampler(2, ImageType::FLOAT_2D, "weight_tx")
     .fragment_out(0, Type::VEC4, "out_data")
     .fragment_out(1, Type::FLOAT, "out_weight")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .fragment_source("eevee_film_filter_frag.glsl")
     .additional_info("draw_fullscreen");
 
@@ -41,7 +41,7 @@ GPU_SHADER_CREATE_INFO(eevee_film_resolve)
     .sampler(1, ImageType::FLOAT_2D, "weight_tx")
     .sampler(2, ImageType::FLOAT_2D, "first_sample_tx")
     .fragment_out(0, Type::VEC4, "out_color")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .fragment_source("eevee_film_resolve_frag.glsl")
     .additional_info("draw_fullscreen");
 
@@ -50,7 +50,7 @@ GPU_SHADER_CREATE_INFO(eevee_film_resolve_depth)
     .sampler(0, ImageType::FLOAT_2D, "data_tx")
     .sampler(1, ImageType::FLOAT_2D, "weight_tx")
     //.fragment_out(0, Type::FLOAT, "gl_FragDepth")
-    .typedef_source("eevee_shader_shared.hh")
+    .additional_info("eevee_shared")
     .fragment_source("eevee_film_resolve_depth_frag.glsl")
     .additional_info("draw_fullscreen");
 

@@ -324,7 +324,6 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_lightprobe_display_cubemap_vert.glsl
   engines/eevee/shaders/eevee_lightprobe_display_grid_frag.glsl
   engines/eevee/shaders/eevee_lightprobe_display_grid_vert.glsl
-  engines/eevee/shaders/eevee_lightprobe_display_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_eval_cubemap_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_eval_grid_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_diffuse_frag.glsl
@@ -382,6 +381,7 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_volume_eval_lib.glsl
   engines/eevee/shaders/eevee_volume_vert.glsl
 
+  engines/eevee/eevee_defines.hh
   engines/eevee/eevee_shader_shared.hh
 
   engines/workbench/shaders/workbench_cavity_lib.glsl
@@ -430,7 +430,6 @@ set(GLSL_SRC
   intern/shaders/common_obinfos_lib.glsl
   intern/shaders/common_pointcloud_lib.glsl
   intern/shaders/common_smaa_lib.glsl
-  intern/shaders/common_uniform_attribute_lib.glsl
   intern/shaders/common_view_lib.glsl
   intern/shaders/common_view_clipping_lib.glsl
 

@@ -8,13 +8,10 @@
 #pragma BLENDER_REQUIRE(eevee_bsdf_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_surface_lib.glsl)
 
-utility_tx_sample_define_stub(utility_tx)
-
-    /* From the paper "Hashed Alpha Testing" by Chris Wyman and Morgan McGuire. */
-    float hash(vec2 a)
+/* From the paper "Hashed Alpha Testing" by Chris Wyman and Morgan McGuire. */
+float hash(vec2 a)
 {
   return fract(1e4 * sin(17.0 * a.x + 0.1 * a.y) * (0.1 + abs(sin(13.0 * a.y + a.x))));
 }

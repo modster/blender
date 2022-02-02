@@ -11,7 +11,6 @@
  */
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 bool neighbor_affect_this_tile(ivec2 offset, vec2 velocity)
 {

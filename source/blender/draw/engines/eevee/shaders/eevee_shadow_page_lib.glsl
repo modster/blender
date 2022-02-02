@@ -1,6 +1,5 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 #define SHADOW_PAGE_ALLOCATED (1u << 16u)
 #define SHADOW_PAGE_IS_CACHED (1u << 17u)

@@ -1,6 +1,5 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_camera_lib.glsl)
 
 void compute_velocity(vec3 P_prev,

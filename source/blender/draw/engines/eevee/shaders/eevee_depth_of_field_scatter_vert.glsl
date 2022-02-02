@@ -6,6 +6,8 @@
  * invocations and overdraw.
  **/
 
+#pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
+
 /* Load 4 Circle of confusion values. texel_co is centered around the 4 taps. */
 vec4 fetch_cocs(vec2 texel_co)
 {
@@ -25,7 +27,7 @@ vec4 fetch_cocs(vec2 texel_co)
   cocs.w = texelFetchOffset(coc_tx, texel, 0, ivec2(0, 0)).r;
 #endif
 
-  if (is_foreground) {
+  if (DOF_FOREGROUND_PASS) {
     cocs *= -1.0;
   }
 
