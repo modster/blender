@@ -448,6 +448,14 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
     }
   }
 
+  /* TODO: Handle this case properly once the update cache is more widly used. We avoid full-copies
+   * for now at the expense of to being able to undo them. */
+#if 1
+  if (!only_frame_changed && gpd->runtime.update_cache == NULL) {
+    return false;
+  }
+#endif
+
   us->undo_data = MEM_callocN(sizeof(GPencilUndoData), __func__);
   us->undo_data->cfra = scene->r.cfra;
   us->undo_data->mode = ob->mode;
