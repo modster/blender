@@ -1616,7 +1616,6 @@ void BKE_gpencil_layer_active_set(bGPdata *gpd, bGPDlayer *active)
     if (gpd->flag & GP_DATA_AUTOLOCK_LAYERS) {
       gpl->flag |= GP_LAYER_LOCKED;
     }
-    BKE_gpencil_tag_light_update(gpd, gpl, NULL, NULL);
   }
 
   /* set as active one */
@@ -1642,7 +1641,6 @@ void BKE_gpencil_layer_autolock_set(bGPdata *gpd, const bool unlock)
       else {
         gpl->flag |= GP_LAYER_LOCKED;
       }
-      BKE_gpencil_tag_light_update(gpd, gpl, NULL, NULL);
     }
   }
   else {
@@ -1652,7 +1650,6 @@ void BKE_gpencil_layer_autolock_set(bGPdata *gpd, const bool unlock)
     if (unlock) {
       LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
         gpl->flag &= ~GP_LAYER_LOCKED;
-        BKE_gpencil_tag_light_update(gpd, gpl, NULL, NULL);
       }
     }
   }
