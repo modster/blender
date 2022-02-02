@@ -95,8 +95,8 @@ void main()
   }
   LIGHT_FOREACH_END
 
-  LIGHT_FOREACH_BEGIN_LOCAL (
-      light_culling, lights_zbins, lights_culling_words, gl_GlobalInvocationID.xy, vP.z, l_idx) {
+  uvec2 px = gl_GlobalInvocationID.xy;
+  LIGHT_FOREACH_BEGIN_LOCAL (light_culling, lights_zbins, lights_culling_words, px, vP.z, l_idx) {
     tag_tilemap(l_idx, P, dist_to_cam, false);
   }
   LIGHT_FOREACH_END

@@ -42,7 +42,7 @@ namespace blender::gpu {
  * \{ */
 
 /* Number of lines before and after the error line to print for compilation errors. */
-#define DEBUG_CONTEXT_LINES 2
+#define DEBUG_CONTEXT_LINES 0
 
 void Shader::print_log(Span<const char *> sources,
                        char *log,
