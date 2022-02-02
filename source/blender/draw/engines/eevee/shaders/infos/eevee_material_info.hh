@@ -152,3 +152,45 @@ GPU_SHADER_CREATE_INFO(eevee_volume_deferred)
     .additional_info("draw_fullscreen");
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Test shaders
+ *
+ * Variations that are only there to test shaders at compile time.
+ * \{ */
+
+#ifdef DEBUG
+
+/* Stub functions defined by the material evaluation. */
+GPU_SHADER_CREATE_INFO(eevee_stub)
+    .define("attrib_load()")
+    .define("nodetree_displacement()", "vec3(0)")
+    .define("nodetree_surface()", "CLOSURE_DEFAULT")
+    .define("nodetree_volume()", "CLOSURE_DEFAULT")
+    .define("nodetree_thickness()", "0.1");
+
+#  define EEVEE_MAT_FINAL_VARIATION(name, ...) \
+    GPU_SHADER_CREATE_INFO(name) \
+        .additional_info(__VA_ARGS__) \
+        .auto_resource_location(true) \
+        .do_static_compilation(true);
+
+#  define EEVEE_MAT_GEOM_VARIATIONS(prefix, ...) \
+    EEVEE_MAT_FINAL_VARIATION(prefix##_world, "eevee_surface_world", __VA_ARGS__) \
+    EEVEE_MAT_FINAL_VARIATION(prefix##_gpencil, "eevee_surface_gpencil", __VA_ARGS__) \
+    EEVEE_MAT_FINAL_VARIATION(prefix##_lookdev, "eevee_surface_lookdev", __VA_ARGS__) \
+    EEVEE_MAT_FINAL_VARIATION(prefix##_hair, "eevee_surface_hair", __VA_ARGS__) \
+    EEVEE_MAT_FINAL_VARIATION(prefix##_mesh, "eevee_surface_mesh", __VA_ARGS__)
+
+#  define EEVEE_MAT_PIPE_VARIATIONS(name, ...) \
+    EEVEE_MAT_GEOM_VARIATIONS(name##_background, "eevee_surface_background", __VA_ARGS__) \
+    EEVEE_MAT_GEOM_VARIATIONS(name##_depth, "eevee_surface_depth", __VA_ARGS__) \
+    EEVEE_MAT_GEOM_VARIATIONS(name##_depth_simple, "eevee_surface_depth_simple", __VA_ARGS__) \
+    EEVEE_MAT_GEOM_VARIATIONS(name##_deferred, "eevee_surface_deferred", __VA_ARGS__) \
+    EEVEE_MAT_GEOM_VARIATIONS(name##_forward, "eevee_surface_forward", __VA_ARGS__)
+
+EEVEE_MAT_PIPE_VARIATIONS(eevee_surface, "eevee_stub")
+
+#endif
+
+/** \} */
