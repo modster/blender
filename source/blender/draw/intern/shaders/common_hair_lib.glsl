@@ -59,28 +59,25 @@ uniform usamplerBuffer hairStrandSegBuffer; /* R16UI */
  */
 
 #ifdef GPU_VERTEX_SHADER
+#  define segment_index (gl_VertexID % hairStrandsRes)
+#  define strand_index (gl_VertexID / hairStrandsRes)
+#elif defined(GPU_COMPUTE_SHADER)
+#  define segment_index int(gl_GlobalInvocationID.y)
+#  define strand_index (int(gl_GlobalInvocationID.x) + hairStrandOffset)
+#else
+#  define segment_index 0
+#  define strand_index 0
+#endif
+
 float hair_get_local_time()
 {
-  return float(gl_VertexID % hairStrandsRes) / float(hairStrandsRes - 1);
+  return float(segment_index) / float(hairStrandsRes - 1);
 }
 
 int hair_get_id()
 {
-  return gl_VertexID / hairStrandsRes;
+  return strand_index;
 }
-#endif
-
-#ifdef GPU_COMPUTE_SHADER
-float hair_get_local_time()
-{
-  return float(gl_GlobalInvocationID.y) / float(hairStrandsRes - 1);
-}
-
-int hair_get_id()
-{
-  return int(gl_GlobalInvocationID.x) + hairStrandOffset;
-}
-#endif
 
 #ifdef HAIR_PHASE_SUBDIV
 int hair_get_base_id(float local_time, int strand_segments, out float interp_time)
