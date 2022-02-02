@@ -801,6 +801,40 @@ struct ShaderCreateInfo {
     return true;
   }
 
+  /** Debug print */
+  friend std::ostream &operator<<(std::ostream &stream, const ShaderCreateInfo &info)
+  {
+    /* TODO(@fclem): Complete print. */
+
+    auto print_resource = [&](const Resource &res) {
+      switch (res.bind_type) {
+        case Resource::BindType::UNIFORM_BUFFER:
+          stream << "UNIFORM_BUFFER(" << res.slot << ", " << res.uniformbuf.name << ")"
+                 << std::endl;
+          break;
+        case Resource::BindType::STORAGE_BUFFER:
+          stream << "STORAGE_BUFFER(" << res.slot << ", " << res.storagebuf.name << ")"
+                 << std::endl;
+          break;
+        case Resource::BindType::SAMPLER:
+          stream << "SAMPLER(" << res.slot << ", " << res.sampler.name << ")" << std::endl;
+          break;
+        case Resource::BindType::IMAGE:
+          stream << "IMAGE(" << res.slot << ", " << res.image.name << ")" << std::endl;
+          break;
+      }
+    };
+
+    /* TODO(@fclem): Order the resources. */
+    for (auto &res : info.batch_resources_) {
+      print_resource(res);
+    }
+    for (auto &res : info.pass_resources_) {
+      print_resource(res);
+    }
+    return stream;
+  }
+
   /** \} */
 
 #undef TEST_EQUAL
