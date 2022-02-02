@@ -13,33 +13,24 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2021 Blender Foundation.
- * All rights reserved.
- */
-
-/** \file
- * \ingroup gpu
- *
- * Shader source dependency builder that make possible to support #include directive inside the
- * shader files.
+ * Copyright 2021, Blender Foundation.
  */
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "COM_Node.h"
 
-void gpu_shader_dependency_init(void);
+namespace blender::compositor {
 
-void gpu_shader_dependency_exit(void);
+/**
+ * \brief SeparateXYZNode
+ * \ingroup Node
+ */
+class CombineXYZNode : public Node {
+ public:
+  CombineXYZNode(bNode *editor_node);
+  void convert_to_operations(NodeConverter &converter,
+                             const CompositorContext &context) const override;
+};
 
-/* User must free the resulting string using free. */
-char *gpu_shader_dependency_get_resolved_source(const char *shader_source_name);
-char *gpu_shader_dependency_get_source(const char *shader_source_name);
-
-uint32_t gpu_shader_dependency_get_builtins(const char *shader_source_name);
-
-#ifdef __cplusplus
-}
-#endif
+}  // namespace blender::compositor
