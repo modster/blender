@@ -156,6 +156,7 @@ set(SRC
   intern/gpencil_curve.c
   intern/gpencil_geom.cc
   intern/gpencil_modifier.c
+  intern/gpencil_update_cache.c
   intern/hair.cc
   intern/icons.cc
   intern/icons_rasterize.c
@@ -383,6 +384,7 @@ set(SRC
   BKE_gpencil_curve.h
   BKE_gpencil_geom.h
   BKE_gpencil_modifier.h
+  BKE_gpencil_update_cache.h
   BKE_hair.h
   BKE_icons.h
   BKE_idprop.h

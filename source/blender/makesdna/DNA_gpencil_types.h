@@ -35,6 +35,7 @@ struct AnimData;
 struct Curve;
 struct Curve;
 struct MDeformVert;
+struct GPencilUpdateCache;
 
 #define GP_DEFAULT_PIX_FACTOR 1.0f
 #define GP_DEFAULT_GRID_LINES 4
@@ -633,6 +634,8 @@ typedef struct bGPdata_Runtime {
   Brush *sbuffer_brush;
   struct GpencilBatchCache *gpencil_cache;
   struct LineartCache *lineart_cache;
+
+  struct GPencilUpdateCache *update_cache;
 } bGPdata_Runtime;
 
 /* grid configuration */

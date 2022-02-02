@@ -43,6 +43,7 @@
 #include "BKE_curve.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_update_cache.h"
 #include "BKE_idprop.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.h"
@@ -762,9 +763,6 @@ void update_id_after_copy(const Depsgraph *depsgraph,
         }
         BKE_pose_pchan_index_rebuild(object_cow->pose);
       }
-      if (object_cow->type == OB_GPENCIL) {
-        BKE_gpencil_update_orig_pointers(object_orig, object_cow);
-      }
       update_particles_after_copy(depsgraph, object_orig, object_cow);
       update_modifiers_orig_pointers(object_orig, object_cow);
       update_proxy_pointers_after_copy(depsgraph, object_orig, object_cow);
@@ -923,8 +921,31 @@ ID *deg_update_copy_on_write_datablock(const Depsgraph *depsgraph, const IDNode 
 
   RuntimeBackup backup(depsgraph);
   backup.init_from_id(id_cow);
-  deg_free_copy_on_write_datablock(id_cow);
-  deg_expand_copy_on_write_datablock(depsgraph, id_node);
+
+  const ID_Type id_type = GS(id_orig->name);
+  switch (id_type) {
+    /* For grease pencil, we can avoid a full copy of the data-block and only do an update-on-write. */
+    case ID_GD: {
+      if (check_datablock_expanded(id_cow) &&
+          !BKE_gpencil_check_copy_on_write_needed((bGPdata *)id_orig)) {
+        BKE_gpencil_update_on_write((bGPdata *)id_orig, (bGPdata *)id_cow);
+      }
+      else {
+        /* Free gpd update cache and set it to null so that it's not copied to the eval data. */
+        BKE_gpencil_free_update_cache((bGPdata *)id_orig);
+        deg_free_copy_on_write_datablock(id_cow);
+        deg_expand_copy_on_write_datablock(depsgraph, id_node);
+        BKE_gpencil_data_update_orig_pointers((bGPdata *)id_orig, (bGPdata *)id_cow);
+      }
+      break;
+    }
+    default: {
+      deg_free_copy_on_write_datablock(id_cow);
+      deg_expand_copy_on_write_datablock(depsgraph, id_node);
+      break;
+    }
+  }
+
   backup.restore_to_id(id_cow);
   return id_cow;
 }

@@ -6454,6 +6454,10 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "use_geometry_nodes_legacy", 1);
   RNA_def_property_ui_text(
       prop, "Geometry Nodes Legacy", "Enable legacy geometry nodes in the menu");
+
+  prop = RNA_def_property(srna, "use_gpencil_update_cache", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "use_gpencil_update_cache", 1);
+  RNA_def_property_ui_text(prop, "GPencil Update Cache", "Enable the grease pencil update cache");
 }
 
 static void rna_def_userdef_addon_collection(BlenderRNA *brna, PropertyRNA *cprop)
