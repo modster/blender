@@ -29,7 +29,7 @@
 
 #include "BLI_sys_types.h" /* for bool */
 
-#include "GPU_shader.h"  /* for GPUShaderSource */
+#include "GPU_shader.h"  /* for GPUShaderCreateInfo */
 #include "GPU_texture.h" /* for eGPUSamplerState */
 
 #ifdef __cplusplus
@@ -96,7 +96,6 @@ typedef enum eGPUMaterialFlag {
   GPU_MATFLAG_SHADER_TO_RGBA = (1 << 7),
 
   GPU_MATFLAG_OBJECT_INFO = (1 << 10),
-  GPU_MATFLAG_UNIFORMS_ATTRIB = (1 << 11),
 
   GPU_MATFLAG_BARYCENTRIC = (1 << 20),
 
@@ -132,23 +131,19 @@ typedef enum eGPUVolumeDefaultValue {
 } eGPUVolumeDefaultValue;
 
 typedef struct GPUCodegenOutput {
-  char *attribs_declare;
-  char *attribs_interface;
-  char *attribs_passthrough;
-  char *attribs_load;
-
+  char *attr_load;
+  /* TODO(@fclem): Replace by new include system. */
   char *library;
-  char *uniforms;
   /* Nodetree functions calls. */
   char *displacement;
   char *surface;
   char *volume;
   char *thickness;
+
+  GPUShaderCreateInfo *create_info;
 } GPUCodegenOutput;
 
-typedef GPUShaderSource (*GPUCodegenCallbackFn)(void *thunk,
-                                                GPUMaterial *mat,
-                                                const GPUCodegenOutput *codegen);
+typedef void (*GPUCodegenCallbackFn)(void *thunk, GPUMaterial *mat, GPUCodegenOutput *codegen);
 
 GPUNodeLink *GPU_constant(const float *num);
 GPUNodeLink *GPU_uniform(const float *num);

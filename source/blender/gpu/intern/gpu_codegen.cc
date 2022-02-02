@@ -52,6 +52,7 @@
 #include "gpu_codegen.h"
 #include "gpu_material_library.h"
 #include "gpu_node_graph.h"
+#include "gpu_shader_create_info.hh"
 
 #include <stdarg.h>
 #include <string.h>
@@ -59,9 +60,40 @@
 #include <sstream>
 #include <string>
 
-extern "C" {
-extern char datatoc_gpu_shader_codegen_lib_glsl[];
-}
+using namespace blender::gpu::shader;
+
+struct GPUCodegenCreateInfo : ShaderCreateInfo {
+  struct NameBuffer {
+    char attr_names[16][GPU_MAX_SAFE_ATTR_NAME + 1];
+    char var_names[16][8];
+  };
+
+  /** Optional generated interface. */
+  StageInterfaceInfo *interface_generated = nullptr;
+  /** Optional name buffer containing names referenced by StringRefNull. */
+  NameBuffer *name_buffer = nullptr;
+
+  GPUCodegenCreateInfo(const char *name) : ShaderCreateInfo(name){};
+  ~GPUCodegenCreateInfo()
+  {
+    delete interface_generated;
+    MEM_delete(name_buffer);
+  };
+};
+
+struct GPUPass {
+  struct GPUPass *next;
+
+  GPUShader *shader;
+  GPUCodegenCreateInfo *create_info = nullptr;
+  /** Orphaned GPUPasses gets freed by the garbage collector. */
+  uint refcount;
+  /** Identity hash generated from all GLSL code. */
+  uint32_t hash;
+  /** Did we already tried to compile the attached GPUShader. */
+  bool compiled;
+};
+
 /* -------------------------------------------------------------------- */
 /** \name GPUPass Cache
  *
@@ -107,20 +139,13 @@ static void gpu_pass_cache_insert_after(GPUPass *node, GPUPass *pass)
 
 /* Check all possible passes with the same hash. */
 static GPUPass *gpu_pass_cache_resolve_collision(GPUPass *pass,
-                                                 GPUShaderSource *source,
+                                                 GPUShaderCreateInfo *info,
                                                  uint32_t hash)
 {
   BLI_spin_lock(&pass_cache_spin);
-  /* Collision, need to `strcmp` the whole shader. */
   for (; pass && (pass->hash == hash); pass = pass->next) {
-    if ((source->defines != nullptr) && (!STREQ(pass->source.defines, source->defines))) {
-      /* Pass */
-    }
-    else if ((source->geometry != nullptr) && (!STREQ(pass->source.geometry, source->geometry))) {
-      /* Pass */
-    }
-    else if (STREQ(pass->source.fragment, source->fragment) &&
-             STREQ(pass->source.vertex, source->vertex)) {
+    if (*reinterpret_cast<ShaderCreateInfo *>(info) ==
+        *reinterpret_cast<ShaderCreateInfo *>(pass->create_info)) {
       BLI_spin_unlock(&pass_cache_spin);
       return pass;
     }
@@ -151,9 +176,9 @@ static std::ostream &operator<<(std::ostream &stream, const GPUInput *input)
     case GPU_SOURCE_UNIFORM:
       return stream << "unf" << input->id;
     case GPU_SOURCE_ATTR:
-      return stream << "var" << input->attr->id;
+      return stream << "var_attrs.v" << input->attr->id;
     case GPU_SOURCE_UNIFORM_ATTR:
-      return stream << "UNIFORM_ATTR_UBO.attr" << input->uniform_attr->id;
+      return stream << "unf_attrs[resource_id].attr" << input->uniform_attr->id;
     case GPU_SOURCE_STRUCT:
       return stream << "strct" << input->id;
     case GPU_SOURCE_TEX:
@@ -173,11 +198,6 @@ static std::ostream &operator<<(std::ostream &stream, const GPUInput *input)
 static std::ostream &operator<<(std::ostream &stream, const GPUOutput *output)
 {
   return stream << "tmp" << output->id;
-}
-
-static std::ostream &operator<<(std::ostream &stream, const eGPUType &type)
-{
-  return stream << gpu_data_type_to_string(type);
 }
 
 /* Trick type to change overload and keep a somewhat nice syntax. */
@@ -213,6 +233,7 @@ class GPUCodegen {
   GPUMaterial &mat;
   GPUNodeGraph &graph;
   GPUCodegenOutput output = {};
+  GPUCodegenCreateInfo *create_info = nullptr;
 
  private:
   uint32_t hash_ = 0;
@@ -223,20 +244,20 @@ class GPUCodegen {
   GPUCodegen(GPUMaterial *mat_, GPUNodeGraph *graph_) : mat(*mat_), graph(*graph_)
   {
     BLI_hash_mm2a_init(&hm2a_, GPU_material_uuid_get(&mat));
+    create_info = new GPUCodegenCreateInfo("codegen");
+    output.create_info = reinterpret_cast<GPUShaderCreateInfo *>(
+        static_cast<ShaderCreateInfo *>(create_info));
   }
 
   ~GPUCodegen()
   {
-    MEM_SAFE_FREE(output.attribs_declare);
-    MEM_SAFE_FREE(output.attribs_interface);
-    MEM_SAFE_FREE(output.attribs_load);
-    MEM_SAFE_FREE(output.attribs_passthrough);
+    MEM_SAFE_FREE(output.attr_load);
     MEM_SAFE_FREE(output.surface);
     MEM_SAFE_FREE(output.volume);
     MEM_SAFE_FREE(output.thickness);
     MEM_SAFE_FREE(output.displacement);
-    MEM_SAFE_FREE(output.uniforms);
     MEM_SAFE_FREE(output.library);
+    delete create_info;
     BLI_freelistN(&ubo_inputs_);
   };
 
@@ -288,117 +309,125 @@ static char attr_prefix_get(CustomDataType type)
 void GPUCodegen::generate_attribs()
 {
   if (BLI_listbase_is_empty(&graph.attributes)) {
-    output.attribs_declare = nullptr;
-    output.attribs_interface = nullptr;
-    output.attribs_load = nullptr;
-    output.attribs_passthrough = nullptr;
+    output.attr_load = nullptr;
     return;
   }
 
-  /* Input declaration, loading / assignment to interface and geometry shader passthrough. */
-  std::stringstream decl_ss, iface_ss, load_ss, pass_ss;
+  GPUCodegenCreateInfo &info = *create_info;
 
+  info.name_buffer = MEM_new<GPUCodegenCreateInfo::NameBuffer>("info.name_buffer");
+  info.interface_generated = new StageInterfaceInfo("codegen_iface", "var_attrs");
+  StageInterfaceInfo &iface = *info.interface_generated;
+
+  /* Input declaration, loading / assignment to interface and geometry shader passthrough. */
+  std::stringstream decl_ss, iface_ss, load_ss;
+
+  int slot = 15;
   LISTBASE_FOREACH (GPUMaterialAttribute *, attr, &graph.attributes) {
-    eGPUType type = attr->gputype;
-    eGPUType in_type = attr->gputype;
-    char name[GPU_MAX_SAFE_ATTR_NAME + 1] = "orco";
+    eGPUType input_type = attr->gputype;
+
+    /* NOTE: Replicate changes to mesh_render_data_create() in draw_cache_impl_mesh.c */
     if (attr->type == CD_ORCO) {
-      /* OPTI : orco is computed from local positions, but only if no modifier is present. */
-      GPU_material_flag_set(&mat, GPU_MATFLAG_OBJECT_INFO);
+      /* OPTI: orco is computed from local positions, but only if no modifier is present. */
+      info.additional_info("draw_object_infos");
       /* Need vec4 to detect usage of default attribute. */
-      in_type = GPU_VEC4;
+      input_type = GPU_VEC4;
+      STRNCPY(info.name_buffer->attr_names[slot], "orco");
     }
     else {
-      name[0] = attr_prefix_get((CustomDataType)(attr->type));
+      char *name = info.name_buffer->attr_names[slot];
+      name[0] = attr_prefix_get(static_cast<CustomDataType>(attr->type));
       name[1] = '\0';
+      if (attr->name[0] != '\0') {
+        /* XXX FIXME: see notes in mesh_render_data_create() */
+        GPU_vertformat_safe_attr_name(attr->name, &name[1], GPU_MAX_SAFE_ATTR_NAME);
+      }
     }
+    SNPRINTF(info.name_buffer->var_names[slot], "v%d", attr->id);
 
-    if (attr->name[0] != '\0') {
-      /* XXX FIXME : see notes in mesh_render_data_create() */
-      GPU_vertformat_safe_attr_name(attr->name, &name[1], GPU_MAX_SAFE_ATTR_NAME);
-    }
-    /* NOTE : Replicate changes to mesh_render_data_create() in draw_cache_impl_mesh.c */
-    decl_ss << in_type << " " << name << ";\n";
+    blender::StringRefNull attr_name = info.name_buffer->attr_names[slot];
+    blender::StringRefNull var_name = info.name_buffer->var_names[slot];
 
-    iface_ss << type << " var" << attr->id << ";\n";
+    info.vertex_in(slot--, to_type(input_type), attr_name);
+    iface.smooth(to_type(attr->gputype), var_name);
 
-    load_ss << "var" << attr->id;
-
+    load_ss << "var_attrs." << var_name;
     switch (attr->type) {
       case CD_ORCO:
-        load_ss << " = attr_load_orco(" << name << ");\n";
+        load_ss << " = attr_load_orco(" << attr_name << ");\n";
         break;
       case CD_TANGENT:
-        load_ss << " = attr_load_tangent(" << name << ");\n";
+        load_ss << " = attr_load_tangent(" << attr_name << ");\n";
         break;
       case CD_MTFACE:
-        load_ss << " = attr_load_uv(" << name << ");\n";
+        load_ss << " = attr_load_uv(" << attr_name << ");\n";
         break;
       case CD_MCOL:
-        load_ss << " = attr_load_color(" << name << ");\n";
+        load_ss << " = attr_load_color(" << attr_name << ");\n";
         break;
       default:
-        load_ss << " = attr_load_" << type << "(" << name << ");\n";
+        load_ss << " = attr_load_" << attr->gputype << "(" << attr_name << ");\n";
         break;
     }
-    pass_ss << "attr_out.var" << attr->id << " = attr_in[vert_id].var" << attr->id << ";\n";
   }
 
-  output.attribs_declare = extract_c_str(decl_ss);
-  output.attribs_interface = extract_c_str(iface_ss);
-  output.attribs_load = extract_c_str(load_ss);
-  output.attribs_passthrough = extract_c_str(pass_ss);
+  output.attr_load = extract_c_str(load_ss);
 }
 
 void GPUCodegen::generate_resources()
 {
+  GPUCodegenCreateInfo &info = *create_info;
+
   std::stringstream ss;
 
   /* Textures. */
   LISTBASE_FOREACH (GPUMaterialTexture *, tex, &graph.textures) {
     if (tex->colorband) {
-      ss << "uniform sampler1DArray " << tex->sampler_name << ";\n";
+      info.sampler(0, ImageType::FLOAT_1D_ARRAY, tex->sampler_name, Frequency::BATCH);
     }
     else if (tex->tiled_mapping_name[0] != '\0') {
-      ss << "uniform sampler2DArray " << tex->sampler_name << ";\n";
-      ss << "uniform sampler1DArray " << tex->tiled_mapping_name << ";\n";
+      info.sampler(0, ImageType::FLOAT_2D_ARRAY, tex->sampler_name, Frequency::BATCH);
+      info.sampler(0, ImageType::FLOAT_1D_ARRAY, tex->tiled_mapping_name, Frequency::BATCH);
     }
     else {
-      ss << "uniform sampler2D " << tex->sampler_name << ";\n";
+      info.sampler(0, ImageType::FLOAT_2D, tex->sampler_name, Frequency::BATCH);
     }
   }
   /* Volume Grids. */
   LISTBASE_FOREACH (GPUMaterialVolumeGrid *, grid, &graph.volume_grids) {
-    ss << "uniform sampler3D " << grid->sampler_name << ";\n";
-    /* TODO(fclem) global uniform. To put in a UBO. */
-    ss << "uniform mat4 " << grid->transform_name << " = mat4(0.0);\n";
+    info.sampler(0, ImageType::FLOAT_3D, grid->sampler_name, Frequency::BATCH);
+    /* TODO(@fclem): Global uniform. To put in an UBO. */
+    info.push_constant(Type::MAT4, grid->transform_name);
   }
 
   if (!BLI_listbase_is_empty(&ubo_inputs_)) {
     /* NOTE: generate_uniform_buffer() should have sorted the inputs before this. */
-    ss << "layout(std140) uniform nodeTree {\n";
+    ss << "struct NodeTree {\n";
     LISTBASE_FOREACH (LinkData *, link, &ubo_inputs_) {
       GPUInput *input = (GPUInput *)(link->data);
-      ss << input->type << " " << input << ";\n";
+      ss << "  " << input->type << " " << input << ";\n";
     }
     ss << "};\n\n";
+
+    info.uniform_buf(0, "NodeTree", "node_tree", Frequency::BATCH);
   }
 
   if (!BLI_listbase_is_empty(&graph.uniform_attrs.list)) {
-    GPU_material_flag_set(&mat, GPU_MATFLAG_UNIFORMS_ATTRIB);
-
-    ss << "struct UniformAttributes {\n";
+    ss << "struct UniformAttrs {\n";
     LISTBASE_FOREACH (GPUUniformAttr *, attr, &graph.uniform_attrs.list) {
       ss << "vec4 attr" << attr->id << ";\n";
     }
     ss << "};\n\n";
+
+    info.uniform_buf(0, "UniformAttrs", "unf_attrs[DRW_RESOURCE_CHUNK_LEN]", Frequency::BATCH);
   }
 
-  output.uniforms = extract_c_str(ss);
+  info.typedef_source_generated = extract_c_str(ss);
 }
 
 void GPUCodegen::generate_library()
 {
+  /* TODO(@fclem): This should be removed in favor of the new include system. */
   output.library = gpu_material_library_generate_code(graph.used_libraries);
 }
 
@@ -546,6 +575,12 @@ void GPUCodegen::generate_graphs()
   hash_ = BLI_hash_mm2a_end(&hm2a_);
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name GPUPass
+ * \{ */
+
 GPUPass *GPU_generate_pass(GPUMaterial *material,
                            GPUNodeGraph *graph,
                            GPUCodegenCallbackFn finalize_source_cb,
@@ -582,19 +617,16 @@ GPUPass *GPU_generate_pass(GPUMaterial *material,
   codegen.generate_library();
 
   /* Make engine add its own code and implement the generated functions. */
-  GPUShaderSource source = finalize_source_cb(thunk, material, &codegen.output);
+  finalize_source_cb(thunk, material, &codegen.output);
 
   GPUPass *pass = nullptr;
   if (pass_hash) {
     /* Cache lookup: Reuse shaders already compiled. */
-    pass = gpu_pass_cache_resolve_collision(pass_hash, &source, codegen.hash_get());
+    pass = gpu_pass_cache_resolve_collision(
+        pass_hash, codegen.output.create_info, codegen.hash_get());
   }
 
   if (pass) {
-    MEM_SAFE_FREE(source.vertex);
-    MEM_SAFE_FREE(source.geometry);
-    MEM_SAFE_FREE(source.fragment);
-    MEM_SAFE_FREE(source.defines);
     /* Cache hit. Reuse the same GPUPass and GPUShader. */
     if (!gpu_pass_is_valid(pass)) {
       /* Shader has already been created but failed to compile. */
@@ -608,9 +640,11 @@ GPUPass *GPU_generate_pass(GPUMaterial *material,
     pass = (GPUPass *)MEM_callocN(sizeof(GPUPass), "GPUPass");
     pass->shader = nullptr;
     pass->refcount = 1;
+    pass->create_info = codegen.create_info;
     pass->hash = codegen.hash_get();
-    pass->source = source;
     pass->compiled = false;
+
+    codegen.create_info = nullptr;
 
     gpu_pass_cache_insert_after(pass_hash, pass);
   }
@@ -623,55 +657,17 @@ GPUPass *GPU_generate_pass(GPUMaterial *material,
 /** \name Compilation
  * \{ */
 
-static int count_active_texture_sampler(GPUShader *shader, char *source)
+static int count_active_texture_sampler(GPUPass *pass, GPUShader *shader)
 {
-  const char *code = source;
-
-  /* Remember this is per stage. */
-  GSet *sampler_ids = BLI_gset_int_new(__func__);
   int num_samplers = 0;
 
-  while ((code = strstr(code, "uniform "))) {
-    /* Move past "uniform". */
-    code += 7;
-    /* Skip following spaces. */
-    while (*code == ' ') {
-      code++;
-    }
-    /* Skip "i" from potential isamplers. */
-    if (*code == 'i') {
-      code++;
-    }
-    /* Skip following spaces. */
-    if (BLI_str_startswith(code, "sampler")) {
-      /* Move past "uniform". */
-      code += 7;
-      /* Skip sampler type suffix. */
-      while (!ELEM(*code, ' ', '\0')) {
-        code++;
-      }
-      /* Skip following spaces. */
-      while (*code == ' ') {
-        code++;
-      }
-
-      if (*code != '\0') {
-        char sampler_name[64];
-        code = gpu_str_skip_token(code, sampler_name, sizeof(sampler_name));
-        int id = GPU_shader_get_uniform(shader, sampler_name);
-
-        if (id == -1) {
-          continue;
-        }
-        /* Catch duplicates. */
-        if (BLI_gset_add(sampler_ids, POINTER_FROM_INT(id))) {
-          num_samplers++;
-        }
+  for (const ShaderCreateInfo::Resource &res : pass->create_info->pass_resources_) {
+    if (res.bind_type == ShaderCreateInfo::Resource::BindType::SAMPLER) {
+      if (GPU_shader_get_uniform(shader, res.sampler.name.c_str()) != -1) {
+        num_samplers += 1;
       }
     }
   }
-
-  BLI_gset_free(sampler_ids, nullptr);
 
   return num_samplers;
 }
@@ -685,38 +681,34 @@ static bool gpu_pass_shader_validate(GPUPass *pass, GPUShader *shader)
   /* NOTE: The only drawback of this method is that it will count a sampler
    * used in the fragment shader and only declared (but not used) in the vertex
    * shader as used by both. But this corner case is not happening for now. */
-  int vert_samplers_len = count_active_texture_sampler(shader, pass->source.vertex);
-  int frag_samplers_len = count_active_texture_sampler(shader, pass->source.fragment);
-
-  int total_samplers_len = vert_samplers_len + frag_samplers_len;
+  int active_samplers_len = count_active_texture_sampler(pass, shader);
 
   /* Validate against opengl limit. */
-  if ((frag_samplers_len > GPU_max_textures_frag()) ||
-      (vert_samplers_len > GPU_max_textures_vert())) {
+  if ((active_samplers_len > GPU_max_textures_frag()) ||
+      (active_samplers_len > GPU_max_textures_vert())) {
     return false;
   }
 
-  if (pass->source.geometry) {
-    int geom_samplers_len = count_active_texture_sampler(shader, pass->source.geometry);
-    total_samplers_len += geom_samplers_len;
-    if (geom_samplers_len > GPU_max_textures_geom()) {
+  if (pass->create_info->geometry_source_.is_empty() == false) {
+    if (active_samplers_len > GPU_max_textures_geom()) {
       return false;
     }
   }
 
-  return (total_samplers_len <= GPU_max_textures());
+  return (active_samplers_len * 3 <= GPU_max_textures());
 }
 
 bool GPU_pass_compile(GPUPass *pass, const char *shname)
 {
   bool success = true;
   if (!pass->compiled) {
-    GPUShader *shader = GPU_shader_create(pass->source.vertex,
-                                          pass->source.fragment,
-                                          pass->source.geometry,
-                                          nullptr,
-                                          pass->source.defines,
-                                          shname);
+    GPUShaderCreateInfo *info = reinterpret_cast<GPUShaderCreateInfo *>(
+        static_cast<ShaderCreateInfo *>(pass->create_info));
+
+    pass->create_info->name_ = shname;
+    pass->create_info->finalize();
+
+    GPUShader *shader = GPU_shader_create_from_info(info);
 
     /* NOTE: Some drivers / gpu allows more active samplers than the opengl limit.
      * We need to make sure to count active samplers to avoid undefined behavior. */
@@ -751,10 +743,7 @@ static void gpu_pass_free(GPUPass *pass)
   if (pass->shader) {
     GPU_shader_free(pass->shader);
   }
-  MEM_SAFE_FREE(pass->source.vertex);
-  MEM_SAFE_FREE(pass->source.fragment);
-  MEM_SAFE_FREE(pass->source.geometry);
-  MEM_SAFE_FREE(pass->source.defines);
+  delete pass->create_info;
   MEM_freeN(pass);
 }
 

@@ -332,6 +332,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
+    sources.append(info.vertex_source_generated.c_str());
     sources.append(code);
 
     shader->vertex_shader_from_glsl(sources);
@@ -356,8 +357,10 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     for (auto *types : typedefs) {
       sources.append(types);
     }
+    sources.append(info.typedef_source_generated.c_str());
     sources.append(resources.c_str());
     sources.append(interface.c_str());
+    sources.append(info.fragment_source_generated.c_str());
     sources.append(code);
 
     shader->fragment_shader_from_glsl(sources);
@@ -380,6 +383,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     for (auto *types : typedefs) {
       sources.append(types);
     }
+    sources.append(info.typedef_source_generated.c_str());
     sources.append(resources.c_str());
     sources.append(layout.c_str());
     sources.append(interface.c_str());
@@ -404,6 +408,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     for (auto *types : typedefs) {
       sources.append(types);
     }
+    sources.append(info.typedef_source_generated.c_str());
     sources.append(resources.c_str());
     sources.append(layout.c_str());
     sources.append(code);
