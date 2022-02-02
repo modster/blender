@@ -134,8 +134,6 @@ void gpencil_undo_push(bGPdata *gpd)
 {
   bGPundonode *undo_node;
 
-  // printf("\t\tGP - undo push\n");
-
   if (cur_node) {
     /* Remove all undone nodes from stack. */
     undo_node = cur_node->next;
@@ -205,8 +203,6 @@ typedef struct GPencilUndoData {
   GPencilUpdateCache *gpd_cache_data;
   /* Scene frame for this step. */
   int cfra;
-  /* Whether this step is only a frame change. */
-  bool frame_changed;
   /* Store the grease pencil mode we are in. */
   eObjectMode mode;
 } GPencilUndoData;
@@ -407,7 +403,6 @@ static bool gpencil_undo_data_to_gpencil_data(GPencilUndoData *gpd_undo_data,
 
 static bool gpencil_undosys_poll(bContext *C)
 {
-  printf("gpencil_undosys_poll\n");
   if (!U.experimental.use_gpencil_undo_system) {
     return false;
   }
@@ -415,31 +410,51 @@ static bool gpencil_undosys_poll(bContext *C)
   return GPENCIL_ANY_MODE(gpd);
 }
 
-static bool gpencil_undosys_step_encode(struct bContext *C, struct Main *bmain, UndoStep *us_p)
+static bool gpencil_undosys_step_encode(struct bContext *C,
+                                        struct Main *UNUSED(bmain),
+                                        UndoStep *us_p)
 {
-  printf("gpencil_undosys_step_encode: \n");
   GPencilUndoStep *us = (GPencilUndoStep *)us_p;
-  us->undo_data = MEM_callocN(sizeof(GPencilUndoData), __func__);
-  us->undo_data->frame_changed = false;
 
+  UndoStack *undo_stack = ED_undo_stack_get();
   Scene *scene = CTX_data_scene(C);
-  us->undo_data->cfra = scene->r.cfra;
-
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = (bGPdata *)ob->data;
+
+  bool only_frame_changed = false;
+
+  /* In case the step we are about to encode would be the first in the gpencil undo system, ensure
+   * that we do a full-copy. */
+  if (undo_stack->step_active == NULL ||
+      undo_stack->step_active->type != BKE_UNDOSYS_TYPE_GPENCIL) {
+    BKE_gpencil_tag_full_update(gpd, NULL, NULL, NULL);
+  }
+  /* If the ID of the grease pencil object was not tagged or the update cache is empty, we assume
+   * the data hasn't changed. */
+  else if ((gpd->id.flag & ID_RECALC_ALL) == 0 && gpd->runtime.update_cache == NULL) {
+    /* If the previous step is of our undo system, check if the frame changed. */
+    if (undo_stack->step_active && undo_stack->step_active->type == BKE_UNDOSYS_TYPE_GPENCIL) {
+      GPencilUndoStep *us_prev = (GPencilUndoStep *)undo_stack->step_active;
+      /* We want to be able to undo frame changes, so check this here. */
+      only_frame_changed = us_prev->undo_data->cfra != scene->r.cfra;
+      if (!only_frame_changed) {
+        /* If the frame did not change, we don't need to encode anything, return. */
+        return false;
+      }
+    }
+    else {
+      /* No change (that we want to undo) happend, return. */
+      return false;
+    }
+  }
+
+  us->undo_data = MEM_callocN(sizeof(GPencilUndoData), __func__);
+  us->undo_data->cfra = scene->r.cfra;
   us->undo_data->mode = ob->mode;
 
-  wmWindowManager *wm = CTX_wm_manager(C);
-
-  // Inspect notifier queue to detect frame change
-  if (wm->notifier_queue.first) {
-    wmNotifier *note = (wmNotifier *)wm->notifier_queue.first;
-    // If frame changed, encode only this information
-    if (note->category == NC_SCENE && note->data == ND_FRAME) {
-      us->undo_data->frame_changed = true;
-      printf("Time changed: %d\n", us->undo_data->cfra);
-      return true;
-    }
+  /* If that step only encodes a frame change (data itself has not changed), return early. */
+  if (only_frame_changed) {
+    return true;
   }
 
   gpencil_data_to_undo_data(gpd, us->undo_data);
@@ -447,10 +462,12 @@ static bool gpencil_undosys_step_encode(struct bContext *C, struct Main *bmain, 
   return true;
 }
 
-static void gpencil_undosys_step_decode(
-    struct bContext *C, struct Main *bmain, UndoStep *us_p, const eUndoStepDir dir, bool is_final)
+static void gpencil_undosys_step_decode(struct bContext *C,
+                                        struct Main *UNUSED(bmain),
+                                        UndoStep *us_p,
+                                        const eUndoStepDir dir,
+                                        bool UNUSED(is_final))
 {
-  printf("gpencil_undosys_step_decode\n");
   GPencilUndoStep *us = (GPencilUndoStep *)us_p;
   GPencilUndoData *undo_data = us->undo_data;
 
@@ -461,12 +478,8 @@ static void gpencil_undosys_step_decode(
     return;
   }
 
-  printf("Direction: %s\n", dir == STEP_UNDO ? "STEP_UNDO" : "STEP_REDO");
-
   Scene *scene = CTX_data_scene(C);
-
   if (undo_data->cfra != scene->r.cfra) {
-    printf("Restoring frame: %d\n", undo_data->cfra);
     scene->r.cfra = undo_data->cfra;
     /* TODO: what if we merged a full copy with a frame change? */
     DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
@@ -523,7 +536,6 @@ static void gpencil_undosys_step_decode(
 
 static void gpencil_undosys_step_free(UndoStep *us_p)
 {
-  printf("gpencil_undosys_step_free\n");
   GPencilUndoStep *us = (GPencilUndoStep *)us_p;
   GPencilUndoData *us_data = us->undo_data;
 
