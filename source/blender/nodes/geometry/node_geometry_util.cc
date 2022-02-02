@@ -45,7 +45,6 @@ void update_attribute_input_socket_availabilities(bNodeTree &ntree,
            (socket->type == SOCK_FLOAT && mode_ == GEO_NODE_ATTRIBUTE_INPUT_FLOAT) ||
            (socket->type == SOCK_INT && mode_ == GEO_NODE_ATTRIBUTE_INPUT_INTEGER) ||
            (socket->type == SOCK_VECTOR && mode_ == GEO_NODE_ATTRIBUTE_INPUT_VECTOR) ||
-           (socket->type == SOCK_VECTOR2D && mode_ == GEO_NODE_ATTRIBUTE_INPUT_VECTOR2D) ||
            (socket->type == SOCK_RGBA && mode_ == GEO_NODE_ATTRIBUTE_INPUT_COLOR));
       nodeSetSocketAvailability(&ntree, socket, socket_is_available);
     }
@@ -59,7 +58,7 @@ std::optional<CustomDataType> node_data_type_to_custom_data_type(const eNodeSock
       return CD_PROP_FLOAT;
     case SOCK_VECTOR:
       return CD_PROP_FLOAT3;
-    case SOCK_VECTOR2D:
+    case SOCK_VECTOR_2D:
       return CD_PROP_FLOAT2;
     case SOCK_RGBA:
       return CD_PROP_COLOR;

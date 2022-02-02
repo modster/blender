@@ -91,8 +91,8 @@ static bool geometry_node_tree_validate_link(eNodeSocketDatatype type_a,
 {
   /* Geometry, string, object, material, texture and collection sockets can only be connected to
    * themselves. The other types can be converted between each other. */
-  if (ELEM(type_a, SOCK_FLOAT, SOCK_VECTOR, SOCK_VECTOR2D, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT) &&
-      ELEM(type_b, SOCK_FLOAT, SOCK_VECTOR, SOCK_VECTOR2D, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT)) {
+  if (ELEM(type_a, SOCK_FLOAT, SOCK_VECTOR, SOCK_VECTOR_2D, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT) &&
+      ELEM(type_b, SOCK_FLOAT, SOCK_VECTOR, SOCK_VECTOR_2D, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT)) {
     return true;
   }
   return type_a == type_b;
@@ -104,7 +104,7 @@ static bool geometry_node_tree_socket_type_valid(bNodeTreeType *UNUSED(ntreetype
   return nodeIsStaticSocketType(socket_type) && ELEM(socket_type->type,
                                                      SOCK_FLOAT,
                                                      SOCK_VECTOR,
-                                                     SOCK_VECTOR2D,
+                                                     SOCK_VECTOR_2D,
                                                      SOCK_RGBA,
                                                      SOCK_BOOLEAN,
                                                      SOCK_INT,

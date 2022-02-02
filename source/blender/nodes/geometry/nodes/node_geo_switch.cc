@@ -51,7 +51,6 @@ static void node_declare(NodeDeclarationBuilder &b)
       .supports_field();
   b.add_input<decl::Vector>(N_("False"), "False_003").supports_field();
   b.add_input<decl::Vector>(N_("True"), "True_003").supports_field();
-
   b.add_input<decl::Color>(N_("False"), "False_004")
       .default_value({0.8f, 0.8f, 0.8f, 1.0f})
       .supports_field();
@@ -60,6 +59,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .supports_field();
   b.add_input<decl::String>(N_("False"), "False_005").supports_field();
   b.add_input<decl::String>(N_("True"), "True_005").supports_field();
+
   b.add_input<decl::Geometry>(N_("False"), "False_006");
   b.add_input<decl::Geometry>(N_("True"), "True_006");
   b.add_input<decl::Object>(N_("False"), "False_007");
@@ -72,8 +72,8 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Material>(N_("True"), "True_010");
   b.add_input<decl::Image>(N_("False"), "False_011");
   b.add_input<decl::Image>(N_("True"), "True_011");
-  b.add_input<decl::Vector2d>(N_("False"), "False_012").supports_field();
-  b.add_input<decl::Vector2d>(N_("True"), "True_012").supports_field();
+  b.add_input<decl::Vector2D>(N_("False"), "False_012").supports_field();
+  b.add_input<decl::Vector2D>(N_("True"), "True_012").supports_field();
 
   b.add_output<decl::Float>(N_("Output")).dependent_field();
   b.add_output<decl::Int>(N_("Output"), "Output_001").dependent_field();
@@ -87,7 +87,7 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Texture>(N_("Output"), "Output_009");
   b.add_output<decl::Material>(N_("Output"), "Output_010");
   b.add_output<decl::Image>(N_("Output"), "Output_011");
-  b.add_output<decl::Vector2d>(N_("Output"), "Output_012").dependent_field();
+  b.add_output<decl::Vector2D>(N_("Output"), "Output_012").dependent_field();
 }
 
 static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -114,7 +114,7 @@ static void node_update(bNodeTree *ntree, bNode *node)
                                 SOCK_INT,
                                 SOCK_BOOLEAN,
                                 SOCK_VECTOR,
-                                SOCK_VECTOR2D,
+                                SOCK_VECTOR_2D,
                                 SOCK_RGBA,
                                 SOCK_STRING);
 
@@ -322,7 +322,7 @@ static void node_geo_exec(GeoNodeExecParams params)
       switch_no_fields<Image *>(params, "_011");
       break;
     }
-    case SOCK_VECTOR2D: {
+    case SOCK_VECTOR_2D: {
       switch_fields<float2>(params, "_012");
       break;
     }

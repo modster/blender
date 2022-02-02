@@ -169,7 +169,7 @@ GVArray GeoNodeExecParams::get_input_attribute(const StringRef name,
     conversions.convert_to_uninitialized(CPPType::get<float3>(), *cpp_type, &value, buffer);
     return GVArray::ForSingle(*cpp_type, domain_size, buffer);
   }
-  if (found_socket->type == SOCK_VECTOR2D) {
+  if (found_socket->type == SOCK_VECTOR_2D) {
     const float2 value = this->get_input<float2>(found_socket->identifier);
     BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);
     conversions.convert_to_uninitialized(CPPType::get<float2>(), *cpp_type, &value, buffer);
@@ -211,7 +211,7 @@ CustomDataType GeoNodeExecParams::get_input_attribute_data_type(
   if (found_socket->type == SOCK_VECTOR) {
     return CD_PROP_FLOAT3;
   }
-  if (found_socket->type == SOCK_VECTOR2D) {
+  if (found_socket->type == SOCK_VECTOR_2D) {
     return CD_PROP_FLOAT2;
   }
   if (found_socket->type == SOCK_RGBA) {

@@ -38,7 +38,7 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Color>(N_("Value"), "Value_002").supports_field().hide_value();
   b.add_input<decl::Int>(N_("Value"), "Value_003").supports_field().hide_value();
   b.add_input<decl::Bool>(N_("Value"), "Value_004").supports_field().hide_value();
-  b.add_input<decl::Vector2d>(N_("Value"), "Value_005").supports_field().hide_value();
+  b.add_input<decl::Vector2D>(N_("Value"), "Value_005").supports_field().hide_value();
 }
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
@@ -62,7 +62,7 @@ static eNodeSocketDatatype custom_data_type_to_socket_type(const CustomDataType 
     case CD_PROP_INT32:
       return SOCK_INT;
     case CD_PROP_FLOAT2:
-      return SOCK_VECTOR2D;
+      return SOCK_VECTOR_2D;
     case CD_PROP_FLOAT3:
       return SOCK_VECTOR;
     case CD_PROP_BOOL:

@@ -112,14 +112,14 @@ void node_socket_set_vector(struct bNodeTree *ntree,
                             struct bNode *node,
                             struct bNodeSocket *sock,
                             const float *value);
-void node_socket_get_vector2d(struct bNodeTree *ntree,
-                              struct bNode *node,
-                              struct bNodeSocket *sock,
-                              float *value);
-void node_socket_set_vector2d(struct bNodeTree *ntree,
-                              struct bNode *node,
-                              struct bNodeSocket *sock,
-                              const float *value);
+void node_socket_get_vector_2d(struct bNodeTree *ntree,
+                               struct bNode *node,
+                               struct bNodeSocket *sock,
+                               float *value);
+void node_socket_set_vector_2d(struct bNodeTree *ntree,
+                               struct bNode *node,
+                               struct bNodeSocket *sock,
+                               const float *value);
 #ifdef __cplusplus
 }
 #endif

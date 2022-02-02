@@ -392,20 +392,20 @@ void node_socket_set_vector(bNodeTree *ntree,
   RNA_float_set_array(&ptr, "default_value", value);
 }
 
-void node_socket_get_vector2d(bNodeTree *ntree,
-                              bNode *UNUSED(node),
-                              bNodeSocket *sock,
-                              float *value)
+void node_socket_get_vector_2d(bNodeTree *ntree,
+                               bNode *UNUSED(node),
+                               bNodeSocket *sock,
+                               float *value)
 {
   PointerRNA ptr;
   RNA_pointer_create((ID *)ntree, &RNA_NodeSocket, sock, &ptr);
   RNA_float_get_array(&ptr, "default_value", value);
 }
 
-void node_socket_set_vector2d(bNodeTree *ntree,
-                              bNode *UNUSED(node),
-                              bNodeSocket *sock,
-                              const float *value)
+void node_socket_set_vector_2d(bNodeTree *ntree,
+                               bNode *UNUSED(node),
+                               bNodeSocket *sock,
+                               const float *value)
 {
   PointerRNA ptr;
   RNA_pointer_create((ID *)ntree, &RNA_NodeSocket, sock, &ptr);

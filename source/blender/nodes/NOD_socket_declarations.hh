@@ -110,19 +110,19 @@ class VectorBuilder : public SocketDeclarationBuilder<Vector> {
   VectorBuilder &compact();
 };
 
-class Vector2dBuilder;
+class Vector2DBuilder;
 
-class Vector2d : public SocketDeclaration {
+class Vector2D : public SocketDeclaration {
  private:
   float2 default_value_ = {0, 0};
   float soft_min_value_ = -FLT_MAX;
   float soft_max_value_ = FLT_MAX;
   PropertySubType subtype_ = PROP_NONE;
 
-  friend Vector2dBuilder;
+  friend Vector2DBuilder;
 
  public:
-  using Builder = Vector2dBuilder;
+  using Builder = Vector2DBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
   bool matches(const bNodeSocket &socket) const override;
@@ -130,13 +130,13 @@ class Vector2d : public SocketDeclaration {
   bool can_connect(const bNodeSocket &socket) const override;
 };
 
-class Vector2dBuilder : public SocketDeclarationBuilder<Vector2d> {
+class Vector2DBuilder : public SocketDeclarationBuilder<Vector2D> {
  public:
-  Vector2dBuilder &default_value(const float2 value);
-  Vector2dBuilder &subtype(PropertySubType subtype);
-  Vector2dBuilder &min(float min);
-  Vector2dBuilder &max(float max);
-  Vector2dBuilder &compact();
+  Vector2DBuilder &default_value(const float2 value);
+  Vector2DBuilder &subtype(PropertySubType subtype);
+  Vector2DBuilder &min(float min);
+  Vector2DBuilder &max(float max);
+  Vector2DBuilder &compact();
 };
 
 class BoolBuilder;
@@ -363,34 +363,34 @@ inline VectorBuilder &VectorBuilder::compact()
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name #Vector2dBuilder Inline Methods
+/** \name #Vector2DBuilder Inline Methods
  * \{ */
 
-inline Vector2dBuilder &Vector2dBuilder::default_value(const float2 value)
+inline Vector2DBuilder &Vector2DBuilder::default_value(const float2 value)
 {
   decl_->default_value_ = value;
   return *this;
 }
 
-inline Vector2dBuilder &Vector2dBuilder::subtype(PropertySubType subtype)
+inline Vector2DBuilder &Vector2DBuilder::subtype(PropertySubType subtype)
 {
   decl_->subtype_ = subtype;
   return *this;
 }
 
-inline Vector2dBuilder &Vector2dBuilder::min(const float min)
+inline Vector2DBuilder &Vector2DBuilder::min(const float min)
 {
   decl_->soft_min_value_ = min;
   return *this;
 }
 
-inline Vector2dBuilder &Vector2dBuilder::max(const float max)
+inline Vector2DBuilder &Vector2DBuilder::max(const float max)
 {
   decl_->soft_max_value_ = max;
   return *this;
 }
 
-inline Vector2dBuilder &Vector2dBuilder::compact()
+inline Vector2DBuilder &Vector2DBuilder::compact()
 {
   decl_->compact_ = true;
   return *this;

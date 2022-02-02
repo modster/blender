@@ -402,7 +402,7 @@ static const std::string attribute_name_suffix = "_attribute_name";
 static bool socket_type_has_attribute_toggle(const bNodeSocket &socket)
 {
   return ELEM(
-      socket.type, SOCK_FLOAT, SOCK_VECTOR, SOCK_VECTOR2D, SOCK_BOOLEAN, SOCK_RGBA, SOCK_INT);
+      socket.type, SOCK_FLOAT, SOCK_VECTOR, SOCK_VECTOR_2D, SOCK_BOOLEAN, SOCK_RGBA, SOCK_INT);
 }
 
 /**
@@ -461,8 +461,8 @@ static IDProperty *id_property_create_from_socket(const bNodeSocket &socket)
       }
       return property;
     }
-    case SOCK_VECTOR2D: {
-      bNodeSocketValueVector2d *value = (bNodeSocketValueVector2d *)socket.default_value;
+    case SOCK_VECTOR_2D: {
+      bNodeSocketValueVector2D *value = (bNodeSocketValueVector2D *)socket.default_value;
       IDPropertyTemplate idprop = {0};
       idprop.array.len = 2;
       idprop.array.type = IDP_FLOAT;
@@ -555,7 +555,7 @@ static bool id_property_type_matches_socket(const bNodeSocket &socket, const IDP
       return ELEM(property.type, IDP_FLOAT, IDP_DOUBLE);
     case SOCK_INT:
       return property.type == IDP_INT;
-    case SOCK_VECTOR2D:
+    case SOCK_VECTOR_2D:
       return property.type == IDP_ARRAY && property.subtype == IDP_FLOAT && property.len == 2;
     case SOCK_VECTOR:
       return property.type == IDP_ARRAY && property.subtype == IDP_FLOAT && property.len == 3;
@@ -603,7 +603,7 @@ static void init_socket_cpp_value_from_property(const IDProperty &property,
       new (r_value) ValueOrField<float3>(value);
       break;
     }
-    case SOCK_VECTOR2D: {
+    case SOCK_VECTOR_2D: {
       float2 value;
       copy_v2_v2(value, (const float *)IDP_Array(&property));
       new (r_value) ValueOrField<float2>(value);

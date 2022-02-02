@@ -471,7 +471,7 @@ static bool socket_can_be_viewed(const OutputSocketRef &socket)
               SOCK_GEOMETRY,
               SOCK_FLOAT,
               SOCK_VECTOR,
-              SOCK_VECTOR2D,
+              SOCK_VECTOR_2D,
               SOCK_INT,
               SOCK_BOOLEAN,
               SOCK_RGBA);
@@ -486,7 +486,7 @@ static CustomDataType socket_type_to_custom_data_type(const eNodeSocketDatatype 
       return CD_PROP_INT32;
     case SOCK_VECTOR:
       return CD_PROP_FLOAT3;
-    case SOCK_VECTOR2D:
+    case SOCK_VECTOR_2D:
       return CD_PROP_FLOAT2;
     case SOCK_BOOLEAN:
       return CD_PROP_BOOL;
@@ -2046,7 +2046,7 @@ static int get_main_socket_priority(const bNodeSocket *socket)
     case SOCK_COLLECTION:
     case SOCK_TEXTURE:
     case SOCK_MATERIAL:
-    case SOCK_VECTOR2D:
+    case SOCK_VECTOR_2D:
       return 6;
   }
   return -1;

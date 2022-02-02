@@ -71,7 +71,7 @@ static bool basic_types_can_connect(const SocketDeclaration &UNUSED(socket_decl)
               SOCK_INT,
               SOCK_BOOLEAN,
               SOCK_VECTOR,
-              SOCK_VECTOR2D,
+              SOCK_VECTOR_2D,
               SOCK_RGBA);
 }
 
@@ -268,27 +268,27 @@ bNodeSocket &Vector::update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket 
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name #Vector2d
+/** \name #Vector2D
  * \{ */
 
-bNodeSocket &Vector2d::build(bNodeTree &ntree, bNode &node) const
+bNodeSocket &Vector2D::build(bNodeTree &ntree, bNode &node) const
 {
   bNodeSocket &socket = *nodeAddStaticSocket(
-      &ntree, &node, in_out_, SOCK_VECTOR2D, subtype_, identifier_.c_str(), name_.c_str());
+      &ntree, &node, in_out_, SOCK_VECTOR_2D, subtype_, identifier_.c_str(), name_.c_str());
   this->set_common_flags(socket);
-  bNodeSocketValueVector2d &value = *(bNodeSocketValueVector2d *)socket.default_value;
+  bNodeSocketValueVector2D &value = *(bNodeSocketValueVector2D *)socket.default_value;
   copy_v2_v2(value.value, default_value_);
   value.min = soft_min_value_;
   value.max = soft_max_value_;
   return socket;
 }
 
-bool Vector2d::matches(const bNodeSocket &socket) const
+bool Vector2D::matches(const bNodeSocket &socket) const
 {
   if (!this->matches_common_data(socket)) {
     return false;
   }
-  if (socket.type != SOCK_VECTOR) {
+  if (socket.type != SOCK_VECTOR_2D) {
     return false;
   }
   if (socket.typeinfo->subtype != subtype_) {
@@ -297,7 +297,7 @@ bool Vector2d::matches(const bNodeSocket &socket) const
   return true;
 }
 
-bool Vector2d::can_connect(const bNodeSocket &socket) const
+bool Vector2D::can_connect(const bNodeSocket &socket) const
 {
   if (!sockets_can_connect(*this, socket)) {
     return false;
@@ -305,9 +305,9 @@ bool Vector2d::can_connect(const bNodeSocket &socket) const
   return basic_types_can_connect(*this, socket);
 }
 
-bNodeSocket &Vector2d::update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const
+bNodeSocket &Vector2D::update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const
 {
-  if (socket.type != SOCK_VECTOR2D) {
+  if (socket.type != SOCK_VECTOR_2D) {
     BLI_assert(socket.in_out == in_out_);
     return this->build(ntree, node);
   }
@@ -315,7 +315,7 @@ bNodeSocket &Vector2d::update_or_build(bNodeTree &ntree, bNode &node, bNodeSocke
     modify_subtype_except_for_storage(socket, subtype_);
   }
   this->set_common_flags(socket);
-  bNodeSocketValueVector2d &value = *(bNodeSocketValueVector2d *)socket.default_value;
+  bNodeSocketValueVector2D &value = *(bNodeSocketValueVector2D *)socket.default_value;
   value.subtype = subtype_;
   STRNCPY(socket.name, name_.c_str());
   return socket;
