@@ -80,7 +80,7 @@ void light_eval(ClosureDiffuse diffuse,
 {
   vec2 uv = vec2(reflection.roughness, safe_sqrt(1.0 - dot(reflection.N, V)));
   uv = uv * UTIL_TEX_UV_SCALE + UTIL_TEX_UV_BIAS;
-  vec4 ltc_mat = utility_tx_sample(uv, UTIL_LTC_MAT_LAYER);
+  vec4 ltc_mat = utility_tx_sample(utility_tx, uv, UTIL_LTC_MAT_LAYER);
 
   LIGHT_FOREACH_BEGIN_DIRECTIONAL (light_culling, l_idx) {
     light_eval_ex(

@@ -10,6 +10,10 @@ GPU_SHADER_CREATE_INFO(eevee_shared)
     .typedef_source("eevee_defines.hh")
     .typedef_source("eevee_shader_shared.hh");
 
+GPU_SHADER_CREATE_INFO(eevee_sampling_data)
+    .additional_info("eevee_shared")
+    .uniform_buf(15, "SamplingData", "sampling");
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -20,17 +24,26 @@ GPU_SHADER_CREATE_INFO(eevee_surface_mesh)
     .vertex_in(0, Type::VEC3, "pos")
     .vertex_in(1, Type::VEC3, "nor")
     .vertex_source("eevee_surface_mesh_vert.glsl")
-    .additional_info("draw_mesh");
+    .additional_info("draw_mesh", "draw_resource_id_varying");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_gpencil)
     .define("MAT_GEOM_GPENCIL")
     .vertex_source("eevee_surface_gpencil_vert.glsl")
-    .additional_info("draw_gpencil");
+    .additional_info("draw_gpencil", "draw_resource_id_varying");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_hair)
     .define("MAT_GEOM_HAIR")
     .vertex_source("eevee_surface_hair_vert.glsl")
-    .additional_info("draw_hair");
+    .additional_info("draw_hair", "draw_resource_id_varying");
+
+GPU_SHADER_CREATE_INFO(eevee_surface_lookdev)
+    .vertex_in(0, Type::VEC3, "pos")
+    .vertex_in(1, Type::VEC3, "nor")
+    .vertex_source("eevee_surface_lookdev_vert.glsl");
+
+GPU_SHADER_CREATE_INFO(eevee_surface_world)
+    .builtins(BuiltinBits::VERTEX_ID)
+    .vertex_source("eevee_surface_world_vert.glsl");
 
 /** \} */
 
@@ -41,6 +54,8 @@ GPU_SHADER_CREATE_INFO(eevee_surface_hair)
 GPU_SHADER_INTERFACE_INFO(eevee_surface_iface, "interp")
     .smooth(Type::VEC3, "P")
     .smooth(Type::VEC3, "N")
+    .smooth(Type::VEC2, "barycentric_coords")
+    .smooth(Type::VEC3, "barycentric_dists")
     .smooth(Type::VEC3, "hair_binormal")
     .smooth(Type::FLOAT, "hair_time")
     .smooth(Type::FLOAT, "hair_time_width")
@@ -70,12 +85,8 @@ GPU_SHADER_CREATE_INFO(eevee_surface_deferred)
     .fragment_source("eevee_surface_deferred_frag.glsl")
     .additional_info("eevee_sampling_data", "eevee_utility_texture");
 
-GPU_SHADER_CREATE_INFO(eevee_sampling_data).uniform_buf(0, "SamplingData", "sampling");
-
 GPU_SHADER_CREATE_INFO(eevee_surface_forward)
-    .uniform_buf(0, "HiZData", "hiz")
-    .sampler(0, ImageType::FLOAT_2D, "hiz_tx")
-    .sampler(1, ImageType::FLOAT_2D, "radiance_tx")
+    .auto_resource_location(true)
     .vertex_out(eevee_surface_iface)
     .fragment_out(0, Type::VEC4, "out_radiance", DualBlend::SRC_0)
     .fragment_out(0, Type::VEC4, "out_transmittance", DualBlend::SRC_1)
@@ -83,47 +94,41 @@ GPU_SHADER_CREATE_INFO(eevee_surface_forward)
     .additional_info("eevee_transmittance_data",
                      "eevee_sampling_data",
                      "eevee_lightprobe_data",
+                     "eevee_raytrace_data",
+                     "eevee_utility_texture",
                      "eevee_light_data",
                      "eevee_shadow_data");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_depth)
     .vertex_out(eevee_surface_iface)
     .fragment_source("eevee_surface_depth_frag.glsl")
-    .additional_info("eevee_sampling_data");
+    .additional_info("eevee_sampling_data", "eevee_utility_texture");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_depth_simple)
     .vertex_out(eevee_surface_iface)
     .fragment_source("eevee_surface_depth_simple_frag.glsl");
 
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Background
- * \{ */
-
 GPU_SHADER_CREATE_INFO(eevee_surface_background)
     .vertex_out(eevee_surface_iface)
     .fragment_out(0, Type::VEC4, "out_background")
-    .fragment_source("eevee_surface_background_frag.glsl");
+    .fragment_source("eevee_surface_background_frag.glsl")
+    .additional_info("eevee_utility_texture");
 
-GPU_SHADER_CREATE_INFO(eevee_surface_world)
-    .vertex_source("eevee_surface_world_vert.glsl")
-    .additional_info("eevee_surface_background");
+/** \} */
 
-GPU_SHADER_CREATE_INFO(eevee_surface_lookdev)
-    .vertex_in(0, Type::VEC3, "pos")
-    .vertex_in(1, Type::VEC3, "nor")
-    .vertex_source("eevee_surface_lookdev_vert.glsl")
-    .additional_info("eevee_surface_background");
+/* -------------------------------------------------------------------- */
+/** \name Lookdev
+ * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_background_lookdev)
+    .additional_info("eevee_shared")
     .uniform_buf(0, "LightProbeInfoData", "probes_info")
     .sampler(0, ImageType::FLOAT_CUBE_ARRAY, "lightprobe_cube_tx")
     .push_constant(Type::FLOAT, "opacity")
     .push_constant(Type::FLOAT, "blur")
     .fragment_out(0, Type::VEC4, "out_background")
     .fragment_source("eevee_lookdev_background_frag.glsl")
-    .additional_info("draw_fullscreen");
+    .additional_info("draw_fullscreen", "eevee_utility_texture");
 
 /** \} */
 

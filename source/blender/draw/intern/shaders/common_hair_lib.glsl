@@ -269,17 +269,6 @@ vec2 hair_get_barycentric(void)
 
 #endif
 
-/* To be fed the result of hair_get_barycentric from vertex shader. */
-vec2 hair_resolve_barycentric(vec2 vert_barycentric)
-{
-  if (fract(vert_barycentric.y) != 0.0) {
-    return vec2(vert_barycentric.x, 0.0);
-  }
-  else {
-    return vec2(1.0 - vert_barycentric.x, 0.0);
-  }
-}
-
 /* Hair interpolation functions. */
 vec4 hair_get_weights_cardinal(float t)
 {

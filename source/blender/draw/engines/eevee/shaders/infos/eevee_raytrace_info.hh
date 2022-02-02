@@ -34,7 +34,6 @@ GPU_SHADER_CREATE_INFO(eevee_raytrace_raygen)
     .uniform_buf(1, "HiZData", "hiz")
     .uniform_buf(2, "CubemapData", "cubes[CULLING_ITEM_BATCH]")
     .uniform_buf(3, "LightProbeInfoData", "probes_info")
-    .uniform_buf(4, "SamplingData", "sampling")
     .sampler(0, ImageType::FLOAT_2D, "hiz_tx")
     .sampler(1, ImageType::FLOAT_2D, "hiz_front_tx")
     .sampler(2, ImageType::FLOAT_CUBE_ARRAY, "lightprobe_cube_tx")
@@ -46,7 +45,7 @@ GPU_SHADER_CREATE_INFO(eevee_raytrace_raygen)
     .fragment_out(0, Type::VEC4, "out_ray_data")
     .fragment_out(1, Type::VEC4, "out_ray_radiance")
     .fragment_source("eevee_raytrace_raygen_frag.glsl")
-    .additional_info("draw_fullscreen", "eevee_utility_texture");
+    .additional_info("draw_fullscreen", "eevee_utility_texture", "eevee_sampling_data");
 
 EEVEE_RAYTRACE_SKIP_VARIATIONS(eevee_raytrace_raygen, "eevee_raytrace_raygen");
 
@@ -96,8 +95,8 @@ GPU_SHADER_CREATE_INFO(eevee_raytrace_data)
     .uniform_buf(0, "RaytraceData", "raytrace_diffuse")
     .uniform_buf(1, "RaytraceData", "raytrace_reflection")
     .uniform_buf(2, "RaytraceData", "raytrace_refraction")
+    .uniform_buf(3, "HiZData", "hiz")
     .sampler(0, ImageType::FLOAT_2D, "hiz_tx")
-    .sampler(1, ImageType::FLOAT_2D, "radiance_tx")
-    .additional_info("eevee_sampling_data");
+    .sampler(1, ImageType::FLOAT_2D, "radiance_tx");
 
 /** \} */

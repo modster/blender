@@ -30,7 +30,7 @@ void main(void)
                                col1,
                                col2,
                                fcol1,
-                               vec4(ViewportSize, ViewportSizeInverse),
+                               vec4(drw_view.viewport_size, drw_view.viewport_size_inverse),
                                interp.P,
                                interp.N,
                                color,

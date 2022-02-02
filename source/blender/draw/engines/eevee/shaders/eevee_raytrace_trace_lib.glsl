@@ -146,7 +146,7 @@ bool raytrace_screen(RaytraceData rt_data,
   bool hit = false;
   const float max_steps = 255.0;
   for (float iter = 1.0; !hit && (time < ssray.max_time) && (iter < max_steps); iter++) {
-    float stride = 1.0 + iter * raytrace.quality;
+    float stride = 1.0 + iter * rt_data.quality;
     float lod = log2(stride) * lod_fac;
 
     prev_time = time;

@@ -20,6 +20,9 @@ struct ViewInfos {
   float4 viewvecs[2];
   /* Should not be here. Not view dependent (only main view). */
   float4 viewcamtexcofac;
+
+  float2 viewport_size;
+  float2 viewport_size_inverse;
 };
 BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
 
@@ -50,3 +53,8 @@ BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
 #define OrcoTexCoFactors (drw_infos[resource_id].drw_OrcoTexCoFactors)
 #define ObjectInfo (drw_infos[resource_id].drw_Infos)
 #define ObjectColor (drw_infos[resource_id].drw_ObjectColor)
+#define ObjectGpencilWorldScale abs(drw_infos[resource_id].drw_OrcoTexCoFactors[0].w)
+#define ObjectGpencilThicknessIsScreenSpace \
+  (drw_infos[resource_id].drw_OrcoTexCoFactors[0].w < 0.0)
+#define ObjectGpencilDepthOrder2D (drw_infos[resource_id].drw_OrcoTexCoFactors[1].w < 0.0)
+#define ObjectGpencilThickness abs(drw_infos[resource_id].drw_OrcoTexCoFactors[1].w)

@@ -116,6 +116,6 @@ GPU_SHADER_CREATE_INFO(draw_gpencil)
     .vertex_in(10, Type::VEC4, "col1")
     .vertex_in(11, Type::VEC4, "col2")
     .vertex_in(12, Type::VEC4, "fcol1")
-    .additional_info("draw_modelmat", "draw_resource_id_uniform");
+    .additional_info("draw_modelmat", "draw_resource_id_uniform", "draw_object_infos");
 
 /** \} */
