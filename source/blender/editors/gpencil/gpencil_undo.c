@@ -431,7 +431,7 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
   }
   /* If the ID of the grease pencil object was not tagged or the update cache is empty, we assume
    * the data hasn't changed. */
-  else if ((gpd->id.flag & ID_RECALC_ALL) == 0 && gpd->runtime.update_cache == NULL) {
+  else if ((gpd->id.recalc & ID_RECALC_ALL) == 0 && gpd->runtime.update_cache == NULL) {
     /* If the previous step is of our undo system, check if the frame changed. */
     if (undo_stack->step_active && undo_stack->step_active->type == BKE_UNDOSYS_TYPE_GPENCIL) {
       GPencilUndoStep *us_prev = (GPencilUndoStep *)undo_stack->step_active;
