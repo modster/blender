@@ -133,26 +133,26 @@ void ShaderCreateInfo::validate(const ShaderCreateInfo &other_info)
     };
 
     auto print_error_msg = [&](const Resource &res) {
-      std::cerr << name_ << ": Validation failed : Overlapping ";
+      std::cout << name_ << ": Validation failed : Overlapping ";
 
       switch (res.bind_type) {
         case Resource::BindType::UNIFORM_BUFFER:
-          std::cerr << "Uniform Buffer " << res.uniformbuf.name;
+          std::cout << "Uniform Buffer " << res.uniformbuf.name;
           break;
         case Resource::BindType::STORAGE_BUFFER:
-          std::cerr << "Storage Buffer " << res.storagebuf.name;
+          std::cout << "Storage Buffer " << res.storagebuf.name;
           break;
         case Resource::BindType::SAMPLER:
-          std::cerr << "Sampler " << res.sampler.name;
+          std::cout << "Sampler " << res.sampler.name;
           break;
         case Resource::BindType::IMAGE:
-          std::cerr << "Image " << res.image.name;
+          std::cout << "Image " << res.image.name;
           break;
         default:
-          std::cerr << "Unknown Type";
+          std::cout << "Unknown Type";
           break;
       }
-      std::cerr << " (" << res.slot << ") while merging " << other_info.name_ << std::endl;
+      std::cout << " (" << res.slot << ") while merging " << other_info.name_ << std::endl;
     };
 
     for (auto &res : batch_resources_) {
