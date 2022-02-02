@@ -309,7 +309,7 @@ void ShaderModule::material_create_info_ammend(GPUMaterial *gpumat, GPUCodegenOu
   }
 
   std::stringstream attr_load;
-  attr_load << "void attrib_load(void)\n";
+  attr_load << "void attrib_load()\n";
   attr_load << "{\n";
   attr_load << ((codegen.attr_load) ? codegen.attr_load : "");
   attr_load << "}\n\n";
@@ -330,7 +330,7 @@ void ShaderModule::material_create_info_ammend(GPUMaterial *gpumat, GPUCodegenOu
         vert_gen << codegen.library << "\n";
       }
 
-      vert_gen << "vec3 nodetree_displacement(void)\n";
+      vert_gen << "vec3 nodetree_displacement()\n";
       vert_gen << "{\n";
       vert_gen << ((codegen.displacement) ? codegen.displacement : "return vec3(0);\n");
       vert_gen << "}\n\n";
@@ -344,17 +344,17 @@ void ShaderModule::material_create_info_ammend(GPUMaterial *gpumat, GPUCodegenOu
       frag_gen << codegen.library << "\n";
     }
 
-    frag_gen << "Closure nodetree_surface(void)\n";
+    frag_gen << "Closure nodetree_surface()\n";
     frag_gen << "{\n";
     frag_gen << ((codegen.surface) ? codegen.surface : "return CLOSURE_DEFAULT;\n");
     frag_gen << "}\n\n";
 
-    frag_gen << "Closure nodetree_volume(void)\n";
+    frag_gen << "Closure nodetree_volume()\n";
     frag_gen << "{\n";
     frag_gen << ((codegen.volume) ? codegen.volume : "return CLOSURE_DEFAULT;\n");
     frag_gen << "}\n\n";
 
-    frag_gen << "float nodetree_thickness(void)\n";
+    frag_gen << "float nodetree_thickness()\n";
     frag_gen << "{\n";
     /* TODO(fclem): Better default. */
     frag_gen << ((codegen.thickness) ? codegen.thickness : "return 0.1;\n");
