@@ -127,6 +127,74 @@ static const char *to_string(const Type &type)
   }
 }
 
+static const char *to_string(const eGPUTextureFormat &type)
+{
+  switch (type) {
+    case GPU_RGBA8UI:
+      return "rgba8ui";
+    case GPU_RGBA8I:
+      return "rgba8i";
+    case GPU_RGBA8:
+      return "rgba8";
+    case GPU_RGBA32UI:
+      return "rgba32ui";
+    case GPU_RGBA32I:
+      return "rgba32i";
+    case GPU_RGBA32F:
+      return "rgba32f";
+    case GPU_RGBA16UI:
+      return "rgba16ui";
+    case GPU_RGBA16I:
+      return "rgba16i";
+    case GPU_RGBA16F:
+      return "rgba16f";
+    case GPU_RGBA16:
+      return "rgba16";
+    case GPU_RG8UI:
+      return "rg8ui";
+    case GPU_RG8I:
+      return "rg8i";
+    case GPU_RG8:
+      return "rg8";
+    case GPU_RG32UI:
+      return "rg32ui";
+    case GPU_RG32I:
+      return "rg32i";
+    case GPU_RG32F:
+      return "rg32f";
+    case GPU_RG16UI:
+      return "rg16ui";
+    case GPU_RG16I:
+      return "rg16i";
+    case GPU_RG16F:
+      return "rg16f";
+    case GPU_RG16:
+      return "rg16";
+    case GPU_R8UI:
+      return "r8ui";
+    case GPU_R8I:
+      return "r8i";
+    case GPU_R8:
+      return "r8";
+    case GPU_R32UI:
+      return "r32ui";
+    case GPU_R32I:
+      return "r32i";
+    case GPU_R32F:
+      return "r32f";
+    case GPU_R16UI:
+      return "r16ui";
+    case GPU_R16I:
+      return "r16i";
+    case GPU_R16F:
+      return "r16f";
+    case GPU_R16:
+      return "r16";
+    default:
+      return "unkown";
+  }
+}
+
 static const char *to_string(const PrimitiveIn &layout)
 {
   switch (layout) {
@@ -294,7 +362,7 @@ static void print_resource(std::ostream &os, const ShaderCreateInfo::Resource &r
   if (GLContext::explicit_location_support) {
     os << "layout(binding = " << res.slot;
     if (res.bind_type == ShaderCreateInfo::Resource::BindType::IMAGE) {
-      os << ", " << res.image.format;
+      os << ", " << to_string(res.image.format);
     }
     else if (res.bind_type == ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER) {
       os << ", std140";
