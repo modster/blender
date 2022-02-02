@@ -280,7 +280,7 @@ typedef struct tGPsdata {
 static void gpencil_update_cache(bGPdata *gpd)
 {
   if (gpd) {
-    DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+    DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
     gpd->flag |= GP_DATA_CACHE_IS_DIRTY;
   }
 }
@@ -2240,7 +2240,6 @@ static void gpencil_paint_initstroke(tGPsdata *p,
       if (!IS_AUTOKEY_ON(scene)) {
         BKE_report(p->reports, RPT_INFO, "No available frame for creating stroke");
       }
-
       return;
     }
     p->gpf->flag |= GP_FRAME_PAINT;

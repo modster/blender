@@ -2241,10 +2241,13 @@ class ExperimentalPanel:
         layout.use_property_split = False
         layout.use_property_decorate = False
 
-        for prop_keywords, reference in items:
+        for prop_keywords, reference, poll_function in items:
             split = layout.split(factor=0.66)
             col = split.split()
             col.prop(experimental, **prop_keywords)
+
+            if poll_function:
+                col.enabled = poll_function(context)
 
             if reference:
                 if type(reference) is tuple:
@@ -2268,8 +2271,8 @@ class USERPREF_PT_experimental_virtual_reality(ExperimentalPanel, Panel):
     def draw(self, context):
         self._draw_items(
             context, (
-                ({"property": "use_virtual_reality_scene_inspection"}, "T71347"),
-                ({"property": "use_virtual_reality_immersive_drawing"}, "T71348"),
+                ({"property": "use_virtual_reality_scene_inspection"}, "T71347", None),
+                ({"property": "use_virtual_reality_immersive_drawing"}, "T71348", None),
             )
         )
 """
@@ -2281,10 +2284,10 @@ class USERPREF_PT_experimental_new_features(ExperimentalPanel, Panel):
     def draw(self, context):
         self._draw_items(
             context, (
-                ({"property": "use_sculpt_vertex_colors"}, "T71947"),
-                ({"property": "use_sculpt_tools_tilt"}, "T82877"),
-                ({"property": "use_extended_asset_browser"}, ("project/view/130/", "Project Page")),
-                ({"property": "use_override_templates"}, ("T73318", "Milestone 4")),
+                ({"property": "use_sculpt_vertex_colors"}, "T71947", None),
+                ({"property": "use_sculpt_tools_tilt"}, "T82877", None),
+                ({"property": "use_extended_asset_browser"}, ("project/view/130/", "Project Page"), None),
+                ({"property": "use_override_templates"}, ("T73318", "Milestone 4"), None),
             ),
         )
 
@@ -2295,9 +2298,9 @@ class USERPREF_PT_experimental_prototypes(ExperimentalPanel, Panel):
     def draw(self, context):
         self._draw_items(
             context, (
-                ({"property": "use_new_hair_type"}, "T68981"),
-                ({"property": "use_new_point_cloud_type"}, "T75717"),
-                ({"property": "use_full_frame_compositor"}, "T88150"),
+                ({"property": "use_new_hair_type"}, "T68981", None),
+                ({"property": "use_new_point_cloud_type"}, "T75717", None),
+                ({"property": "use_full_frame_compositor"}, "T88150", None),
             ),
         )
 
@@ -2314,13 +2317,15 @@ class USERPREF_PT_experimental_debugging(ExperimentalPanel, Panel):
     def draw(self, context):
         self._draw_items(
             context, (
-                ({"property": "use_undo_legacy"}, "T60695"),
-                ({"property": "override_auto_resync"}, "T83811"),
-                ({"property": "use_cycles_debug"}, None),
-                ({"property": "use_geometry_nodes_legacy"}, "T91274"),
-                ({"property": "show_asset_debug_info"}, None),
-                ({"property": "use_asset_indexing"}, None),
-                ({"property": "use_gpencil_update_cache"}, "T95401"),
+                ({"property": "use_undo_legacy"}, "T60695", None),
+                ({"property": "override_auto_resync"}, "T83811", None),
+                ({"property": "use_cycles_debug"}, None, None),
+                ({"property": "use_geometry_nodes_legacy"}, "T91274", None),
+                ({"property": "show_asset_debug_info"}, None, None),
+                ({"property": "use_asset_indexing"}, None, None),
+                ({"property": "use_gpencil_update_cache"}, "T95401", None),
+                # Disabled if use_gpencil_update_cache is disabled
+                ({"property": "use_gpencil_undo_system"}, "TODO", lambda ctx: ctx.preferences.experimental.use_gpencil_update_cache),
             ),
         )
 

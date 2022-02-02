@@ -222,12 +222,13 @@ struct bGPDstroke *BKE_gpencil_stroke_duplicate(struct bGPDstroke *gps_src,
 
 /**
  * Make a copy of a given gpencil data-block.
- *
- * XXX: Should this be deprecated?
+ * \param bmain: Main structure. Can be NULL which will make a localized copy of the data-block
+ * outside of bmain.
+ * \param gpd: The grease pencil data-block to duplicate.
  */
-struct bGPdata *BKE_gpencil_data_duplicate(struct Main *bmain,
-                                           const struct bGPdata *gpd,
-                                           bool internal_copy);
+void BKE_gpencil_data_duplicate(struct Main *bmain,
+                                const struct bGPdata *gpd,
+                                struct bGPdata **gpd_dst);
 
 /**
  * Delete the last stroke of the given frame.

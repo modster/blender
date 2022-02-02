@@ -924,7 +924,8 @@ ID *deg_update_copy_on_write_datablock(const Depsgraph *depsgraph, const IDNode 
 
   const ID_Type id_type = GS(id_orig->name);
   switch (id_type) {
-    /* For grease pencil, we can avoid a full copy of the data-block and only do an update-on-write. */
+    /* For grease pencil, we can avoid a full copy of the data-block and only do an
+     * update-on-write. */
     case ID_GD: {
       if (check_datablock_expanded(id_cow) &&
           !BKE_gpencil_check_copy_on_write_needed((bGPdata *)id_orig)) {

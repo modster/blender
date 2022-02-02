@@ -167,8 +167,11 @@ static void update_cache_node_create_ex(GPencilUpdateCache *root_cache,
   }
 
   GPencilUpdateCache *gps_cache = update_cache_alloc(gps_index, node_flag, (bGPDstroke *)data);
-  BLI_dlrbTree_add(
-      gpf_node->cache->children, cache_node_compare, cache_node_alloc, cache_node_update, gps_cache);
+  BLI_dlrbTree_add(gpf_node->cache->children,
+                   cache_node_compare,
+                   cache_node_alloc,
+                   cache_node_update,
+                   gps_cache);
 
   BLI_dlrbTree_linkedlist_sync(gpf_node->cache->children);
 }
@@ -178,6 +181,10 @@ static void update_cache_node_create(
 {
   if (gpd == NULL) {
     return;
+  }
+
+  if (gpd->flag & GP_DATA_UPDATE_CACHE_UNDO_ENCODED) {
+    BKE_gpencil_free_update_cache(gpd);
   }
 
   GPencilUpdateCache *root_cache = gpd->runtime.update_cache;
@@ -234,6 +241,143 @@ static void gpencil_traverse_update_cache_ex(GPencilUpdateCache *parent_cache,
   }
 }
 
+typedef struct GPencilUpdateCacheDuplicateTraverseData {
+  GPencilUpdateCache *new_cache;
+  int gpl_index;
+  int gpf_index;
+} GPencilUpdateCacheDuplicateTraverseData;
+
+static bool gpencil_duplicate_update_cache_layer_cb(GPencilUpdateCache *cache, void *user_data)
+{
+  GPencilUpdateCacheDuplicateTraverseData *td = (GPencilUpdateCacheDuplicateTraverseData *)
+      user_data;
+
+  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
+    /* Do a full copy of the layer. */
+    bGPDlayer *gpl = (bGPDlayer *)cache->data;
+    bGPDlayer *gpl_new = BKE_gpencil_layer_duplicate(gpl, true, true);
+    update_cache_node_create_ex(td->new_cache, gpl_new, cache->index, -1, -1, true);
+    return true;
+  }
+  else if (cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
+    bGPDlayer *gpl = (bGPDlayer *)cache->data;
+    bGPDlayer *gpl_new = (bGPDlayer *)MEM_dupallocN(gpl);
+
+    gpl_new->prev = gpl_new->next = NULL;
+    BLI_listbase_clear(&gpl_new->frames);
+    BLI_listbase_clear(&gpl_new->mask_layers);
+    update_cache_node_create_ex(td->new_cache, gpl_new, cache->index, -1, -1, false);
+  }
+  td->gpl_index = cache->index;
+  return false;
+}
+
+static bool gpencil_duplicate_update_cache_frame_cb(GPencilUpdateCache *cache, void *user_data)
+{
+  GPencilUpdateCacheDuplicateTraverseData *td = (GPencilUpdateCacheDuplicateTraverseData *)
+      user_data;
+  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
+    bGPDframe *gpf = (bGPDframe *)cache->data;
+    bGPDframe *gpf_new = BKE_gpencil_frame_duplicate(gpf, true);
+    update_cache_node_create_ex(td->new_cache, gpf_new, td->gpl_index, cache->index, -1, true);
+    return true;
+  }
+  else if (cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
+    bGPDframe *gpf = (bGPDframe *)cache->data;
+    bGPDframe *gpf_new = MEM_dupallocN(gpf);
+    gpf_new->prev = gpf_new->next = NULL;
+    BLI_listbase_clear(&gpf_new->strokes);
+    update_cache_node_create_ex(td->new_cache, gpf_new, td->gpl_index, cache->index, -1, false);
+  }
+  td->gpf_index = cache->index;
+  return false;
+}
+
+static bool gpencil_duplicate_update_cache_stroke_cb(GPencilUpdateCache *cache, void *user_data)
+{
+  GPencilUpdateCacheDuplicateTraverseData *td = (GPencilUpdateCacheDuplicateTraverseData *)
+      user_data;
+
+  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
+    bGPDstroke *gps = (bGPDstroke *)cache->data;
+    bGPDstroke *gps_new = BKE_gpencil_stroke_duplicate(gps, true, true);
+    update_cache_node_create_ex(
+        td->new_cache, gps_new, td->gpl_index, td->gpf_index, cache->index, true);
+  }
+  else if (cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
+    bGPDstroke *gps = (bGPDstroke *)cache->data;
+    bGPDstroke *gps_new = MEM_dupallocN(gps);
+
+    gps_new->prev = gps_new->next = NULL;
+    gps_new->points = NULL;
+    gps_new->triangles = NULL;
+    gps_new->dvert = NULL;
+    gps_new->editcurve = NULL;
+
+    update_cache_node_create_ex(
+        td->new_cache, gps_new, td->gpl_index, td->gpf_index, cache->index, false);
+  }
+  return true;
+}
+
+static bool gpencil_free_update_cache_layer_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
+{
+  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
+    BKE_gpencil_free_frames(cache->data);
+    BKE_gpencil_free_layer_masks(cache->data);
+  }
+  if (cache->data) {
+    MEM_freeN(cache->data);
+  }
+  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
+}
+
+static bool gpencil_free_update_cache_frame_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
+{
+  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
+    BKE_gpencil_free_strokes(cache->data);
+  }
+  if (cache->data) {
+    MEM_freeN(cache->data);
+  }
+  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
+}
+
+static bool gpencil_free_update_cache_stroke_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
+{
+  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
+    BKE_gpencil_free_stroke(cache->data);
+  }
+  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
+}
+
+static bool gpencil_print_update_cache_layer_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
+{
+  printf("  - Layer: %s | Index: %d | Flag: %d | Tagged Frames: %d\n",
+         (cache->data ? ((bGPDlayer *)cache->data)->info : "N/A"),
+         cache->index,
+         cache->flag,
+         BLI_listbase_count((ListBase *)cache->children));
+  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
+}
+
+static bool gpencil_print_update_cache_frame_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
+{
+  printf("  - Layer: %s | Index: %d | Flag: %d | Tagged Frames: %d\n",
+         (cache->data ? ((bGPDlayer *)cache->data)->info : "N/A"),
+         cache->index,
+         cache->flag,
+         BLI_listbase_count((ListBase *)cache->children));
+  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
+}
+
+static bool gpencil_print_update_cache_stroke_cb(GPencilUpdateCache *cache,
+                                                 void *UNUSED(user_data))
+{
+  printf("     - Stroke Index: %d | | Flag: %d\n", cache->index, cache->flag);
+  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
+}
+
 /* -------------------------------------------------------------------- */
 /** \name Update Cache API
  *
@@ -266,6 +410,70 @@ void BKE_gpencil_tag_light_update(bGPdata *gpd, bGPDlayer *gpl, bGPDframe *gpf, 
   }
 }
 
+GPencilUpdateCache *BKE_gpencil_duplicate_update_cache_and_data(GPencilUpdateCache *gpd_cache)
+{
+  GPencilUpdateCache *new_cache = update_cache_alloc(0, gpd_cache->flag, NULL);
+  bGPdata *gpd_new = NULL;
+  if (gpd_cache->flag == GP_UPDATE_NODE_FULL_COPY) {
+    BKE_gpencil_data_duplicate(NULL, gpd_cache->data, &gpd_new);
+    new_cache->data = gpd_new;
+    return new_cache;
+  }
+  else if (gpd_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
+    gpd_new = MEM_dupallocN(gpd_cache->data);
+
+    /* Clear all the pointers, since they shouldn't store anything. */
+    BLI_listbase_clear(&gpd_new->layers);
+    BLI_listbase_clear(&gpd_new->vertex_group_names);
+    gpd_new->adt = NULL;
+    gpd_new->mat = NULL;
+    gpd_new->runtime.update_cache = NULL;
+
+    new_cache->data = gpd_new;
+  }
+
+  GPencilUpdateCacheTraverseSettings ts = {{gpencil_duplicate_update_cache_layer_cb,
+                                            gpencil_duplicate_update_cache_frame_cb,
+                                            gpencil_duplicate_update_cache_stroke_cb}};
+
+  GPencilUpdateCacheDuplicateTraverseData td = {
+      .new_cache = new_cache,
+      .gpl_index = -1,
+      .gpf_index = -1,
+  };
+
+  BKE_gpencil_traverse_update_cache(gpd_cache, &ts, &td);
+  return new_cache;
+}
+
+/**
+ *  Return true if any of the branches in gpd_cache_b are "strictly greater than" the branches in
+ * gpd_cache_a, e.g. one of them contains more data than their counterpart.
+ */
+bool BKE_gpencil_compare_update_caches(GPencilUpdateCache *gpd_cache_a,
+                                       GPencilUpdateCache *gpd_cache_b)
+{
+  if (gpd_cache_b->flag == GP_UPDATE_NODE_FULL_COPY) {
+    return gpd_cache_a->flag != GP_UPDATE_NODE_FULL_COPY;
+  }
+  if (gpd_cache_a->flag == GP_UPDATE_NODE_FULL_COPY) {
+    return false;
+  }
+
+  LISTBASE_FOREACH (GPencilUpdateCacheNode *, node_b, gpd_cache_b->children) {
+    GPencilUpdateCacheNode *node_a = (GPencilUpdateCacheNode *)BLI_dlrbTree_search_exact(
+        gpd_cache_a->children, cache_node_compare, node_b->cache);
+    if (node_a == NULL) {
+      return true;
+    }
+
+    if (BKE_gpencil_compare_update_caches(node_a->cache, node_b->cache)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void BKE_gpencil_free_update_cache(bGPdata *gpd)
 {
   GPencilUpdateCache *gpd_cache = gpd->runtime.update_cache;
@@ -273,6 +481,47 @@ void BKE_gpencil_free_update_cache(bGPdata *gpd)
     update_cache_free(gpd_cache);
     gpd->runtime.update_cache = NULL;
   }
+  gpd->flag &= ~GP_DATA_UPDATE_CACHE_UNDO_ENCODED;
+}
+
+void BKE_gpencil_free_update_cache_and_data(GPencilUpdateCache *gpd_cache)
+{
+  if (gpd_cache->data != NULL) {
+    if (gpd_cache->flag == GP_UPDATE_NODE_FULL_COPY) {
+      BKE_gpencil_free_data(gpd_cache->data, true);
+      MEM_freeN(gpd_cache->data);
+      update_cache_free(gpd_cache);
+      return;
+    }
+    MEM_freeN(gpd_cache->data);
+  }
+
+  GPencilUpdateCacheTraverseSettings ts = {{gpencil_free_update_cache_layer_cb,
+                                            gpencil_free_update_cache_frame_cb,
+                                            gpencil_free_update_cache_stroke_cb}};
+
+  BKE_gpencil_traverse_update_cache(gpd_cache, &ts, NULL);
+  update_cache_free(gpd_cache);
+}
+
+void BKE_gpencil_print_update_cache(bGPdata *gpd)
+{
+  GPencilUpdateCache *update_cache = gpd->runtime.update_cache;
+
+  if (update_cache == NULL) {
+    printf("No update cache\n");
+    return;
+  }
+  printf("Update Cache:\n");
+  printf("- GPdata: %s | Flag: %d | Tagged Layers: %d\n",
+         gpd->id.name,
+         update_cache->flag,
+         BLI_listbase_count((ListBase *)update_cache->children));
+
+  GPencilUpdateCacheTraverseSettings ts = {{gpencil_print_update_cache_layer_cb,
+                                            gpencil_print_update_cache_frame_cb,
+                                            gpencil_print_update_cache_stroke_cb}};
+  BKE_gpencil_traverse_update_cache(update_cache, &ts, NULL);
 }
 
 /** \} */

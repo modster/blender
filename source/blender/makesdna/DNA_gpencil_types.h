@@ -807,6 +807,8 @@ typedef enum eGPdata_Flag {
   GP_DATA_CURVE_EDIT_MODE = (1 << 21),
   /* Use adaptive curve resolution */
   GP_DATA_CURVE_ADAPTIVE_RESOLUTION = (1 << 22),
+  /* Update cache was encoded by the undo system. */
+  GP_DATA_UPDATE_CACHE_UNDO_ENCODED = (1 << 23),
 } eGPdata_Flag;
 
 /* gpd->onion_flag */

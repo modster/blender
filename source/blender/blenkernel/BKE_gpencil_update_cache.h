@@ -140,10 +140,30 @@ void BKE_gpencil_tag_light_update(struct bGPdata *gpd,
                                   struct bGPDstroke *gps);
 
 /**
+ *
+ */
+GPencilUpdateCache *BKE_gpencil_duplicate_update_cache_and_data(GPencilUpdateCache *gpd_cache);
+
+/**
+ *
+ */
+bool BKE_gpencil_compare_update_caches(GPencilUpdateCache *cache_a, GPencilUpdateCache *cache_b);
+
+/**
  * Frees the GPencilUpdateCache on the gpd->runtime. This will not free the data that the cache
  * node might point to. It assumes that the cache does not own the data.
  */
 void BKE_gpencil_free_update_cache(struct bGPdata *gpd);
+
+/**
+ *
+ */
+void BKE_gpencil_free_update_cache_and_data(GPencilUpdateCache *cache);
+
+/**
+ *
+ */
+void BKE_gpencil_print_update_cache(struct bGPdata *gpd);
 
 #ifdef __cplusplus
 }

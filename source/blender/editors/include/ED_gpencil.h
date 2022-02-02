@@ -52,6 +52,7 @@ struct SnapObjectContext;
 struct ToolSettings;
 struct View3D;
 struct bContext;
+struct UndoType;
 
 struct Material;
 struct Object;
@@ -352,6 +353,8 @@ int ED_gpencil_session_active(void);
  * \param step: eUndoStepDir.
  */
 int ED_undo_gpencil_step(struct bContext *C, int step); /* eUndoStepDir. */
+
+void ED_gpencil_undosys_type(struct UndoType *ut);
 
 /* ------------ Grease-Pencil Armature ------------------ */
 bool ED_gpencil_add_armature(const struct bContext *C,
