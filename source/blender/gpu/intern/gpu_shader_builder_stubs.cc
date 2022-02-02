@@ -180,7 +180,7 @@ void BKE_material_defaults_free_gpu()
 /** \name Stubs of BKE_world.h
  * \{ */
 
-void BKE_world_defaults_free_gpu(void)
+void BKE_world_defaults_free_gpu()
 {
   /* This function is reachable via GPU_exit. */
 }
