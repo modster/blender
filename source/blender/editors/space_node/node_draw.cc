@@ -817,6 +817,9 @@ static void create_inspection_string_for_generic_value(const GPointer value, std
   else if (type.is<blender::float3>()) {
     ss << *(blender::float3 *)buffer << TIP_(" (Vector)");
   }
+  else if (type.is<blender::float2>()) {
+    ss << *(blender::float2 *)buffer << TIP_(" (2D Vector)");
+  }
   else if (type.is<bool>()) {
     ss << ((*(bool *)buffer) ? TIP_("True") : TIP_("False")) << TIP_(" (Boolean)");
   }
@@ -854,6 +857,9 @@ static void create_inspection_string_for_gfield(const geo_log::GFieldValueLog &v
     }
     else if (type.is<blender::float3>()) {
       ss << TIP_("Vector field");
+    }
+    else if (type.is<blender::float2>()) {
+      ss << TIP_("2D Vector field");
     }
     else if (type.is<bool>()) {
       ss << TIP_("Boolean field");
