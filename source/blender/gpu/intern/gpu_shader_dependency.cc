@@ -332,14 +332,12 @@ struct GPUSource {
   }
 
   /* Returns the final string with all includes done. */
-  std::string build() const
+  void build(Vector<const char *> &result) const
   {
-    std::string str;
     for (auto *dep : dependencies) {
-      str += dep->source;
+      result.append(dep->source.c_str());
     }
-    str += source;
-    return str;
+    result.append(source.c_str());
   }
 
   shader::BuiltinBits builtins_get() const
@@ -392,14 +390,18 @@ uint32_t gpu_shader_dependency_get_builtins(const char *shader_source_name)
   return static_cast<uint32_t>(source->builtins_get());
 }
 
-char *gpu_shader_dependency_get_resolved_source(const char *shader_source_name)
+blender::Vector<const char *> gpu_shader_dependency_get_resolved_source(
+    const blender::StringRefNull shader_source_name)
 {
+  blender::Vector<const char *> result;
   GPUSource *source = g_sources->lookup(shader_source_name);
-  return strdup(source->build().c_str());
+  source->build(result);
+  return result;
 }
 
-char *gpu_shader_dependency_get_source(const char *shader_source_name)
+blender::StringRefNull gpu_shader_dependency_get_source(
+    const blender::StringRefNull shader_source_name)
 {
   GPUSource *src = g_sources->lookup(shader_source_name);
-  return strdup(src->source.c_str());
+  return src->source;
 }

@@ -304,16 +304,16 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
 
   defines += "#define USE_GPU_SHADER_CREATE_INFO\n";
 
-  Vector<char *> typedefs;
+  Vector<const char *> typedefs;
   if (!info.typedef_sources_.is_empty()) {
-    typedefs.append(gpu_shader_dependency_get_source("gpu_shader_shared_utils.h"));
+    typedefs.append(gpu_shader_dependency_get_source("gpu_shader_shared_utils.h").c_str());
   }
   for (auto filename : info.typedef_sources_) {
-    typedefs.append(gpu_shader_dependency_get_source(filename.c_str()));
+    typedefs.append(gpu_shader_dependency_get_source(filename).c_str());
   }
 
   if (!info.vertex_source_.is_empty()) {
-    char *code = gpu_shader_dependency_get_resolved_source(info.vertex_source_.c_str());
+    auto code = gpu_shader_dependency_get_resolved_source(info.vertex_source_);
     std::string interface = shader->vertex_interface_declare(info);
 
     Vector<const char *> sources;
@@ -329,15 +329,13 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     sources.append(resources.c_str());
     sources.append(interface.c_str());
     sources.append(info.vertex_source_generated.c_str());
-    sources.append(code);
+    sources.extend(code);
 
     shader->vertex_shader_from_glsl(sources);
-
-    free(code);
   }
 
   if (!info.fragment_source_.is_empty()) {
-    char *code = gpu_shader_dependency_get_resolved_source(info.fragment_source_.c_str());
+    auto code = gpu_shader_dependency_get_resolved_source(info.fragment_source_);
     std::string interface = shader->fragment_interface_declare(info);
 
     Vector<const char *> sources;
@@ -354,15 +352,13 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     sources.append(resources.c_str());
     sources.append(interface.c_str());
     sources.append(info.fragment_source_generated.c_str());
-    sources.append(code);
+    sources.extend(code);
 
     shader->fragment_shader_from_glsl(sources);
-
-    free(code);
   }
 
   if (!info.geometry_source_.is_empty()) {
-    char *code = gpu_shader_dependency_get_resolved_source(info.geometry_source_.c_str());
+    auto code = gpu_shader_dependency_get_resolved_source(info.geometry_source_);
     std::string layout = shader->geometry_layout_declare(info);
     std::string interface = shader->geometry_interface_declare(info);
 
@@ -377,15 +373,13 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     sources.append(resources.c_str());
     sources.append(layout.c_str());
     sources.append(interface.c_str());
-    sources.append(code);
+    sources.extend(code);
 
     shader->geometry_shader_from_glsl(sources);
-
-    free(code);
   }
 
   if (!info.compute_source_.is_empty()) {
-    char *code = gpu_shader_dependency_get_resolved_source(info.compute_source_.c_str());
+    auto code = gpu_shader_dependency_get_resolved_source(info.compute_source_);
     std::string layout = shader->compute_layout_declare(info);
 
     Vector<const char *> sources;
@@ -398,15 +392,9 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     sources.append(info.typedef_source_generated.c_str());
     sources.append(resources.c_str());
     sources.append(layout.c_str());
-    sources.append(code);
+    sources.extend(code);
 
     shader->compute_shader_from_glsl(sources);
-
-    free(code);
-  }
-
-  for (auto *types : typedefs) {
-    free(types);
   }
 
   if (!shader->finalize(&info)) {
