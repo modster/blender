@@ -416,7 +416,7 @@ typedef struct bNode {
 #define __NODE_ACTIVE_PREVIEW (1 << 18) /* deprecated */
 
 /* node->update */
-#define NODE_UPDATE_ID 1 /* associated id data block has changed */
+#define NODE_UPDATE_ID 1       /* associated id data block has changed */
 #define NODE_UPDATE_OPERATOR 2 /* node update triggered from update operator */
 
 /* Unique hash key for identifying node instances
@@ -462,10 +462,10 @@ typedef struct bNodeLink {
 /* link->flag */
 #define NODE_LINKFLAG_HILITE (1 << 0) /* link has been successfully validated */
 #define NODE_LINK_VALID (1 << 1)
-#define NODE_LINK_TEST (1 << 2) /* free test flag, undefined */
+#define NODE_LINK_TEST (1 << 2)           /* free test flag, undefined */
 #define NODE_LINK_TEMP_HIGHLIGHT (1 << 3) /* Link is highlighted for picking. */
-#define NODE_LINK_MUTED (1 << 4) /* Link is muted. */
-#define NODE_LINK_DRAGGED (1 << 5) /* Node link is being dragged by the user. */
+#define NODE_LINK_MUTED (1 << 4)          /* Link is muted. */
+#define NODE_LINK_DRAGGED (1 << 5)        /* Node link is being dragged by the user. */
 
 /* tree->edit_quality/tree->render_quality */
 #define NTREE_QUALITY_HIGH 0
@@ -594,7 +594,7 @@ typedef struct bNodeTree {
 /** #NodeTree.type, index */
 
 #define NTREE_UNDEFINED -2 /* Represents #NodeTreeTypeUndefined type. */
-#define NTREE_CUSTOM -1 /* for dynamically registered custom types */
+#define NTREE_CUSTOM -1    /* for dynamically registered custom types */
 #define NTREE_SHADER 0
 #define NTREE_COMPOSIT 1
 #define NTREE_TEXTURE 2
@@ -604,11 +604,11 @@ typedef struct bNodeTree {
 #define NTREE_TYPE_INIT 1
 
 /** #NodeTree.flag */
-#define NTREE_DS_EXPAND (1 << 0) /* for animation editors */
-#define NTREE_COM_OPENCL (1 << 1) /* use opencl */
-#define NTREE_TWO_PASS (1 << 2) /* two pass */
+#define NTREE_DS_EXPAND (1 << 0)            /* for animation editors */
+#define NTREE_COM_OPENCL (1 << 1)           /* use opencl */
+#define NTREE_TWO_PASS (1 << 2)             /* two pass */
 #define NTREE_COM_GROUPNODE_BUFFER (1 << 3) /* use groupnode buffers */
-#define NTREE_VIEWER_BORDER (1 << 4) /* use a border for viewer nodes */
+#define NTREE_VIEWER_BORDER (1 << 4)        /* use a border for viewer nodes */
 /* NOTE: DEPRECATED, use (id->tag & LIB_TAG_LOCALIZED) instead. */
 
 /* tree is localized copy, free when deleting node groups */
@@ -1677,7 +1677,7 @@ typedef struct NodeFunctionCompare {
 
 /* Frame node flags. */
 
-#define NODE_FRAME_SHRINK 1 /* keep the bounding box minimal */
+#define NODE_FRAME_SHRINK 1     /* keep the bounding box minimal */
 #define NODE_FRAME_RESIZEABLE 2 /* test flag, if frame can be resized by user */
 
 /* Proxy node flags. */

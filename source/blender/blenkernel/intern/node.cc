@@ -1774,19 +1774,8 @@ const char *nodeStaticSocketType(int type, int subtype)
       }
     case SOCK_VECTOR_2D:
       switch (subtype) {
-        // case PROP_TRANSLATION:
-        //   return "NodeSocketVectorTranslation";
-        // case PROP_DIRECTION:
-        //   return "NodeSocketVectorDirection";
-        // case PROP_VELOCITY:
-        //   return "NodeSocketVectorVelocity";
-        // case PROP_ACCELERATION:
-        //   return "NodeSocketVectorAcceleration";
-        // case PROP_EULER:
-        //   return "NodeSocketVectorEuler";
         case PROP_XYZ:
           return "NodeSocketVectorXYZ";
-        // case PROP_NONE:
         default:
           return "NodeSocketVector2D";
       }
