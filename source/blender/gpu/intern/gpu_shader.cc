@@ -301,16 +301,15 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
 
   std::string defines = shader->defines_declare(info);
   std::string resources = shader->resources_declare(info);
-  char *shader_shared_utils = nullptr;
 
   defines += "#define USE_GPU_SHADER_CREATE_INFO\n";
 
   Vector<char *> typedefs;
+  if (!info.typedef_sources_.is_empty()) {
+    typedefs.append(gpu_shader_dependency_get_source("gpu_shader_shared_utils.h"));
+  }
   for (auto filename : info.typedef_sources_) {
     typedefs.append(gpu_shader_dependency_get_source(filename.c_str()));
-  }
-  if (!typedefs.is_empty()) {
-    shader_shared_utils = gpu_shader_dependency_get_source("gpu_shader_shared_utils.h");
   }
 
   if (!info.vertex_source_.is_empty()) {
@@ -324,9 +323,6 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    if (!typedefs.is_empty()) {
-      sources.append(shader_shared_utils);
-    }
     for (auto *types : typedefs) {
       sources.append(types);
     }
@@ -351,9 +347,6 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    if (!typedefs.is_empty()) {
-      sources.append(shader_shared_utils);
-    }
     for (auto *types : typedefs) {
       sources.append(types);
     }
@@ -377,9 +370,6 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     standard_defines(sources);
     sources.append("#define GPU_GEOMETRY_SHADER\n");
     sources.append(defines.c_str());
-    if (!typedefs.is_empty()) {
-      sources.append(shader_shared_utils);
-    }
     for (auto *types : typedefs) {
       sources.append(types);
     }
@@ -402,9 +392,6 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     standard_defines(sources);
     sources.append("#define GPU_COMPUTE_SHADER\n");
     sources.append(defines.c_str());
-    if (!typedefs.is_empty()) {
-      sources.append(shader_shared_utils);
-    }
     for (auto *types : typedefs) {
       sources.append(types);
     }
@@ -420,10 +407,6 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
 
   for (auto *types : typedefs) {
     free(types);
-  }
-
-  if (shader_shared_utils) {
-    free(shader_shared_utils);
   }
 
   if (!shader->finalize(&info)) {
