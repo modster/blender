@@ -280,6 +280,8 @@ struct ShaderCreateInfo {
   bool do_static_compilation_ = false;
   /** If true, all additionally linked create info will be merged into this one. */
   bool finalized_ = false;
+  /** If true, all resources will have an automatic location assigned. */
+  bool auto_resource_location_ = false;
   /**
    * Maximum length of all the resource names including each null terminator.
    * Only for names used by gpu::ShaderInterface.
@@ -687,6 +689,12 @@ struct ShaderCreateInfo {
   Self &builtins(BuiltinBits builtin)
   {
     builtins_ |= builtin;
+    return *(Self *)this;
+  }
+
+  Self &auto_resource_location(bool value)
+  {
+    auto_resource_location_ = value;
     return *(Self *)this;
   }
 
