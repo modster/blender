@@ -575,6 +575,14 @@ foreach(GLSL_FILE ${GLSL_SRC})
   data_to_c_simple(${GLSL_FILE} GLSL_C)
 endforeach()
 
+# Generated shader files
+# TODO(@fclem): Clean that by wrapping it into a function.
+data_to_c(${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl.c GLSL_C)
+
+list(APPEND GLSL_SRC
+  ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl
+)
+
 blender_add_lib(bf_draw_shaders "${GLSL_C}" "" "" "")
 
 list(APPEND LIB
