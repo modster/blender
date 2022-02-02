@@ -1036,8 +1036,11 @@ Mesh *BKE_modifier_get_evaluated_mesh_from_evaluated_object(Object *ob_eval,
     BMEditMesh *em = BKE_editmesh_from_object(ob_eval);
     /* 'em' might not exist yet in some cases, just after loading a .blend file, see T57878. */
     if (em != NULL) {
-      me = (get_cage_mesh && em->mesh_eval_cage != NULL) ? em->mesh_eval_cage :
-                                                           em->mesh_eval_final;
+      Mesh *editmesh_eval_final = BKE_object_get_editmesh_eval_final(ob_eval);
+      Mesh *editmesh_eval_cage = BKE_object_get_editmesh_eval_cage(ob_eval);
+
+      me = (get_cage_mesh && editmesh_eval_cage != NULL) ? editmesh_eval_cage :
+                                                           editmesh_eval_final;
     }
   }
   if (me == NULL) {
@@ -1179,8 +1182,8 @@ void BKE_modifier_blend_write(BlendWriter *writer, ListBase *modbase)
 
 #if 0
       CollisionModifierData *collmd = (CollisionModifierData *)md;
-      // TODO: CollisionModifier should use pointcache
-      // + have proper reset events before enabling this
+      /* TODO: CollisionModifier should use pointcache
+       * + have proper reset events before enabling this. */
       writestruct(wd, DATA, MVert, collmd->numverts, collmd->x);
       writestruct(wd, DATA, MVert, collmd->numverts, collmd->xnew);
       writestruct(wd, DATA, MFace, collmd->numfaces, collmd->mfaces);

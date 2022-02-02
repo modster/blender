@@ -142,6 +142,7 @@ def mesh_node_items(context):
         yield NodeItemCustom(draw=lambda self, layout, context: layout.separator())
 
     yield NodeItem("GeometryNodeDualMesh")
+    yield NodeItem("GeometryNodeExtrudeMesh")
     yield NodeItem("GeometryNodeFlipFaces")
     yield NodeItem("GeometryNodeMeshBoolean")
     yield NodeItem("GeometryNodeMeshToCurve")
@@ -150,6 +151,7 @@ def mesh_node_items(context):
     yield NodeItem("GeometryNodeSubdivideMesh")
     yield NodeItem("GeometryNodeSubdivisionSurface")
     yield NodeItem("GeometryNodeTriangulate")
+    yield NodeItem("GeometryNodeScaleElements")
     yield NodeItemCustom(draw=lambda self, layout, context: layout.separator())
     yield NodeItem("GeometryNodeInputMeshEdgeAngle")
     yield NodeItem("GeometryNodeInputMeshEdgeNeighbors")
@@ -179,6 +181,7 @@ def geometry_node_items(context):
     yield NodeItem("GeometryNodeConvexHull")
     yield NodeItem("GeometryNodeDeleteGeometry")
     yield NodeItem("GeometryNodeGeometryToInstance")
+    yield NodeItem("GeometryNodeMergeByDistance")
     yield NodeItem("GeometryNodeProximity")
     yield NodeItem("GeometryNodeJoinGeometry")
     yield NodeItem("GeometryNodeRaycast")
@@ -388,6 +391,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeAmbientOcclusion"),
         NodeItem("ShaderNodeObjectInfo"),
         NodeItem("ShaderNodeHairInfo"),
+        NodeItem("ShaderNodePointInfo"),
         NodeItem("ShaderNodeVolumeInfo"),
         NodeItem("ShaderNodeParticleInfo"),
         NodeItem("ShaderNodeCameraData"),
@@ -543,6 +547,8 @@ compositor_node_categories = [
         NodeItem("CompositorNodeCombYUVA"),
         NodeItem("CompositorNodeSepYCCA"),
         NodeItem("CompositorNodeCombYCCA"),
+        NodeItem("CompositorNodeSeparateXYZ"),
+        NodeItem("CompositorNodeCombineXYZ"),
         NodeItem("CompositorNodeSwitchView"),
         NodeItem("CompositorNodeConvertColorSpace"),
     ]),

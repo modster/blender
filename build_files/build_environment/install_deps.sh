@@ -379,27 +379,27 @@ USE_CXX11=true
 CLANG_FORMAT_VERSION_MIN="6.0"
 CLANG_FORMAT_VERSION_MEX="10.0"
 
-PYTHON_VERSION="3.9.7"
-PYTHON_VERSION_SHORT="3.9"
-PYTHON_VERSION_MIN="3.7"
-PYTHON_VERSION_MEX="3.11"
+PYTHON_VERSION="3.10.2"
+PYTHON_VERSION_SHORT="3.10"
+PYTHON_VERSION_MIN="3.9"
+PYTHON_VERSION_MEX="3.12"
 PYTHON_VERSION_INSTALLED=$PYTHON_VERSION_SHORT
 PYTHON_FORCE_BUILD=false
 PYTHON_FORCE_REBUILD=false
 PYTHON_SKIP=false
 
 # Additional Python modules.
-PYTHON_IDNA_VERSION="3.2"
+PYTHON_IDNA_VERSION="3.3"
 PYTHON_IDNA_VERSION_MIN="2.0"
 PYTHON_IDNA_VERSION_MEX="4.0"
 PYTHON_IDNA_NAME="idna"
 
-PYTHON_CHARSET_NORMALIZER_VERSION="2.0.6"
+PYTHON_CHARSET_NORMALIZER_VERSION="2.0.10"
 PYTHON_CHARSET_NORMALIZER_VERSION_MIN="2.0.6"
 PYTHON_CHARSET_NORMALIZER_VERSION_MEX="2.1.0"  # requests uses `charset_normalizer~=2.0.0`
 PYTHON_CHARSET_NORMALIZER_NAME="charset-normalizer"
 
-PYTHON_URLLIB3_VERSION="1.26.7"
+PYTHON_URLLIB3_VERSION="1.26.8"
 PYTHON_URLLIB3_VERSION_MIN="1.0"
 PYTHON_URLLIB3_VERSION_MEX="2.0"
 PYTHON_URLLIB3_NAME="urllib3"
@@ -409,17 +409,17 @@ PYTHON_CERTIFI_VERSION_MIN="2021.0"
 PYTHON_CERTIFI_VERSION_MEX="2023.0"
 PYTHON_CERTIFI_NAME="certifi"
 
-PYTHON_REQUESTS_VERSION="2.23.0"
+PYTHON_REQUESTS_VERSION="2.27.1"
 PYTHON_REQUESTS_VERSION_MIN="2.0"
 PYTHON_REQUESTS_VERSION_MEX="3.0"
 PYTHON_REQUESTS_NAME="requests"
 
-PYTHON_ZSTANDARD_VERSION="0.15.2"
+PYTHON_ZSTANDARD_VERSION="0.16.0"
 PYTHON_ZSTANDARD_VERSION_MIN="0.15.2"
-PYTHON_ZSTANDARD_VERSION_MEX="0.16.0"
+PYTHON_ZSTANDARD_VERSION_MEX="0.20.0"
 PYTHON_ZSTANDARD_NAME="zstandard"
 
-PYTHON_NUMPY_VERSION="1.21.2"
+PYTHON_NUMPY_VERSION="1.22.0"
 PYTHON_NUMPY_VERSION_MIN="1.14"
 PYTHON_NUMPY_VERSION_MEX="2.0"
 PYTHON_NUMPY_NAME="numpy"
@@ -499,7 +499,7 @@ LLVM_FORCE_REBUILD=false
 LLVM_SKIP=false
 
 # OSL needs to be compiled for now!
-OSL_VERSION="1.11.14.1"
+OSL_VERSION="1.11.17.0"
 OSL_VERSION_SHORT="1.11"
 OSL_VERSION_MIN="1.11"
 OSL_VERSION_MEX="2.0"
@@ -4036,13 +4036,13 @@ install_DEB() {
     INFO "Forced Python building, as requested..."
     _do_compile_python=true
   else
-    check_package_version_ge_lt_DEB python3-dev $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
+    check_package_version_ge_lt_DEB python${PYTHON_VERSION_SHORT}-dev $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
     if [ $? -eq 0 ]; then
-      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_DEB python3-dev` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
-
-      install_packages_DEB python3-dev
+      install_packages_DEB python${PYTHON_VERSION_SHORT}-dev
       clean_Python
       PRINT ""
+
+      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_DEB python${PYTHON_VERSION_SHORT}-dev` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
 
       for module in "${PYTHON_MODULES_PACKAGES[@]}"
       do
@@ -4681,10 +4681,10 @@ install_RPM() {
   else
     check_package_version_ge_lt_RPM python3-devel $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
     if [ $? -eq 0 ]; then
-      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_RPM python3-devel` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
-
       install_packages_RPM python3-devel
       clean_Python
+
+      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_RPM python3-devel` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
 
       for module in "${PYTHON_MODULES_PACKAGES[@]}"
       do
@@ -5224,11 +5224,11 @@ install_ARCH() {
   else
     check_package_version_ge_lt_ARCH python $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
     if [ $? -eq 0 ]; then
-      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_ARCH python` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
-
       install_packages_ARCH python
       clean_Python
       PRINT ""
+
+      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_ARCH python` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
 
       for module in "${PYTHON_MODULES_PACKAGES[@]}"
       do
