@@ -88,22 +88,22 @@ static void cache_node_update(void *node, void *data)
   GPencilUpdateCache *update_cache = ((GPencilUpdateCacheNode *)node)->cache;
   GPencilUpdateCache *new_update_cache = (GPencilUpdateCache *)data;
 
-  if (new_update_cache->data == NULL) {
+  /* If the new cache is already "covered" by the current cache, just free it and return. */
+  if (new_update_cache->flag <= update_cache->flag) {
     update_cache_free(new_update_cache);
     return;
   }
 
   update_cache->data = new_update_cache->data;
-  if (update_cache->flag == GP_UPDATE_NODE_NO_COPY) {
-    update_cache->flag = new_update_cache->flag;
+  update_cache->flag = new_update_cache->flag;
+
+  /* In case the new cache does a full update, remove its children since they will be all
+   * updated by this cache. */
+  if (new_update_cache->flag == GP_UPDATE_NODE_FULL_COPY && update_cache->children != NULL) {
+    BLI_dlrbTree_free(update_cache->children, cache_node_free);
+    MEM_freeN(update_cache->children);
   }
-  if (new_update_cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    update_cache->flag = new_update_cache->flag;
-    if (update_cache->children != NULL) {
-      BLI_dlrbTree_free(update_cache->children, cache_node_free);
-      MEM_freeN(update_cache->children);
-    }
-  }
+
   update_cache_free(new_update_cache);
 }
 
