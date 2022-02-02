@@ -162,7 +162,7 @@ GPU_SHADER_CREATE_INFO(eevee_volume_deferred)
 #ifdef DEBUG
 
 /* Stub functions defined by the material evaluation. */
-GPU_SHADER_CREATE_INFO(eevee_stub)
+GPU_SHADER_CREATE_INFO(eevee_material_stub)
     .define("attrib_load()")
     .define("nodetree_displacement()", "vec3(0)")
     .define("nodetree_surface()", "CLOSURE_DEFAULT")
@@ -189,7 +189,7 @@ GPU_SHADER_CREATE_INFO(eevee_stub)
     EEVEE_MAT_GEOM_VARIATIONS(name##_deferred, "eevee_surface_deferred", __VA_ARGS__) \
     EEVEE_MAT_GEOM_VARIATIONS(name##_forward, "eevee_surface_forward", __VA_ARGS__)
 
-EEVEE_MAT_PIPE_VARIATIONS(eevee_surface, "eevee_stub")
+EEVEE_MAT_PIPE_VARIATIONS(eevee_surface, "eevee_material_stub")
 
 #endif
 
