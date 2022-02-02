@@ -120,7 +120,7 @@ static void update_cache_node_create_ex(GPencilUpdateCache *root_cache,
     return;
   }
 
-  const int node_flag = full_copy ? GP_UPDATE_NODE_FULL_COPY : GP_UPDATE_NODE_STRUCT_COPY;
+  const int node_flag = full_copy ? GP_UPDATE_NODE_FULL_COPY : GP_UPDATE_NODE_LIGHT_COPY;
 
   if (gpl_index == -1) {
     root_cache->data = (bGPdata *)data;
@@ -166,8 +166,7 @@ static void update_cache_node_create_ex(GPencilUpdateCache *root_cache,
     return;
   }
 
-  GPencilUpdateCache *gps_cache = update_cache_alloc(
-      gps_index, node_flag, (bGPDstroke *)data);
+  GPencilUpdateCache *gps_cache = update_cache_alloc(gps_index, node_flag, (bGPDstroke *)data);
   BLI_dlrbTree_add(
       gpf_node->cache->children, cache_node_compare, cache_node_alloc, NULL, gps_cache);
 
@@ -243,7 +242,7 @@ static void gpencil_traverse_update_cache_ex(GPencilUpdateCache *parent_cache,
 GPencilUpdateCache *BKE_gpencil_create_update_cache(void *data, bool full_copy)
 {
   return update_cache_alloc(
-      0, full_copy ? GP_UPDATE_NODE_FULL_COPY : GP_UPDATE_NODE_STRUCT_COPY, data);
+      0, full_copy ? GP_UPDATE_NODE_FULL_COPY : GP_UPDATE_NODE_LIGHT_COPY, data);
 }
 
 void BKE_gpencil_traverse_update_cache(GPencilUpdateCache *cache,
@@ -260,7 +259,7 @@ void BKE_gpencil_tag_full_update(bGPdata *gpd, bGPDlayer *gpl, bGPDframe *gpf, b
   }
 }
 
-void BKE_gpencil_tag_struct_update(bGPdata *gpd, bGPDlayer *gpl, bGPDframe *gpf, bGPDstroke *gps)
+void BKE_gpencil_tag_light_update(bGPdata *gpd, bGPDlayer *gpl, bGPDframe *gpf, bGPDstroke *gps)
 {
   if (U.experimental.use_gpencil_update_cache) {
     update_cache_node_create(gpd, gpl, gpf, gps, false);

@@ -2876,7 +2876,7 @@ static bool gpencil_update_on_write_layer_cb(GPencilUpdateCache *gpl_cache, void
     td->gpl_eval->runtime.gpl_orig = gpl;
     return true;
   }
-  else if (gpl_cache->flag == GP_UPDATE_NODE_STRUCT_COPY) {
+  else if (gpl_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
     BLI_assert(gpl != NULL);
     BKE_gpencil_layer_copy_settings(gpl, td->gpl_eval);
     td->gpl_eval->runtime.gpl_orig = gpl;
@@ -2916,7 +2916,7 @@ static bool gpencil_update_on_write_frame_cb(GPencilUpdateCache *gpf_cache, void
 
     return true;
   }
-  else if (gpf_cache->flag == GP_UPDATE_NODE_STRUCT_COPY) {
+  else if (gpf_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
     BLI_assert(gpf != NULL);
     BKE_gpencil_frame_copy_settings(gpf, td->gpf_eval);
     td->gpf_eval->runtime.gpf_orig = gpf;
@@ -2958,7 +2958,7 @@ static bool gpencil_update_on_write_stroke_cb(GPencilUpdateCache *gps_cache, voi
       pt_eval->runtime.idx_orig = i;
     }
   }
-  else if (gps_cache->flag == GP_UPDATE_NODE_STRUCT_COPY) {
+  else if (gps_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
     BLI_assert(gps != NULL);
     BKE_gpencil_stroke_copy_settings(gps, td->gps_eval);
     td->gps_eval->runtime.gps_orig = gps;
@@ -2982,7 +2982,7 @@ void BKE_gpencil_update_on_write(bGPdata *gpd_orig, bGPdata *gpd_eval)
     return;
   }
 
-  if (update_cache->flag == GP_UPDATE_NODE_STRUCT_COPY) {
+  if (update_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
     BKE_gpencil_data_copy_settings(gpd_orig, gpd_eval);
   }
 
