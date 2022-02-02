@@ -589,7 +589,7 @@ static void gpencil_undosys_step_free(UndoStep *us_p)
 
 void ED_gpencil_undosys_type(UndoType *ut)
 {
-  ut->name = "Grease Pencil Draw";
+  ut->name = "Grease Pencil Undo";
   ut->poll = gpencil_undosys_poll;
   ut->step_encode = gpencil_undosys_step_encode;
   ut->step_decode = gpencil_undosys_step_decode;
