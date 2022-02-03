@@ -102,9 +102,7 @@ typedef struct CurvePenData {
   bool link_handles_pressed;
   /* Whether the current state of the moved handle is linked. */
   bool link_handles;
-  /* Whether shortcut for linking handles was pressed. */
-  bool lock_angle_pressed;
-  /* Whether the current state of the moved handle is linked. */
+  /* Whether the current state of the handle angle is locked. */
   bool lock_angle;
   /* Whether some action was done. Used for select. */
   bool acted;
@@ -1572,18 +1570,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
   }
   cpd->link_handles_pressed = is_extra_key_pressed(event, link_handles);
-
-  if (!cpd->lock_angle_pressed && is_extra_key_pressed(event, lock_angle)) {
-    cpd->lock_angle = !cpd->lock_angle;
-    if (cpd->lock_angle) {
-      move_all_selected_points(nurbs, false, false, cpd, event, &vc);
-    }
-    else {
-      // Recalculate offset after lock angle is turned off
-      cpd->offset_calc = false;
-    }
-  }
-  cpd->lock_angle_pressed = is_extra_key_pressed(event, lock_angle);
+  cpd->lock_angle = is_extra_key_pressed(event, lock_angle);
 
   const bool move_entire_pressed = is_extra_key_pressed(event, move_entire);
 
