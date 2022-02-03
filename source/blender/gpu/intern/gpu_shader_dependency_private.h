@@ -34,8 +34,6 @@ void gpu_shader_dependency_init(void);
 
 void gpu_shader_dependency_exit(void);
 
-uint32_t gpu_shader_dependency_get_builtins(const char *shader_source_name);
-
 #ifdef __cplusplus
 }
 #endif
@@ -45,9 +43,15 @@ uint32_t gpu_shader_dependency_get_builtins(const char *shader_source_name);
 #  include "BLI_string_ref.hh"
 #  include "BLI_vector.hh"
 
-blender::Vector<const char *> gpu_shader_dependency_get_resolved_source(
-    const blender::StringRefNull shader_source_name);
-blender::StringRefNull gpu_shader_dependency_get_source(
-    const blender::StringRefNull shader_source_name);
+#  include "gpu_shader_create_info.hh"
+
+namespace blender::gpu::shader {
+
+BuiltinBits gpu_shader_dependency_get_builtins(const StringRefNull source_name);
+
+Vector<const char *> gpu_shader_dependency_get_resolved_source(const StringRefNull source_name);
+StringRefNull gpu_shader_dependency_get_source(const StringRefNull source_name);
+
+}  // namespace blender::gpu::shader
 
 #endif

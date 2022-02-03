@@ -381,27 +381,30 @@ void gpu_shader_dependency_exit()
   delete g_sources;
 }
 
-uint32_t gpu_shader_dependency_get_builtins(const char *shader_source_name)
+namespace blender::gpu::shader {
+
+BuiltinBits gpu_shader_dependency_get_builtins(const StringRefNull shader_source_name)
 {
   if (shader_source_name[0] == '\0') {
-    return 0;
+    return shader::BuiltinBits::NONE;
   }
   GPUSource *source = g_sources->lookup(shader_source_name);
-  return static_cast<uint32_t>(source->builtins_get());
+  return source->builtins_get();
 }
 
-blender::Vector<const char *> gpu_shader_dependency_get_resolved_source(
-    const blender::StringRefNull shader_source_name)
+Vector<const char *> gpu_shader_dependency_get_resolved_source(
+    const StringRefNull shader_source_name)
 {
-  blender::Vector<const char *> result;
+  Vector<const char *> result;
   GPUSource *source = g_sources->lookup(shader_source_name);
   source->build(result);
   return result;
 }
 
-blender::StringRefNull gpu_shader_dependency_get_source(
-    const blender::StringRefNull shader_source_name)
+StringRefNull gpu_shader_dependency_get_source(const StringRefNull shader_source_name)
 {
   GPUSource *src = g_sources->lookup(shader_source_name);
   return src->source;
 }
+
+}  // namespace blender::gpu::shader
