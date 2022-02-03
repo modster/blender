@@ -488,7 +488,7 @@ static void gpencil_undosys_step_decode(struct bContext *C,
   if (undo_data->cfra != scene->r.cfra) {
     scene->r.cfra = undo_data->cfra;
     /* TODO: what if we merged a full copy with a frame change? */
-    DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
+    DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_MUTE);
     WM_event_add_notifier(C, NC_SCENE | ND_FRAME, NULL);
   }
 
