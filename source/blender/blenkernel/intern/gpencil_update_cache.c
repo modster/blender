@@ -89,7 +89,7 @@ static void cache_node_update(void *node, void *data)
   GPencilUpdateCache *new_update_cache = (GPencilUpdateCache *)data;
 
   /* If the new cache is already "covered" by the current cache, just free it and return. */
-  if (new_update_cache->flag <= update_cache->flag) {
+  if (new_update_cache->flag < update_cache->flag) {
     update_cache_free(new_update_cache);
     return;
   }
