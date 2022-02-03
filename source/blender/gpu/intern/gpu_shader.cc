@@ -305,8 +305,11 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
   defines += "#define USE_GPU_SHADER_CREATE_INFO\n";
 
   Vector<const char *> typedefs;
-  if (!info.typedef_sources_.is_empty()) {
+  if (!info.typedef_sources_.is_empty() || !info.typedef_source_generated.empty()) {
     typedefs.append(gpu_shader_dependency_get_source("gpu_shader_shared_utils.h").c_str());
+  }
+  if (!info.typedef_source_generated.empty()) {
+    typedefs.append(info.typedef_source_generated.c_str());
   }
   for (auto filename : info.typedef_sources_) {
     typedefs.append(gpu_shader_dependency_get_source(filename).c_str());
@@ -323,13 +326,11 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    for (auto *types : typedefs) {
-      sources.append(types);
-    }
+    sources.extend(typedefs);
     sources.append(resources.c_str());
     sources.append(interface.c_str());
-    sources.append(info.vertex_source_generated.c_str());
     sources.extend(code);
+    sources.append(info.vertex_source_generated.c_str());
 
     shader->vertex_shader_from_glsl(sources);
   }
@@ -345,14 +346,11 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    for (auto *types : typedefs) {
-      sources.append(types);
-    }
-    sources.append(info.typedef_source_generated.c_str());
+    sources.extend(typedefs);
     sources.append(resources.c_str());
     sources.append(interface.c_str());
-    sources.append(info.fragment_source_generated.c_str());
     sources.extend(code);
+    sources.append(info.fragment_source_generated.c_str());
 
     shader->fragment_shader_from_glsl(sources);
   }
@@ -366,10 +364,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     standard_defines(sources);
     sources.append("#define GPU_GEOMETRY_SHADER\n");
     sources.append(defines.c_str());
-    for (auto *types : typedefs) {
-      sources.append(types);
-    }
-    sources.append(info.typedef_source_generated.c_str());
+    sources.extend(typedefs);
     sources.append(resources.c_str());
     sources.append(layout.c_str());
     sources.append(interface.c_str());
@@ -386,10 +381,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     standard_defines(sources);
     sources.append("#define GPU_COMPUTE_SHADER\n");
     sources.append(defines.c_str());
-    for (auto *types : typedefs) {
-      sources.append(types);
-    }
-    sources.append(info.typedef_source_generated.c_str());
+    sources.extend(typedefs);
     sources.append(resources.c_str());
     sources.append(layout.c_str());
     sources.extend(code);
