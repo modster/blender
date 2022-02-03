@@ -385,7 +385,13 @@ namespace blender::gpu::shader {
 
 BuiltinBits gpu_shader_dependency_get_builtins(const StringRefNull shader_source_name)
 {
-  if (shader_source_name[0] == '\0') {
+  if (shader_source_name.is_empty()) {
+    return shader::BuiltinBits::NONE;
+  }
+  if (g_sources->contains(shader_source_name) == false) {
+    std::cout << "Error: Could not find \"" << shader_source_name
+              << "\" in the list of registered source.\n";
+    BLI_assert(0);
     return shader::BuiltinBits::NONE;
   }
   GPUSource *source = g_sources->lookup(shader_source_name);
