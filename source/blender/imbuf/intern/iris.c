@@ -72,14 +72,14 @@ BLI_STATIC_ASSERT(sizeof(IMAGE) == HEADER_SIZE, "Invalid header size");
 
 // #define TYPEMASK        0xff00
 #define BPPMASK 0x00ff
-// #define ITYPE_VERBATIM      0x0000 // UNUSED
+// #define ITYPE_VERBATIM      0x0000 /* UNUSED */
 #define ITYPE_RLE 0x0100
 #define ISRLE(type) (((type)&0xff00) == ITYPE_RLE)
 // #define ISVERBATIM(type)    (((type) & 0xff00) == ITYPE_VERBATIM)
 #define BPP(type) ((type)&BPPMASK)
 #define RLE(bpp) (ITYPE_RLE | (bpp))
-// #define VERBATIM(bpp)       (ITYPE_VERBATIM | (bpp)) // UNUSED
-// #define IBUFSIZE(pixels)    ((pixels + (pixels >> 6)) << 2) // UNUSED
+// #define VERBATIM(bpp)       (ITYPE_VERBATIM | (bpp)) /* UNUSED */
+// #define IBUFSIZE(pixels)    ((pixels + (pixels >> 6)) << 2) /* UNUSED */
 // #define RLE_NOP         0x00
 
 /* local struct for mem access */
@@ -251,12 +251,6 @@ bool imb_is_a_iris(const uchar *mem, size_t size)
   return ((GS(mem) == IMAGIC) || (GSS(mem) == IMAGIC));
 }
 
-/*
- * longimagedata -
- * read in a B/W RGB or RGBA iris image file and return a
- * pointer to an array of ints.
- */
-
 struct ImBuf *imb_loadiris(const uchar *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE])
 {
   uint *base, *lptr = NULL;
@@ -274,7 +268,7 @@ struct ImBuf *imb_loadiris(const uchar *mem, size_t size, int flags, char colors
     return NULL;
   }
 
-  /* Could pe part of the magic check above,
+  /* Could be part of the magic check above,
    * by convention this check only requests the size needed to read it's magic though. */
   if (size < HEADER_SIZE) {
     return NULL;
@@ -542,7 +536,7 @@ struct ImBuf *imb_loadiris(const uchar *mem, size_t size, int flags, char colors
       }
     }
     else if (image.zsize == 2) {
-      /* grayscale with alpha */
+      /* Gray-scale with alpha. */
       rect = (uchar *)ibuf->rect;
       for (size_t x = (size_t)ibuf->x * (size_t)ibuf->y; x > 0; x--) {
         rect[0] = rect[2];
@@ -570,7 +564,7 @@ struct ImBuf *imb_loadiris(const uchar *mem, size_t size, int flags, char colors
       }
     }
     else if (image.zsize == 2) {
-      /* grayscale with alpha */
+      /* Gray-scale with alpha. */
       fbase = ibuf->rect_float;
       for (size_t x = (size_t)ibuf->x * (size_t)ibuf->y; x > 0; x--) {
         fbase[0] = fbase[2];

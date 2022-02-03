@@ -34,6 +34,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
+#include "DNA_view2d_types.h"
 
 #include "PIL_time.h"
 
@@ -111,13 +112,6 @@ static void draw_render_info(
       GPU_matrix_translate_2f(x, y);
       GPU_matrix_scale_2f(zoomx, zoomy);
 
-      RenderData *rd = RE_engine_get_render_data(re);
-      if (rd->mode & R_BORDER) {
-        /* TODO: round or floor instead of casting to int */
-        GPU_matrix_translate_2f((int)(-rd->border.xmin * rd->xsch * rd->size * 0.01f),
-                                (int)(-rd->border.ymin * rd->ysch * rd->size * 0.01f));
-      }
-
       uint pos = GPU_vertformat_attr_add(
           immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
       immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
@@ -141,7 +135,6 @@ static void draw_render_info(
   }
 }
 
-/* used by node view too */
 void ED_image_draw_info(Scene *scene,
                         ARegion *region,
                         bool color_manage,
@@ -191,26 +184,26 @@ void ED_image_draw_info(Scene *scene,
 
   GPU_blend(GPU_BLEND_NONE);
 
-  BLF_size(blf_mono_font, 11 * U.pixelsize, U.dpi);
+  BLF_size(blf_mono_font, 11.0f * U.pixelsize, U.dpi);
 
   BLF_color3ub(blf_mono_font, 255, 255, 255);
   SNPRINTF(str, "X:%-4d  Y:%-4d |", x, y);
   BLF_position(blf_mono_font, dx, dy, 0);
-  BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+  BLF_draw(blf_mono_font, str, sizeof(str));
   dx += BLF_width(blf_mono_font, str, sizeof(str));
 
   if (zp) {
     BLF_color3ub(blf_mono_font, 255, 255, 255);
     SNPRINTF(str, " Z:%-.4f |", 0.5f + 0.5f * (((float)*zp) / (float)0x7fffffff));
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
   }
   if (zpf) {
     BLF_color3ub(blf_mono_font, 255, 255, 255);
     SNPRINTF(str, " Z:%-.3f |", *zpf);
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
   }
 
@@ -223,7 +216,7 @@ void ED_image_draw_info(Scene *scene,
     }
     BLF_color3ub(blf_mono_font, 255, 255, 255);
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
   }
 
@@ -239,7 +232,7 @@ void ED_image_draw_info(Scene *scene,
       STRNCPY(str, "  R:-");
     }
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
 
     BLF_color3ubv(blf_mono_font, green);
@@ -253,7 +246,7 @@ void ED_image_draw_info(Scene *scene,
       STRNCPY(str, "  G:-");
     }
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
 
     BLF_color3ubv(blf_mono_font, blue);
@@ -267,7 +260,7 @@ void ED_image_draw_info(Scene *scene,
       STRNCPY(str, "  B:-");
     }
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
 
     if (channels == 4) {
@@ -282,7 +275,7 @@ void ED_image_draw_info(Scene *scene,
         STRNCPY(str, "- ");
       }
       BLF_position(blf_mono_font, dx, dy, 0);
-      BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+      BLF_draw(blf_mono_font, str, sizeof(str));
       dx += BLF_width(blf_mono_font, str, sizeof(str));
     }
 
@@ -307,7 +300,7 @@ void ED_image_draw_info(Scene *scene,
 
       SNPRINTF(str, "  |  CM  R:%-.4f  G:%-.4f  B:%-.4f", rgba[0], rgba[1], rgba[2]);
       BLF_position(blf_mono_font, dx, dy, 0);
-      BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+      BLF_draw(blf_mono_font, str, sizeof(str));
       dx += BLF_width(blf_mono_font, str, sizeof(str));
     }
   }
@@ -389,10 +382,12 @@ void ED_image_draw_info(Scene *scene,
     immRecti(pos, color_quater_x, color_quater_y, color_rect_half.xmax, color_rect_half.ymax);
     immRecti(pos, color_rect_half.xmin, color_rect_half.ymin, color_quater_x, color_quater_y);
 
-    GPU_blend(GPU_BLEND_ALPHA);
-    immUniformColor3fvAlpha(finalcol, fp ? fp[3] : (cp[3] / 255.0f));
-    immRecti(pos, color_rect.xmin, color_rect.ymin, color_rect.xmax, color_rect.ymax);
-    GPU_blend(GPU_BLEND_NONE);
+    if (fp != NULL || cp != NULL) {
+      GPU_blend(GPU_BLEND_ALPHA);
+      immUniformColor3fvAlpha(finalcol, fp ? fp[3] : (cp[3] / 255.0f));
+      immRecti(pos, color_rect.xmin, color_rect.ymin, color_rect.xmax, color_rect.ymax);
+      GPU_blend(GPU_BLEND_NONE);
+    }
   }
   else {
     immUniformColor3fv(finalcol);
@@ -429,12 +424,12 @@ void ED_image_draw_info(Scene *scene,
 
     SNPRINTF(str, "V:%-.4f", val);
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
 
     SNPRINTF(str, "   L:%-.4f", lum);
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
   }
   else if (channels >= 3) {
     rgb_to_hsv(finalcol[0], finalcol[1], finalcol[2], &hue, &sat, &val);
@@ -442,22 +437,22 @@ void ED_image_draw_info(Scene *scene,
 
     SNPRINTF(str, "H:%-.4f", hue);
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
 
     SNPRINTF(str, "  S:%-.4f", sat);
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
 
     SNPRINTF(str, "  V:%-.4f", val);
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
     dx += BLF_width(blf_mono_font, str, sizeof(str));
 
     SNPRINTF(str, "   L:%-.4f", lum);
     BLF_position(blf_mono_font, dx, dy, 0);
-    BLF_draw_ascii(blf_mono_font, str, sizeof(str));
+    BLF_draw(blf_mono_font, str, sizeof(str));
   }
 }
 void draw_image_sample_line(SpaceImage *sima)
@@ -504,7 +499,7 @@ void draw_image_main_helpers(const bContext *C, ARegion *region)
   }
 }
 
-bool ED_space_image_show_cache(SpaceImage *sima)
+bool ED_space_image_show_cache(const SpaceImage *sima)
 {
   Image *image = ED_space_image(sima);
   Mask *mask = NULL;
@@ -518,6 +513,17 @@ bool ED_space_image_show_cache(SpaceImage *sima)
     return ELEM(image->source, IMA_SRC_SEQUENCE, IMA_SRC_MOVIE);
   }
   return true;
+}
+
+bool ED_space_image_show_cache_and_mval_over(const SpaceImage *sima,
+                                             ARegion *region,
+                                             const int mval[2])
+{
+  const rcti *rect_visible = ED_region_visible_rect(region);
+  if (mval[1] > rect_visible->ymin + (16 * UI_DPI_FAC)) {
+    return false;
+  }
+  return ED_space_image_show_cache(sima);
 }
 
 void draw_image_cache(const bContext *C, ARegion *region)
@@ -573,4 +579,58 @@ void draw_image_cache(const bContext *C, ARegion *region)
   if (mask != NULL) {
     ED_mask_draw_frames(mask, region, cfra, sfra, efra);
   }
+}
+
+float ED_space_image_zoom_level(const View2D *v2d, const int grid_dimension)
+{
+  /* UV-space length per pixel */
+  float xzoom = (v2d->cur.xmax - v2d->cur.xmin) / ((float)(v2d->mask.xmax - v2d->mask.xmin));
+  float yzoom = (v2d->cur.ymax - v2d->cur.ymin) / ((float)(v2d->mask.ymax - v2d->mask.ymin));
+
+  /* Zoom_factor for UV/Image editor is calculated based on:
+   * - Default grid size on startup, which is 256x256 pixels
+   * - How blend factor for grid lines is set up in the fragment shader `grid_frag.glsl`. */
+  float zoom_factor;
+  zoom_factor = (xzoom + yzoom) / 2.0f; /* Average for accuracy. */
+  zoom_factor *= 256.0f / (powf(grid_dimension, 2));
+  return zoom_factor;
+}
+
+void ED_space_image_grid_steps(SpaceImage *sima,
+                               float grid_steps[SI_GRID_STEPS_LEN],
+                               const int grid_dimension)
+{
+  if (sima->flag & SI_CUSTOM_GRID) {
+    for (int step = 0; step < SI_GRID_STEPS_LEN; step++) {
+      grid_steps[step] = powf(1, step) * (1.0f / ((float)sima->custom_grid_subdiv));
+    }
+  }
+  else {
+    for (int step = 0; step < SI_GRID_STEPS_LEN; step++) {
+      grid_steps[step] = powf(grid_dimension, step) *
+                         (1.0f / (powf(grid_dimension, SI_GRID_STEPS_LEN)));
+    }
+  }
+}
+
+float ED_space_image_increment_snap_value(const int grid_dimesnions,
+                                          const float grid_steps[SI_GRID_STEPS_LEN],
+                                          const float zoom_factor)
+{
+  /* Small offset on each grid_steps[] so that snapping value doesn't change until grid lines are
+   * significantly visible.
+   * `Offset = 3/4 * (grid_steps[i] - (grid_steps[i] / grid_dimesnsions))`
+   *
+   * Refer `grid_frag.glsl` to find out when grid lines actually start appearing */
+
+  for (int step = 0; step < SI_GRID_STEPS_LEN; step++) {
+    float offset = (3.0f / 4.0f) * (grid_steps[step] - (grid_steps[step] / grid_dimesnions));
+
+    if ((grid_steps[step] - offset) > zoom_factor) {
+      return grid_steps[step];
+    }
+  }
+
+  /* Fallback */
+  return grid_steps[0];
 }

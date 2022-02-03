@@ -59,6 +59,18 @@ typedef struct CacheObjectPath {
   char path[4096];
 } CacheObjectPath;
 
+/* CacheFileLayer::flag */
+enum { CACHEFILE_LAYER_HIDDEN = (1 << 0) };
+
+typedef struct CacheFileLayer {
+  struct CacheFileLayer *next, *prev;
+
+  /** 1024 = FILE_MAX. */
+  char filepath[1024];
+  int flag;
+  int _pad;
+} CacheFileLayer;
+
 /* CacheFile::velocity_unit
  * Determines what temporal unit is used to interpret velocity vectors for motion blur effects. */
 enum {
@@ -72,6 +84,8 @@ typedef struct CacheFile {
 
   /** Paths of the objects inside of the archive referenced by this CacheFile. */
   ListBase object_paths;
+
+  ListBase layers;
 
   /** 1024 = FILE_MAX. */
   char filepath[1024];
@@ -87,14 +101,32 @@ typedef struct CacheFile {
   /** The frame offset to subtract. */
   float frame_offset;
 
+  char _pad[4];
+
   /** Animation flag. */
   short flag;
-  short draw_flag; /* UNUSED */
 
   /* eCacheFileType enum. */
   char type;
 
-  char _pad[2];
+  /** Do not load data from the cache file and display objects in the scene as boxes, Cycles will
+   * load objects directly from the CacheFile. Other render engines which can load Alembic data
+   * directly can take care of rendering it themselves.
+   */
+  char use_render_procedural;
+
+  char _pad1[3];
+
+  /** Enable data prefetching when using the Cycles Procedural. */
+  char use_prefetch;
+
+  /** Size in megabytes for the prefetch cache used by the Cycles Procedural. */
+  int prefetch_cache_size;
+
+  /** Index of the currently selected layer in the UI, starts at 1. */
+  int active_layer;
+
+  char _pad2[3];
 
   char velocity_unit;
   /* Name of the velocity property in the archive. */

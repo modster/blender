@@ -27,6 +27,7 @@ set(INC
   ../../gpu
   ../../imbuf
   ../../makesdna
+  ../../nodes
   ../../makesrna
   ../../render
   ../../windowmanager
@@ -44,6 +45,7 @@ set(SRC
   paint_hide.c
   paint_image.c
   paint_image_2d.c
+  paint_image_2d_curve_mask.cc
   paint_image_proj.c
   paint_mask.c
   paint_ops.c
@@ -58,6 +60,7 @@ set(SRC
   sculpt.c
   sculpt_automasking.c
   sculpt_boundary.c
+  sculpt_brush_types.c
   sculpt_cloth.c
   sculpt_detail.c
   sculpt_dyntopo.c
@@ -70,6 +73,7 @@ set(SRC
   sculpt_mask_expand.c
   sculpt_mask_init.c
   sculpt_multiplane_scrape.c
+  sculpt_ops.c
   sculpt_paint_color.c
   sculpt_pose.c
   sculpt_smooth.c
@@ -85,10 +89,6 @@ set(LIB
   bf_blenkernel
   bf_blenlib
 )
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
 
 
 blender_add_lib(bf_editor_sculpt_paint "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

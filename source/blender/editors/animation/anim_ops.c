@@ -74,8 +74,23 @@ static bool change_frame_poll(bContext *C)
    * this shouldn't show up in 3D editor (or others without 2D timeline view) via search
    */
   if (area) {
-    if (ELEM(area->spacetype, SPACE_ACTION, SPACE_NLA, SPACE_SEQ, SPACE_CLIP, SPACE_GRAPH)) {
+    if (ELEM(area->spacetype, SPACE_ACTION, SPACE_NLA, SPACE_CLIP)) {
       return true;
+    }
+    if (area->spacetype == SPACE_SEQ) {
+      /* Check the region type so tools (which are shared between preview/strip view)
+       * don't conflict with actions which can have the same key bound (2D cursor for example). */
+      const ARegion *region = CTX_wm_region(C);
+      if (region && region->regiontype == RGN_TYPE_WINDOW) {
+        return true;
+      }
+    }
+    if (area->spacetype == SPACE_GRAPH) {
+      const SpaceGraph *sipo = area->spacedata.first;
+      /* Driver Editor's X axis is not time. */
+      if (sipo->mode != SIPO_MODE_DRIVERS) {
+        return true;
+      }
     }
   }
 
@@ -105,7 +120,7 @@ static void seq_frame_snap_update_best(const int position,
 static int seq_frame_apply_snap(bContext *C, Scene *scene, const int timeline_frame)
 {
 
-  ListBase *seqbase = SEQ_active_seqbase_get(SEQ_editing_get(scene, false));
+  ListBase *seqbase = SEQ_active_seqbase_get(SEQ_editing_get(scene));
   SeqCollection *strips = SEQ_query_all_strips(seqbase);
 
   int best_frame = 0;
@@ -134,7 +149,7 @@ static void change_frame_apply(bContext *C, wmOperator *op)
   bool do_snap = RNA_boolean_get(op->ptr, "snap");
 
   if (do_snap) {
-    if (CTX_wm_space_seq(C)) {
+    if (CTX_wm_space_seq(C) && SEQ_editing_get(scene) != NULL) {
       frame = seq_frame_apply_snap(C, scene, frame);
     }
     else {
@@ -154,7 +169,7 @@ static void change_frame_apply(bContext *C, wmOperator *op)
   FRAMENUMBER_MIN_CLAMP(CFRA);
 
   /* do updates */
-  DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
+  DEG_id_tag_update(&scene->id, ID_RECALC_FRAME_CHANGE);
   WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
 }
 
@@ -241,6 +256,11 @@ static bool use_sequencer_snapping(bContext *C)
 /* Modal Operator init */
 static int change_frame_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
+  ARegion *region = CTX_wm_region(C);
+  if (CTX_wm_space_seq(C) != NULL && region->regiontype == RGN_TYPE_PREVIEW) {
+    return OPERATOR_CANCELLED;
+  }
+
   /* Change to frame that mouse is over before adding modal handler,
    * as user could click on a single frame (jump to frame) as well as
    * click-dragging over a range (modal scrubbing).

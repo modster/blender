@@ -58,6 +58,7 @@
 #include "DEG_depsgraph.h"
 
 #include "view3d_intern.h" /* own include */
+#include "view3d_navigate.h"
 
 /* -------------------------------------------------------------------- */
 /** \name Modal Key-map
@@ -101,7 +102,6 @@ typedef enum eFlyPanState {
   FLY_AXISLOCK_STATE_ACTIVE = 2,
 } eFlyPanState;
 
-/* Called in transform_ops.c, on each regeneration of key-maps. */
 void fly_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -539,7 +539,7 @@ static void flyEvent(FlyInfo *fly, const wmEvent *event)
 
       /* Speed adjusting with mouse-pan (track-pad). */
       case FLY_MODAL_SPEED: {
-        float fac = 0.02f * (event->prevy - event->y);
+        float fac = 0.02f * (event->prev_xy[1] - event->xy[1]);
 
         /* allowing to brake immediate */
         if (fac > 0.0f && fly->speed < 0.0f) {
@@ -1103,9 +1103,9 @@ static int fly_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else
 #endif /* WITH_INPUT_NDOF */
-      if (event->type == TIMER && event->customdata == fly->timer) {
-    flyApply(C, fly, false);
-  }
+    if (event->type == TIMER && event->customdata == fly->timer) {
+      flyApply(C, fly, false);
+    }
 
   do_draw |= fly->redraw;
 

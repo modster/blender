@@ -305,8 +305,6 @@ typedef enum eGp_Vertex_Mode {
 typedef enum eGP_Sculpt_Flag {
   /* invert the effect of the brush */
   GP_SCULPT_FLAG_INVERT = (1 << 0),
-  /* smooth brush affects pressure values as well */
-  GP_SCULPT_FLAG_SMOOTH_PRESSURE = (1 << 2),
   /* temporary invert action */
   GP_SCULPT_FLAG_TMP_INVERT = (1 << 3),
 } eGP_Sculpt_Flag;
@@ -524,7 +522,7 @@ typedef enum eBrushUVSculptTool {
         SCULPT_TOOL_SLIDE_RELAX, \
         SCULPT_TOOL_MASK) == 0)
 
-/* ImagePaintSettings.tool */
+/** #ImagePaintSettings.tool */
 typedef enum eBrushImagePaintTool {
   PAINT_TOOL_DRAW = 0,
   PAINT_TOOL_SOFTEN = 1,
@@ -534,6 +532,9 @@ typedef enum eBrushImagePaintTool {
   PAINT_TOOL_MASK = 5,
 } eBrushImagePaintTool;
 
+/* The enums here should be kept in sync with the weight paint tool.
+ * This is because #smooth_brush_toggle_on and #smooth_brush_toggle_off
+ * assumes that the blur brush has the same enum value. */
 typedef enum eBrushVertexPaintTool {
   VPAINT_TOOL_DRAW = 0,
   VPAINT_TOOL_BLUR = 1,
@@ -541,6 +542,7 @@ typedef enum eBrushVertexPaintTool {
   VPAINT_TOOL_SMEAR = 3,
 } eBrushVertexPaintTool;
 
+/* See #eBrushVertexPaintTool when changing this definition. */
 typedef enum eBrushWeightPaintTool {
   WPAINT_TOOL_DRAW = 0,
   WPAINT_TOOL_BLUR = 1,

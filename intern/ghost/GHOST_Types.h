@@ -496,8 +496,6 @@ typedef struct {
   int target_start;
   /** Represents the position of the end of the selection */
   int target_end;
-  /** custom temporal data */
-  GHOST_TUserDataPtr tmp;
 } GHOST_TEventImeData;
 
 typedef struct {
@@ -569,6 +567,7 @@ typedef enum {
   GHOST_kUserSpecialDirMusic,
   GHOST_kUserSpecialDirPictures,
   GHOST_kUserSpecialDirVideos,
+  GHOST_kUserSpecialDirCaches,
   /* Can be extended as needed. */
 } GHOST_TUserSpecialDirTypes;
 
@@ -652,6 +651,11 @@ typedef struct {
 enum {
   GHOST_kXrContextDebug = (1 << 0),
   GHOST_kXrContextDebugTime = (1 << 1),
+#  ifdef WIN32
+  /* Needed to avoid issues with the SteamVR OpenGL graphics binding
+   * (use DirectX fallback instead). */
+  GHOST_kXrContextGpuNVIDIA = (1 << 2),
+#  endif
 };
 
 typedef struct {
@@ -669,6 +673,14 @@ typedef struct {
   void *exit_customdata;
 } GHOST_XrSessionBeginInfo;
 
+/** Texture format for XR swapchain. */
+typedef enum GHOST_TXrSwapchainFormat {
+  GHOST_kXrSwapchainFormatRGBA8,
+  GHOST_kXrSwapchainFormatRGBA16,
+  GHOST_kXrSwapchainFormatRGBA16F,
+  GHOST_kXrSwapchainFormatRGB10_A2,
+} GHOST_TXrSwapchainFormat;
+
 typedef struct GHOST_XrDrawViewInfo {
   int ofsx, ofsy;
   int width, height;
@@ -681,6 +693,7 @@ typedef struct GHOST_XrDrawViewInfo {
     float angle_up, angle_down;
   } fov;
 
+  GHOST_TXrSwapchainFormat swapchain_format;
   /** Set if the buffer should be submitted with a SRGB transfer applied. */
   char expects_srgb_buffer;
 
@@ -739,8 +752,31 @@ typedef struct GHOST_XrActionProfileInfo {
   const char *profile_path;
   uint32_t count_subaction_paths;
   const char **subaction_paths;
-  /* Bindings for each subaction path. */
+  /** Bindings for each subaction path. */
   const GHOST_XrActionBindingInfo *bindings;
 } GHOST_XrActionProfileInfo;
+
+typedef struct GHOST_XrControllerModelVertex {
+  float position[3];
+  float normal[3];
+} GHOST_XrControllerModelVertex;
+
+typedef struct GHOST_XrControllerModelComponent {
+  /** World space transform. */
+  float transform[4][4];
+  uint32_t vertex_offset;
+  uint32_t vertex_count;
+  uint32_t index_offset;
+  uint32_t index_count;
+} GHOST_XrControllerModelComponent;
+
+typedef struct GHOST_XrControllerModelData {
+  uint32_t count_vertices;
+  const GHOST_XrControllerModelVertex *vertices;
+  uint32_t count_indices;
+  const uint32_t *indices;
+  uint32_t count_components;
+  const GHOST_XrControllerModelComponent *components;
+} GHOST_XrControllerModelData;
 
 #endif /* WITH_XR_OPENXR */

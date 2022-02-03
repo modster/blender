@@ -26,6 +26,8 @@
 
 #include "BLI_utildefines.h"
 
+#include "BKE_node_tree_update.h"
+
 #include "RNA_define.h"
 #include "rna_internal.h"
 
@@ -189,7 +191,7 @@ static char *rna_ColorRamp_path(PointerRNA *ptr)
                    SH_NODE_VALTORGB,
                    CMP_NODE_VALTORGB,
                    TEX_NODE_VALTORGB,
-                   GEO_NODE_ATTRIBUTE_COLOR_RAMP)) {
+                   GEO_NODE_LEGACY_ATTRIBUTE_COLOR_RAMP)) {
             if (node->storage == ptr->data) {
               /* all node color ramp properties called 'color_ramp'
                * prepend path from ID to the node
@@ -320,8 +322,9 @@ static void rna_ColorRamp_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *
                    SH_NODE_VALTORGB,
                    CMP_NODE_VALTORGB,
                    TEX_NODE_VALTORGB,
-                   GEO_NODE_ATTRIBUTE_COLOR_RAMP)) {
-            ED_node_tag_update_nodetree(bmain, ntree, node);
+                   GEO_NODE_LEGACY_ATTRIBUTE_COLOR_RAMP)) {
+            BKE_ntree_update_tag_node_property(ntree, node);
+            ED_node_tree_propagate_change(NULL, bmain, ntree);
           }
         }
         break;
@@ -597,6 +600,27 @@ static const EnumPropertyItem *rna_ColorManagedColorspaceSettings_colorspace_ite
   return items;
 }
 
+typedef struct Seq_colorspace_cb_data {
+  ColorManagedColorspaceSettings *colorspace_settings;
+  Sequence *r_seq;
+} Seq_colorspace_cb_data;
+
+static bool seq_find_colorspace_settings_cb(Sequence *seq, void *user_data)
+{
+  Seq_colorspace_cb_data *cd = (Seq_colorspace_cb_data *)user_data;
+  if (seq->strip && &seq->strip->colorspace_settings == cd->colorspace_settings) {
+    cd->r_seq = seq;
+    return false;
+  }
+  return true;
+}
+
+static bool seq_free_anim_cb(Sequence *seq, void *UNUSED(user_data))
+{
+  SEQ_relations_sequence_free_anim(seq);
+  return true;
+}
+
 static void rna_ColorManagedColorspaceSettings_reload_update(Main *bmain,
                                                              Scene *UNUSED(scene),
                                                              PointerRNA *ptr)
@@ -629,20 +653,14 @@ static void rna_ColorManagedColorspaceSettings_reload_update(Main *bmain,
     if (scene->ed) {
       ColorManagedColorspaceSettings *colorspace_settings = (ColorManagedColorspaceSettings *)
                                                                 ptr->data;
-      Sequence *seq;
-      bool seq_found = false;
+      Seq_colorspace_cb_data cb_data = {colorspace_settings, NULL};
 
       if (&scene->sequencer_colorspace_settings != colorspace_settings) {
-        SEQ_ALL_BEGIN (scene->ed, seq) {
-          if (seq->strip && &seq->strip->colorspace_settings == colorspace_settings) {
-            seq_found = true;
-            break;
-          }
-        }
-        SEQ_ALL_END;
+        SEQ_for_each_callback(&scene->ed->seqbase, seq_find_colorspace_settings_cb, &cb_data);
       }
+      Sequence *seq = cb_data.r_seq;
 
-      if (seq_found) {
+      if (seq) {
         SEQ_relations_sequence_free_anim(seq);
 
         if (seq->strip->proxy && seq->strip->proxy->anim) {
@@ -653,10 +671,7 @@ static void rna_ColorManagedColorspaceSettings_reload_update(Main *bmain,
         SEQ_relations_invalidate_cache_raw(scene, seq);
       }
       else {
-        SEQ_ALL_BEGIN (scene->ed, seq) {
-          SEQ_relations_sequence_free_anim(seq);
-        }
-        SEQ_ALL_END;
+        SEQ_for_each_callback(&scene->ed->seqbase, seq_free_anim_cb, NULL);
       }
 
       WM_main_add_notifier(NC_SCENE | ND_SEQUENCER, NULL);
@@ -701,11 +716,7 @@ static float rna_CurveMapping_evaluateF(struct CurveMapping *cumap,
   }
 
   if (!cuma->table) {
-    BKE_report(
-        reports,
-        RPT_ERROR,
-        "CurveMap table not initialized, call initialize() on CurveMapping owner of the CurveMap");
-    return 0.0f;
+    BKE_curvemapping_init(cumap);
   }
   return BKE_curvemap_evaluateF(cumap, cuma, value);
 }

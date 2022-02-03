@@ -78,6 +78,7 @@
 #include "IMB_imbuf.h" /* for proxy / time-code versioning stuff. */
 
 #include "NOD_common.h"
+#include "NOD_composite.h"
 #include "NOD_texture.h"
 
 #include "BLO_readfile.h"
@@ -661,6 +662,53 @@ static void do_versions_nodetree_customnodes(bNodeTree *ntree, int UNUSED(is_gro
                      sizeof(sock->identifier));
     }
   }
+}
+
+static bool seq_colorbalance_update_cb(Sequence *seq, void *UNUSED(user_data))
+{
+  Strip *strip = seq->strip;
+
+  if (strip && strip->color_balance) {
+    SequenceModifierData *smd;
+    ColorBalanceModifierData *cbmd;
+
+    smd = SEQ_modifier_new(seq, NULL, seqModifierType_ColorBalance);
+    cbmd = (ColorBalanceModifierData *)smd;
+
+    cbmd->color_balance = *strip->color_balance;
+
+    /* multiplication with color balance used is handled differently,
+     * so we need to move multiplication to modifier so files would be
+     * compatible
+     */
+    cbmd->color_multiply = seq->mul;
+    seq->mul = 1.0f;
+
+    MEM_freeN(strip->color_balance);
+    strip->color_balance = NULL;
+  }
+  return true;
+}
+
+static bool seq_set_alpha_mode_cb(Sequence *seq, void *UNUSED(user_data))
+{
+  enum { SEQ_MAKE_PREMUL = (1 << 6) };
+  if (seq->flag & SEQ_MAKE_PREMUL) {
+    seq->alpha_mode = SEQ_ALPHA_STRAIGHT;
+  }
+  else {
+    SEQ_alpha_mode_from_file_extension(seq);
+  }
+  return true;
+}
+
+static bool seq_set_wipe_angle_cb(Sequence *seq, void *UNUSED(user_data))
+{
+  if (seq->type == SEQ_TYPE_WIPE) {
+    WipeVars *wv = seq->effectdata;
+    wv->angle = DEG2RADF(wv->angle);
+  }
+  return true;
 }
 
 /* NOLINTNEXTLINE: readability-function-size */
@@ -1337,7 +1385,6 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
             tex->iuser.frames = 1;
             tex->iuser.sfra = 1;
-            tex->iuser.ok = 1;
           }
         }
       }
@@ -1492,32 +1539,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
     for (scene = bmain->scenes.first; scene; scene = scene->id.next) {
       if (scene->ed) {
-        Sequence *seq;
-
-        SEQ_ALL_BEGIN (scene->ed, seq) {
-          Strip *strip = seq->strip;
-
-          if (strip && strip->color_balance) {
-            SequenceModifierData *smd;
-            ColorBalanceModifierData *cbmd;
-
-            smd = SEQ_modifier_new(seq, NULL, seqModifierType_ColorBalance);
-            cbmd = (ColorBalanceModifierData *)smd;
-
-            cbmd->color_balance = *strip->color_balance;
-
-            /* multiplication with color balance used is handled differently,
-             * so we need to move multiplication to modifier so files would be
-             * compatible
-             */
-            cbmd->color_multiply = seq->mul;
-            seq->mul = 1.0f;
-
-            MEM_freeN(strip->color_balance);
-            strip->color_balance = NULL;
-          }
-        }
-        SEQ_ALL_END;
+        SEQ_for_each_callback(&scene->ed->seqbase, seq_colorbalance_update_cb, NULL);
       }
     }
   }
@@ -1778,7 +1800,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
             }
             case SPACE_SEQ: {
               SpaceSeq *sseq = (SpaceSeq *)sl;
-              sseq->flag |= SEQ_SHOW_GPENCIL;
+              sseq->flag |= SEQ_PREVIEW_SHOW_GPENCIL;
               break;
             }
             case SPACE_IMAGE: {
@@ -1807,18 +1829,9 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
     Tex *tex;
 
     for (scene = bmain->scenes.first; scene; scene = scene->id.next) {
-      Sequence *seq;
-
-      SEQ_ALL_BEGIN (scene->ed, seq) {
-        enum { SEQ_MAKE_PREMUL = (1 << 6) };
-        if (seq->flag & SEQ_MAKE_PREMUL) {
-          seq->alpha_mode = SEQ_ALPHA_STRAIGHT;
-        }
-        else {
-          SEQ_alpha_mode_from_file_extension(seq);
-        }
+      if (scene->ed) {
+        SEQ_for_each_callback(&scene->ed->seqbase, seq_set_alpha_mode_cb, NULL);
       }
-      SEQ_ALL_END;
 
       if (scene->r.bake_samples == 0) {
         scene->r.bake_samples = 256;
@@ -1880,7 +1893,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
     for (cu = bmain->curves.first; cu; cu = cu->id.next) {
       if (cu->flag & (CU_FRONT | CU_BACK)) {
-        if (cu->ext1 != 0.0f || cu->ext2 != 0.0f) {
+        if (cu->extrude != 0.0f || cu->bevel_radius != 0.0f) {
           Nurb *nu;
 
           for (nu = cu->nurb.first; nu; nu = nu->next) {
@@ -2450,14 +2463,9 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
 
       for (scene = bmain->scenes.first; scene; scene = scene->id.next) {
-        Sequence *seq;
-        SEQ_ALL_BEGIN (scene->ed, seq) {
-          if (seq->type == SEQ_TYPE_WIPE) {
-            WipeVars *wv = seq->effectdata;
-            wv->angle = DEG2RADF(wv->angle);
-          }
+        if (scene->ed) {
+          SEQ_for_each_callback(&scene->ed->seqbase, seq_set_wipe_angle_cb, NULL);
         }
-        SEQ_ALL_END;
       }
 
       FOREACH_NODETREE_BEGIN (bmain, ntree, id) {

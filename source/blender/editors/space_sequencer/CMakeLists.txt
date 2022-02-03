@@ -22,6 +22,7 @@ set(INC
   ../../blenlib
   ../../blentranslation
   ../../depsgraph
+  ../../draw
   ../../gpu
   ../../imbuf
   ../../makesdna
@@ -45,6 +46,7 @@ set(SRC
   sequencer_proxy.c
   sequencer_scopes.c
   sequencer_select.c
+  sequencer_thumbnails.c
   sequencer_view.c
   space_sequencer.c
 
@@ -66,10 +68,6 @@ if(WITH_AUDASPACE)
     ${AUDASPACE_C_LIBRARIES}
     ${AUDASPACE_PY_LIBRARIES}
   )
-endif()
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 

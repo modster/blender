@@ -46,13 +46,7 @@ class VIEW3D_HT_tool_header(Header):
     def draw(self, context):
         layout = self.layout
 
-        layout.row(align=True).template_header()
-
         self.draw_tool_settings(context)
-
-        layout.separator_spacer()
-
-        VIEW3D_HT_header.draw_xform_template(layout, context)
 
         layout.separator_spacer()
 
@@ -604,10 +598,8 @@ class VIEW3D_HT_header(Header):
         tool_settings = context.tool_settings
         view = context.space_data
         shading = view.shading
-        show_region_tool_header = view.show_region_tool_header
 
-        if not show_region_tool_header:
-            layout.row(align=True).template_header()
+        layout.row(align=True).template_header()
 
         row = layout.row(align=True)
         obj = context.active_object
@@ -754,7 +746,7 @@ class VIEW3D_HT_header(Header):
                     )
 
             layout.separator_spacer()
-        elif not show_region_tool_header:
+        else:
             # Transform settings depending on tool header visibility
             VIEW3D_HT_header.draw_xform_template(layout, context)
 
@@ -1362,6 +1354,7 @@ class VIEW3D_MT_select_object(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1422,6 +1415,7 @@ class VIEW3D_MT_select_pose(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1456,6 +1450,7 @@ class VIEW3D_MT_select_particle(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1562,6 +1557,7 @@ class VIEW3D_MT_select_edit_mesh(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1615,6 +1611,7 @@ class VIEW3D_MT_select_edit_curve(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1650,6 +1647,7 @@ class VIEW3D_MT_select_edit_surface(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1711,6 +1709,7 @@ class VIEW3D_MT_select_edit_metaball(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1752,6 +1751,7 @@ class VIEW3D_MT_select_edit_lattice(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1782,6 +1782,7 @@ class VIEW3D_MT_select_edit_armature(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1849,6 +1850,7 @@ class VIEW3D_MT_select_gpencil(Menu):
 
         layout.operator("gpencil.select_box")
         layout.operator("gpencil.select_circle")
+        layout.operator_menu_enum("gpencil.select_lasso", "mode")
 
         layout.separator()
 
@@ -1885,6 +1887,7 @@ class VIEW3D_MT_select_paint_mask(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1905,6 +1908,7 @@ class VIEW3D_MT_select_paint_mask_vertex(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -2222,11 +2226,7 @@ class VIEW3D_MT_object_relations(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        layout.operator("object.proxy_make", text="Make Proxy...")
-
         layout.operator("object.make_override_library", text="Make Library Override...")
-
-        layout.operator("object.convert_proxy_to_override")
 
         layout.operator("object.make_dupli_face")
 
@@ -2263,6 +2263,7 @@ class VIEW3D_MT_object(Menu):
 
         layout.separator()
 
+        layout.menu("VIEW3D_MT_object_asset")
         layout.menu("VIEW3D_MT_object_parent")
         layout.menu("VIEW3D_MT_object_collection")
         layout.menu("VIEW3D_MT_object_relations")
@@ -2756,6 +2757,16 @@ class VIEW3D_MT_object_cleanup(Menu):
 
         layout.operator("object.material_slot_remove_unused", text="Remove Unused Material Slots")
 
+class VIEW3D_MT_object_asset(Menu):
+    bl_label = "Asset"
+
+    def draw(self, _context):
+        layout = self.layout
+
+        layout.operator("asset.mark")
+        layout.operator("asset.clear", text="Clear Asset").set_fake_user = False
+        layout.operator("asset.clear", text="Clear Asset (Set Fake User)").set_fake_user = True
+
 
 class VIEW3D_MT_make_single_user(Menu):
     bl_label = "Make Single User"
@@ -3047,8 +3058,7 @@ class VIEW3D_MT_sculpt(Menu):
 
         layout.separator()
 
-        props = layout.operator("object.transfer_mode", text="Transfer Sculpt Mode")
-        props.use_eyedropper = True
+        layout.operator("object.transfer_mode", text="Transfer Sculpt Mode")
 
 
 class VIEW3D_MT_mask(Menu):
@@ -3441,6 +3451,7 @@ class VIEW3D_MT_pose_slide(Menu):
         layout.operator("pose.push")
         layout.operator("pose.relax")
         layout.operator("pose.breakdown")
+        layout.operator("pose.blend_to_neighbor")
 
 
 class VIEW3D_MT_pose_propagate(Menu):
@@ -3593,11 +3604,14 @@ class VIEW3D_MT_pose_context_menu(Menu):
         layout.operator("pose.push")
         layout.operator("pose.relax")
         layout.operator("pose.breakdown")
+        layout.operator("pose.blend_to_neighbor")
 
         layout.separator()
 
         layout.operator("pose.paths_calculate", text="Calculate Motion Paths")
         layout.operator("pose.paths_clear", text="Clear Motion Paths")
+        layout.operator("pose.paths_update", text="Update Armature Motion Paths")
+        layout.operator("object.paths_update_visible", text="Update All Motion Paths")
 
         layout.separator()
 
@@ -3983,6 +3997,7 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
         layout.operator_context = 'INVOKE_REGION_WIN'
 
         layout.operator("mesh.extrude_vertices_move", text="Extrude Vertices")
+        layout.operator("mesh.dupli_extrude_cursor").rotate_source = True
         layout.operator("mesh.bevel", text="Bevel Vertices").affect = 'VERTICES'
 
         layout.separator()
@@ -4006,6 +4021,10 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
         layout.operator("mesh.vertices_smooth", text="Smooth Vertices").factor = 0.5
         layout.operator("mesh.vertices_smooth_laplacian", text="Smooth Vertices (Laplacian)")
         layout.operator_context = 'INVOKE_REGION_WIN'
+
+        layout.separator()
+
+        layout.operator("transform.vert_crease")
 
         layout.separator()
 
@@ -4414,6 +4433,7 @@ class VIEW3D_MT_edit_curve_ctrlpoints(Menu):
 
         if edit_object.type in {'CURVE', 'SURFACE'}:
             layout.operator("curve.extrude_move")
+            layout.operator("curve.vertex_add")
 
             layout.separator()
 
@@ -4742,6 +4762,7 @@ class VIEW3D_MT_edit_armature(Menu):
         layout.separator()
 
         layout.operator("armature.extrude_move")
+        layout.operator("armature.click_extrude")
 
         if arm.use_mirror_x:
             layout.operator("armature.extrude_forked")
@@ -5971,7 +5992,7 @@ class VIEW3D_PT_shading_render_pass(Panel):
 class VIEW3D_PT_gizmo_display(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
-    bl_label = "Gizmo"
+    bl_label = "Gizmos"
     bl_ui_units_x = 8
 
     def draw(self, context):
@@ -6485,18 +6506,38 @@ class VIEW3D_PT_overlay_sculpt(Panel):
         row.prop(overlay, "sculpt_mode_face_sets_opacity", text="Face Sets")
 
 
-class VIEW3D_PT_overlay_pose(Panel):
+class VIEW3D_PT_overlay_bones(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
     bl_parent_id = 'VIEW3D_PT_overlay'
-    bl_label = "Pose Mode"
+    bl_label = "Bones"
+
+    @staticmethod
+    def is_using_wireframe(context):
+        shading = VIEW3D_PT_shading.get_shading(context)
+
+        if shading.type == 'WIREFRAME' or shading.show_xray:
+            return True
+
+        mode = context.mode
+
+        if mode in {'POSE', 'PAINT_WEIGHT'}:
+            armature = context.pose_object
+        elif mode == 'EDIT_ARMATURE':
+            armature = context.edit_object
+        else:
+            return False
+
+        return armature and armature.display_type == 'WIRE'
 
     @classmethod
     def poll(cls, context):
         mode = context.mode
         return (
             (mode == 'POSE') or
-            (mode == 'PAINT_WEIGHT' and context.pose_object)
+            (mode == 'PAINT_WEIGHT' and context.pose_object) or
+            (mode in {'EDIT_ARMATURE', 'OBJECT'} and
+             VIEW3D_PT_overlay_bones.is_using_wireframe(context))
         )
 
     def draw(self, context):
@@ -6515,9 +6556,12 @@ class VIEW3D_PT_overlay_pose(Panel):
             sub = row.row()
             sub.active = display_all and overlay.show_xray_bone
             sub.prop(overlay, "xray_alpha_bone", text="Fade Geometry")
-        else:
+        elif mode == 'PAINT_WEIGHT':
             row = col.row()
             row.prop(overlay, "show_xray_bone")
+
+        if VIEW3D_PT_overlay_bones.is_using_wireframe(context):
+            col.prop(overlay, "bone_wire_alpha")
 
 
 class VIEW3D_PT_overlay_texture_paint(Panel):
@@ -7533,6 +7577,7 @@ classes = (
     VIEW3D_MT_image_add,
     VIEW3D_MT_object,
     VIEW3D_MT_object_animation,
+    VIEW3D_MT_object_asset,
     VIEW3D_MT_object_rigid_body,
     VIEW3D_MT_object_clear,
     VIEW3D_MT_object_context_menu,
@@ -7685,7 +7730,7 @@ classes = (
     VIEW3D_PT_overlay_texture_paint,
     VIEW3D_PT_overlay_vertex_paint,
     VIEW3D_PT_overlay_weight_paint,
-    VIEW3D_PT_overlay_pose,
+    VIEW3D_PT_overlay_bones,
     VIEW3D_PT_overlay_sculpt,
     VIEW3D_PT_snapping,
     VIEW3D_PT_proportional_edit,

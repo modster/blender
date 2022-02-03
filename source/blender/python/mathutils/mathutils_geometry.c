@@ -1210,7 +1210,7 @@ PyDoc_STRVAR(M_Geometry_tessellate_polygon_doc,
              "\n"
              "   :arg veclist_list: list of polylines\n"
              "   :rtype: list\n");
-/* PolyFill function, uses Blenders scanfill to fill multiple poly lines */
+/* PolyFill function, uses Blenders scan-fill to fill multiple poly lines. */
 static PyObject *M_Geometry_tessellate_polygon(PyObject *UNUSED(self), PyObject *polyLineSeq)
 {
   PyObject *tri_list; /* Return this list of tri's */
@@ -1236,7 +1236,7 @@ static PyObject *M_Geometry_tessellate_polygon(PyObject *UNUSED(self), PyObject 
     polyLine = PySequence_GetItem(polyLineSeq, i);
     if (!PySequence_Check(polyLine)) {
       BKE_displist_free(&dispbase);
-      Py_XDECREF(polyLine); /* may be null so use Py_XDECREF*/
+      Py_XDECREF(polyLine); /* May be null so use #Py_XDECREF. */
       PyErr_SetString(PyExc_TypeError,
                       "One or more of the polylines is not a sequence of mathutils.Vector's");
       return NULL;

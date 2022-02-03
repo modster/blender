@@ -18,8 +18,6 @@
 # All rights reserved.
 # ***** END GPL LICENSE BLOCK *****
 
-setup_libdirs()
-
 blender_include_dirs(
   ../../intern/clog
   ../../intern/glew-mx
@@ -73,8 +71,8 @@ endif()
 
 if(WITH_TBB)
   blender_include_dirs(${TBB_INCLUDE_DIRS})
-  if(NOT APPLE)
-    # APPLE platform uses full paths for linking libraries.
+  if(WIN32)
+    # For pragma that links tbbmalloc_proxy.lib
     link_directories(${LIBDIR}/tbb/lib)
   endif()
 endif()
@@ -515,11 +513,12 @@ if(UNIX AND NOT APPLE)
       DESTINATION "."
     )
 
-    install(
-      PROGRAMS
-      ${CMAKE_SOURCE_DIR}/release/bin/blender-thumbnailer.py
-      DESTINATION "."
-    )
+    if(WITH_BLENDER_THUMBNAILER)
+      install(
+        TARGETS blender-thumbnailer
+        DESTINATION "."
+      )
+    endif()
 
     if(EXISTS ${LIBDIR}/mesa)
       install(DIRECTORY ${LIBDIR}/mesa/lib DESTINATION ".")
@@ -559,10 +558,12 @@ if(UNIX AND NOT APPLE)
       FILES ${CMAKE_SOURCE_DIR}/release/freedesktop/icons/symbolic/apps/blender-symbolic.svg
       DESTINATION share/icons/hicolor/symbolic/apps
     )
-    install(
-      PROGRAMS ${CMAKE_SOURCE_DIR}/release/bin/blender-thumbnailer.py
-      DESTINATION bin
-    )
+    if(WITH_BLENDER_THUMBNAILER)
+      install(
+        TARGETS blender-thumbnailer
+        DESTINATION bin
+      )
+    endif()
     set(BLENDER_TEXT_FILES_DESTINATION share/doc/blender)
   endif()
 
@@ -636,6 +637,36 @@ if(UNIX AND NOT APPLE)
           PATTERN "*.h" EXCLUDE                   # some includes are not in include dirs
           PATTERN "*.a" EXCLUDE                   # ./core/lib/libnpymath.a - for linking, we don't need.
         )
+        install(
+          DIRECTORY ${PYTHON_NUMPY_PATH}/Cython
+          DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}/python${PYTHON_VERSION}/${_suffix}
+          PATTERN ".svn" EXCLUDE
+          PATTERN "__pycache__" EXCLUDE           # * any cache *
+          PATTERN "*.pyc" EXCLUDE                 # * any cache *
+          PATTERN "*.pyo" EXCLUDE                 # * any cache *
+        )
+        install(
+          FILES ${PYTHON_NUMPY_PATH}/cython.py
+          DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}/python${PYTHON_VERSION}/${_suffix}
+        )
+        unset(_suffix)
+      endif()
+
+      if(WITH_PYTHON_INSTALL_ZSTANDARD)
+        # Install to the same directory as the source, so debian-like
+        # distros are happy with their policy.
+        set(_suffix "site-packages")
+        if(${PYTHON_ZSTANDARD_PATH} MATCHES "dist-packages")
+          set(_suffix "dist-packages")
+        endif()
+        install(
+          DIRECTORY ${PYTHON_ZSTANDARD_PATH}/zstandard
+          DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}/python${PYTHON_VERSION}/${_suffix}
+          PATTERN ".svn" EXCLUDE
+          PATTERN "__pycache__" EXCLUDE           # * any cache *
+          PATTERN "*.pyc" EXCLUDE                 # * any cache *
+          PATTERN "*.pyo" EXCLUDE                 # * any cache *
+        )
         unset(_suffix)
       endif()
 
@@ -654,7 +685,11 @@ if(UNIX AND NOT APPLE)
           PATTERN "*.pyo" EXCLUDE                 # * any cache *
         )
         # On some platforms requests does have extra dependencies.
-        set(_requests_deps "certifi" "chardet" "idna" "urllib3")
+        #
+        # Either 'chardet' or 'charset_normalizer" is used, depending on the
+        # version of Python. The code below silently skips the one that's not
+        # available, so we can just list both here.
+        set(_requests_deps "certifi" "chardet" "charset_normalizer" "idna" "urllib3")
         foreach(_requests_dep ${_requests_deps})
           if(EXISTS ${PYTHON_REQUESTS_PATH}/${_requests_dep})
             install(
@@ -956,6 +991,13 @@ elseif(WIN32)
       ${CMAKE_SOURCE_DIR}/release/windows/batch/oculus.json
     DESTINATION "."
   )
+
+  if(WITH_BLENDER_THUMBNAILER)
+    install(
+      TARGETS BlendThumb
+      DESTINATION "."
+    )
+  endif()
 
   if(WITH_DRACO)
     install(

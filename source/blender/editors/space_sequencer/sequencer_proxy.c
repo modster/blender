@@ -56,7 +56,7 @@
 static void seq_proxy_build_job(const bContext *C, ReportList *reports)
 {
   Scene *scene = CTX_data_scene(C);
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
   ScrArea *area = CTX_wm_area(C);
 
   if (ed == NULL) {
@@ -85,7 +85,7 @@ static void seq_proxy_build_job(const bContext *C, ReportList *reports)
     }
 
     bool success = SEQ_proxy_rebuild_context(
-        pj->main, pj->depsgraph, pj->scene, seq, file_list, &pj->queue);
+        pj->main, pj->depsgraph, pj->scene, seq, file_list, &pj->queue, false);
 
     if (!success && (seq->strip->proxy->build_flags & SEQ_PROXY_SKIP_EXISTING) != 0) {
       BKE_reportf(reports, RPT_WARNING, "Overwrite is not checked for %s, skipping", seq->name);
@@ -121,7 +121,7 @@ static int sequencer_rebuild_proxy_exec(bContext *C, wmOperator *UNUSED(op))
   Main *bmain = CTX_data_main(C);
   struct Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
   GSet *file_list;
 
   if (ed == NULL) {
@@ -137,7 +137,7 @@ static int sequencer_rebuild_proxy_exec(bContext *C, wmOperator *UNUSED(op))
       short stop = 0, do_update;
       float progress;
 
-      SEQ_proxy_rebuild_context(bmain, depsgraph, scene, seq, file_list, &queue);
+      SEQ_proxy_rebuild_context(bmain, depsgraph, scene, seq, file_list, &queue, false);
 
       for (link = queue.first; link; link = link->next) {
         struct SeqIndexBuildContext *context = link->data;
@@ -184,7 +184,7 @@ static int sequencer_enable_proxies_invoke(bContext *C,
 static int sequencer_enable_proxies_exec(bContext *C, wmOperator *op)
 {
   Scene *scene = CTX_data_scene(C);
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
   bool proxy_25 = RNA_boolean_get(op->ptr, "proxy_25");
   bool proxy_50 = RNA_boolean_get(op->ptr, "proxy_50");
   bool proxy_75 = RNA_boolean_get(op->ptr, "proxy_75");

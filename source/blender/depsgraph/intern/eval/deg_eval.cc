@@ -41,6 +41,10 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
+#ifdef WITH_PYTHON
+#  include "BPY_extern.h"
+#endif
+
 #include "atomic_ops.h"
 
 #include "intern/depsgraph.h"
@@ -357,23 +361,19 @@ static TaskPool *deg_evaluate_task_pool_create(DepsgraphEvalState *state)
   return BLI_task_pool_create_suspended(state, TASK_PRIORITY_HIGH);
 }
 
-/**
- * Evaluate all nodes tagged for updating,
- * \warning This is usually done as part of main loop, but may also be
- * called from frame-change update.
- *
- * \note Time sources should be all valid!
- */
 void deg_evaluate_on_refresh(Depsgraph *graph)
 {
-  graph_tag_ids_for_visible_update(graph);
-
   /* Nothing to update, early out. */
   if (graph->entry_tags.is_empty()) {
     return;
   }
 
   graph->debug.begin_graph_evaluation();
+
+#ifdef WITH_PYTHON
+  /* Release the GIL so that Python drivers can be evaluated. See T91046. */
+  BPy_BEGIN_ALLOW_THREADS;
+#endif
 
   graph->is_evaluating = true;
   depsgraph_ensure_view_layer(graph);
@@ -414,6 +414,10 @@ void deg_evaluate_on_refresh(Depsgraph *graph)
   /* Clear any uncleared tags - just in case. */
   deg_graph_clear_tags(graph);
   graph->is_evaluating = false;
+
+#ifdef WITH_PYTHON
+  BPy_END_ALLOW_THREADS;
+#endif
 
   graph->debug.end_graph_evaluation();
 }

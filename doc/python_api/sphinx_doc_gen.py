@@ -254,6 +254,8 @@ else:
         "gpu.shader",
         "gpu.state",
         "gpu.texture",
+        "gpu.platform",
+        "gpu.capabilities",
         "gpu_extras",
         "idprop.types",
         "mathutils",
@@ -415,7 +417,8 @@ MODULE_GROUPING = {
 BLENDER_REVISION = str(bpy.app.build_hash, 'utf_8')
 
 # '2.83.0 Beta' or '2.83.0' or '2.83.1'
-BLENDER_VERSION_DOTS = bpy.app.version_string
+BLENDER_VERSION_STRING = bpy.app.version_string
+BLENDER_VERSION_DOTS = "%d.%d" % (bpy.app.version[0], bpy.app.version[1])
 
 if BLENDER_REVISION != "Unknown":
     # SHA1 Git hash
@@ -1037,13 +1040,17 @@ context_type_map = {
     # context_member: (RNA type, is_collection)
     "active_annotation_layer": ("GPencilLayer", False),
     "active_bone": ("EditBone", False),
+    "active_file": ("FileSelectEntry", False),
     "active_gpencil_frame": ("GreasePencilLayer", True),
     "active_gpencil_layer": ("GPencilLayer", True),
     "active_node": ("Node", False),
     "active_object": ("Object", False),
     "active_operator": ("Operator", False),
     "active_pose_bone": ("PoseBone", False),
+    "active_sequence_strip": ("Sequence", False),
     "active_editable_fcurve": ("FCurve", False),
+    "active_nla_strip": ("NlaStrip", False),
+    "active_nla_track": ("NlaTrack", False),
     "annotation_data": ("GreasePencil", False),
     "annotation_data_owner": ("ID", False),
     "armature": ("Armature", False),
@@ -1072,6 +1079,7 @@ context_type_map = {
     "gpencil_data": ("GreasePencil", False),
     "gpencil_data_owner": ("ID", False),
     "hair": ("Hair", False),
+    "id": ("ID", False),
     "image_paint_object": ("Object", False),
     "lattice": ("Lattice", False),
     "light": ("Light", False),
@@ -1094,24 +1102,31 @@ context_type_map = {
     "scene": ("Scene", False),
     "sculpt_object": ("Object", False),
     "selectable_objects": ("Object", True),
+    "selected_asset_files": ("FileSelectEntry", True),
     "selected_bones": ("EditBone", True),
+    "selected_editable_actions": ("Action", True),
     "selected_editable_bones": ("EditBone", True),
     "selected_editable_fcurves": ("FCurve", True),
     "selected_editable_keyframes": ("Keyframe", True),
     "selected_editable_objects": ("Object", True),
     "selected_editable_sequences": ("Sequence", True),
+    "selected_ids": ("ID", True),
+    "selected_files": ("FileSelectEntry", True),
+    "selected_ids": ("ID", True),
     "selected_nla_strips": ("NlaStrip", True),
+    "selected_movieclip_tracks": ("MovieTrackingTrack", True),
     "selected_nodes": ("Node", True),
     "selected_objects": ("Object", True),
     "selected_pose_bones": ("PoseBone", True),
     "selected_pose_bones_from_active_object": ("PoseBone", True),
     "selected_sequences": ("Sequence", True),
+    "selected_visible_actions": ("Action", True),
     "selected_visible_fcurves": ("FCurve", True),
     "sequences": ("Sequence", True),
     "soft_body": ("SoftBodyModifier", False),
     "speaker": ("Speaker", False),
     "texture": ("Texture", False),
-    "texture_slot": ("MaterialTextureSlot", False),
+    "texture_slot": ("TextureSlot", False),
     "texture_user": ("ID", False),
     "texture_user_property": ("Property", False),
     "ui_list": ("UIList", False),
@@ -1196,6 +1211,7 @@ def pycontext2sphinx(basepath):
         "text_context_dir",
         "clip_context_dir",
         "sequencer_context_dir",
+        "file_context_dir",
     )
 
     unique = set()
@@ -1211,7 +1227,10 @@ def pycontext2sphinx(basepath):
         while char_array[i] is not None:
             member = ctypes.string_at(char_array[i]).decode(encoding="ascii")
             fw(".. data:: %s\n\n" % member)
-            member_type, is_seq = context_type_map[member]
+            try:
+                member_type, is_seq = context_type_map[member]
+            except KeyError:
+                raise SystemExit("Error: context key %r not found in context_type_map; update %s" % (member, __file__)) from None
             fw("   :type: %s :class:`bpy.types.%s`\n\n" % ("sequence of " if is_seq else "", member_type))
             unique.add(member)
             i += 1
@@ -1706,11 +1725,11 @@ def write_sphinx_conf_py(basepath):
     fw("import sys, os\n\n")
     fw("extensions = ['sphinx.ext.intersphinx']\n\n")
     fw("intersphinx_mapping = {'blender_manual': ('https://docs.blender.org/manual/en/dev/', None)}\n\n")
-    fw("project = 'Blender %s Python API'\n" % BLENDER_VERSION_DOTS)
+    fw("project = 'Blender %s Python API'\n" % BLENDER_VERSION_STRING)
     fw("master_doc = 'index'\n")
     fw("copyright = u'Blender Foundation'\n")
-    fw("version = '%s'\n" % BLENDER_VERSION_HASH)
-    fw("release = '%s'\n" % BLENDER_VERSION_HASH)
+    fw("version = '%s'\n" % BLENDER_VERSION_DOTS)
+    fw("release = '%s'\n" % BLENDER_VERSION_DOTS)
 
     # Quiet file not in table-of-contents warnings.
     fw("exclude_patterns = [\n")
@@ -1731,6 +1750,7 @@ except ModuleNotFoundError:
 
     fw("if html_theme == 'sphinx_rtd_theme':\n")
     fw("    html_theme_options = {\n")
+    fw("        'display_version': False,\n")
     # fw("        'analytics_id': '',\n")
     # fw("        'collapse_navigation': True,\n")
     fw("        'sticky_navigation': False,\n")
@@ -1744,12 +1764,18 @@ except ModuleNotFoundError:
     fw("html_show_sphinx = False\n")
     fw("html_baseurl = 'https://docs.blender.org/api/current/'\n")
     fw("html_use_opensearch = 'https://docs.blender.org/api/current'\n")
+    fw("html_show_search_summary = True\n")
     fw("html_split_index = True\n")
     fw("html_static_path = ['static']\n")
+    fw("templates_path = ['templates']\n")
+    fw("html_context = {'commit': '%s'}\n" % BLENDER_VERSION_HASH)
     fw("html_extra_path = ['static/favicon.ico', 'static/blender_logo.svg']\n")
     fw("html_favicon = 'static/favicon.ico'\n")
     fw("html_logo = 'static/blender_logo.svg'\n")
     fw("html_last_updated_fmt = '%m/%d/%Y'\n\n")
+    fw("if html_theme == 'sphinx_rtd_theme':\n")
+    fw("    html_css_files = ['css/version_switch.css']\n")
+    fw("    html_js_files = ['js/version_switch.js']\n")
 
     # needed for latex, pdf gen
     fw("latex_elements = {\n")
@@ -1993,13 +2019,15 @@ def write_rst_importable_modules(basepath):
         "blf": "Font Drawing",
         "imbuf": "Image Buffer",
         "imbuf.types": "Image Buffer Types",
-        "gpu": "GPU Shader Module",
+        "gpu": "GPU Module",
         "gpu.types": "GPU Types",
         "gpu.matrix": "GPU Matrix Utilities",
         "gpu.select": "GPU Select Utilities",
         "gpu.shader": "GPU Shader Utilities",
         "gpu.state": "GPU State Utilities",
         "gpu.texture": "GPU Texture Utilities",
+        "gpu.platform": "GPU Platform Utilities",
+        "gpu.capabilities": "GPU Capabilities Utilities",
         "bmesh": "BMesh Module",
         "bmesh.ops": "BMesh Operators",
         "bmesh.types": "BMesh Types",
@@ -2103,6 +2131,9 @@ def copy_handwritten_extra(basepath):
 def copy_theme_assets(basepath):
     shutil.copytree(os.path.join(SCRIPT_DIR, "static"),
                     os.path.join(basepath, "static"),
+                    copy_function=shutil.copy)
+    shutil.copytree(os.path.join(SCRIPT_DIR, "templates"),
+                    os.path.join(basepath, "templates"),
                     copy_function=shutil.copy)
 
 
@@ -2236,7 +2267,7 @@ def main():
     # First monkey patch to load in fake members.
     setup_monkey_patch()
 
-    # Perform changes to Blender it's self.
+    # Perform changes to Blender itself.
     setup_data = setup_blender()
 
     # eventually, create the dirs

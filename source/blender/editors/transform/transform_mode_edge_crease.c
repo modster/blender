@@ -37,8 +37,10 @@
 #include "BLT_translation.h"
 
 #include "transform.h"
-#include "transform_mode.h"
+#include "transform_convert.h"
 #include "transform_snap.h"
+
+#include "transform_mode.h"
 
 /* -------------------------------------------------------------------- */
 /** \name Transform (Crease) Element
@@ -95,7 +97,7 @@ static void applyCrease(TransInfo *t, const int UNUSED(mval[2]))
   int i;
   char str[UI_MAX_DRAW_STR];
 
-  crease = t->values[0];
+  crease = t->values[0] + t->values_modal_offset[0];
 
   CLAMP_MAX(crease, 1.0f);
 
@@ -155,9 +157,9 @@ static void applyCrease(TransInfo *t, const int UNUSED(mval[2]))
   ED_area_status_text(t->area, str);
 }
 
-void initCrease(TransInfo *t)
+static void initCrease_ex(TransInfo *t, int mode)
 {
-  t->mode = TFM_CREASE;
+  t->mode = mode;
   t->transform = applyCrease;
 
   initMouseInputMode(t, &t->mouse, INPUT_SPRING_DELTA);
@@ -174,4 +176,13 @@ void initCrease(TransInfo *t)
   t->flag |= T_NO_CONSTRAINT | T_NO_PROJECT;
 }
 
+void initEgdeCrease(TransInfo *t)
+{
+  initCrease_ex(t, TFM_EDGE_CREASE);
+}
+
+void initVertCrease(TransInfo *t)
+{
+  initCrease_ex(t, TFM_VERT_CREASE);
+}
 /** \} */

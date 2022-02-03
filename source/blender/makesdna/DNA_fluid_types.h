@@ -480,10 +480,6 @@ enum {
   SM_HRES_FULLSAMPLE = 2,
 };
 
-typedef struct FluidDomainVertexVelocity {
-  float vel[3];
-} FluidDomainVertexVelocity;
-
 typedef struct FluidDomainSettings {
 
   /* -- Runtime-only fields (from here on). -- */
@@ -509,8 +505,6 @@ typedef struct FluidDomainSettings {
   struct GPUTexture *tex_flags;
   struct GPUTexture *tex_range_field;
   struct Object *guide_parent;
-  /** Vertex velocities of simulated fluid mesh. */
-  struct FluidDomainVertexVelocity *mesh_velocities;
   struct EffectorWeights *effector_weights;
 
   /* Domain object data. */
@@ -519,7 +513,7 @@ typedef struct FluidDomainSettings {
   float p1[3];          /* End point of BB in local space. */
   float dp0[3];         /* Difference from object center to grid start point. */
   float cell_size[3];   /* Size of simulation cell in local space. */
-  float global_size[3]; /* Global size of domain axises. */
+  float global_size[3]; /* Global size of domain axes. */
   float prev_loc[3];
   int shift[3];         /* Current domain shift in simulation cells. */
   float shift_f[3];     /* Exact domain shift. */
@@ -607,9 +601,8 @@ typedef struct FluidDomainSettings {
   int mesh_smoothen_pos;
   int mesh_smoothen_neg;
   int mesh_scale;
-  int totvert;
   short mesh_generator;
-  char _pad6[6]; /* Unused. */
+  char _pad6[2]; /* Unused. */
 
   /* Secondary particle options. */
   int particle_type;
@@ -701,7 +694,7 @@ typedef struct FluidDomainSettings {
   char openvdb_data_depth;
   char _pad11[7]; /* Unused. */
 
-  /* -- Deprecated / unsed options (below). -- */
+  /* -- Deprecated / unused options (below). -- */
 
   /* View options. */
   int viewsettings;

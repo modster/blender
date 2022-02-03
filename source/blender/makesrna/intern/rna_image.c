@@ -161,12 +161,14 @@ static void rna_ImageUser_update(Main *bmain, Scene *scene, PointerRNA *ptr)
   ImageUser *iuser = ptr->data;
   ID *id = ptr->owner_id;
 
-  BKE_image_user_frame_calc(NULL, iuser, scene->r.cfra);
+  if (scene != NULL) {
+    BKE_image_user_frame_calc(NULL, iuser, scene->r.cfra);
+  }
 
   if (id) {
     if (GS(id->name) == ID_NT) {
       /* Special update for nodetrees to find parent datablock. */
-      ED_node_tag_update_nodetree(bmain, (bNodeTree *)id, NULL);
+      ED_node_tree_propagate_change(NULL, bmain, NULL);
     }
     else {
       /* Update material or texture for render preview. */
@@ -290,15 +292,10 @@ static void rna_UDIMTile_tile_number_set(PointerRNA *ptr, int value)
   ImageTile *tile = (ImageTile *)ptr->data;
   Image *image = (Image *)ptr->owner_id;
 
-  /* The index of the first tile can't be changed. */
-  if (tile->tile_number == 1001) {
-    return;
-  }
-
   /* Check that no other tile already has that number. */
   ImageTile *cur_tile = BKE_image_get_tile(image, value);
-  if (cur_tile == NULL || cur_tile == tile) {
-    tile->tile_number = value;
+  if (cur_tile == NULL) {
+    BKE_image_reassign_tile(image, tile, value);
   }
 }
 
@@ -409,7 +406,7 @@ static void rna_Image_resolution_set(PointerRNA *ptr, const float *values)
 static int rna_Image_bindcode_get(PointerRNA *ptr)
 {
   Image *ima = (Image *)ptr->data;
-  GPUTexture *tex = ima->gputexture[TEXTARGET_2D][0];
+  GPUTexture *tex = ima->gputexture[TEXTARGET_2D][0][IMA_TEXTURE_RESOLUTION_FULL];
   return (tex) ? GPU_texture_opengl_bindcode(tex) : 0;
 }
 
@@ -1110,7 +1107,7 @@ static void rna_def_image(BlenderRNA *brna)
       prop, "Duration", "Duration (in frames) of the image (1 when not a video/sequence)");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
-  /* NOTE about pixels/channels/is_float:
+  /* NOTE: About pixels/channels/is_float:
    * These properties describe how the image is stored internally (inside of ImBuf),
    * not how it was saved to disk or how it'll be saved on disk.
    */

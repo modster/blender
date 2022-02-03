@@ -159,11 +159,25 @@ static bool gather_objects_paths(const IObject &object, ListBase *object_paths)
 
 CacheArchiveHandle *ABC_create_handle(struct Main *bmain,
                                       const char *filename,
+                                      const CacheFileLayer *layers,
                                       ListBase *object_paths)
 {
-  ArchiveReader *archive = new ArchiveReader(bmain, filename);
+  std::vector<const char *> filenames;
+  filenames.push_back(filename);
 
-  if (!archive->valid()) {
+  while (layers) {
+    if ((layers->flag & CACHEFILE_LAYER_HIDDEN) == 0) {
+      filenames.push_back(layers->filepath);
+    }
+    layers = layers->next;
+  }
+
+  /* We need to reverse the order as overriding archives should come first. */
+  std::reverse(filenames.begin(), filenames.end());
+
+  ArchiveReader *archive = ArchiveReader::get(bmain, filenames);
+
+  if (!archive || !archive->valid()) {
     delete archive;
     return nullptr;
   }
@@ -447,9 +461,9 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   WM_set_locked_interface(data->wm, true);
 
-  ArchiveReader *archive = new ArchiveReader(data->bmain, data->filename);
+  ArchiveReader *archive = ArchiveReader::get(data->bmain, {data->filename});
 
-  if (!archive->valid()) {
+  if (!archive || !archive->valid()) {
     data->error_code = ABC_ARCHIVE_FAIL;
     delete archive;
     return;
@@ -460,7 +474,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   /* Decrement the ID ref-count because it is going to be incremented for each
    * modifier and constraint that it will be attached to, so since currently
-   * it is not used by anyone, its use count will off by one. */
+   * it is not used by anyone, its use count will be off by one. */
   id_us_min(&cache_file->id);
 
   cache_file->is_sequence = data->settings.is_sequence;
@@ -663,6 +677,7 @@ bool ABC_import(bContext *C,
                 int sequence_len,
                 int offset,
                 bool validate_meshes,
+                bool always_add_cache_reader,
                 bool as_background_job)
 {
   /* Using new here since MEM_* functions do not call constructor to properly initialize data. */
@@ -681,6 +696,7 @@ bool ABC_import(bContext *C,
   job->settings.sequence_len = sequence_len;
   job->settings.sequence_offset = offset;
   job->settings.validate_meshes = validate_meshes;
+  job->settings.always_add_cache_reader = always_add_cache_reader;
   job->error_code = ABC_NO_ERROR;
   job->was_cancelled = false;
   job->archive = nullptr;
@@ -784,7 +800,9 @@ Mesh *ABC_read_mesh(CacheReader *reader,
                     Mesh *existing_mesh,
                     const float time,
                     const char **err_str,
-                    int read_flag)
+                    const int read_flag,
+                    const char *velocity_name,
+                    const float velocity_scale)
 {
   AbcObjectReader *abc_reader = get_abc_reader(reader, ob, err_str);
   if (abc_reader == nullptr) {
@@ -792,7 +810,8 @@ Mesh *ABC_read_mesh(CacheReader *reader,
   }
 
   ISampleSelector sample_sel = sample_selector_for_time(time);
-  return abc_reader->read_mesh(existing_mesh, sample_sel, read_flag, err_str);
+  return abc_reader->read_mesh(
+      existing_mesh, sample_sel, read_flag, velocity_name, velocity_scale, err_str);
 }
 
 bool ABC_mesh_topology_changed(
@@ -857,137 +876,4 @@ CacheReader *CacheReader_open_alembic_object(CacheArchiveHandle *handle,
   abc_reader->incref();
 
   return reinterpret_cast<CacheReader *>(abc_reader);
-}
-
-/* ************************************************************************** */
-
-static const PropertyHeader *get_property_header(const IPolyMeshSchema &schema, const char *name)
-{
-  const PropertyHeader *prop_header = schema.getPropertyHeader(name);
-
-  if (prop_header) {
-    return prop_header;
-  }
-
-  ICompoundProperty prop = schema.getArbGeomParams();
-
-  if (!has_property(prop, name)) {
-    return nullptr;
-  }
-
-  return prop.getPropertyHeader(name);
-}
-
-bool ABC_has_vec3_array_property_named(struct CacheReader *reader, const char *name)
-{
-  AbcObjectReader *abc_reader = reinterpret_cast<AbcObjectReader *>(reader);
-
-  if (!abc_reader) {
-    return false;
-  }
-
-  IObject iobject = abc_reader->iobject();
-
-  if (!iobject.valid()) {
-    return false;
-  }
-
-  const ObjectHeader &header = iobject.getHeader();
-
-  if (!IPolyMesh::matches(header)) {
-    return false;
-  }
-
-  IPolyMesh mesh(iobject, kWrapExisting);
-  IPolyMeshSchema schema = mesh.getSchema();
-
-  const PropertyHeader *prop_header = get_property_header(schema, name);
-
-  if (!prop_header) {
-    return false;
-  }
-
-  return IV3fArrayProperty::matches(prop_header->getMetaData());
-}
-
-static V3fArraySamplePtr get_velocity_prop(const IPolyMeshSchema &schema,
-                                           const ISampleSelector &iss,
-                                           const std::string &name)
-{
-  const PropertyHeader *prop_header = schema.getPropertyHeader(name);
-
-  if (prop_header) {
-    const IV3fArrayProperty &velocity_prop = IV3fArrayProperty(schema, name, 0);
-    return velocity_prop.getValue(iss);
-  }
-
-  ICompoundProperty prop = schema.getArbGeomParams();
-
-  if (!has_property(prop, name)) {
-    return V3fArraySamplePtr();
-  }
-
-  const IV3fArrayProperty &velocity_prop = IV3fArrayProperty(prop, name, 0);
-
-  if (velocity_prop) {
-    return velocity_prop.getValue(iss);
-  }
-
-  return V3fArraySamplePtr();
-}
-
-int ABC_read_velocity_cache(CacheReader *reader,
-                            const char *velocity_name,
-                            const float time,
-                            float velocity_scale,
-                            int num_vertices,
-                            float *r_vertex_velocities)
-{
-  AbcObjectReader *abc_reader = reinterpret_cast<AbcObjectReader *>(reader);
-
-  if (!abc_reader) {
-    return -1;
-  }
-
-  IObject iobject = abc_reader->iobject();
-
-  if (!iobject.valid()) {
-    return -1;
-  }
-
-  const ObjectHeader &header = iobject.getHeader();
-
-  if (!IPolyMesh::matches(header)) {
-    return -1;
-  }
-
-  IPolyMesh mesh(iobject, kWrapExisting);
-  IPolyMeshSchema schema = mesh.getSchema();
-  ISampleSelector sample_sel(time);
-  const IPolyMeshSchema::Sample sample = schema.getValue(sample_sel);
-
-  V3fArraySamplePtr velocities = get_velocity_prop(schema, sample_sel, velocity_name);
-
-  if (!velocities) {
-    return -1;
-  }
-
-  float vel[3];
-
-  int num_velocity_vectors = static_cast<int>(velocities->size());
-
-  if (num_velocity_vectors != num_vertices) {
-    return -1;
-  }
-
-  for (size_t i = 0; i < velocities->size(); ++i) {
-    const Imath::V3f &vel_in = (*velocities)[i];
-    copy_zup_from_yup(vel, vel_in.getValue());
-
-    mul_v3_fl(vel, velocity_scale);
-
-    copy_v3_v3(r_vertex_velocities + i * 3, vel);
-  }
-
-  return num_vertices;
 }

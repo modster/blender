@@ -16,6 +16,7 @@
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
+  ../asset
   ../include
   ../../blenfont
   ../../blenkernel
@@ -34,7 +35,9 @@ set(INC
 )
 
 set(SRC
+  asset_catalog_tree_view.cc
   file_draw.c
+  file_indexer.cc
   file_ops.c
   file_panels.c
   file_utils.c
@@ -43,12 +46,14 @@ set(SRC
   fsmenu.c
   space_file.c
 
+  file_indexer.h
   file_intern.h
   filelist.h
   fsmenu.h
 )
 
 set(LIB
+  bf_blenkernel
 )
 
 if(WITH_HEADLESS)
@@ -85,10 +90,6 @@ endif()
 
 if(WITH_IMAGE_HDR)
   add_definitions(-DWITH_HDR)
-endif()
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 

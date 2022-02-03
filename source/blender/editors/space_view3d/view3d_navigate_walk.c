@@ -58,6 +58,7 @@
 #include "DEG_depsgraph.h"
 
 #include "view3d_intern.h" /* own include */
+#include "view3d_navigate.h"
 
 #ifdef WITH_INPUT_NDOF
 //#  define NDOF_WALK_DEBUG
@@ -142,7 +143,6 @@ typedef enum eWalkLockState {
   WALK_AXISLOCK_STATE_DONE = 3,
 } eWalkLockState;
 
-/* Called in transform_ops.c, on each regeneration of key-maps. */
 void walk_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -423,6 +423,7 @@ static bool walk_floor_distance_get(RegionView3D *rv3d,
   ret = ED_transform_snap_object_project_ray(
       walk->snap_context,
       walk->depsgraph,
+      walk->v3d,
       &(const struct SnapObjectParams){
           .snap_select = SNAP_ALL,
           /* Avoid having to convert the edit-mesh to a regular mesh. */
@@ -464,6 +465,7 @@ static bool walk_ray_cast(RegionView3D *rv3d,
 
   ret = ED_transform_snap_object_project_ray(walk->snap_context,
                                              walk->depsgraph,
+                                             walk->v3d,
                                              &(const struct SnapObjectParams){
                                                  .snap_select = SNAP_ALL,
                                              },
@@ -602,8 +604,7 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
 
   walk->rv3d->rflag |= RV3D_NAVIGATING;
 
-  walk->snap_context = ED_transform_snap_object_context_create_view3d(
-      walk->scene, 0, walk->region, walk->v3d);
+  walk->snap_context = ED_transform_snap_object_context_create(walk->scene, 0);
 
   walk->v3d_camera_control = ED_view3d_cameracontrol_acquire(
       walk->depsgraph, walk->scene, walk->v3d, walk->rv3d);
@@ -1486,9 +1487,9 @@ static int walk_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else
 #endif /* WITH_INPUT_NDOF */
-      if (event->type == TIMER && event->customdata == walk->timer) {
-    walkApply(C, walk, false);
-  }
+    if (event->type == TIMER && event->customdata == walk->timer) {
+      walkApply(C, walk, false);
+    }
 
   do_draw |= walk->redraw;
 

@@ -25,46 +25,19 @@
 
 #include "node_geometry_util.hh"
 
-using blender::fn::GVArray_For_GSpan;
-using blender::fn::GVArray_For_Span;
-using blender::fn::GVArray_Typed;
+namespace blender::nodes::node_geo_curve_subdivide_cc {
 
-static bNodeSocketTemplate geo_node_curve_subdivide_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("Cuts")},
-    {SOCK_INT, N_("Cuts"), 1, 0, 0, 0, 0, 1000},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate geo_node_curve_subdivide_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
-
-static void geo_node_curve_subdivide_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "cuts_type", 0, IFACE_("Cuts"), ICON_NONE);
-}
-
-static void geo_node_curve_subdivide_init(bNodeTree *UNUSED(tree), bNode *node)
-{
-  NodeGeometryCurveSubdivide *data = (NodeGeometryCurveSubdivide *)MEM_callocN(
-      sizeof(NodeGeometryCurveSubdivide), __func__);
-
-  data->cuts_type = GEO_NODE_ATTRIBUTE_INPUT_INTEGER;
-  node->storage = data;
-}
-
-namespace blender::nodes {
-
-static void geo_node_curve_subdivide_update(bNodeTree *UNUSED(ntree), bNode *node)
-{
-  NodeGeometryPointTranslate &node_storage = *(NodeGeometryPointTranslate *)node->storage;
-
-  update_attribute_input_socket_availabilities(
-      *node, "Cuts", (GeometryNodeAttributeInputMode)node_storage.input_type);
+  b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
+  b.add_input<decl::Int>(N_("Cuts"))
+      .default_value(1)
+      .min(0)
+      .max(1000)
+      .supports_field()
+      .description(
+          N_("The number of control points to create on the segment following each point"));
+  b.add_output<decl::Geometry>(N_("Curve"));
 }
 
 static Array<int> get_subdivided_offsets(const Spline &spline,
@@ -92,9 +65,9 @@ static void subdivide_attribute(Span<T> src,
     for (const int i : range) {
       const int cuts = offsets[i + 1] - offsets[i];
       dst[offsets[i]] = src[i];
-      const float factor_delta = 1.0f / (cuts + 1.0f);
+      const float factor_delta = cuts == 0 ? 1.0f : 1.0f / cuts;
       for (const int cut : IndexRange(cuts)) {
-        const float factor = (cut + 1) * factor_delta;
+        const float factor = cut * factor_delta;
         dst[offsets[i] + cut] = attribute_math::mix2(factor, src[i], src[i + 1]);
       }
     }
@@ -104,9 +77,9 @@ static void subdivide_attribute(Span<T> src,
     const int i = src_size - 1;
     const int cuts = offsets[i + 1] - offsets[i];
     dst[offsets[i]] = src.last();
-    const float factor_delta = 1.0f / (cuts + 1.0f);
+    const float factor_delta = cuts == 0 ? 1.0f : 1.0f / cuts;
     for (const int cut : IndexRange(cuts)) {
-      const float factor = (cut + 1) * factor_delta;
+      const float factor = cut * factor_delta;
       dst[offsets[i] + cut] = attribute_math::mix2(factor, src.last(), src.first());
     }
   }
@@ -287,16 +260,16 @@ static void subdivide_dynamic_attributes(const Spline &src_spline,
 {
   const bool is_cyclic = src_spline.is_cyclic();
   src_spline.attributes.foreach_attribute(
-      [&](StringRefNull name, const AttributeMetaData &meta_data) {
-        std::optional<GSpan> src = src_spline.attributes.get_for_read(name);
+      [&](const bke::AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+        std::optional<GSpan> src = src_spline.attributes.get_for_read(attribute_id);
         BLI_assert(src);
 
-        if (!dst_spline.attributes.create(name, meta_data.data_type)) {
+        if (!dst_spline.attributes.create(attribute_id, meta_data.data_type)) {
           /* Since the source spline of the same type had the attribute, adding it should work. */
           BLI_assert_unreachable();
         }
 
-        std::optional<GMutableSpan> dst = dst_spline.attributes.get_for_write(name);
+        std::optional<GMutableSpan> dst = dst_spline.attributes.get_for_write(attribute_id);
         BLI_assert(dst);
 
         attribute_math::convert_to_static_type(dst->type(), [&](auto dummy) {
@@ -312,8 +285,12 @@ static SplinePtr subdivide_spline(const Spline &spline,
                                   const VArray<int> &cuts,
                                   const int spline_offset)
 {
-  /* Since we expect to access each value many times, it should be worth it to make sure the
-   * attribute is a real span (especially considering the note below). Using the offset at each
+  if (spline.size() <= 1) {
+    return spline.copy();
+  }
+
+  /* Since we expect to access each value many times, it should be worth it to make sure count
+   * of cuts is a real span (especially considering the note below). Using the offset at each
    * point facilitates subdividing in parallel later. */
   Array<int> offsets = get_subdivided_offsets(spline, cuts, spline_offset);
   const int result_size = offsets.last() + int(!spline.is_cyclic());
@@ -351,45 +328,45 @@ static std::unique_ptr<CurveEval> subdivide_curve(const CurveEval &input_curve,
   return output_curve;
 }
 
-static void geo_node_subdivide_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
+  Field<int> cuts_field = params.extract_input<Field<int>>("Cuts");
 
-  geometry_set = bke::geometry_set_realize_instances(geometry_set);
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    if (!geometry_set.has_curve()) {
+      return;
+    }
 
-  if (!geometry_set.has_curve()) {
-    params.set_output("Geometry", geometry_set);
-    return;
-  }
+    const CurveComponent &component = *geometry_set.get_component_for_read<CurveComponent>();
+    GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
+    const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
 
-  const CurveComponent &component = *geometry_set.get_component_for_read<CurveComponent>();
-  GVArray_Typed<int> cuts = params.get_input_attribute<int>(
-      "Cuts", component, ATTR_DOMAIN_POINT, 0);
-  if (cuts->is_single() && cuts->get_internal_single() < 1) {
-    params.set_output("Geometry", geometry_set);
-    return;
-  }
+    fn::FieldEvaluator evaluator{field_context, domain_size};
+    evaluator.add(cuts_field);
+    evaluator.evaluate();
+    const VArray<int> &cuts = evaluator.get_evaluated<int>(0);
 
-  std::unique_ptr<CurveEval> output_curve = subdivide_curve(*component.get_for_read(), *cuts);
+    if (cuts.is_single() && cuts.get_internal_single() < 1) {
+      return;
+    }
 
-  params.set_output("Geometry", GeometrySet::create_with_curve(output_curve.release()));
+    std::unique_ptr<CurveEval> output_curve = subdivide_curve(*component.get_for_read(), cuts);
+    geometry_set.replace_curve(output_curve.release());
+  });
+  params.set_output("Curve", geometry_set);
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_curve_subdivide_cc
 
 void register_node_type_geo_curve_subdivide()
 {
+  namespace file_ns = blender::nodes::node_geo_curve_subdivide_cc;
+
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_SUBDIVIDE, "Curve Subdivide", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_curve_subdivide_in, geo_node_curve_subdivide_out);
-  ntype.draw_buttons = geo_node_curve_subdivide_layout;
-  node_type_storage(&ntype,
-                    "NodeGeometryCurveSubdivide",
-                    node_free_standard_storage,
-                    node_copy_standard_storage);
-  node_type_init(&ntype, geo_node_curve_subdivide_init);
-  node_type_update(&ntype, blender::nodes::geo_node_curve_subdivide_update);
-  ntype.geometry_node_execute = blender::nodes::geo_node_subdivide_exec;
+  geo_node_type_base(&ntype, GEO_NODE_SUBDIVIDE_CURVE, "Subdivide Curve", NODE_CLASS_GEOMETRY);
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
   nodeRegisterType(&ntype);
 }

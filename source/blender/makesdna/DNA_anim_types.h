@@ -348,7 +348,7 @@ typedef enum eDriverTarget_Flag {
   /** idtype can only be 'Object' */
   DTAR_FLAG_ID_OB_ONLY = (1 << 1),
 
-  /* "localspace" flags */
+  /* "local-space" flags. */
   /** base flag - basically "pre parent+constraints" */
   DTAR_FLAG_LOCALSPACE = (1 << 2),
   /** include constraints transformed to space including parents */
@@ -658,9 +658,10 @@ typedef enum eFCurve_Flags {
   /** FCurve will not be evaluated for the next round. */
   FCURVE_MUTED = (1 << 4),
 
+#ifdef DNA_DEPRECATED_ALLOW
   /** fcurve uses 'auto-handles', which stay horizontal... */
-  // DEPRECATED
-  FCURVE_AUTO_HANDLES = (1 << 5),
+  FCURVE_AUTO_HANDLES = (1 << 5), /* Dirty. */
+#endif
   FCURVE_MOD_OFF = (1 << 6),
   /** skip evaluation, as RNA-path cannot be resolved
    * (similar to muting, but cannot be set by user) */

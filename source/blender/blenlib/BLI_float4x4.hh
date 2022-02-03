@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include "BLI_float3.hh"
 #include "BLI_math_matrix.h"
+#include "BLI_math_vec_types.hh"
+#include "BLI_math_vector.h"
 
 namespace blender {
 
@@ -45,6 +46,13 @@ struct float4x4 {
     return mat;
   }
 
+  static float4x4 from_location(const float3 location)
+  {
+    float4x4 mat = float4x4::identity();
+    copy_v3_v3(mat.values[3], location);
+    return mat;
+  }
+
   static float4x4 from_normalized_axis_data(const float3 location,
                                             const float3 forward,
                                             const float3 up)
@@ -56,7 +64,7 @@ struct float4x4 {
      * Without the negation, the result would be a so called improper rotation. That means it
      * contains a reflection. Such an improper rotation matrix could not be converted to another
      * representation of a rotation such as euler angles. */
-    const float3 cross = -float3::cross(forward, up);
+    const float3 cross = -math::cross(forward, up);
 
     float4x4 matrix;
     matrix.values[0][0] = forward.x;
@@ -99,6 +107,20 @@ struct float4x4 {
     return &values[0][0];
   }
 
+  float *operator[](const int64_t index)
+  {
+    BLI_assert(index >= 0);
+    BLI_assert(index < 4);
+    return &values[index][0];
+  }
+
+  const float *operator[](const int64_t index) const
+  {
+    BLI_assert(index >= 0);
+    BLI_assert(index < 4);
+    return &values[index][0];
+  }
+
   using c_style_float4x4 = float[4][4];
   c_style_float4x4 &ptr()
   {
@@ -115,6 +137,11 @@ struct float4x4 {
     float4x4 result;
     mul_m4_m4m4(result.values, a.values, b.values);
     return result;
+  }
+
+  void operator*=(const float4x4 &other)
+  {
+    mul_m4_m4_post(values, other.values);
   }
 
   /**

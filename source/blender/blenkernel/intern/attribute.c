@@ -51,7 +51,7 @@ typedef struct DomainInfo {
   int length;
 } DomainInfo;
 
-static void get_domains(ID *id, DomainInfo info[ATTR_DOMAIN_NUM])
+static void get_domains(const ID *id, DomainInfo info[ATTR_DOMAIN_NUM])
 {
   memset(info, 0, sizeof(DomainInfo) * ATTR_DOMAIN_NUM);
 
@@ -90,10 +90,10 @@ static void get_domains(ID *id, DomainInfo info[ATTR_DOMAIN_NUM])
     }
     case ID_HA: {
       Hair *hair = (Hair *)id;
-      info[ATTR_DOMAIN_POINT].customdata = &hair->pdata;
-      info[ATTR_DOMAIN_POINT].length = hair->totpoint;
-      info[ATTR_DOMAIN_CURVE].customdata = &hair->cdata;
-      info[ATTR_DOMAIN_CURVE].length = hair->totcurve;
+      info[ATTR_DOMAIN_POINT].customdata = &hair->geometry.point_data;
+      info[ATTR_DOMAIN_POINT].length = hair->geometry.point_size;
+      info[ATTR_DOMAIN_CURVE].customdata = &hair->geometry.curve_data;
+      info[ATTR_DOMAIN_CURVE].length = hair->geometry.curve_size;
       break;
     }
     default:
@@ -221,6 +221,29 @@ bool BKE_id_attribute_remove(ID *id, CustomDataLayer *layer, ReportList *reports
   }
 
   return true;
+}
+
+CustomDataLayer *BKE_id_attribute_find(const ID *id,
+                                       const char *name,
+                                       const int type,
+                                       const AttributeDomain domain)
+{
+  DomainInfo info[ATTR_DOMAIN_NUM];
+  get_domains(id, info);
+
+  CustomData *customdata = info[domain].customdata;
+  if (customdata == NULL) {
+    return NULL;
+  }
+
+  for (int i = 0; i < customdata->totlayer; i++) {
+    CustomDataLayer *layer = &customdata->layers[i];
+    if (layer->type == type && STREQ(layer->name, name)) {
+      return layer;
+    }
+  }
+
+  return NULL;
 }
 
 int BKE_id_attributes_length(ID *id, const CustomDataMask mask)

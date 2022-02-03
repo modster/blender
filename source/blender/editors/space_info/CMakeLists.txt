@@ -37,7 +37,7 @@ set(SRC
   info_draw.c
   info_ops.c
   info_report.c
-  info_stats.c
+  info_stats.cc
   space_info.c
   textview.c
 
@@ -47,10 +47,6 @@ set(SRC
 
 set(LIB
 )
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
 
 
 blender_add_lib(bf_editor_space_info "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

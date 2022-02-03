@@ -104,14 +104,6 @@ typedef enum DerivedMeshType {
   DM_TYPE_CCGDM,
 } DerivedMeshType;
 
-typedef enum DMDirtyFlag {
-  /* dm has valid tessellated faces, but tessellated CDDATA need to be updated. */
-  DM_DIRTY_TESS_CDLAYERS = 1 << 0,
-
-  /* check this with modifier dependsOnNormals callback to see if normals need recalculation */
-  DM_DIRTY_NORMALS = 1 << 1,
-} DMDirtyFlag;
-
 typedef struct DerivedMesh DerivedMesh;
 struct DerivedMesh {
   /** Private DerivedMesh data, only for internal DerivedMesh use */
@@ -120,7 +112,6 @@ struct DerivedMesh {
   int needsFree;    /* checked on ->release, is set to 0 for cached results */
   int deformedOnly; /* set by modifier stack if only deformed from original */
   DerivedMeshType type;
-  DMDirtyFlag dirty;
 
   /**
    * \warning Typical access is done via #getLoopTriArray, #getNumLoopTri.
@@ -139,9 +130,6 @@ struct DerivedMesh {
 
   short tangent_mask; /* which tangent layers are calculated */
 
-  /** Calculate vert and face normals */
-  void (*calcNormals)(DerivedMesh *dm);
-
   /** Loop tessellation cache (WARNING! Only call inside threading-protected code!) */
   void (*recalcLoopTri)(DerivedMesh *dm);
   /** accessor functions */
@@ -157,15 +145,6 @@ struct DerivedMesh {
   int (*getNumLoops)(DerivedMesh *dm);
   int (*getNumPolys)(DerivedMesh *dm);
 
-  /** Copy a single vert/edge/tessellated face from the derived mesh into
-   * `*r_{vert/edge/face}`. note that the current implementation
-   * of this function can be quite slow, iterating over all
-   * elements (editmesh)
-   */
-  void (*getVert)(DerivedMesh *dm, int index, struct MVert *r_vert);
-  void (*getEdge)(DerivedMesh *dm, int index, struct MEdge *r_edge);
-  void (*getTessFace)(DerivedMesh *dm, int index, struct MFace *r_face);
-
   /** Return a pointer to the entire array of verts/edges/face from the
    * derived mesh. if such an array does not exist yet, it will be created,
    * and freed on the next ->release(). consider using getVert/Edge/Face if
@@ -173,7 +152,6 @@ struct DerivedMesh {
    */
   struct MVert *(*getVertArray)(DerivedMesh *dm);
   struct MEdge *(*getEdgeArray)(DerivedMesh *dm);
-  struct MFace *(*getTessFaceArray)(DerivedMesh *dm);
   struct MLoop *(*getLoopArray)(DerivedMesh *dm);
   struct MPoly *(*getPolyArray)(DerivedMesh *dm);
 
@@ -182,7 +160,6 @@ struct DerivedMesh {
    */
   void (*copyVertArray)(DerivedMesh *dm, struct MVert *r_vert);
   void (*copyEdgeArray)(DerivedMesh *dm, struct MEdge *r_edge);
-  void (*copyTessFaceArray)(DerivedMesh *dm, struct MFace *r_face);
   void (*copyLoopArray)(DerivedMesh *dm, struct MLoop *r_loop);
   void (*copyPolyArray)(DerivedMesh *dm, struct MPoly *r_poly);
 
@@ -191,18 +168,8 @@ struct DerivedMesh {
    */
   struct MVert *(*dupVertArray)(DerivedMesh *dm);
   struct MEdge *(*dupEdgeArray)(DerivedMesh *dm);
-  struct MFace *(*dupTessFaceArray)(DerivedMesh *dm);
   struct MLoop *(*dupLoopArray)(DerivedMesh *dm);
   struct MPoly *(*dupPolyArray)(DerivedMesh *dm);
-
-  /** Return a pointer to a single element of vert/edge/face custom data
-   * from the derived mesh (this gives a pointer to the actual data, not
-   * a copy)
-   */
-  void *(*getVertData)(DerivedMesh *dm, int index, int type);
-  void *(*getEdgeData)(DerivedMesh *dm, int index, int type);
-  void *(*getTessFaceData)(DerivedMesh *dm, int index, int type);
-  void *(*getPolyData)(DerivedMesh *dm, int index, int type);
 
   /** Return a pointer to the entire array of vert/edge/face custom data
    * from the derived mesh (this gives a pointer to the actual data, not
@@ -210,17 +177,8 @@ struct DerivedMesh {
    */
   void *(*getVertDataArray)(DerivedMesh *dm, int type);
   void *(*getEdgeDataArray)(DerivedMesh *dm, int type);
-  void *(*getTessFaceDataArray)(DerivedMesh *dm, int type);
   void *(*getLoopDataArray)(DerivedMesh *dm, int type);
   void *(*getPolyDataArray)(DerivedMesh *dm, int type);
-
-  /** Retrieves the base CustomData structures for
-   * verts/edges/tessfaces/loops/faces. */
-  CustomData *(*getVertDataLayout)(DerivedMesh *dm);
-  CustomData *(*getEdgeDataLayout)(DerivedMesh *dm);
-  CustomData *(*getTessFaceDataLayout)(DerivedMesh *dm);
-  CustomData *(*getLoopDataLayout)(DerivedMesh *dm);
-  CustomData *(*getPolyDataLayout)(DerivedMesh *dm);
 
   /** Optional grid access for subsurf */
   int (*getNumGrids)(DerivedMesh *dm);
@@ -240,19 +198,23 @@ struct DerivedMesh {
 
   /** Get smooth vertex normal, undefined if index is not valid */
   void (*getVertNo)(DerivedMesh *dm, int index, float r_no[3]);
-  void (*getPolyNo)(DerivedMesh *dm, int index, float r_no[3]);
-
-  /** Get a map of vertices to faces
-   */
-  const struct MeshElemMap *(*getPolyMap)(struct Object *ob, DerivedMesh *dm);
 
   /** Release reference to the DerivedMesh. This function decides internally
    * if the DerivedMesh will be freed, or cached for later use. */
   void (*release)(DerivedMesh *dm);
 };
 
+/**
+ * Utility function to initialize a #DerivedMesh's function pointers to
+ * the default implementation (for those functions which have a default).
+ */
 void DM_init_funcs(DerivedMesh *dm);
 
+/**
+ * Utility function to initialize a #DerivedMesh for the desired number
+ * of vertices, edges and faces (doesn't allocate memory for them, just
+ * sets up the custom data layers)>
+ */
 void DM_init(DerivedMesh *dm,
              DerivedMeshType type,
              int numVerts,
@@ -261,15 +223,10 @@ void DM_init(DerivedMesh *dm,
              int numLoops,
              int numPolys);
 
-void DM_from_template_ex(DerivedMesh *dm,
-                         DerivedMesh *source,
-                         DerivedMeshType type,
-                         int numVerts,
-                         int numEdges,
-                         int numTessFaces,
-                         int numLoops,
-                         int numPolys,
-                         const struct CustomData_MeshMasks *mask);
+/**
+ * Utility function to initialize a DerivedMesh for the desired number
+ * of vertices, edges and faces, with a layer setup copied from source
+ */
 void DM_from_template(DerivedMesh *dm,
                       DerivedMesh *source,
                       DerivedMeshType type,
@@ -285,43 +242,41 @@ void DM_from_template(DerivedMesh *dm,
  */
 bool DM_release(DerivedMesh *dm);
 
+/**
+ * set the #CD_FLAG_NOCOPY flag in custom data layers where the mask is
+ * zero for the layer type, so only layer types specified by the mask
+ * will be copied
+ */
 void DM_set_only_copy(DerivedMesh *dm, const struct CustomData_MeshMasks *mask);
 
-/* adds a vertex/edge/face custom data layer to a DerivedMesh, optionally
+/* Adds a vertex/edge/face custom data layer to a DerivedMesh, optionally
  * backed by an external data array
  * alloctype defines how the layer is allocated or copied, and how it is
- * freed, see BKE_customdata.h for the different options
- */
+ * freed, see BKE_customdata.h for the different options. */
+
 void DM_add_vert_layer(struct DerivedMesh *dm, int type, eCDAllocType alloctype, void *layer);
 void DM_add_edge_layer(struct DerivedMesh *dm, int type, eCDAllocType alloctype, void *layer);
-void DM_add_tessface_layer(struct DerivedMesh *dm, int type, eCDAllocType alloctype, void *layer);
-void DM_add_loop_layer(DerivedMesh *dm, int type, eCDAllocType alloctype, void *layer);
 void DM_add_poly_layer(struct DerivedMesh *dm, int type, eCDAllocType alloctype, void *layer);
 
-/* custom data access functions
- * return pointer to data from first layer which matches type
- * if they return NULL for valid indices, data doesn't exist
- * note these return pointers - any change modifies the internals of the mesh
- */
-void *DM_get_vert_data(struct DerivedMesh *dm, int index, int type);
-void *DM_get_edge_data(struct DerivedMesh *dm, int index, int type);
-void *DM_get_tessface_data(struct DerivedMesh *dm, int index, int type);
-void *DM_get_poly_data(struct DerivedMesh *dm, int index, int type);
+/* -------------------------------------------------------------------- */
+/** \name Custom Data Layer Access Functions
+ *
+ * \return pointer to first data layer which matches type (a flat array)
+ * if they return NULL, data doesn't exist.
+ * \note these return pointers - any change modifies the internals of the mesh.
+ * \{ */
 
-/* custom data layer access functions
- * return pointer to first data layer which matches type (a flat array)
- * if they return NULL, data doesn't exist
- * note these return pointers - any change modifies the internals of the mesh
- */
 void *DM_get_vert_data_layer(struct DerivedMesh *dm, int type);
 void *DM_get_edge_data_layer(struct DerivedMesh *dm, int type);
-void *DM_get_tessface_data_layer(struct DerivedMesh *dm, int type);
 void *DM_get_poly_data_layer(struct DerivedMesh *dm, int type);
 void *DM_get_loop_data_layer(struct DerivedMesh *dm, int type);
 
-/* custom data copy functions
+/** \} */
+
+/**
+ * Custom data copy functions
  * copy count elements from source_index in source to dest_index in dest
- * these copy all layers for which the CD_FLAG_NOCOPY flag is not set
+ * these copy all layers for which the CD_FLAG_NOCOPY flag is not set.
  */
 void DM_copy_vert_data(struct DerivedMesh *source,
                        struct DerivedMesh *dest,
@@ -329,13 +284,24 @@ void DM_copy_vert_data(struct DerivedMesh *source,
                        int dest_index,
                        int count);
 
-/* Sets up mpolys for a DM based on face iterators in source. */
+/**
+ * Sets up mpolys for a DM based on face iterators in source.
+ */
 void DM_DupPolys(DerivedMesh *source, DerivedMesh *target);
 
-void DM_ensure_normals(DerivedMesh *dm);
-
+/**
+ * Ensure the array is large enough.
+ *
+ * \note This function must always be thread-protected by caller.
+ * It should only be used by internal code.
+ */
 void DM_ensure_looptri_data(DerivedMesh *dm);
 
+/**
+ * Interpolates vertex data from the vertices indexed by `src_indices` in the
+ * source mesh using the given weights and stores the result in the vertex
+ * indexed by `dest_index` in the `dest` mesh.
+ */
 void DM_interp_vert_data(struct DerivedMesh *source,
                          struct DerivedMesh *dest,
                          int *src_indices,
@@ -343,9 +309,11 @@ void DM_interp_vert_data(struct DerivedMesh *source,
                          int count,
                          int dest_index);
 
-void mesh_get_mapped_verts_coords(struct Mesh *me_eval, float (*r_cos)[3], const int totcos);
+void mesh_get_mapped_verts_coords(struct Mesh *me_eval, float (*r_cos)[3], int totcos);
 
-/* same as above but won't use render settings */
+/**
+ * Same as above but won't use render settings.
+ */
 struct Mesh *editbmesh_get_eval_cage(struct Depsgraph *depsgraph,
                                      struct Scene *scene,
                                      struct Object *,
@@ -355,12 +323,6 @@ struct Mesh *editbmesh_get_eval_cage_from_orig(struct Depsgraph *depsgraph,
                                                struct Scene *scene,
                                                struct Object *obedit,
                                                const struct CustomData_MeshMasks *dataMask);
-struct Mesh *editbmesh_get_eval_cage_and_final(struct Depsgraph *depsgraph,
-                                               struct Scene *scene,
-                                               struct Object *,
-                                               struct BMEditMesh *em,
-                                               const struct CustomData_MeshMasks *dataMask,
-                                               struct Mesh **r_final);
 
 float (*editbmesh_vert_coords_alloc(struct BMEditMesh *em, int *r_vert_len))[3];
 bool editbmesh_modifier_is_enabled(struct Scene *scene,
@@ -370,21 +332,7 @@ bool editbmesh_modifier_is_enabled(struct Scene *scene,
 void makeDerivedMesh(struct Depsgraph *depsgraph,
                      struct Scene *scene,
                      struct Object *ob,
-                     struct BMEditMesh *em,
                      const struct CustomData_MeshMasks *dataMask);
-
-void DM_calc_loop_tangents(DerivedMesh *dm,
-                           bool calc_active_tangent,
-                           const char (*tangent_names)[MAX_NAME],
-                           int tangent_names_len);
-
-/* debug only */
-#ifndef NDEBUG
-char *DM_debug_info(DerivedMesh *dm);
-void DM_debug_print(DerivedMesh *dm);
-
-bool DM_is_valid(DerivedMesh *dm);
-#endif
 
 #ifdef __cplusplus
 }

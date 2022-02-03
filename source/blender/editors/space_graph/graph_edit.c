@@ -19,6 +19,8 @@
 
 /** \file
  * \ingroup spgraph
+ *
+ * Insert duplicate and bake keyframes.
  */
 
 #include <float.h>
@@ -68,9 +70,6 @@
 #include "WM_types.h"
 
 #include "graph_intern.h"
-
-/* ************************************************************************** */
-/* INSERT DUPLICATE AND BAKE KEYFRAMES */
 
 /* -------------------------------------------------------------------- */
 /** \name Insert Keyframes Operator
@@ -403,8 +402,8 @@ static int graphkeys_click_insert_invoke(bContext *C, wmOperator *op, const wmEv
   region = ac.region;
   v2d = &region->v2d;
 
-  mval[0] = (event->x - region->winrct.xmin);
-  mval[1] = (event->y - region->winrct.ymin);
+  mval[0] = (event->xy[0] - region->winrct.xmin);
+  mval[1] = (event->xy[1] - region->winrct.ymin);
 
   UI_view2d_region_to_view(v2d, mval[0], mval[1], &x, &y);
 
@@ -417,6 +416,8 @@ static int graphkeys_click_insert_invoke(bContext *C, wmOperator *op, const wmEv
 
 void GRAPH_OT_click_insert(wmOperatorType *ot)
 {
+  PropertyRNA *prop;
+
   /* Identifiers */
   ot->name = "Click-Insert Keyframes";
   ot->idname = "GRAPH_OT_click_insert";
@@ -443,11 +444,12 @@ void GRAPH_OT_click_insert(wmOperatorType *ot)
   RNA_def_float(
       ot->srna, "value", 1.0f, -FLT_MAX, FLT_MAX, "Value", "Value for keyframe on", 0, 100);
 
-  RNA_def_boolean(ot->srna,
-                  "extend",
-                  false,
-                  "Extend",
-                  "Extend selection instead of deselecting everything first");
+  prop = RNA_def_boolean(ot->srna,
+                         "extend",
+                         false,
+                         "Extend",
+                         "Extend selection instead of deselecting everything first");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -1095,7 +1097,8 @@ static int graphkeys_sound_bake_exec(bContext *C, wmOperator *op)
                                     RNA_boolean_get(op->ptr, "use_square"),
                                     RNA_float_get(op->ptr, "sthreshold"),
                                     FPS,
-                                    &sbi.length);
+                                    &sbi.length,
+                                    0);
 
   if (sbi.samples == NULL) {
     BKE_report(op->reports, RPT_ERROR, "Unsupported audio format");
@@ -1876,7 +1879,7 @@ static bool euler_filter_single_channel(FCurve *fcu)
     return false;
   }
 
-  /* Prev follows bezt, bezt = "current" point to be fixed. */
+  /* `prev` follows bezt, bezt = "current" point to be fixed. */
   /* Our method depends on determining a "difference" from the previous vert. */
   bool is_modified = false;
   for (i = 1, prev = fcu->bezt, bezt = fcu->bezt + 1; i < fcu->totvert; i++, prev = bezt++) {
@@ -2345,6 +2348,103 @@ void GRAPH_OT_snap(wmOperatorType *ot)
 
   /* Id-props */
   ot->prop = RNA_def_enum(ot->srna, "type", prop_graphkeys_snap_types, 0, "Type", "");
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Equalize Handles Operator
+ * \{ */
+
+/* Defines for equalize handles tool. */
+static const EnumPropertyItem prop_graphkeys_equalize_handles_sides[] = {
+    {GRAPHKEYS_EQUALIZE_LEFT, "LEFT", 0, "Left", "Equalize selected keyframes' left handles"},
+    {GRAPHKEYS_EQUALIZE_RIGHT, "RIGHT", 0, "Right", "Equalize selected keyframes' right handles"},
+    {GRAPHKEYS_EQUALIZE_BOTH, "BOTH", 0, "Both", "Equalize both of a keyframe's handles"},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* ------------------- */
+
+/* Equalize selected keyframes' bezier handles. */
+static void equalize_graph_keys(bAnimContext *ac, int mode, float handle_length, bool flatten)
+{
+  /* Filter data. */
+  const int filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT |
+                      ANIMFILTER_NODUPLIS);
+  ListBase anim_data = {NULL, NULL};
+  ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
+
+  /* Equalize keyframes. */
+  LISTBASE_FOREACH (bAnimListElem *, ale, &anim_data) {
+    ANIM_fcurve_equalize_keyframes_loop(ale->key_data, mode, handle_length, flatten);
+    ale->update |= ANIM_UPDATE_DEFAULT;
+  }
+
+  ANIM_animdata_update(ac, &anim_data);
+  ANIM_animdata_freelist(&anim_data);
+}
+
+static int graphkeys_equalize_handles_exec(bContext *C, wmOperator *op)
+{
+  bAnimContext ac;
+
+  /* Get editor data. */
+  if (ANIM_animdata_get_context(C, &ac) == 0) {
+    return OPERATOR_CANCELLED;
+  }
+
+  /* Get equalize mode. */
+  int mode = RNA_enum_get(op->ptr, "side");
+  float handle_length = RNA_float_get(op->ptr, "handle_length");
+  bool flatten = RNA_boolean_get(op->ptr, "flatten");
+
+  /* Equalize graph keyframes. */
+  equalize_graph_keys(&ac, mode, handle_length, flatten);
+
+  WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+
+  return OPERATOR_FINISHED;
+}
+
+void GRAPH_OT_equalize_handles(wmOperatorType *ot)
+{
+  /* Identifiers */
+  ot->name = "Equalize Handles";
+  ot->idname = "GRAPH_OT_equalize_handles";
+  ot->description =
+      "Ensure selected keyframes' handles have equal length, optionally making them horizontal";
+
+  /* API callbacks */
+  ot->invoke = WM_menu_invoke;
+  ot->exec = graphkeys_equalize_handles_exec;
+  ot->poll = graphop_editable_keyframes_poll;
+
+  /* Flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  /* Properties */
+  ot->prop = RNA_def_enum(ot->srna,
+                          "side",
+                          prop_graphkeys_equalize_handles_sides,
+                          0,
+                          "Side",
+                          "Side of the keyframes' bezier handles to affect");
+  RNA_def_float(ot->srna,
+                "handle_length",
+                5.0f,
+                0.1f,
+                FLT_MAX,
+                "Handle Length",
+                "Length to make selected keyframes' bezier handles",
+                1.0f,
+                50.0f);
+  RNA_def_boolean(
+      ot->srna,
+      "flatten",
+      false,
+      "Flatten",
+      "Make the values of the selected keyframes' handles the same as their respective keyframes");
 }
 
 /** \} */

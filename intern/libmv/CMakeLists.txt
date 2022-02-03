@@ -38,8 +38,6 @@ set(LIB
 )
 
 if(WITH_LIBMV)
-  setup_libdirs()
-
   if(WIN32)
     add_definitions(-D_USE_MATH_DEFINES)
   endif()
@@ -156,6 +154,7 @@ if(WITH_LIBMV)
     libmv/base/scoped_ptr.h
     libmv/base/vector.h
     libmv/base/vector_utils.h
+    libmv/build/build_config.h
     libmv/image/array_nd.h
     libmv/image/convolve.h
     libmv/image/correlation.h
@@ -199,6 +198,7 @@ if(WITH_LIBMV)
     libmv/simple_pipeline/reconstruction_scale.h
     libmv/simple_pipeline/resect.h
     libmv/simple_pipeline/tracks.h
+    libmv/threading/threading.h
     libmv/tracking/brute_region_tracker.h
     libmv/tracking/hybrid_region_tracker.h
     libmv/tracking/kalman_filter.h
