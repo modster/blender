@@ -1360,13 +1360,29 @@ static bool delete_point_under_mouse(ViewContext *vc,
 static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase *nurbs)
 {
   FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
-  /* Get the adjacent `BezTriple` */
-  BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
-  int cp_index = 2;
-  if (!adj_bezt) {
+  BezTriple *adj_bezt;
+  int cp_idx;
+  if (nu->pntsu == 1) {
+    continue;
+  }
+  if (nu->bezt == bezt) {
     adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
-    cp_index = 0;
-    if (!adj_bezt) {
+    cp_idx = 0;
+  }
+  else if (nu->bezt + nu->pntsu - 1 == bezt) {
+    adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+    cp_idx = 2;
+  }
+  else {
+    if (BEZT_ISSEL_IDX(bezt, 0)) {
+      adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+      cp_idx = 2;
+    }
+    else if (BEZT_ISSEL_IDX(bezt, 2)) {
+      adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
+      cp_idx = 0;
+    }
+    else {
       continue;
     }
   }
@@ -1375,16 +1391,14 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase
   float screen_co[2];
   int displacement[2];
   /* Get the screen space coordinates of moved handle. */
-  ED_view3d_project_float_object(vc->region,
-                                 adj_bezt->vec[cp_index],
-                                 screen_co,
-                                 V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+  ED_view3d_project_float_object(
+      vc->region, adj_bezt->vec[cp_idx], screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
   sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
   const float disp_fl[2] = {UNPACK2(displacement)};
 
   /* Add the displacement of the mouse to the handle position. */
   add_v2_v2v2(screen_co, screen_co, disp_fl);
-  move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co, cp_index, vc);
+  move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co, cp_idx, vc);
   BKE_nurb_handles_calc(nu);
   FOREACH_SELECTED_BEZT_END
 }
