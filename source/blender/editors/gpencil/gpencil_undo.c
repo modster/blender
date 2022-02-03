@@ -464,7 +464,7 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
   }
 
   gpencil_data_to_undo_data(gpd, us->undo_data);
-  gpd->flag |= GP_DATA_UPDATE_CACHE_UNDO_ENCODED;
+  gpd->flag |= GP_DATA_UPDATE_CACHE_DISPOSABLE;
   return true;
 }
 
@@ -494,9 +494,10 @@ static void gpencil_undosys_step_decode(struct bContext *C,
 
   if (change_gpencil_mode(C, ob, undo_data->mode)) {
     if (is_final) {
-    DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
-    WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | ND_GPENCIL_EDITMODE, NULL);
-    WM_event_add_notifier(C, NC_SCENE | ND_MODE, NULL);
+      gpd->flag |= GP_DATA_UPDATE_CACHE_DISPOSABLE;
+      DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+      WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | ND_GPENCIL_EDITMODE, NULL);
+      WM_event_add_notifier(C, NC_SCENE | ND_MODE, NULL);
     }
     return;
   }
@@ -536,11 +537,11 @@ static void gpencil_undosys_step_decode(struct bContext *C,
 
     gpencil_undo_data_to_gpencil_data(undo_data, gpd, true);
   }
-  gpd->flag |= GP_DATA_UPDATE_CACHE_UNDO_ENCODED;
 
   if (is_final) {
-  DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
-  WM_event_add_notifier(C, NC_GEOM | ND_DATA, NULL);
+    gpd->flag |= GP_DATA_UPDATE_CACHE_DISPOSABLE;
+    DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
+    WM_event_add_notifier(C, NC_GEOM | ND_DATA, NULL);
   }
 }
 

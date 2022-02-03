@@ -3004,7 +3004,7 @@ void BKE_gpencil_update_on_write(bGPdata *gpd_orig, bGPdata *gpd_eval)
   gpd_eval->flag |= GP_DATA_CACHE_IS_DIRTY;
 
   /* TODO: This might cause issues when we have multiple depsgraphs? */
-  if ((gpd_orig->flag & GP_DATA_UPDATE_CACHE_UNDO_ENCODED) ||
+  if ((gpd_orig->flag & GP_DATA_UPDATE_CACHE_DISPOSABLE) || !GPENCIL_ANY_MODE(gpd_orig) ||
       !U.experimental.use_gpencil_undo_system) {
     BKE_gpencil_free_update_cache(gpd_orig);
   }

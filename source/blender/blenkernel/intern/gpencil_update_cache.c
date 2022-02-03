@@ -478,7 +478,7 @@ void BKE_gpencil_free_update_cache(bGPdata *gpd)
     update_cache_free(gpd_cache);
     gpd->runtime.update_cache = NULL;
   }
-  gpd->flag &= ~GP_DATA_UPDATE_CACHE_UNDO_ENCODED;
+  gpd->flag &= ~GP_DATA_UPDATE_CACHE_DISPOSABLE;
 }
 
 void BKE_gpencil_free_update_cache_and_data(GPencilUpdateCache *gpd_cache)
