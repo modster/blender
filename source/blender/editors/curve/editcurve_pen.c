@@ -1178,9 +1178,6 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
   if (bezt) {
     bezt->h1 = extrude_handle;
     bezt->h2 = extrude_handle;
-
-    BEZT_DESEL_ALL(bezt);
-    BEZT_SEL_IDX(bezt, is_last_bezt(nu, bezt) ? 2 : 0);
   }
   FOREACH_SELECTED_BEZT_END
 }
@@ -1599,6 +1596,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         bezt->h1 = bezt->h2 = HD_ALIGN;
         copy_v3_v3(bezt->vec[0], bezt->vec[1]);
         copy_v3_v3(bezt->vec[2], bezt->vec[1]);
+        BEZT_DESEL_ALL(bezt);
+        BEZT_SEL_IDX(bezt, is_last_bezt(nu, bezt) ? 2 : 0);
         FOREACH_SELECTED_BEZT_END
       }
     }
