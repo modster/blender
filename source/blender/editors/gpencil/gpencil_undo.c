@@ -534,12 +534,15 @@ static void gpencil_undosys_step_decode(struct bContext *C,
       data_iter = ((GPencilUndoStep *)us_iter)->undo_data;
     }
   }
-  else {
+  else if (dir == STEP_REDO) {
     if (undo_data->gpd_cache_data == NULL) {
       return;
     }
 
     gpencil_undo_data_to_gpencil_data(undo_data, gpd, true);
+  }
+  else {
+    BLI_assert_unreachable();
   }
 
   if (is_final) {
