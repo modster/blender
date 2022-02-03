@@ -624,6 +624,35 @@ static void lib_override_linked_group_tag_recursive(LibOverrideGroupTagData *dat
   }
 }
 
+static bool lib_override_linked_group_tag_collections_keep_tagged_check_recursive(
+    LibOverrideGroupTagData *data, Collection *collection)
+{
+  /* NOTE: Collection's object cache (using bases, as returned by #BKE_collection_object_cache_get)
+   * is not usable here, as it may have become invalid from some previous operation and it should
+   * not be updated here. So instead only use collections' reliable 'raw' data to check if some
+   * object in the hierarchy of the given collection is still tagged for override. */
+  for (CollectionObject *collection_object = collection->gobject.first; collection_object != NULL;
+       collection_object = collection_object->next) {
+    Object *object = collection_object->ob;
+    if (object == NULL) {
+      continue;
+    }
+    if ((object->id.tag & data->tag) != 0) {
+      return true;
+    }
+  }
+
+  for (CollectionChild *collection_child = collection->children.first; collection_child != NULL;
+       collection_child = collection_child->next) {
+    if (lib_override_linked_group_tag_collections_keep_tagged_check_recursive(
+            data, collection_child->collection)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static void lib_override_linked_group_tag_clear_boneshapes_objects(LibOverrideGroupTagData *data)
 {
   Main *bmain = data->bmain;
@@ -646,15 +675,8 @@ static void lib_override_linked_group_tag_clear_boneshapes_objects(LibOverrideGr
     if ((collection->id.tag & data->tag) == 0) {
       continue;
     }
-    bool keep_tagged = false;
-    const ListBase object_bases = BKE_collection_object_cache_get(collection);
-    LISTBASE_FOREACH (Base *, base, &object_bases) {
-      if ((base->object->id.tag & data->tag) != 0) {
-        keep_tagged = true;
-        break;
-      }
-    }
-    if (!keep_tagged) {
+
+    if (!lib_override_linked_group_tag_collections_keep_tagged_check_recursive(data, collection)) {
       collection->id.tag &= ~data->tag;
     }
   }
@@ -1023,128 +1045,6 @@ bool BKE_lib_override_library_template_create(struct ID *id)
 
   BKE_lib_override_library_init(id, NULL);
   return true;
-}
-
-bool BKE_lib_override_library_proxy_convert(Main *bmain,
-                                            Scene *scene,
-                                            ViewLayer *view_layer,
-                                            Object *ob_proxy)
-{
-  /* `proxy_group`, if defined, is the empty instantiating the collection from which the proxy is
-   * coming. */
-  Object *ob_proxy_group = ob_proxy->proxy_group;
-  const bool is_override_instancing_object = ob_proxy_group != NULL;
-  ID *id_root = is_override_instancing_object ? &ob_proxy_group->instance_collection->id :
-                                                &ob_proxy->proxy->id;
-  ID *id_reference = is_override_instancing_object ? &ob_proxy_group->id : &ob_proxy->id;
-
-  /* In some cases the instance collection of a proxy object may be local (see e.g. T83875). Not
-   * sure this is a valid state, but for now just abort the overriding process. */
-  if (!ID_IS_OVERRIDABLE_LIBRARY_HIERARCHY(id_root)) {
-    if (ob_proxy->proxy != NULL) {
-      ob_proxy->proxy->proxy_from = NULL;
-    }
-    id_us_min((ID *)ob_proxy->proxy);
-    ob_proxy->proxy = ob_proxy->proxy_group = NULL;
-    return false;
-  }
-
-  /* We manually convert the proxy object into a library override, further override handling will
-   * then be handled by `BKE_lib_override_library_create()` just as for a regular override
-   * creation.
-   */
-  ob_proxy->proxy->id.tag |= LIB_TAG_DOIT;
-  ob_proxy->proxy->id.newid = &ob_proxy->id;
-  BKE_lib_override_library_init(&ob_proxy->id, &ob_proxy->proxy->id);
-
-  ob_proxy->proxy->proxy_from = NULL;
-  ob_proxy->proxy = ob_proxy->proxy_group = NULL;
-
-  DEG_id_tag_update(&ob_proxy->id, ID_RECALC_COPY_ON_WRITE);
-
-  /* In case of proxy conversion, remap all local ID usages to linked IDs to their newly created
-   * overrides. Also do that for the IDs from the same lib as the proxy in case it is linked.
-   * While this might not be 100% the desired behavior, it is likely to be the case most of the
-   * time. Ref: T91711. */
-  ID *id_iter;
-  FOREACH_MAIN_ID_BEGIN (bmain, id_iter) {
-    if (!ID_IS_LINKED(id_iter) || id_iter->lib == ob_proxy->id.lib) {
-      id_iter->tag |= LIB_TAG_DOIT;
-    }
-  }
-  FOREACH_MAIN_ID_END;
-
-  return BKE_lib_override_library_create(
-      bmain, scene, view_layer, ob_proxy->id.lib, id_root, id_reference, NULL);
-}
-
-static void lib_override_library_proxy_convert_do(Main *bmain,
-                                                  Scene *scene,
-                                                  Object *ob_proxy,
-                                                  BlendFileReadReport *reports)
-{
-  Object *ob_proxy_group = ob_proxy->proxy_group;
-  const bool is_override_instancing_object = ob_proxy_group != NULL;
-
-  const bool success = BKE_lib_override_library_proxy_convert(bmain, scene, NULL, ob_proxy);
-
-  if (success) {
-    CLOG_INFO(&LOG,
-              4,
-              "Proxy object '%s' successfully converted to library overrides",
-              ob_proxy->id.name);
-    /* Remove the instance empty from this scene, the items now have an overridden collection
-     * instead. */
-    if (is_override_instancing_object) {
-      BKE_scene_collections_object_remove(bmain, scene, ob_proxy_group, true);
-    }
-    reports->count.proxies_to_lib_overrides_success++;
-  }
-}
-
-void BKE_lib_override_library_main_proxy_convert(Main *bmain, BlendFileReadReport *reports)
-{
-  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-    FOREACH_SCENE_OBJECT_BEGIN (scene, object) {
-      if (object->proxy_group == NULL) {
-        continue;
-      }
-
-      lib_override_library_proxy_convert_do(bmain, scene, object, reports);
-    }
-    FOREACH_SCENE_OBJECT_END;
-
-    FOREACH_SCENE_OBJECT_BEGIN (scene, object) {
-      if (object->proxy == NULL) {
-        continue;
-      }
-
-      lib_override_library_proxy_convert_do(bmain, scene, object, reports);
-    }
-    FOREACH_SCENE_OBJECT_END;
-  }
-
-  LISTBASE_FOREACH (Object *, object, &bmain->objects) {
-    if (object->proxy_group != NULL || object->proxy != NULL) {
-      if (ID_IS_LINKED(object)) {
-        CLOG_WARN(&LOG,
-                  "Linked proxy object '%s' from '%s' failed to be converted to library override",
-                  object->id.name + 2,
-                  object->id.lib->filepath);
-      }
-      else {
-        CLOG_WARN(&LOG,
-                  "Proxy object '%s' failed to be converted to library override",
-                  object->id.name + 2);
-      }
-      reports->count.proxies_to_lib_overrides_failures++;
-      if (object->proxy != NULL) {
-        object->proxy->proxy_from = NULL;
-      }
-      id_us_min((ID *)object->proxy);
-      object->proxy = object->proxy_group = NULL;
-    }
-  }
 }
 
 static void lib_override_library_remap(Main *bmain,
