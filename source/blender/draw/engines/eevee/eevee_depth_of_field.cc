@@ -251,7 +251,7 @@ void DepthOfField::bokeh_lut_pass_sync(void)
   DRW_PASS_CREATE(bokeh_lut_ps_, DRW_STATE_WRITE_COLOR);
   GPUShader *sh = inst_.shaders.static_shader_get(DOF_BOKEH_LUT);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, bokeh_lut_ps_);
-  DRW_shgroup_uniform_block(grp, "dof_block", data_);
+  DRW_shgroup_uniform_block(grp, "dof_buf", data_);
   DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
   bokeh_gather_lut_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
@@ -287,7 +287,7 @@ void DepthOfField::setup_pass_sync(void)
   eGPUSamplerState no_filter = GPU_SAMPLER_DEFAULT;
   DRW_shgroup_uniform_texture_ref_ex(grp, "color_tx", &input_color_tx_, no_filter);
   DRW_shgroup_uniform_texture_ref_ex(grp, "depth_tx", &input_depth_tx_, no_filter);
-  DRW_shgroup_uniform_block(grp, "dof_block", data_);
+  DRW_shgroup_uniform_block(grp, "dof_buf", data_);
   DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
   setup_color_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
@@ -454,7 +454,7 @@ void DepthOfField::reduce_pass_sync(void)
     DRW_shgroup_uniform_texture_ref_ex(grp, "color_tx", &setup_color_tx_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "coc_tx", &setup_coc_tx_, no_filter);
     DRW_shgroup_uniform_texture_ex(grp, "downsampled_tx", reduce_downsample_tx_, no_filter);
-    DRW_shgroup_uniform_block(grp, "dof_block", data_);
+    DRW_shgroup_uniform_block(grp, "dof_buf", data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
     scatter_src_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R11F_G11F_B10F, owner);
@@ -530,8 +530,8 @@ void DepthOfField::convolve_pass_sync(void)
     DRW_shgroup_uniform_texture_ex(grp, "coc_tx", reduced_coc_tx_, no_filter);
     DRW_shgroup_uniform_texture(grp, "tiles_bg_tx", tiles_dilated_bg_tx_);
     DRW_shgroup_uniform_texture(grp, "tiles_fg_tx", tiles_dilated_fg_tx_);
-    DRW_shgroup_uniform_block(grp, "dof_block", data_);
-    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "dof_buf", data_);
+    DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     /* Reuse textures from the setup pass. */
@@ -557,8 +557,8 @@ void DepthOfField::convolve_pass_sync(void)
     if (bokeh_gather_lut_tx_) {
       DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_gather_lut_tx_);
     }
-    DRW_shgroup_uniform_block(grp, "dof_block", data_);
-    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "dof_buf", data_);
+    DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     color_fg_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
@@ -577,8 +577,8 @@ void DepthOfField::convolve_pass_sync(void)
     if (bokeh_gather_lut_tx_) {
       DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_gather_lut_tx_);
     }
-    DRW_shgroup_uniform_block(grp, "dof_block", data_);
-    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "dof_buf", data_);
+    DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     color_bg_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
@@ -630,7 +630,7 @@ void DepthOfField::convolve_pass_sync(void)
     if (bokeh_scatter_lut_tx_) {
       DRW_shgroup_uniform_texture(grp, "bokehLut", bokeh_scatter_lut_tx_);
     }
-    DRW_shgroup_uniform_block(grp, "dof_block", data_);
+    DRW_shgroup_uniform_block(grp, "dof_buf", data_);
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
     scatter_fg_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(color_fg_tx_));
@@ -646,7 +646,7 @@ void DepthOfField::convolve_pass_sync(void)
     if (bokeh_scatter_lut_tx_) {
       DRW_shgroup_uniform_texture(grp, "bokehLut", bokeh_scatter_lut_tx_);
     }
-    DRW_shgroup_uniform_block(grp, "dof_block", data_);
+    DRW_shgroup_uniform_block(grp, "dof_buf", data_);
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
     scatter_bg_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(color_bg_tx_));
@@ -711,8 +711,8 @@ void DepthOfField::resolve_pass_sync(void)
   DRW_shgroup_uniform_texture_ex(grp, "weight_bg_tx", weight_bg_tx_, with_filter);
   DRW_shgroup_uniform_texture_ex(grp, "weight_fg_tx", weight_fg_tx_, with_filter);
   DRW_shgroup_uniform_texture_ex(grp, "weight_holefill_tx", weight_holefill_tx_, with_filter);
-  DRW_shgroup_uniform_block(grp, "dof_block", data_);
-  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+  DRW_shgroup_uniform_block(grp, "dof_buf", data_);
+  DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
   if (bokeh_resolve_lut_tx_) {
     DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_resolve_lut_tx_);
   }

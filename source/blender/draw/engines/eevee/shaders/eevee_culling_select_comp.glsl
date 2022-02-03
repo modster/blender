@@ -16,7 +16,7 @@ void main()
     return;
   }
 
-  LightData light = lights[l_idx];
+  LightData light = lights_buf[l_idx];
 
   /* Sun lights are packed at the start of the array. */
   if (light.type == LIGHT_SUN) {

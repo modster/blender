@@ -1,7 +1,7 @@
 
 /**
  * The resources expected to be defined are:
- * - probes_info
+ * - probes_buf
  * - lightprobe_cube_tx
  * - cubes
  */
@@ -68,14 +68,14 @@ vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_thres
   /* Go through all cubemaps, computing and adding their weights for this pixel
    * until reaching a random threshold. */
   float weight = 0.0;
-  int cube_index = probes_info.cubes_info.cube_count - 1;
+  int cube_index = probes_buf.cubes_info.cube_count - 1;
   for (; cube_index > 0; cube_index--) {
-    weight += lightprobe_cubemap_weight(cubes[cube_index], P);
+    weight += lightprobe_cubemap_weight(cubes_buf[cube_index], P);
     if (weight >= random_threshold) {
       break;
     }
   }
 
   return lightprobe_cubemap_evaluate(
-      probes_info.cubes_info, lightprobe_cube_tx, cubes[cube_index], P, R, roughness);
+      probes_buf.cubes_info, lightprobe_cube_tx, cubes_buf[cube_index], P, R, roughness);
 }

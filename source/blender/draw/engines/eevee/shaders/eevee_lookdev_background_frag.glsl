@@ -14,9 +14,9 @@ void main()
   vec3 vV = viewCameraVec(vP);
   vec3 R = -normal_view_to_world(vV);
 
-  R = transform_direction(probes_info.cubes_info.lookdev_rotation, R);
+  R = transform_direction(probes_buf.cubes_info.lookdev_rotation, R);
 
-  float lod = blur * probes_info.cubes_info.roughness_max_lod;
+  float lod = blur * probes_buf.cubes_info.roughness_max_lod;
   out_background.rgb = textureLod(lightprobe_cube_tx, vec4(R, 0), lod).rgb;
   out_background.rgb *= opacity;
   out_background.a = 1.0 - opacity;

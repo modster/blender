@@ -98,7 +98,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DOWNSAMPLE_CUBE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, cube_downsample_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "input_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
+    DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
   }
   {
@@ -107,7 +107,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_GLOSSY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_glossy_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
+    DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
   }
   {
@@ -116,7 +116,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DIFFUSE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_diffuse_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
+    DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
   {
@@ -125,7 +125,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_VISIBILITY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_visibility_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
+    DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 
@@ -142,8 +142,8 @@ void LightProbeModule::begin_sync()
         GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_CUBEMAP);
         DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
         DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", cube_tx_ref_get());
-        DRW_shgroup_uniform_block(grp, "cubes_block", cube_ubo_get());
-        DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
+        DRW_shgroup_uniform_block(grp, "cubes_buf", cube_ubo_get());
+        DRW_shgroup_uniform_block(grp, "probes_buf", info_ubo_get());
 
         uint cubemap_count = 0;
         /* Skip world. */
@@ -165,8 +165,8 @@ void LightProbeModule::begin_sync()
         GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_IRRADIANCE);
         DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
         DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", grid_tx_ref_get());
-        DRW_shgroup_uniform_block(grp, "grids_block", grid_ubo_get());
-        DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
+        DRW_shgroup_uniform_block(grp, "grids_buf", grid_ubo_get());
+        DRW_shgroup_uniform_block(grp, "probes_buf", info_ubo_get());
 
         /* Skip world. */
         for (auto grid_id : IndexRange(1, lightcache_->grid_len - 1)) {

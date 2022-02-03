@@ -13,7 +13,7 @@ void main(void)
   gl_Position = vec4(interp.coord.xy * 2.0 - 1.0, 1.0, 1.0);
 
   int cube_face = gl_VertexID / 3;
-  interp.layer = probe.target_layer + cube_face;
+  interp.layer = filter_buf.target_layer + cube_face;
   interp.coord.z = float(interp.layer);
 
 #ifdef CUBEMAP

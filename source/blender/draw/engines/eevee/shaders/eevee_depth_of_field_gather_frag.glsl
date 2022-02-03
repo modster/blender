@@ -50,8 +50,8 @@ void main()
     out_occlusion = vec2(0.0, 0.0);
   }
   else if (do_fast_gather) {
-    dof_gather_accumulator(sampling,
-                           dof,
+    dof_gather_accumulator(sampling_buf,
+                           dof_buf,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,
@@ -65,8 +65,8 @@ void main()
                            out_occlusion);
   }
   else if (do_density_change) {
-    dof_gather_accumulator(sampling,
-                           dof,
+    dof_gather_accumulator(sampling_buf,
+                           dof_buf,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,
@@ -80,8 +80,8 @@ void main()
                            out_occlusion);
   }
   else {
-    dof_gather_accumulator(sampling,
-                           dof,
+    dof_gather_accumulator(sampling_buf,
+                           dof_buf,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,

@@ -36,7 +36,7 @@ void main(void)
   float ray_variance = texture(ray_variance_tx, uv).r;
   vec4 ray_data = texture(ray_radiance_tx, uv);
   float center_depth = ray_data.w;
-  vec2 texel_size = hiz.pixel_to_ndc * 0.5;
+  vec2 texel_size = hiz_buf.pixel_to_ndc * 0.5;
 
   out_combined = vec4(0.0);
   out_diffuse = vec4(0.0);

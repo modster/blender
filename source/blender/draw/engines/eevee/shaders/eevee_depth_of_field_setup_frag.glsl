@@ -46,10 +46,10 @@ void main()
   for (int i = 0; i < 4; i++) {
     vec2 sample_uv = quad_center + quad_offsets[i] * fullres_texel_size;
     colors[i] = safe_color(textureLod(color_tx, sample_uv, 0.0));
-    cocs[i] = dof_coc_from_depth(dof, sample_uv, textureLod(depth_tx, sample_uv, 0.0).r);
+    cocs[i] = dof_coc_from_depth(dof_buf, sample_uv, textureLod(depth_tx, sample_uv, 0.0).r);
   }
 
-  cocs = clamp(cocs, -dof.coc_abs_max, dof.coc_abs_max);
+  cocs = clamp(cocs, -dof_buf.coc_abs_max, dof_buf.coc_abs_max);
 
   vec4 weights = dof_bilateral_coc_weights(cocs);
   weights *= dof_bilateral_color_weights(colors);

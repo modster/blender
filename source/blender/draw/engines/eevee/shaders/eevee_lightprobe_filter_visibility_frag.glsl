@@ -54,14 +54,15 @@ void main()
 
   vec2 accum = vec2(0.0);
 
-  for (float i = 0; i < probe.sample_count; i++) {
-    vec3 Xi = sample_cylinder(hammersley_2d(i, probe.sample_count));
+  for (float i = 0; i < filter_buf.sample_count; i++) {
+    vec3 Xi = sample_cylinder(hammersley_2d(i, filter_buf.sample_count));
 
-    vec3 dir = sample_uniform_cone(Xi, M_PI_2 * probe.visibility_blur, N, T, B);
+    vec3 dir = sample_uniform_cone(Xi, M_PI_2 * filter_buf.visibility_blur, N, T, B);
     float depth = texture(depth_tx, dir).r;
     depth = get_world_distance(depth, dir);
     accum += vec2(depth, depth * depth);
   }
 
-  out_visibility = visibility_encode(abs(accum / probe.sample_count), probe.visibility_range);
+  out_visibility = visibility_encode(abs(accum / filter_buf.sample_count),
+                                     filter_buf.visibility_range);
 }

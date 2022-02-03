@@ -12,16 +12,16 @@
 void main()
 {
   if (gl_GlobalInvocationID == uvec3(0)) {
-    infos.page_free_next = SHADOW_MAX_PAGE - 1;
-    infos.page_free_next_prev = 0;
-    infos.page_updated_count = 0;
+    pages_infos_buf.page_free_next = SHADOW_MAX_PAGE - 1;
+    pages_infos_buf.page_free_next_prev = 0;
+    pages_infos_buf.page_updated_count = 0;
   }
 
   uint page_index = gl_GlobalInvocationID.x;
 
   ivec2 texel = ivec2(page_index % (SHADOW_TILEMAP_PER_ROW * SHADOW_TILEMAP_RES),
                       page_index / (SHADOW_TILEMAP_PER_ROW * SHADOW_TILEMAP_RES));
-  free_page_owners[page_index] = packUvec2x16(uvec2(texel));
+  pages_free_buf[page_index] = packUvec2x16(uvec2(texel));
 
   /* Start with a blank tile. */
   ShadowTileData tile = shadow_tile_data_unpack(0u);

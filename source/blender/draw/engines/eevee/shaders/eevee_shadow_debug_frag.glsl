@@ -70,7 +70,7 @@ bool debug_tilemap()
 bool debug_tilemap_point_is_inside(vec3 P, int tilemap_index)
 {
   int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
-  vec3 clipP = project_point(tilemaps[tilemap_data_index].tilemat, P);
+  vec3 clipP = project_point(tilemaps_buf[tilemap_data_index].tilemat, P);
   return in_range_inclusive(clipP, vec3(0.0), vec3(SHADOW_TILEMAP_RES));
 }
 
@@ -109,7 +109,7 @@ void debug_pages(vec3 P)
                                                         debug_punctual_tilemap_index(P);
   if (tilemap_index != -1) {
     int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
-    vec3 clipP = project_point(tilemaps[tilemap_data_index].tilemat, P);
+    vec3 clipP = project_point(tilemaps_buf[tilemap_data_index].tilemat, P);
     ivec2 tile = ivec2(clipP.xy);
     ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, 0, tilemap_index);
     vec3 color = debug_random_color(ivec2(tile_data.page));
@@ -143,7 +143,7 @@ void debug_tile_state(vec3 P)
                                                         debug_punctual_tilemap_index(P);
   if (tilemap_index != -1) {
     int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
-    vec3 clipP = project_point(tilemaps[tilemap_data_index].tilemat, P);
+    vec3 clipP = project_point(tilemaps_buf[tilemap_data_index].tilemat, P);
     ivec2 tile = ivec2(clipP.xy);
     ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, 0, tilemap_index);
     vec3 color = debug_tile_state_color(tile_data);

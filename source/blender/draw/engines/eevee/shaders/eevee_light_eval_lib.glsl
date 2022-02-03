@@ -2,9 +2,9 @@
 /**
  * The resources expected to be defined are:
  * - lights
- * - lights_zbins
- * - light_culling
- * - lights_culling_words
+ * - lights_zbin_buf
+ * - lights_cull_buf
+ * - lights_tile_buf
  * - shadow_atlas_tx
  * - shadow_tilemaps_tx
  * - sss_transmittance_tx
@@ -25,7 +25,7 @@ void light_eval_ex(ClosureDiffuse diffuse,
                    inout vec3 out_diffuse,
                    inout vec3 out_specular)
 {
-  LightData light = lights[l_idx];
+  LightData light = lights_buf[l_idx];
   vec3 L;
   float dist;
   light_vector_get(light, P, L, dist);
@@ -82,14 +82,14 @@ void light_eval(ClosureDiffuse diffuse,
   uv = uv * UTIL_TEX_UV_SCALE + UTIL_TEX_UV_BIAS;
   vec4 ltc_mat = utility_tx_sample(utility_tx, uv, UTIL_LTC_MAT_LAYER);
 
-  LIGHT_FOREACH_BEGIN_DIRECTIONAL (light_culling, l_idx) {
+  LIGHT_FOREACH_BEGIN_DIRECTIONAL (lights_cull_buf, l_idx) {
     light_eval_ex(
         diffuse, reflection, P, V, vP_z, thickness, ltc_mat, l_idx, out_diffuse, out_specular);
   }
   LIGHT_FOREACH_END
 
   uvec2 px = uvec2(gl_FragCoord.xy);
-  LIGHT_FOREACH_BEGIN_LOCAL (light_culling, lights_zbins, lights_culling_words, px, vP_z, l_idx) {
+  LIGHT_FOREACH_BEGIN_LOCAL (lights_cull_buf, lights_zbin_buf, lights_tile_buf, px, vP_z, l_idx) {
     light_eval_ex(
         diffuse, reflection, P, V, vP_z, thickness, ltc_mat, l_idx, out_diffuse, out_specular);
   }

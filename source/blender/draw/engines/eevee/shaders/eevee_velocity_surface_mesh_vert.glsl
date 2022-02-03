@@ -1,5 +1,6 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
+#pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
 vec3 velocity_object_to_world_prev(VelocityObjectData data, vec3 prev_pos, vec3 current_pos)
 {

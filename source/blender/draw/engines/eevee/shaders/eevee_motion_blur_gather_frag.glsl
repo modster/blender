@@ -24,7 +24,8 @@ vec2 spread_compare(float center_motion_length, float sample_motion_length, floa
 
 vec2 depth_compare(float center_depth, float sample_depth)
 {
-  return saturate(0.5 + vec2(-mb.depth_scale, mb.depth_scale) * (sample_depth - center_depth));
+  return saturate(0.5 +
+                  vec2(-mb_buf.depth_scale, mb_buf.depth_scale) * (sample_depth - center_depth));
 }
 
 /* Kill contribution if not going the same direction. */
@@ -60,8 +61,8 @@ void gather_sample(vec2 screen_uv,
                    inout vec4 accum_bg,
                    inout vec3 w_accum)
 {
-  vec2 sample_uv = screen_uv - offset * mb.target_size_inv;
-  vec2 sample_motion = sample_velocity(mb, velocity_tx, sample_uv, next);
+  vec2 sample_uv = screen_uv - offset * mb_buf.target_size_inv;
+  vec2 sample_motion = sample_velocity(mb_buf, velocity_tx, sample_uv, next);
   float sample_motion_len = length(sample_motion);
   float sample_depth = texture(depth_tx, sample_uv).r;
   vec4 sample_color = textureLod(color_tx, sample_uv, 0.0);
@@ -146,11 +147,11 @@ void main()
 
   /* Data of the center pixel of the gather (target). */
   float center_depth = get_view_z_from_depth(texture(depth_tx, uv).r);
-  vec4 center_motion = sample_velocity(mb, velocity_tx, ivec2(gl_FragCoord.xy));
+  vec4 center_motion = sample_velocity(mb_buf, velocity_tx, ivec2(gl_FragCoord.xy));
 
   vec4 center_color = textureLod(color_tx, uv, 0.0);
 
-  float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_TIME);
+  float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_TIME);
   /** TODO(fclem) Blue noise. */
   vec2 rand = vec2(interlieved_gradient_noise(gl_FragCoord.xy, 0, noise_offset),
                    interlieved_gradient_noise(gl_FragCoord.xy, 1, noise_offset));

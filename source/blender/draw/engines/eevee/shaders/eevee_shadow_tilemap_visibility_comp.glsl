@@ -12,7 +12,7 @@
 
 void main()
 {
-  ShadowTileMapData tilemap = tilemaps[gl_GlobalInvocationID.z];
+  ShadowTileMapData tilemap = tilemaps_buf[gl_GlobalInvocationID.z];
   ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
 
   bool is_intersecting;

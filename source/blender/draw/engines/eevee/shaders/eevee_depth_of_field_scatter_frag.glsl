@@ -17,7 +17,7 @@ float bokeh_shape(vec2 center)
       /* Negate to flip bokeh shape. Mimics optical phenomenon. */
       co = -co;
     }
-    co *= dof.bokeh_anisotropic_scale_inv;
+    co *= dof_buf.bokeh_anisotropic_scale_inv;
     float texture_size = float(textureSize(bokeh_lut_tx, 0).x);
     /* Bias scale to avoid sampling at the texture's border. */
     float scale_fac = spritesize * (float(DOF_BOKEH_LUT_SIZE) / float(DOF_BOKEH_LUT_SIZE - 1));

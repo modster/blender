@@ -64,23 +64,23 @@ void main()
   /* Generate ray. */
   float pdf;
 #if defined(DIFFUSE)
-  Ray ray = raytrace_create_diffuse_ray(sampling, noise.xy, diffuse, P, pdf);
+  Ray ray = raytrace_create_diffuse_ray(sampling_buf, noise.xy, diffuse, P, pdf);
 #elif defined(REFRACTION)
-  Ray ray = raytrace_create_refraction_ray(sampling, noise.xy, refraction, V, P, pdf);
+  Ray ray = raytrace_create_refraction_ray(sampling_buf, noise.xy, refraction, V, P, pdf);
 #else
-  Ray ray = raytrace_create_reflection_ray(sampling, noise.xy, reflection, V, P, pdf);
+  Ray ray = raytrace_create_reflection_ray(sampling_buf, noise.xy, reflection, V, P, pdf);
 #endif
   ray = raytrace_world_ray_to_view(ray);
 
   bool hit = false;
 
 #ifndef SKIP_TRACE
-  vec2 noise_offset = sampling_rng_2D_get(sampling, SAMPLING_RAYTRACE_W);
+  vec2 noise_offset = sampling_rng_2D_get(sampling_buf, SAMPLING_RAYTRACE_W);
   vec2 rand = fract(noise.zw + noise_offset.xy);
   /* Extend the ray to cover the whole view. */
   ray.direction *= 1e16;
 
-  if (roughness - rand.y * 0.2 < raytrace.max_roughness) {
+  if (roughness - rand.y * 0.2 < raytrace_buf.max_roughness) {
 #  ifdef REFRACTION
     const bool discard_backface = false;
     const bool allow_self_intersection = true;
@@ -89,8 +89,14 @@ void main()
     const bool discard_backface = true;
     const bool allow_self_intersection = false;
 #  endif
-    hit = raytrace_screen(
-        raytrace, hiz, hiz_tx, rand.x, roughness, discard_backface, allow_self_intersection, ray);
+    hit = raytrace_screen(raytrace_buf,
+                          hiz_buf,
+                          hiz_tx,
+                          rand.x,
+                          roughness,
+                          discard_backface,
+                          allow_self_intersection,
+                          ray);
   }
 #endif
 
@@ -117,7 +123,7 @@ void main()
   }
   else {
     /* Evaluate fallback lightprobe. */
-    float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE);
+    float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_LIGHTPROBE);
     float random_probe = fract(noise.w + noise_offset);
 
     ray = raytrace_view_ray_to_world(ray);
@@ -128,7 +134,7 @@ void main()
   }
   /* Apply brightness clamping. */
   float luma = max_v3(radiance);
-  radiance *= 1.0 - max(0.0, luma - raytrace.brightness_clamp) * safe_rcp(luma);
+  radiance *= 1.0 - max(0.0, luma - raytrace_buf.brightness_clamp) * safe_rcp(luma);
   /* Limit to the smallest non-0 value that the format can encode.
    * Strangely it does not correspond to the IEEE spec. */
   float inv_pdf = (pdf == 0.0) ? 0.0 : max(6e-8, 1.0 / pdf);

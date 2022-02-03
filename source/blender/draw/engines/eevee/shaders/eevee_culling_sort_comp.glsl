@@ -25,7 +25,7 @@ void main()
   }
 
   uint key = keys[src_index];
-  LightData light = lights[key];
+  LightData light = lights_buf[key];
 
   if (light.type == LIGHT_SUN) {
     valid_thread = false;

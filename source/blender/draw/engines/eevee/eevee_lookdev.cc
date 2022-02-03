@@ -242,7 +242,7 @@ void LookDev::sync_background(void)
   GPUShader *sh = inst_.shaders.static_shader_get(LOOKDEV_BACKGROUND);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, background_ps_);
   DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", inst_.lightprobes.cube_tx_ref_get());
-  DRW_shgroup_uniform_block(grp, "lightprobes_info_block", inst_.lightprobes.info_ubo_get());
+  DRW_shgroup_uniform_block(grp, "probes_buf", inst_.lightprobes.info_ubo_get());
   DRW_shgroup_uniform_float_copy(grp, "blur", clamp_f(blur_, 0.0f, 0.99999f));
   DRW_shgroup_uniform_float_copy(grp, "opacity", opacity_);
   DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
@@ -301,10 +301,10 @@ void LookDev::sync_overlay(void)
         mat, mat->nodetree, MAT_PIPE_FORWARD, MAT_GEOM_LOOKDEV, false);
     DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, overlay_ps_);
     lights.shgroup_resources(grp);
-    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
-    DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
-    DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
-    DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+    DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "grids_buf", lightprobes.grid_ubo_get());
+    DRW_shgroup_uniform_block(grp, "cubes_buf", lightprobes.cube_ubo_get());
+    DRW_shgroup_uniform_block(grp, "probes_buf", lightprobes.info_ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
 

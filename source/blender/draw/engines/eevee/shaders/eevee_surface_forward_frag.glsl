@@ -39,7 +39,7 @@ void main(void)
   g_data = init_globals();
 
   float noise = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
-  g_data.closure_rand = fract(noise + sampling_rng_1D_get(sampling, SAMPLING_CLOSURE));
+  g_data.closure_rand = fract(noise + sampling_rng_1D_get(sampling_buf, SAMPLING_CLOSURE));
   g_data.transmit_rand = -1.0;
 
   float thickness = nodetree_thickness();
@@ -51,7 +51,7 @@ void main(void)
   vec3 P = g_data.P;
 
   float noise_probe = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).g;
-  float random_probe = fract(noise_probe + sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE));
+  float random_probe = fract(noise_probe + sampling_rng_1D_get(sampling_buf, SAMPLING_LIGHTPROBE));
 
   if (gl_FrontFacing) {
     g_refraction_data.ior = safe_rcp(g_refraction_data.ior);
@@ -73,18 +73,18 @@ void main(void)
              radiance_reflection);
 
   vec4 noise_rt = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).rgba;
-  vec2 noise_offset = sampling_rng_2D_get(sampling, SAMPLING_RAYTRACE_W);
+  vec2 noise_offset = sampling_rng_2D_get(sampling_buf, SAMPLING_RAYTRACE_W);
   noise_rt.zw = fract(noise_rt.zw + noise_offset);
 
   {
     float pdf; /* UNUSED */
     bool hit = false;
-    Ray ray = raytrace_create_diffuse_ray(sampling, noise_rt.xy, g_diffuse_data, P, pdf);
+    Ray ray = raytrace_create_diffuse_ray(sampling_buf, noise_rt.xy, g_diffuse_data, P, pdf);
     ray = raytrace_world_ray_to_view(ray);
 #ifdef USE_RAYTRACING
     /* Extend the ray to cover the whole view. */
     ray.direction *= 1e16;
-    hit = raytrace_screen(raytrace_diffuse, hiz, hiz_tx, noise_rt.w, 1.0, false, true, ray);
+    hit = raytrace_screen(raytrace_diffuse, hiz_buf, hiz_tx, noise_rt.w, 1.0, false, true, ray);
 #endif
     if (hit) {
       vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);
@@ -100,14 +100,15 @@ void main(void)
     float pdf; /* UNUSED */
     bool hit = false;
     float roughness = g_reflection_data.roughness;
-    Ray ray = raytrace_create_reflection_ray(sampling, noise_rt.xy, g_reflection_data, V, P, pdf);
+    Ray ray = raytrace_create_reflection_ray(
+        sampling_buf, noise_rt.xy, g_reflection_data, V, P, pdf);
     ray = raytrace_world_ray_to_view(ray);
 #ifdef USE_RAYTRACING
     if (roughness - noise_rt.z * 0.2 < raytrace_reflection.max_roughness) {
       /* Extend the ray to cover the whole view. */
       ray.direction *= 1e16;
       hit = raytrace_screen(
-          raytrace_reflection, hiz, hiz_tx, noise_rt.w, roughness, false, true, ray);
+          raytrace_reflection, hiz_buf, hiz_tx, noise_rt.w, roughness, false, true, ray);
     }
 #endif
     if (hit) {
@@ -125,7 +126,8 @@ void main(void)
     float pdf; /* UNUSED */
     bool hit = false;
     float roughness = g_refraction_data.roughness;
-    Ray ray = raytrace_create_refraction_ray(sampling, noise_rt.xy, g_refraction_data, V, P, pdf);
+    Ray ray = raytrace_create_refraction_ray(
+        sampling_buf, noise_rt.xy, g_refraction_data, V, P, pdf);
     ray = raytrace_world_ray_to_view(ray);
 #ifdef USE_RAYTRACING
     if (roughness - noise_rt.z * 0.2 < raytrace_refraction.max_roughness) {
@@ -133,7 +135,7 @@ void main(void)
       ray.direction *= 1e16;
       /* TODO(fclem): Take IOR into account in the roughness LOD bias. */
       hit = raytrace_screen(
-          raytrace_refraction, hiz, hiz_tx, noise_rt.w, roughness, false, true, ray);
+          raytrace_refraction, hiz_buf, hiz_tx, noise_rt.w, roughness, false, true, ray);
     }
 #endif
     if (hit) {

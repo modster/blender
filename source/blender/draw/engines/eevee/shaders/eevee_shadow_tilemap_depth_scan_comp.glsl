@@ -14,7 +14,7 @@
 
 void tag_tilemap(uint l_idx, vec3 P, float dist_to_cam, const bool is_directional)
 {
-  LightData light = lights[l_idx];
+  LightData light = lights_buf[l_idx];
   ShadowData shadow = light.shadow_data;
 
   if (light.shadow_id == LIGHT_NO_SHADOW) {
@@ -90,13 +90,13 @@ void main()
 
   float dist_to_cam = length(vP);
 
-  LIGHT_FOREACH_BEGIN_DIRECTIONAL (light_culling, l_idx) {
+  LIGHT_FOREACH_BEGIN_DIRECTIONAL (lights_cull_buf, l_idx) {
     tag_tilemap(l_idx, P, dist_to_cam, true);
   }
   LIGHT_FOREACH_END
 
   uvec2 px = gl_GlobalInvocationID.xy;
-  LIGHT_FOREACH_BEGIN_LOCAL (light_culling, lights_zbins, lights_culling_words, px, vP.z, l_idx) {
+  LIGHT_FOREACH_BEGIN_LOCAL (lights_cull_buf, lights_zbin_buf, lights_tile_buf, px, vP.z, l_idx) {
     tag_tilemap(l_idx, P, dist_to_cam, false);
   }
   LIGHT_FOREACH_END

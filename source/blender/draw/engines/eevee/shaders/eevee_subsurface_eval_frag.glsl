@@ -92,11 +92,11 @@ void main(void)
 
   /* TODO/OPTI(fclem) Make separate sample set for lower radius. */
 
-  for (int i = 0; i < sss.sample_len; i++) {
-    vec2 sample_uv = center_uv + sample_space * sss.samples[i].xy;
-    float pdf_inv = sss.samples[i].z;
+  for (int i = 0; i < sss_buf.sample_len; i++) {
+    vec2 sample_uv = center_uv + sample_space * sss_buf.samples[i].xy;
+    float pdf_inv = sss_buf.samples[i].z;
 
-    float sample_depth = textureLod(hiz_tx, sample_uv * hiz.uv_scale, 0.0).r;
+    float sample_depth = textureLod(hiz_tx, sample_uv * hiz_buf.uv_scale, 0.0).r;
     vec3 sample_vP = get_view_space_from_depth(sample_uv, sample_depth);
 
     vec4 sample_data = texture(radiance_tx, sample_uv);

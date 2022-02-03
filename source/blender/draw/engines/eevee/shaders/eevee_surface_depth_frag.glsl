@@ -69,7 +69,7 @@ void main(void)
 
   nodetree_surface();
 
-  float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_TRANSPARENCY);
+  float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_TRANSPARENCY);
   float random_threshold = hashed_alpha_threshold(1.0, noise_offset, g_data.P);
 
   float transparency = avg(g_transparency_data.transmittance);

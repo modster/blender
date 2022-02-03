@@ -6,6 +6,7 @@
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_film_filter)
+    .do_static_compilation(true)
     .uniform_buf(0, "CameraData", "camera")
     .uniform_buf(1, "FilmData", "film")
     .sampler(0, ImageType::FLOAT_2D, "input_tx")
@@ -18,6 +19,7 @@ GPU_SHADER_CREATE_INFO(eevee_film_filter)
     .additional_info("draw_fullscreen");
 
 GPU_SHADER_CREATE_INFO(eevee_film_filter_depth)
+    .do_static_compilation(true)
     .uniform_buf(0, "CameraData", "camera")
     .uniform_buf(1, "FilmData", "film")
     .sampler(0, ImageType::DEPTH_2D, "input_tx")
@@ -36,6 +38,7 @@ GPU_SHADER_CREATE_INFO(eevee_film_filter_depth)
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_film_resolve)
+    .do_static_compilation(true)
     .uniform_buf(1, "FilmData", "film")
     .sampler(0, ImageType::FLOAT_2D, "data_tx")
     .sampler(1, ImageType::FLOAT_2D, "weight_tx")
@@ -46,6 +49,7 @@ GPU_SHADER_CREATE_INFO(eevee_film_resolve)
     .additional_info("draw_fullscreen");
 
 GPU_SHADER_CREATE_INFO(eevee_film_resolve_depth)
+    .do_static_compilation(true)
     .uniform_buf(1, "FilmData", "film")
     .sampler(0, ImageType::FLOAT_2D, "data_tx")
     .sampler(1, ImageType::FLOAT_2D, "weight_tx")

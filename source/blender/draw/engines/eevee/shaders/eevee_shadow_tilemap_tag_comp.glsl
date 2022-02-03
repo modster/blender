@@ -29,7 +29,7 @@ vec3 safe_project(ShadowTileMapData tilemap, inout int clipped, vec3 v)
 
 void main()
 {
-  ShadowTileMapData tilemap = tilemaps[gl_GlobalInvocationID.z];
+  ShadowTileMapData tilemap = tilemaps_buf[gl_GlobalInvocationID.z];
 
   /* Bitmap of tile intersection tests. Use one uint per row for each LOD. */
   shared uint flag_map[SHADOW_TILEMAP_RES * 2];

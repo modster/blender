@@ -29,7 +29,7 @@ void main(void)
   uint word = 0u;
 
   for (; l_idx < l_end; l_idx++) {
-    LightData light = lights[l_idx];
+    LightData light = lights_buf[l_idx];
 
     bool intersect_tile;
     switch (light.type) {

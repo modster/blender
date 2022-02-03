@@ -122,9 +122,9 @@ const char *ShaderModule::static_shader_create_info_name_get(eShaderType shader_
     case DOF_REDUCE_RECURSIVE:
       return "eevee_depth_of_field_reduce_recursive";
     case DOF_RESOLVE_LUT:
-      return "eevee_depth_of_field_resolve_lut_lq";
+      return "eevee_depth_of_field_resolve_lq_lut";
     case DOF_RESOLVE_LUT_HQ:
-      return "eevee_depth_of_field_resolve_lut_hq";
+      return "eevee_depth_of_field_resolve_hq_lut";
     case DOF_RESOLVE:
       return "eevee_depth_of_field_resolve_lq";
     case DOF_RESOLVE_HQ:

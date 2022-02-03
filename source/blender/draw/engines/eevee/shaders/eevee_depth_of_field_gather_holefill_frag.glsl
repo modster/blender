@@ -37,8 +37,8 @@ void main()
   }
   else if (do_fast_gather) {
     vec2 unused_occlusion;
-    dof_gather_accumulator(sampling,
-                           dof,
+    dof_gather_accumulator(sampling_buf,
+                           dof_buf,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,
@@ -53,8 +53,8 @@ void main()
   }
   else {
     vec2 unused_occlusion;
-    dof_gather_accumulator(sampling,
-                           dof,
+    dof_gather_accumulator(sampling_buf,
+                           dof_buf,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,

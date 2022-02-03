@@ -19,9 +19,9 @@ void main(void)
   interp.samp = 1 + (gl_VertexID / 6);
   interp.coord = pos[gl_VertexID % 6];
 
-  CubemapData cube = cubes[interp.samp];
+  CubemapData cube = cubes_buf[interp.samp];
 
-  vec3 quad = vec3(interp.coord * probes_info.cubes_info.display_size * 0.5, 0.0);
+  vec3 quad = vec3(interp.coord * probes_buf.cubes_info.display_size * 0.5, 0.0);
 
   interp.P = vec3(cube._world_position_x, cube._world_position_y, cube._world_position_z);
   interp.P += transform_direction(ViewMatrixInverse, quad);

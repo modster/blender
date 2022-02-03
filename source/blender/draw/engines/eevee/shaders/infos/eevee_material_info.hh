@@ -12,7 +12,7 @@ GPU_SHADER_CREATE_INFO(eevee_shared)
 
 GPU_SHADER_CREATE_INFO(eevee_sampling_data)
     .additional_info("eevee_shared")
-    .uniform_buf(15, "SamplingData", "sampling");
+    .uniform_buf(15, "SamplingData", "sampling_buf");
 
 /** \} */
 
@@ -122,7 +122,7 @@ GPU_SHADER_CREATE_INFO(eevee_surface_background)
 
 GPU_SHADER_CREATE_INFO(eevee_background_lookdev)
     .additional_info("eevee_shared")
-    .uniform_buf(0, "LightProbeInfoData", "probes_info")
+    .uniform_buf(0, "LightProbeInfoData", "probes_buf")
     .sampler(0, ImageType::FLOAT_CUBE_ARRAY, "lightprobe_cube_tx")
     .push_constant(Type::FLOAT, "opacity")
     .push_constant(Type::FLOAT, "blur")

@@ -100,10 +100,10 @@ DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMa
   eGPUSamplerState no_interp = GPU_SAMPLER_DEFAULT;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
   lights.shgroup_resources(grp);
-  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
-  DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
-  DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
-  DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+  DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
+  DRW_shgroup_uniform_block(grp, "grids_buf", lightprobes.grid_ubo_get());
+  DRW_shgroup_uniform_block(grp, "cubes_buf", lightprobes.cube_ubo_get());
+  DRW_shgroup_uniform_block(grp, "probes_buf", lightprobes.info_ubo_get());
   DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
   DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
   DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
@@ -113,13 +113,13 @@ DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMa
         grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
   }
   if (true) {
-    DRW_shgroup_uniform_block(grp, "rt_diffuse_block", inst_.raytracing.diffuse_ubo_get());
-    DRW_shgroup_uniform_block(grp, "rt_reflection_block", inst_.raytracing.reflection_ubo_get());
-    DRW_shgroup_uniform_block(grp, "rt_refraction_block", inst_.raytracing.refraction_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_diffuse_buf", inst_.raytracing.diffuse_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_reflection_buf", inst_.raytracing.reflection_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_refraction_buf", inst_.raytracing.refraction_ubo_get());
     DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_radiance_tx_, no_interp);
   }
   if (true) {
-    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
   }
   return grp;
@@ -141,10 +141,10 @@ DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
   eGPUSamplerState no_interp = GPU_SAMPLER_DEFAULT;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, transparent_ps_);
   lights.shgroup_resources(grp);
-  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
-  DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
-  DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
-  DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+  DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
+  DRW_shgroup_uniform_block(grp, "grids_buf", lightprobes.grid_ubo_get());
+  DRW_shgroup_uniform_block(grp, "cubes_buf", lightprobes.cube_ubo_get());
+  DRW_shgroup_uniform_block(grp, "probes_buf", lightprobes.info_ubo_get());
   DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
   DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
   DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
@@ -154,13 +154,13 @@ DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
         grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
   }
   if (true) {
-    DRW_shgroup_uniform_block(grp, "rt_diffuse_block", inst_.raytracing.diffuse_ubo_get());
-    DRW_shgroup_uniform_block(grp, "rt_reflection_block", inst_.raytracing.reflection_ubo_get());
-    DRW_shgroup_uniform_block(grp, "rt_refraction_block", inst_.raytracing.refraction_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_diffuse_buf", inst_.raytracing.diffuse_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_reflection_buf", inst_.raytracing.reflection_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_refraction_buf", inst_.raytracing.refraction_ubo_get());
     DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_radiance_tx_, no_interp);
   }
   if (true) {
-    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
   }
 
@@ -276,7 +276,7 @@ DRWShadingGroup *DeferredLayer::material_add(::Material *blender_mat, GPUMateria
   DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? gbuffer_culled_ps_ :
                                                                     gbuffer_ps_;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
-  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+  DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
   DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
   DRW_shgroup_stencil_set(grp, stencil_mask, 0xFF, 0xFF);
   return grp;
@@ -287,7 +287,7 @@ DRWShadingGroup *DeferredLayer::prepass_add(::Material *blender_mat, GPUMaterial
   DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? prepass_culled_ps_ :
                                                                     prepass_ps_;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
-  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+  DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
   return grp;
 }
 
@@ -462,10 +462,10 @@ void DeferredPass::sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(DEFERRED_EVAL_DIRECT);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_direct_ps_);
     lights.shgroup_resources(grp);
-    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
-    DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
-    DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
-    DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+    DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "grids_buf", lightprobes.grid_ubo_get());
+    DRW_shgroup_uniform_block(grp, "cubes_buf", lightprobes.cube_ubo_get());
+    DRW_shgroup_uniform_block(grp, "probes_buf", lightprobes.info_ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
     DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
@@ -493,9 +493,8 @@ void DeferredPass::sync(void)
     eval_subsurface_ps_ = DRW_pass_create("DeferredSubsurface", state);
     GPUShader *sh = inst_.shaders.static_shader_get(SUBSURFACE_EVAL);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_subsurface_ps_);
-    DRW_shgroup_uniform_block(grp, "subsurface_block", inst_.subsurface.ubo_get());
-    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
-    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_block(grp, "sss_buf", inst_.subsurface.ubo_get());
+    DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_front_tx_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_diffuse_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref_ex(
@@ -584,7 +583,7 @@ void DeferredPass::render(const DRWView *drw_view,
   refraction_layer_.render(drw_view, gbuffer, hiz_front, hiz_back, rt_buffer_refract_, view_fb);
   DRW_stats_group_end();
 
-  /* NOTE(fclem): Reuse the same rtbuffer as refraction but should not use it. */
+  /* NOTE(fclem): Reuse the same rtbuf_buf as refraction but should not use it. */
   DRW_stats_group_start("VolumetricLayer");
   volumetric_layer_.render(drw_view, gbuffer, hiz_front, hiz_back, rt_buffer_refract_, view_fb);
   DRW_stats_group_end();

@@ -35,7 +35,7 @@ void main(void)
   float thickness;
   gbuffer_load_global_data(tra_nor_in, thickness);
 
-  float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE);
+  float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_LIGHTPROBE);
   float noise = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
   float random_probe = fract(noise + noise_offset);
 

@@ -18,25 +18,25 @@ void main()
 
   vec2 texel = floor(gl_FragCoord.xy) - float(dof_max_slight_focus_radius);
 
-  if (dof.bokeh_blades > 0.0) {
+  if (dof_buf.bokeh_blades > 0.0) {
     /* NOTE: atan(y,x) has output range [-M_PI..M_PI], so add 2pi to avoid negative angles. */
     float theta = atan(uv.y, uv.x) + M_2PI;
     float r = length(uv);
 
-    radius /= circle_to_polygon_radius(dof.bokeh_blades, theta - dof.bokeh_rotation);
+    radius /= circle_to_polygon_radius(dof_buf.bokeh_blades, theta - dof_buf.bokeh_rotation);
 
-    float theta_new = circle_to_polygon_angle(dof.bokeh_blades, theta);
-    float r_new = circle_to_polygon_radius(dof.bokeh_blades, theta_new);
+    float theta_new = circle_to_polygon_angle(dof_buf.bokeh_blades, theta);
+    float r_new = circle_to_polygon_radius(dof_buf.bokeh_blades, theta_new);
 
-    theta_new -= dof.bokeh_rotation;
+    theta_new -= dof_buf.bokeh_rotation;
 
     uv = r_new * vec2(-cos(theta_new), sin(theta_new));
 
     {
       /* Slight focus distance */
-      texel *= dof.bokeh_anisotropic_scale_inv;
+      texel *= dof_buf.bokeh_anisotropic_scale_inv;
       float theta = atan(texel.y, -texel.x) + M_2PI;
-      texel /= circle_to_polygon_radius(dof.bokeh_blades, theta + dof.bokeh_rotation);
+      texel /= circle_to_polygon_radius(dof_buf.bokeh_blades, theta + dof_buf.bokeh_rotation);
     }
   }
   else {

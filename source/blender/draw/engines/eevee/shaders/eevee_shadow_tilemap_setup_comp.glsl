@@ -11,7 +11,7 @@
 
 void main()
 {
-  ShadowTileMapData tilemap = tilemaps[gl_GlobalInvocationID.z];
+  ShadowTileMapData tilemap = tilemaps_buf[gl_GlobalInvocationID.z];
   ivec2 grid_shift = (do_tilemap_setup) ? tilemap.grid_shift : ivec2(0);
   ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
   ivec2 tile_shifted = tile_co + grid_shift;
@@ -34,7 +34,7 @@ void main()
 
   if (grid_shift != ivec2(0) && tile_data.is_cached) {
     /* Update page location after shift. */
-    free_page_owners[tile_data.free_page_owner_index] = packUvec2x16(uvec2(texel_out));
+    pages_free_buf[tile_data.free_page_owner_index] = packUvec2x16(uvec2(texel_out));
   }
 
   imageStore(tilemaps_img, texel_out, uvec4(shadow_tile_data_pack(tile_data)));
@@ -61,8 +61,8 @@ void main()
   }
 
   if (gl_GlobalInvocationID == uvec3(0)) {
-    infos.page_free_next = max(-1, infos.page_free_next);
-    infos.page_free_next_prev = infos.page_free_next;
-    infos.page_updated_count = 0;
+    pages_infos_buf.page_free_next = max(-1, pages_infos_buf.page_free_next);
+    pages_infos_buf.page_free_next_prev = pages_infos_buf.page_free_next;
+    pages_infos_buf.page_updated_count = 0;
   }
 }

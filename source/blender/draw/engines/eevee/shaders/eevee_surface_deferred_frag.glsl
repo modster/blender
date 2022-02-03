@@ -11,7 +11,7 @@ void main(void)
 {
   g_data = init_globals();
 
-  float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_CLOSURE);
+  float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_CLOSURE);
   float noise = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
   g_data.closure_rand = fract(noise + noise_offset);
   /* TODO(fclem) other RNG. */

@@ -46,8 +46,8 @@ void main(void)
   }
 
   if (!no_slight_focus_pass && prediction.do_slight_focus) {
-    dof_slight_focus_gather(sampling,
-                            dof,
+    dof_slight_focus_gather(sampling_buf,
+                            dof_buf,
                             depth_tx,
                             color_tx,
                             bokeh_lut_tx,

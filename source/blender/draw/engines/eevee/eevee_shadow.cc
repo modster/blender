@@ -529,10 +529,9 @@ void ShadowModule::init(void)
 
     int2 atlas_extent = int2(shadow_page_size_ * SHADOW_PAGE_PER_ROW);
     int2 render_extent = int2(shadow_page_size_ * SHADOW_TILEMAP_RES);
-    GPUTexture *tex = atlas_tx_;
 
     /* Global update. */
-    if ((tex == nullptr) || GPU_texture_format(atlas_tx_) != shadow_format_ ||
+    if ((atlas_tx_.is_valid() == false) || GPU_texture_format(atlas_tx_) != shadow_format_ ||
         GPU_texture_width(atlas_tx_) != atlas_extent.x ||
         GPU_texture_height(atlas_tx_) != atlas_extent.y) {
       for (ShadowTileMap *tilemap : tilemap_allocator.maps) {
@@ -986,7 +985,7 @@ void ShadowModule::debug_end_sync(void)
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_uniform_texture(grp, "atlas_tx", atlas_tx_);
-    DRW_shgroup_uniform_block(grp, "debug_block", debug_data_);
+    DRW_shgroup_uniform_block(grp, "debug", debug_data_);
     if (debug_data_.type == SHADOW_DEBUG_PAGE_ALLOCATION) {
       DRW_shgroup_uniform_texture(grp, "debug_page_tx", debug_page_tx_);
     }
@@ -1189,7 +1188,7 @@ void ShadowPass::sync(void)
 DRWShadingGroup *ShadowPass::material_add(::Material *UNUSED(material), GPUMaterial *gpumat)
 {
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, surface_ps_);
-  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+  DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
   return grp;
 }
 

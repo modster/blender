@@ -469,8 +469,8 @@ void LightModule::debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz)
 void LightModule::shgroup_resources(DRWShadingGroup *grp)
 {
   DRW_shgroup_vertex_buffer_ref(grp, "lights_buf", &culling_light_buf);
-  DRW_shgroup_vertex_buffer_ref(grp, "lights_culling_buf", &culling_data);
-  DRW_shgroup_vertex_buffer_ref(grp, "lights_zbins_buf", &culling_zbin_buf);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_cull_buf", &culling_data);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_zbin_buf", &culling_zbin_buf);
   DRW_shgroup_vertex_buffer_ref(grp, "lights_tile_buf", &culling_tile_buf);
 
   DRW_shgroup_uniform_texture(grp, "shadow_atlas_tx", inst_.shadows.atlas_tx_get());

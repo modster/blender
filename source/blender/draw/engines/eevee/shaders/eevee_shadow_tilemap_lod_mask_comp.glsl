@@ -10,7 +10,7 @@
 
 void main()
 {
-  ShadowTileMapData tilemap_data = tilemaps[gl_GlobalInvocationID.z];
+  ShadowTileMapData tilemap_data = tilemaps_buf[gl_GlobalInvocationID.z];
   int tilemap_idx = tilemap_data.index;
   int lod_max = tilemap_data.is_cubeface ? SHADOW_TILEMAP_LOD : 0;
 

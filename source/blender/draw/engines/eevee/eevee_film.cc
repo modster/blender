@@ -101,7 +101,7 @@ void Film::sync(void)
 {
   char full_name[32];
   for (int i = 0; i < 2; i++) {
-    if (data_tx_[i] == nullptr) {
+    if (data_tx_[i].is_valid() == false) {
       eGPUTextureFormat tex_format = to_gpu_texture_format(data_.data_type);
       data_tx_[i].ensure_2d(tex_format, data_.extent);
       /* TODO(fclem) The weight texture could be shared between all similar accumulators. */
