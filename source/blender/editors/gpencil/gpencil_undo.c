@@ -421,6 +421,10 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
 
   bool only_frame_changed = false;
 
+  /* TODO: We might need to check if ID_RECALC_ALL is set on the gpd here to test if we need to
+   * clear the cache. It might be bad to "start" with some cache and add new update nodes on top.
+   */
+
   /* In case the step we are about to encode would be the first in the gpencil undo system, ensure
    * that we do a full-copy. */
   if (undo_stack->step_active == NULL ||
@@ -448,7 +452,7 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
 
   /* TODO: Handle this case properly once the update cache is more widly used. We avoid full-copies
    * for now at the expense of to being able to undo them. */
-#if 1
+#if 0
   if (!only_frame_changed && gpd->runtime.update_cache == NULL) {
     return false;
   }
