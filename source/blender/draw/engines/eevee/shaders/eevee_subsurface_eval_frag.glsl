@@ -15,7 +15,6 @@
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_closure_lib.glsl)
 
 vec3 burley_setup(vec3 radius, vec3 albedo)
 {

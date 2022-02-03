@@ -272,6 +272,8 @@ void ShaderModule::material_create_info_ammend(GPUMaterial *gpumat, GPUCodegenOu
   GPUCodegenOutput &codegen = *codegen_;
   ShaderCreateInfo &info = *reinterpret_cast<ShaderCreateInfo *>(codegen.create_info);
 
+  info.auto_resource_location(true);
+
   std::stringstream global_vars;
   switch (geometry_type) {
     case MAT_GEOM_MESH:
@@ -308,6 +310,22 @@ void ShaderModule::material_create_info_ammend(GPUMaterial *gpumat, GPUCodegenOu
       break;
   }
 
+  const bool do_fragment_attrib_load = (geometry_type == MAT_GEOM_WORLD);
+
+  if (do_fragment_attrib_load && !info.vertex_out_interfaces_.is_empty()) {
+    /* Codegen outputs only one interface. */
+    const StageInterfaceInfo &iface = *info.vertex_out_interfaces_.first();
+    /* Globals the attrib_load() can write to when it is in the fragment shader. */
+    global_vars << "struct " << iface.name << " {\n";
+    for (auto &inout : iface.inouts) {
+      global_vars << "  " << inout.type << " " << inout.name << ";\n";
+    }
+    global_vars << "};\n";
+    global_vars << iface.name << " " << iface.instance_name << ";\n";
+
+    info.vertex_out_interfaces_.clear();
+  }
+
   std::stringstream attr_load;
   attr_load << "void attrib_load()\n";
   attr_load << "{\n";
@@ -316,7 +334,7 @@ void ShaderModule::material_create_info_ammend(GPUMaterial *gpumat, GPUCodegenOu
 
   std::stringstream vert_gen, frag_gen;
 
-  if (geometry_type == MAT_GEOM_WORLD) {
+  if (do_fragment_attrib_load) {
     frag_gen << global_vars.str() << attr_load.str();
   }
   else {
@@ -360,7 +378,7 @@ void ShaderModule::material_create_info_ammend(GPUMaterial *gpumat, GPUCodegenOu
     frag_gen << ((codegen.thickness) ? codegen.thickness : "return 0.1;\n");
     frag_gen << "}\n\n";
 
-    info.fragment_source_generated = vert_gen.str();
+    info.fragment_source_generated = frag_gen.str();
   }
 
   /* Geometry Info. */
@@ -413,6 +431,7 @@ void ShaderModule::material_create_info_ammend(GPUMaterial *gpumat, GPUCodegenOu
           }
           else {
             info.additional_info("eevee_surface_depth_simple");
+            info.fragment_source_generated = "";
           }
           break;
         case MAT_PIPE_DEFERRED:

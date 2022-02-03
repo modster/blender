@@ -39,11 +39,13 @@ GPU_SHADER_CREATE_INFO(eevee_surface_hair)
 GPU_SHADER_CREATE_INFO(eevee_surface_lookdev)
     .vertex_in(0, Type::VEC3, "pos")
     .vertex_in(1, Type::VEC3, "nor")
-    .vertex_source("eevee_surface_lookdev_vert.glsl");
+    .vertex_source("eevee_surface_lookdev_vert.glsl")
+    .additional_info("draw_mesh", "draw_resource_id_varying");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_world)
     .builtins(BuiltinBits::VERTEX_ID)
-    .vertex_source("eevee_surface_world_vert.glsl");
+    .vertex_source("eevee_surface_world_vert.glsl")
+    .additional_info("draw_modelmat", "draw_resource_id_varying");
 
 /** \} */
 
@@ -121,6 +123,7 @@ GPU_SHADER_CREATE_INFO(eevee_surface_background)
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_background_lookdev)
+    .do_static_compilation(true)
     .additional_info("eevee_shared")
     .uniform_buf(0, "LightProbeInfoData", "probes_buf")
     .sampler(0, ImageType::FLOAT_CUBE_ARRAY, "lightprobe_cube_tx")
@@ -162,12 +165,7 @@ GPU_SHADER_CREATE_INFO(eevee_volume_deferred)
 #ifdef DEBUG
 
 /* Stub functions defined by the material evaluation. */
-GPU_SHADER_CREATE_INFO(eevee_material_stub)
-    .define("attrib_load()")
-    .define("nodetree_displacement()", "vec3(0)")
-    .define("nodetree_surface()", "CLOSURE_DEFAULT")
-    .define("nodetree_volume()", "CLOSURE_DEFAULT")
-    .define("nodetree_thickness()", "0.1");
+GPU_SHADER_CREATE_INFO(eevee_material_stub).define("EEVEE_MATERIAL_STUBS");
 
 #  define EEVEE_MAT_FINAL_VARIATION(name, ...) \
     GPU_SHADER_CREATE_INFO(name) \

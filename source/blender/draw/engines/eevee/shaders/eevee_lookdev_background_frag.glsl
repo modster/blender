@@ -7,6 +7,7 @@
  */
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
+#pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
 void main()
 {

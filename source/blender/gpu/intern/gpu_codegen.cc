@@ -174,7 +174,7 @@ static std::ostream &operator<<(std::ostream &stream, const GPUInput *input)
     case GPU_SOURCE_CONSTANT:
       return stream << "cons" << input->id;
     case GPU_SOURCE_UNIFORM:
-      return stream << "unf" << input->id;
+      return stream << "node_tree.u" << input->id;
     case GPU_SOURCE_ATTR:
       return stream << "var_attrs.v" << input->attr->id;
     case GPU_SOURCE_UNIFORM_ATTR:
@@ -318,6 +318,7 @@ void GPUCodegen::generate_attribs()
   info.name_buffer = MEM_new<GPUCodegenCreateInfo::NameBuffer>("info.name_buffer");
   info.interface_generated = new StageInterfaceInfo("codegen_iface", "var_attrs");
   StageInterfaceInfo &iface = *info.interface_generated;
+  info.vertex_out(iface);
 
   /* Input declaration, loading / assignment to interface and geometry shader passthrough. */
   std::stringstream decl_ss, iface_ss, load_ss;
@@ -405,7 +406,7 @@ void GPUCodegen::generate_resources()
     ss << "struct NodeTree {\n";
     LISTBASE_FOREACH (LinkData *, link, &ubo_inputs_) {
       GPUInput *input = (GPUInput *)(link->data);
-      ss << "  " << input->type << " " << input << ";\n";
+      ss << input->type << " u" << input->id << ";\n";
     }
     ss << "};\n\n";
 
@@ -448,7 +449,7 @@ void GPUCodegen::node_serialize(std::stringstream &eval_ss, const GPUNode *node)
   }
   /* Declare temporary variables for node output storage. */
   LISTBASE_FOREACH (GPUOutput *, output, &node->outputs) {
-    eval_ss << output->type << " " << output << ";\n";
+    eval_ss << gpu_data_type_to_string(output->type) << " " << output << ";\n";
   }
 
   /* Function call. */
