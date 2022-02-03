@@ -26,7 +26,9 @@
 #include "BLI_dynstr.h"
 #include "BLI_string.h"
 #include "BLI_string_utils.h"
+#include "BLI_vector.hh"
 
+#include "gpu_shader_dependency_private.h"
 #include "gpu_shader_private.hh"
 
 #include "GPU_platform.h"
@@ -57,6 +59,18 @@ void Shader::print_log(Span<const char *> sources,
   char reset_col[] = "\033[0;0m";
   char *sources_combined = BLI_string_join_arrayN((const char **)sources.data(), sources.size());
   DynStr *dynstr = BLI_dynstr_new();
+
+  Vector<int64_t> sources_end_line;
+  for (StringRefNull src : sources) {
+    int64_t cursor = 0, line_count = 0;
+    while ((cursor = src.find('\n', cursor) + 1)) {
+      line_count++;
+    }
+    if (sources_end_line.is_empty() == false) {
+      line_count += sources_end_line.last();
+    }
+    sources_end_line.append(line_count);
+  }
 
   if (!CLG_color_support_get(&LOG)) {
     err_col[0] = warn_col[0] = info_col[0] = reset_col[0] = '\0';
@@ -148,6 +162,35 @@ void Shader::print_log(Span<const char *> sources,
       }
     }
     BLI_dynstr_appendf(dynstr, line_prefix);
+
+    /* Search the correct source index. */
+    int row_in_file = log_item.cursor.row;
+    int source_index = log_item.cursor.source;
+    if (source_index <= 0) {
+      for (auto i : sources_end_line.index_range()) {
+        if (log_item.cursor.row <= sources_end_line[i]) {
+          source_index = i;
+          if (i > 0) {
+            row_in_file -= sources_end_line[i - 1];
+          }
+          break;
+        }
+      }
+    }
+    /* Print the filename the error line is comming from. */
+    if (source_index > 0) {
+      StringRefNull filename = shader::gpu_shader_dependency_get_filename_from_source_string(
+          sources[source_index]);
+      if (!filename.is_empty()) {
+        BLI_dynstr_appendf(dynstr,
+                           "%s%s:%d:%d: %s",
+                           info_col,
+                           filename.c_str(),
+                           row_in_file,
+                           log_item.cursor.column + 1,
+                           reset_col);
+      }
+    }
 
     if (log_item.severity == Severity::Error) {
       BLI_dynstr_appendf(dynstr, "%s%s%s: ", err_col, "Error", info_col);

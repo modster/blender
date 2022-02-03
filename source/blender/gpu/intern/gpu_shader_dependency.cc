@@ -407,4 +407,15 @@ StringRefNull gpu_shader_dependency_get_source(const StringRefNull shader_source
   return src->source;
 }
 
+StringRefNull gpu_shader_dependency_get_filename_from_source_string(
+    const StringRefNull source_string)
+{
+  for (auto &source : g_sources->values()) {
+    if (source->source.c_str() == source_string.c_str()) {
+      return source->filename;
+    }
+  }
+  return "";
+}
+
 }  // namespace blender::gpu::shader
