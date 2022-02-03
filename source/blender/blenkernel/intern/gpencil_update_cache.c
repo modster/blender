@@ -100,8 +100,9 @@ static void cache_node_update(void *node, void *data)
   /* In case the new cache does a full update, remove its children since they will be all
    * updated by this cache. */
   if (new_update_cache->flag == GP_UPDATE_NODE_FULL_COPY && update_cache->children != NULL) {
+    /* We don't free the tree itself here, because we just want to clear the children, not delete
+     * the whole node. */
     BLI_dlrbTree_free(update_cache->children, cache_node_free);
-    MEM_freeN(update_cache->children);
   }
 
   update_cache_free(new_update_cache);
@@ -181,10 +182,6 @@ static void update_cache_node_create(
 {
   if (gpd == NULL) {
     return;
-  }
-
-  if (gpd->flag & GP_DATA_UPDATE_CACHE_UNDO_ENCODED) {
-    BKE_gpencil_free_update_cache(gpd);
   }
 
   GPencilUpdateCache *root_cache = gpd->runtime.update_cache;
