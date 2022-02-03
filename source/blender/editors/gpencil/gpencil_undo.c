@@ -472,7 +472,7 @@ static void gpencil_undosys_step_decode(struct bContext *C,
                                         struct Main *UNUSED(bmain),
                                         UndoStep *us_p,
                                         const eUndoStepDir dir,
-                                        bool UNUSED(is_final))
+                                        bool is_final)
 {
   GPencilUndoStep *us = (GPencilUndoStep *)us_p;
   GPencilUndoData *undo_data = us->undo_data;
@@ -493,9 +493,11 @@ static void gpencil_undosys_step_decode(struct bContext *C,
   }
 
   if (change_gpencil_mode(C, ob, undo_data->mode)) {
+    if (is_final) {
     DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
     WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | ND_GPENCIL_EDITMODE, NULL);
     WM_event_add_notifier(C, NC_SCENE | ND_MODE, NULL);
+    }
     return;
   }
 
@@ -536,8 +538,10 @@ static void gpencil_undosys_step_decode(struct bContext *C,
   }
   gpd->flag |= GP_DATA_UPDATE_CACHE_UNDO_ENCODED;
 
+  if (is_final) {
   DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
   WM_event_add_notifier(C, NC_GEOM | ND_DATA, NULL);
+  }
 }
 
 static void gpencil_undosys_step_free(UndoStep *us_p)
