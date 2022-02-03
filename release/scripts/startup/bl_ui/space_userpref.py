@@ -2325,7 +2325,7 @@ class USERPREF_PT_experimental_debugging(ExperimentalPanel, Panel):
                 ({"property": "use_asset_indexing"}, None, None),
                 ({"property": "use_gpencil_update_cache"}, "T95401", None),
                 # Disabled if use_gpencil_update_cache is disabled
-                ({"property": "use_gpencil_undo_system"}, "TODO", lambda ctx: ctx.preferences.experimental.use_gpencil_update_cache),
+                ({"property": "use_gpencil_undo_system"}, "T95450", lambda ctx: ctx.preferences.experimental.use_gpencil_update_cache),
             ),
         )
 
