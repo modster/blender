@@ -25,11 +25,14 @@
  */
 
 #include <iostream>
+#include <regex>
 
+#include "BLI_ghash.h"
 #include "BLI_map.hh"
 #include "BLI_set.hh"
 #include "BLI_string_ref.hh"
 
+#include "gpu_material_library.h"
 #include "gpu_shader_create_info.hh"
 #include "gpu_shader_dependency_private.h"
 
@@ -43,6 +46,7 @@ extern "C" {
 namespace blender::gpu {
 
 using GPUSourceDictionnary = Map<StringRef, struct GPUSource *>;
+using GPUFunctionDictionnary = Map<StringRef, struct GPUFunction *>;
 
 struct GPUSource {
   StringRefNull fullpath;
@@ -53,7 +57,10 @@ struct GPUSource {
   shader::BuiltinBits builtins = (shader::BuiltinBits)0;
   std::string processed_source;
 
-  GPUSource(const char *path, const char *file, const char *datatoc)
+  GPUSource(const char *path,
+            const char *file,
+            const char *datatoc,
+            GPUFunctionDictionnary *g_functions)
       : fullpath(path), filename(file), source(datatoc)
   {
     /* Scan for builtins. */
@@ -104,6 +111,10 @@ struct GPUSource {
     if (filename.endswith(".h") || filename.endswith(".hh")) {
       enum_preprocess();
     }
+
+    if (is_from_material_library()) {
+      material_functions_parse(g_functions);
+    }
   };
 
   bool is_in_comment(const StringRef &input, int64_t offset)
@@ -126,7 +137,7 @@ struct GPUSource {
         if constexpr (check_whole_word) {
           /* Fix false positive if something has "enum" as suffix. */
           char previous_char = input[offset - 1];
-          if (!(ELEM(previous_char, '\n', '\t', ' ', ':'))) {
+          if (!(ELEM(previous_char, '\n', '\t', ' ', ':', '(', ','))) {
             offset += (reversed) ? -1 : 1;
             continue;
           }
@@ -141,9 +152,13 @@ struct GPUSource {
     }
   }
 
+#define find_keyword find_str<true, false>
+#define rfind_keyword find_str<true, true>
+#define find_token find_str<false, false>
+#define rfind_token find_str<false, true>
+
   void print_error(const StringRef &input, int64_t offset, const StringRef message)
   {
-    std::cout << " error: " << message << "\n";
     StringRef sub = input.substr(0, offset);
     int64_t line_number = std::count(sub.begin(), sub.end(), '\n') + 1;
     int64_t line_end = input.find("\n", offset);
@@ -163,6 +178,12 @@ struct GPUSource {
       std::cout << " ";
     }
     std::cout << "^\n";
+  }
+
+#define CHECK(test_value, str, ofs, msg) \
+  if ((test_value) == -1) { \
+    print_error(str, ofs, msg); \
+    continue; \
   }
 
   /**
@@ -202,22 +223,12 @@ struct GPUSource {
   {
     const StringRefNull input = source;
     std::string output;
-    int64_t cursor = 0;
+    int64_t cursor = -1;
     int64_t last_pos = 0;
     const bool is_cpp = filename.endswith(".hh");
 
-#define find_keyword find_str<true, false>
-#define find_token find_str<false, false>
-#define rfind_token find_str<false, true>
-#define CHECK(test_value, str, ofs, msg) \
-  if ((test_value) == -1) { \
-    print_error(str, ofs, msg); \
-    cursor++; \
-    continue; \
-  }
-
     while (true) {
-      cursor = find_keyword(input, "enum ", cursor);
+      cursor = find_keyword(input, "enum ", cursor + 1);
       if (cursor == -1) {
         break;
       }
@@ -277,10 +288,6 @@ struct GPUSource {
       return;
     }
 
-#undef find_keyword
-#undef find_token
-#undef rfind_token
-
     if (last_pos != 0) {
       output += input.substr(last_pos);
     }
@@ -288,37 +295,228 @@ struct GPUSource {
     source = processed_source.c_str();
   };
 
+  void material_functions_parse(GPUFunctionDictionnary *g_functions)
+  {
+    const std::string input = source;
+
+    /* TODO(@fclem): Ignore the comments. */
+    const std::regex function_regex(
+        /* Return type. */
+        "(void|[iu]?vec[234]|float|u?int|Closure)"
+        /* Separator. */
+        "[ ]+"
+        /* Function name. */
+        "([\\w]+)"
+        /* Separator. */
+        "[ ]*"
+        /* Argument list. */
+        "\\(([\\w\\s\\n,]*)\\)");
+    const std::regex arg_regex(
+        /* Qualifier. */
+        "(in|out|inout)?"
+        /* Separator. */
+        "[\\s]*"
+        /* Type. */
+        "(void|[iu]?vec[234]|float|u?int|Closure|sampler[123]D(?:Array)?)"
+        /* Separator. */
+        "[\\s]+"
+        /* Name. */
+        "([\\w]+)"
+        /* Separator. */
+        "[\\s]*,?");
+
+    std::smatch func_match;
+    std::string::const_iterator search_start(input.cbegin());
+    while (std::regex_search(search_start, input.cend(), func_match, function_regex)) {
+      search_start = func_match.suffix().first;
+
+      std::string func_return_type = func_match[1].str();
+      std::string func_name = func_match[2].str();
+      std::string func_args = func_match[3].str();
+
+      GPUFunction *func = MEM_new<GPUFunction>(__func__);
+
+      STRNCPY(func->name, func_name.c_str());
+      func->source = reinterpret_cast<void *>(this);
+
+      bool insert = g_functions->add(func->name, func);
+
+      /* NOTE: We allow overloading non void function, but only if the function comes from the same
+       * file. Otherwise the dependency system breaks. */
+      if (!insert) {
+        GPUSource *other_source = reinterpret_cast<GPUSource *>(
+            g_functions->lookup(func_name)->source);
+        if (other_source != this) {
+          print_error(input,
+                      source.find(func_match[0].str()),
+                      "Function redefinition or overload in two different files ...");
+          print_error(
+              input, other_source->source.find(func_name), "... previous definition was here");
+        }
+        else {
+          /* Non-void function overload. */
+          MEM_delete(func);
+        }
+        continue;
+      }
+
+      if (func_return_type != "void") {
+        continue;
+      }
+
+      func->totparam = 0;
+      std::smatch args_match;
+      std::string::const_iterator args_search_start(func_args.cbegin());
+      while (std::regex_search(args_search_start, func_args.cend(), args_match, arg_regex)) {
+        args_search_start = args_match.suffix().first;
+        std::string arg_qualifier = args_match[1].str();
+        std::string arg_type = args_match[2].str();
+        std::string arg_name = args_match[3].str();
+
+        if (func->totparam >= ARRAY_SIZE(func->paramtype)) {
+          print_error(input, source.find(func_name), "Too much parameter in function");
+          break;
+        }
+
+        auto parse_qualifier = [](std::string &qualifier) -> GPUFunctionQual {
+          if (qualifier == "out") {
+            return FUNCTION_QUAL_OUT;
+          }
+          else if (qualifier == "inout") {
+            return FUNCTION_QUAL_INOUT;
+          }
+          else {
+            return FUNCTION_QUAL_IN;
+          }
+        };
+
+        auto parse_type = [](std::string &type) -> eGPUType {
+          if (type == "float") {
+            return GPU_FLOAT;
+          }
+          else if (type == "vec2") {
+            return GPU_VEC2;
+          }
+          else if (type == "vec3") {
+            return GPU_VEC3;
+          }
+          else if (type == "vec4") {
+            return GPU_VEC4;
+          }
+          else if (type == "mat3") {
+            return GPU_MAT3;
+          }
+          else if (type == "mat4") {
+            return GPU_MAT4;
+          }
+          else if (type == "sampler1DArray") {
+            return GPU_TEX1D_ARRAY;
+          }
+          else if (type == "sampler2DArray") {
+            return GPU_TEX2D_ARRAY;
+          }
+          else if (type == "sampler2D") {
+            return GPU_TEX2D;
+          }
+          else if (type == "sampler3D") {
+            return GPU_TEX3D;
+          }
+          else if (type == "Closure") {
+            return GPU_CLOSURE;
+          }
+          else {
+            return GPU_NONE;
+          }
+        };
+
+        func->paramqual[func->totparam] = parse_qualifier(arg_qualifier);
+        func->paramtype[func->totparam] = parse_type(arg_type);
+
+        if (func->paramtype[func->totparam] == GPU_NONE) {
+          std::string err = "Unknown parameter type \"" + arg_type + "\"";
+          int64_t err_ofs = source.find(func_name);
+          err_ofs = find_keyword(source, arg_name, err_ofs);
+          err_ofs = rfind_keyword(source, arg_type, err_ofs);
+          print_error(input, err_ofs, err);
+        }
+
+        func->totparam++;
+      }
+    }
+  }
+
+#undef find_keyword
+#undef rfind_keyword
+#undef find_token
+#undef rfind_token
+
   /* Return 1 one error. */
-  int init_dependencies(const GPUSourceDictionnary &dict)
+  int init_dependencies(const GPUSourceDictionnary &dict,
+                        const GPUFunctionDictionnary &g_functions)
   {
     if (dependencies_init) {
       return 0;
     }
     dependencies_init = true;
-    int64_t pos = 0;
+    int64_t pos = -1;
+
+    const bool is_material_library = this->is_from_material_library();
+
+    const std::regex function_regex("([\\w]+)[ ]*\\(");
+    const std::string input = source;
+    std::string::const_iterator search_start(input.cbegin());
+
+    if (is_material_library && (pos = source.find("pragma BLENDER_REQUIRE(")) != -1) {
+      /* NOTE(@fclem): This is design choice. This is to make sure the engine has total control to
+       * what gets pulled by the codegen. */
+      print_error(source, pos, "Shader node files should not use BLENDER_REQUIRE");
+    }
+
     while (true) {
-      pos = source.find("pragma BLENDER_REQUIRE(", pos);
-      if (pos == -1) {
-        return 0;
+      GPUSource *dependency_source = nullptr;
+
+      if (is_material_library) {
+
+        std::smatch func_match;
+        if (std::regex_search(search_start, input.cend(), func_match, function_regex)) {
+          search_start = func_match.suffix().first;
+          std::string func_name = func_match[1].str();
+          GPUFunction *fun = g_functions.lookup_default(func_name, nullptr);
+
+          /* Function might not in the function list. This is the case for builtin functions or
+           * functions implemented by the engines. */
+          if (fun == nullptr) {
+            continue;
+          }
+          dependency_source = reinterpret_cast<GPUSource *>(fun->source);
+          if (dependency_source == this) {
+            continue;
+          }
+        }
+        else {
+          return 0;
+        }
       }
-      int64_t start = source.find('(', pos) + 1;
-      int64_t end = source.find(')', pos);
-      if (end == -1) {
-        /* TODO Use clog. */
-        std::cout << "Error: " << filename << " : Malformed BLENDER_REQUIRE: Missing \")\"."
-                  << std::endl;
-        return 1;
-      }
-      StringRef dependency_name = source.substr(start, end - start);
-      GPUSource *dependency_source = dict.lookup_default(dependency_name, nullptr);
-      if (dependency_source == nullptr) {
-        /* TODO Use clog. */
-        std::cout << "Error: " << filename << " : Dependency not found \"" << dependency_name
-                  << "\"." << std::endl;
-        return 1;
+      else {
+        pos = source.find("pragma BLENDER_REQUIRE(", pos + 1);
+        if (pos == -1) {
+          return 0;
+        }
+        int64_t start = source.find('(', pos) + 1;
+        int64_t end = source.find(')', pos);
+        if (end == -1) {
+          print_error(source, start, "Malformed BLENDER_REQUIRE: Missing \")\" token");
+          return 1;
+        }
+        StringRef dependency_name = source.substr(start, end - start);
+        dependency_source = dict.lookup_default(dependency_name, nullptr);
+        if (dependency_source == nullptr) {
+          print_error(source, start, "Dependency not found");
+          return 1;
+        }
       }
       /* Recursive. */
-      int result = dependency_source->init_dependencies(dict);
+      int result = dependency_source->init_dependencies(dict, g_functions);
       if (result != 0) {
         return 1;
       }
@@ -327,8 +525,8 @@ struct GPUSource {
         dependencies.append_non_duplicates(dep);
       }
       dependencies.append_non_duplicates(dependency_source);
-      pos++;
     };
+    return 0;
   }
 
   /* Returns the final string with all includes done. */
@@ -348,6 +546,11 @@ struct GPUSource {
     }
     return out_builtins;
   }
+
+  bool is_from_material_library() const
+  {
+    return filename.startswith("gpu_shader_material_") && filename.endswith(".glsl");
+  }
 };
 
 }  // namespace blender::gpu
@@ -355,20 +558,22 @@ struct GPUSource {
 using namespace blender::gpu;
 
 static GPUSourceDictionnary *g_sources = nullptr;
+static GPUFunctionDictionnary *g_functions = nullptr;
 
 void gpu_shader_dependency_init()
 {
   g_sources = new GPUSourceDictionnary();
+  g_functions = new GPUFunctionDictionnary();
 
 #define SHADER_SOURCE(datatoc, filename, filepath) \
-  g_sources->add_new(filename, new GPUSource(filepath, filename, datatoc));
+  g_sources->add_new(filename, new GPUSource(filepath, filename, datatoc, g_functions));
 #include "glsl_draw_source_list.h"
 #include "glsl_gpu_source_list.h"
 #undef SHADER_SOURCE
 
   int errors = 0;
   for (auto *value : g_sources->values()) {
-    errors += value->init_dependencies(*g_sources);
+    errors += value->init_dependencies(*g_sources, *g_functions);
   }
   BLI_assert_msg(errors == 0, "Dependency errors detected: Aborting");
 }
@@ -378,7 +583,20 @@ void gpu_shader_dependency_exit()
   for (auto *value : g_sources->values()) {
     delete value;
   }
+  for (auto *value : g_functions->values()) {
+    MEM_delete(value);
+  }
   delete g_sources;
+  delete g_functions;
+}
+
+GPUFunction *gpu_material_library_use_function(GSet *used_libraries, const char *name)
+{
+  GPUFunction *function = g_functions->lookup_default(name, nullptr);
+  BLI_assert_msg(function != nullptr, "Requested function not in the function library");
+  GPUSource *source = reinterpret_cast<GPUSource *>(function->source);
+  BLI_gset_add(used_libraries, const_cast<char *>(source->filename.c_str()));
+  return function;
 }
 
 namespace blender::gpu::shader {

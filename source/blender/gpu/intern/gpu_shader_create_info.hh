@@ -298,6 +298,8 @@ struct ShaderCreateInfo {
   std::string vertex_source_generated = "";
   std::string fragment_source_generated = "";
   std::string typedef_source_generated = "";
+  /** Manually set generated dependencies. */
+  Vector<const char *, 0> dependencies_generated;
 
 #define TEST_EQUAL(a, b, _member) \
   if (!((a)._member == (b)._member)) { \

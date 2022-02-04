@@ -75,8 +75,6 @@ typedef enum eGPUType {
   GPU_TEX2D = 1002,
   GPU_TEX2D_ARRAY = 1003,
   GPU_TEX3D = 1004,
-  GPU_SHADOW2D = 1005,
-  GPU_TEXCUBE = 1006,
 
   /* GLSL Struct types */
   GPU_CLOSURE = 1007,
@@ -132,8 +130,6 @@ typedef enum eGPUVolumeDefaultValue {
 
 typedef struct GPUCodegenOutput {
   char *attr_load;
-  /* TODO(@fclem): Replace by new include system. */
-  char *library;
   /* Nodetree functions calls. */
   char *displacement;
   char *surface;

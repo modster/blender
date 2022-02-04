@@ -330,6 +330,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     sources.append(resources.c_str());
     sources.append(interface.c_str());
     sources.extend(code);
+    sources.extend(info.dependencies_generated);
     sources.append(info.vertex_source_generated.c_str());
 
     shader->vertex_shader_from_glsl(sources);
@@ -350,6 +351,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     sources.append(resources.c_str());
     sources.append(interface.c_str());
     sources.extend(code);
+    sources.extend(info.dependencies_generated);
     sources.append(info.fragment_source_generated.c_str());
 
     shader->fragment_shader_from_glsl(sources);

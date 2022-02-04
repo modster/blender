@@ -53,6 +53,7 @@
 #include "gpu_material_library.h"
 #include "gpu_node_graph.h"
 #include "gpu_shader_create_info.hh"
+#include "gpu_shader_dependency_private.h"
 
 #include <stdarg.h>
 #include <string.h>
@@ -256,7 +257,6 @@ class GPUCodegen {
     MEM_SAFE_FREE(output.volume);
     MEM_SAFE_FREE(output.thickness);
     MEM_SAFE_FREE(output.displacement);
-    MEM_SAFE_FREE(output.library);
     delete create_info;
     BLI_freelistN(&ubo_inputs_);
   };
@@ -428,8 +428,14 @@ void GPUCodegen::generate_resources()
 
 void GPUCodegen::generate_library()
 {
-  /* TODO(@fclem): This should be removed in favor of the new include system. */
-  output.library = gpu_material_library_generate_code(graph.used_libraries);
+  GPUCodegenCreateInfo &info = *create_info;
+
+  void *value;
+  GSetIterState pop_state = {0};
+  while (BLI_gset_pop(graph.used_libraries, &pop_state, &value)) {
+    auto deps = gpu_shader_dependency_get_resolved_source((const char *)value);
+    info.dependencies_generated.extend_non_duplicates(deps);
+  }
 }
 
 void GPUCodegen::node_serialize(std::stringstream &eval_ss, const GPUNode *node)
