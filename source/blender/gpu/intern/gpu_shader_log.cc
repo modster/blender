@@ -93,8 +93,20 @@ void Shader::print_log(Span<const char *> sources,
     GPULogItem log_item;
     log_line = parser->parse_line(log_line, log_item);
 
+    /* Sanitize output. Really bad values can happen when the error line is buggy. */
+    if (log_item.cursor.source >= sources.size()) {
+      log_item.cursor.source = -1;
+    }
+    if (log_item.cursor.row >= sources_end_line.last()) {
+      log_item.cursor.source = -1;
+      log_item.cursor.row = -1;
+    }
+
     if (log_item.cursor.row == -1) {
       found_line_id = false;
+    }
+    else if (log_item.source_base_row && log_item.cursor.source > 0) {
+      log_item.cursor.row += sources_end_line[log_item.cursor.source - 1];
     }
 
     const char *src_line = sources_combined;
@@ -170,12 +182,12 @@ void Shader::print_log(Span<const char *> sources,
       for (auto i : sources_end_line.index_range()) {
         if (log_item.cursor.row <= sources_end_line[i]) {
           source_index = i;
-          if (i > 0) {
-            row_in_file -= sources_end_line[i - 1];
-          }
           break;
         }
       }
+    }
+    if (source_index > 0) {
+      row_in_file -= sources_end_line[source_index - 1];
     }
     /* Print the filename the error line is comming from. */
     if (source_index > 0) {
