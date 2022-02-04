@@ -487,6 +487,31 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
   return true;
 }
 
+static bool step_is_skippable(GPencilUndoData *data_current,
+                              GPencilUndoData *data_next,
+                              bool is_taget_step)
+{
+  /* If the step is e.g. a frame change, there is no cache, so we can safely skip it. */
+  if (data_current->gpd_cache == NULL) {
+    return true;
+  }
+
+  /* We must always decode the target step. */
+  if (is_taget_step) {
+    return false;
+  }
+
+  /* If decoding the changes of the current step will be overwritten by the next one, then we can
+   * skip it. */
+  if (data_next->gpd_cache != NULL &&
+      !BKE_gpencil_compare_update_caches(data_next->gpd_cache, data_current->gpd_cache)) {
+    return true;
+  }
+
+  /* Otherwise decode the step as usual. */
+  return false;
+}
+
 static void gpencil_undosys_step_decode(struct bContext *C,
                                         struct Main *UNUSED(bmain),
                                         UndoStep *us_p,
@@ -566,8 +591,9 @@ static void gpencil_undosys_step_decode(struct bContext *C,
     /* Once we find a good undo step, we need to go Back to the Future, so re-apply all the steps
      * until we reach the target step. */
     while (us_iter != us_next) {
-      /* We skip over undo steps that don't store a cache (e.g. a frame change). */
-      if (data_iter->gpd_cache != NULL) {
+      data_next = ((GPencilUndoStep *)us_iter->next)->undo_data;
+      /* Check if we can skip this step. If we can't we need to decode it. */
+      if (!step_is_skippable(data_iter, data_next, us_iter->next == us_next)) {
         decode_undo_data_to_gpencil_data(data_iter, gpd, true);
       }
       us_iter = us_iter->next;
