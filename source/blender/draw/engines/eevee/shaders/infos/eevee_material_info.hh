@@ -12,7 +12,7 @@ GPU_SHADER_CREATE_INFO(eevee_shared)
 
 GPU_SHADER_CREATE_INFO(eevee_sampling_data)
     .additional_info("eevee_shared")
-    .uniform_buf(15, "SamplingData", "sampling_buf");
+    .uniform_buf(14, "SamplingData", "sampling_buf");
 
 /** \} */
 
@@ -24,28 +24,28 @@ GPU_SHADER_CREATE_INFO(eevee_surface_mesh)
     .vertex_in(0, Type::VEC3, "pos")
     .vertex_in(1, Type::VEC3, "nor")
     .vertex_source("eevee_surface_mesh_vert.glsl")
-    .additional_info("draw_mesh", "draw_resource_id_varying");
+    .additional_info("draw_mesh", "draw_resource_id_varying", "draw_resource_handle");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_gpencil)
     .define("MAT_GEOM_GPENCIL")
     .vertex_source("eevee_surface_gpencil_vert.glsl")
-    .additional_info("draw_gpencil", "draw_resource_id_varying");
+    .additional_info("draw_gpencil", "draw_resource_id_varying", "draw_resource_handle");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_hair)
     .define("MAT_GEOM_HAIR")
     .vertex_source("eevee_surface_hair_vert.glsl")
-    .additional_info("draw_hair", "draw_resource_id_varying");
+    .additional_info("draw_hair", "draw_resource_id_varying", "draw_resource_handle");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_lookdev)
     .vertex_in(0, Type::VEC3, "pos")
     .vertex_in(1, Type::VEC3, "nor")
     .vertex_source("eevee_surface_lookdev_vert.glsl")
-    .additional_info("draw_mesh", "draw_resource_id_varying");
+    .additional_info("draw_mesh", "draw_resource_id_varying", "draw_resource_handle");
 
 GPU_SHADER_CREATE_INFO(eevee_surface_world)
     .builtins(BuiltinBits::VERTEX_ID)
     .vertex_source("eevee_surface_world_vert.glsl")
-    .additional_info("draw_modelmat", "draw_resource_id_varying");
+    .additional_info("draw_modelmat", "draw_resource_id_varying", "draw_resource_handle");
 
 /** \} */
 

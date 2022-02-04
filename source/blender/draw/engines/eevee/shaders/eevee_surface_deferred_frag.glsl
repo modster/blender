@@ -52,6 +52,9 @@ void main(void)
     out_transmit_data.y = g_refraction_data.roughness;
   }
   else {
+    if (g_diffuse_data.sss_id == 1u) {
+      g_diffuse_data.sss_id = uint(resource_handle + 1);
+    }
     /* Output diffuse / SSS in transmit data. */
     out_transmit_color = g_diffuse_data.color;
     out_transmit_normal.xy = gbuffer_encode_normal(g_diffuse_data.N);

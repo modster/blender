@@ -1,4 +1,5 @@
 
+#pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_closure_lib.glsl)
 #pragma BLENDER_REQUIRE(gpu_shader_codegen_lib.glsl)
@@ -104,9 +105,9 @@ Closure nodetree_volume();
 float nodetree_thickness();
 
 #ifdef EEVEE_MATERIAL_STUBS
-#define attrib_load()
-#define nodetree_displacement() vec3(0)
-#define nodetree_surface() CLOSURE_DEFAULT
-#define nodetree_volume() CLOSURE_DEFAULT
-#define nodetree_thickness() 0.1
+#  define attrib_load()
+#  define nodetree_displacement() vec3(0)
+#  define nodetree_surface() CLOSURE_DEFAULT
+#  define nodetree_volume() CLOSURE_DEFAULT
+#  define nodetree_thickness() 0.1
 #endif
