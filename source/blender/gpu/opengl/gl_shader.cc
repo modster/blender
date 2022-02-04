@@ -804,7 +804,7 @@ static char *glsl_patch_default_get()
     STR_CONCAT(patch, slen, "#extension GL_ARB_texture_cube_map_array : enable\n");
     STR_CONCAT(patch, slen, "#define GPU_ARB_texture_cube_map_array\n");
   }
-  if (GLEW_ARB_conservative_depth) {
+  if (!GLEW_VERSION_4_2 && GLEW_ARB_conservative_depth) {
     STR_CONCAT(patch, slen, "#extension GL_ARB_conservative_depth : enable\n");
   }
   if (GPU_shader_image_load_store_support()) {
