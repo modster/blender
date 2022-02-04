@@ -24,7 +24,9 @@
 
 #include "DRW_render.h"
 
+#include "BLI_hash.hh"
 #include "BLI_map.hh"
+#include "BLI_set.hh"
 #include "BLI_string_ref.hh"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
@@ -46,6 +48,72 @@ namespace blender::compositor {
 
 using nodes::CompositorContext;
 using namespace nodes::derived_node_tree_types;
+
+/* A key structure used to identify a texture in a texture pool. Defines a hash and an equality
+ * operator for use in a hash map. */
+class TexturePoolKey {
+ public:
+  int width;
+  int height;
+  eGPUTextureFormat format;
+
+  TexturePoolKey(int width, int height, eGPUTextureFormat format)
+      : width(width), height(height), format(format)
+  {
+  }
+
+  TexturePoolKey(const GPUTexture *texture)
+  {
+    width = GPU_texture_width(texture);
+    height = GPU_texture_height(texture);
+    format = GPU_texture_format(texture);
+  }
+
+  uint64_t hash() const
+  {
+    return get_default_hash_3(width, height, format);
+  }
+};
+
+inline bool operator==(const TexturePoolKey &a, const TexturePoolKey &b)
+{
+  return a.width == b.width && a.height == b.height && a.format == b.format;
+}
+
+/* A pool of textures that can be reused transparently throughout the evaluation of the node tree.
+ * Uses the DRW texture pool as a base for allocation. The acquired textures are uncleared and are
+ * expected to contain garbage data. */
+class TexturePool {
+ private:
+  /* The set of textures in the pool that are currently in use. */
+  Set<GPUTexture *> in_use_textures_;
+  /* The set of textures in the pool that are available to acquire. */
+  Map<TexturePoolKey, GPUTexture *> available_textures_;
+
+ public:
+  /* Check if there is an available texture with the given specification in the pool, if such
+   * texture exists, return it, otherwise, get a new texture from the DRW texture pool. */
+  GPUTexture *acquire(int width, int height, eGPUTextureFormat format)
+  {
+    const TexturePoolKey key = TexturePoolKey(width, height, format);
+    std::optional<GPUTexture *> available_texture = available_textures_.pop_try(key);
+    if (available_texture) {
+      return *available_texture;
+    }
+    DrawEngineType *owner = (DrawEngineType *)this;
+    GPUTexture *new_texture = DRW_texture_pool_query_2d(width, height, format, owner);
+    in_use_textures_.add_new(new_texture);
+    return new_texture;
+  }
+
+  /* Move the texture from the in-use textures set to the available textures set, potentially to be
+   * acquired later by another user. */
+  void release(GPUTexture *texture)
+  {
+    in_use_textures_.remove_contained(texture);
+    available_textures_.add_new(TexturePoolKey(texture), texture);
+  }
+};
 
 class DRWCompositorContext : public CompositorContext {
  private:
