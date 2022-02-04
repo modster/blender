@@ -90,6 +90,14 @@ void Shader::print_log(Span<const char *> sources,
       continue;
     }
 
+    /* Silence not useful lines. */
+    StringRef logref = StringRefNull(log_line).substr(0, (size_t)line_end - (size_t)log_line);
+    if (logref.endswith(" shader failed to compile with the following errors:") ||
+        logref.endswith(" No code generated")) {
+      log_line += (size_t)line_end - (size_t)log_line;
+      continue;
+    }
+
     GPULogItem log_item;
     log_line = parser->parse_line(log_line, log_item);
 
