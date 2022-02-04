@@ -68,7 +68,7 @@ extern "C" {
 #endif
 
 /* Uncomment to track unused resource bindings. */
-// #define DRW_UNUSED_RESOURCE_TRACKING
+#define DRW_UNUSED_RESOURCE_TRACKING
 
 #ifdef DRW_UNUSED_RESOURCE_TRACKING
 #  define DRW_DEBUG_FILE_LINE_ARGS , const char *file, int line
@@ -528,8 +528,6 @@ void DRW_shgroup_stencil_set(DRWShadingGroup *shgroup,
  * TODO: remove this function. Obsolete version. mask is actually reference value.
  */
 void DRW_shgroup_stencil_mask(DRWShadingGroup *shgroup, uint mask);
-
-void DRW_shgroup_barrier(DRWShadingGroup *shgroup, eGPUBarrier type);
 
 /**
  * Issue a barrier command.
