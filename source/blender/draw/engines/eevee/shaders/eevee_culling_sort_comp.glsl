@@ -15,7 +15,7 @@ void main()
   uint src_index = gl_GlobalInvocationID.x;
   bool valid_thread = true;
 
-  uint items_count_total = culling.items_no_cull_count + culling.visible_count;
+  uint items_count_total = lights_cull_buf.items_no_cull_count + lights_cull_buf.visible_count;
 
   if (src_index >= items_count_total) {
     /* Do not return because we use barriers later on (which need uniform control flow).
@@ -24,14 +24,14 @@ void main()
     valid_thread = false;
   }
 
-  uint key = keys[src_index];
+  uint key = keys_buf[src_index];
   LightData light = lights_buf[key];
 
   if (light.type == LIGHT_SUN) {
     valid_thread = false;
   }
 
-  if (!culling.enable_specular) {
+  if (!lights_cull_buf.enable_specular) {
     light.specular_power = 0.0;
   }
 
@@ -42,8 +42,10 @@ void main()
   float radius = light.influence_radius_max;
   float z_dist = dot(cameraForward, lP) - dot(cameraForward, cameraPos);
 
-  int z_min = clamp(culling_z_to_zbin(culling, z_dist + radius), 0, CULLING_ZBIN_COUNT - 1);
-  int z_max = clamp(culling_z_to_zbin(culling, z_dist - radius), 0, CULLING_ZBIN_COUNT - 1);
+  int z_min = culling_z_to_zbin(lights_cull_buf, z_dist + radius);
+  int z_max = culling_z_to_zbin(lights_cull_buf, z_dist - radius);
+  z_min = clamp(z_min, 0, CULLING_ZBIN_COUNT - 1);
+  z_max = clamp(z_max, 0, CULLING_ZBIN_COUNT - 1);
 
   /* Fits the limit of 32KB. */
   shared int zbin_max[CULLING_ZBIN_COUNT];
@@ -61,7 +63,7 @@ void main()
   barrier();
 
   int batch_start = int(gl_WorkGroupID.x) * CULLING_BATCH_SIZE;
-  int i_start = max(batch_start, int(culling.items_no_cull_count));
+  int i_start = max(batch_start, int(lights_cull_buf.items_no_cull_count));
   int i_max = min(CULLING_BATCH_SIZE, int(items_count_total) - batch_start);
   for (int i = i_start; i < i_max; i++) {
     float ref = intBitsToFloat(z_dists[i]);
@@ -85,11 +87,11 @@ void main()
      */
     index += atomicAdd(contender_table[index], -1) - 1;
     index += i_start;
-    out_lights[index] = light;
+    out_lights_buf[index] = light;
   }
   else if (light.type == LIGHT_SUN) {
     /* Directional lights are just copied to the same index. */
-    out_lights[key] = light;
+    out_lights_buf[key] = light;
   }
   barrier();
 
@@ -115,6 +117,6 @@ void main()
   /* Write result to zbins buffer. */
   for (uint i = 0u, g = zbin_global, l = zbin_local; i < iter; i++, g++, l++) {
     /* Pack min & max into 1 uint. */
-    out_zbins[g] = (uint(zbin_max[l]) << 16u) | uint(zbin_min[l]);
+    lights_zbin_buf[g] = (uint(zbin_max[l]) << 16u) | uint(zbin_min[l]);
   }
 }

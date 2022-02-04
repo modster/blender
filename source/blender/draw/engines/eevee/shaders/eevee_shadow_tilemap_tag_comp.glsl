@@ -51,7 +51,7 @@ void main()
     if (aabb_index >= aabb_len) {
       break;
     }
-    AABB aabb = AABB(aabbs[aabb_index * 2], aabbs[aabb_index * 2 + 1]);
+    AABB aabb = AABB(aabbs_buf[aabb_index * 2], aabbs_buf[aabb_index * 2 + 1]);
     /* Avoid completely flat object disapearing. */
     aabb.max += 1e-6;
     aabb.min -= 1e-6;

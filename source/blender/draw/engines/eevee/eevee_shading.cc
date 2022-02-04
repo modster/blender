@@ -287,7 +287,6 @@ DRWShadingGroup *DeferredLayer::prepass_add(::Material *blender_mat, GPUMaterial
   DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? prepass_culled_ps_ :
                                                                     prepass_ps_;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
-  DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
   return grp;
 }
 

@@ -12,7 +12,7 @@
 void main()
 {
   uint l_idx = gl_GlobalInvocationID.x;
-  if (l_idx >= culling.items_count) {
+  if (l_idx >= lights_cull_buf.items_count) {
     return;
   }
 
@@ -20,7 +20,7 @@ void main()
 
   /* Sun lights are packed at the start of the array. */
   if (light.type == LIGHT_SUN) {
-    keys[l_idx] = l_idx;
+    keys_buf[l_idx] = l_idx;
     return;
   }
 
@@ -36,7 +36,8 @@ void main()
   }
 
   if (intersect_view(sphere)) {
-    uint index = culling.items_no_cull_count + atomicAdd(culling.visible_count, 1u);
-    keys[index] = l_idx;
+    uint index = lights_cull_buf.items_no_cull_count +
+                 atomicAdd(lights_cull_buf.visible_count, 1u);
+    keys_buf[index] = l_idx;
   }
 }

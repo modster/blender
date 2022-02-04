@@ -13,19 +13,21 @@
 
 void main(void)
 {
-  uint word_idx = gl_GlobalInvocationID.x % culling.tile_word_len;
-  uint tile_idx = gl_GlobalInvocationID.x / culling.tile_word_len;
-  uvec2 tile_co = uvec2(tile_idx % culling.tile_x_len, tile_idx / culling.tile_x_len);
+  uint word_idx = gl_GlobalInvocationID.x % lights_cull_buf.tile_word_len;
+  uint tile_idx = gl_GlobalInvocationID.x / lights_cull_buf.tile_word_len;
+  uvec2 tile_co = uvec2(tile_idx % lights_cull_buf.tile_x_len,
+                        tile_idx / lights_cull_buf.tile_x_len);
 
-  if (tile_co.y >= culling.tile_y_len) {
+  if (tile_co.y >= lights_cull_buf.tile_y_len) {
     return;
   }
 
   /* TODO(fclem): We could stop the tile at the HiZ depth. */
-  CullingTile tile = culling_tile_get(culling, tile_co);
+  CullingTile tile = culling_tile_get(lights_cull_buf, tile_co);
 
-  uint l_idx = max(word_idx * 32u, culling.items_no_cull_count);
-  uint l_end = min(l_idx + 32u, culling.visible_count + culling.items_no_cull_count);
+  uint l_idx = max(word_idx * 32u, lights_cull_buf.items_no_cull_count);
+  uint l_end = min(l_idx + 32u,
+                   lights_cull_buf.visible_count + lights_cull_buf.items_no_cull_count);
   uint word = 0u;
 
   for (; l_idx < l_end; l_idx++) {
@@ -48,5 +50,5 @@ void main(void)
     }
   }
 
-  culling_words[gl_GlobalInvocationID.x] = word;
+  lights_tile_buf[gl_GlobalInvocationID.x] = word;
 }

@@ -103,7 +103,7 @@ GPU_SHADER_CREATE_INFO(eevee_shadow_tilemap_tag)
     .additional_info("eevee_shared")
     .local_group_size(SHADOW_AABB_TAG_GROUP_SIZE)
     /* NOTE(@fclem): Use an array of vec3 to avoid possible layout confusion. */
-    .storage_buf(1, Qualifier::READ, "vec3", "aabbs[]")
+    .storage_buf(1, Qualifier::READ, "vec3", "aabbs_buf[]")
     .storage_buf(2, Qualifier::READ, "ShadowTileMapData", "tilemaps_buf[]")
     .image(0, GPU_R32UI, Qualifier::READ_WRITE, ImageType::UINT_2D, "tilemaps_img")
     .push_constant(Type::INT, "aabb_len")

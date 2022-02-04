@@ -746,7 +746,7 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_TAG_USAGE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_usage_tag_ps_);
-    DRW_shgroup_vertex_buffer(grp, "aabb_buf", receivers_aabbs);
+    DRW_shgroup_vertex_buffer(grp, "aabbs_buf", receivers_aabbs);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_float(grp, "tilemap_pixel_radius", &tilemap_pixel_radius_, 1);
@@ -765,8 +765,8 @@ void ShadowModule::end_sync(void)
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_depth_scan_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_vertex_buffer_ref(grp, "lights_buf", &inst_.lights.culling_light_buf);
-    DRW_shgroup_vertex_buffer_ref(grp, "lights_culling_buf", &inst_.lights.culling_data);
-    DRW_shgroup_vertex_buffer_ref(grp, "lights_zbins_buf", &inst_.lights.culling_zbin_buf);
+    DRW_shgroup_vertex_buffer_ref(grp, "lights_cull_buf", &inst_.lights.culling_data);
+    DRW_shgroup_vertex_buffer_ref(grp, "lights_zbin_buf", &inst_.lights.culling_zbin_buf);
     DRW_shgroup_vertex_buffer_ref(grp, "lights_tile_buf", &inst_.lights.culling_tile_buf);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_float(grp, "tilemap_pixel_radius", &tilemap_pixel_radius_, 1);
@@ -782,7 +782,7 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_TAG_UPDATE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_update_tag_ps_);
-    DRW_shgroup_vertex_buffer(grp, "aabb_buf", casters_aabbs);
+    DRW_shgroup_vertex_buffer(grp, "aabbs_buf", casters_aabbs);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_int_copy(grp, "aabb_len", GPU_vertbuf_get_vertex_len(casters_aabbs));
@@ -1188,7 +1188,6 @@ void ShadowPass::sync(void)
 DRWShadingGroup *ShadowPass::material_add(::Material *UNUSED(material), GPUMaterial *gpumat)
 {
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, surface_ps_);
-  DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
   return grp;
 }
 

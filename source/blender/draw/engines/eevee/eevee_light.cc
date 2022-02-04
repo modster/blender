@@ -360,8 +360,8 @@ void LightModule::end_sync(void)
         GPUShader *sh = inst_.shaders.static_shader_get(CULLING_SELECT);
         DRWShadingGroup *grp = DRW_shgroup_create(sh, culling_ps_);
         DRW_shgroup_vertex_buffer(grp, "lights_buf", lights_data);
-        DRW_shgroup_vertex_buffer_ref(grp, "culling_buf", &culling_data);
-        DRW_shgroup_vertex_buffer(grp, "key_buf", culling_key_buf);
+        DRW_shgroup_vertex_buffer_ref(grp, "lights_cull_buf", &culling_data);
+        DRW_shgroup_vertex_buffer(grp, "keys_buf", culling_key_buf);
         DRW_shgroup_call_compute(grp, batch_len, 1, 1);
         DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_STORAGE);
       }
@@ -369,10 +369,10 @@ void LightModule::end_sync(void)
         GPUShader *sh = inst_.shaders.static_shader_get(CULLING_SORT);
         DRWShadingGroup *grp = DRW_shgroup_create(sh, culling_ps_);
         DRW_shgroup_vertex_buffer(grp, "lights_buf", lights_data);
-        DRW_shgroup_vertex_buffer_ref(grp, "culling_buf", &culling_data);
-        DRW_shgroup_vertex_buffer(grp, "key_buf", culling_key_buf);
-        DRW_shgroup_vertex_buffer_ref(grp, "out_zbins_buf", &culling_zbin_buf);
-        DRW_shgroup_vertex_buffer_ref(grp, "out_items_buf", &culling_light_buf);
+        DRW_shgroup_vertex_buffer_ref(grp, "lights_cull_buf", &culling_data);
+        DRW_shgroup_vertex_buffer(grp, "keys_buf", culling_key_buf);
+        DRW_shgroup_vertex_buffer_ref(grp, "lights_zbin_buf", &culling_zbin_buf);
+        DRW_shgroup_vertex_buffer_ref(grp, "out_lights_buf", &culling_light_buf);
         DRW_shgroup_call_compute(grp, batch_len, 1, 1);
         DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_STORAGE);
       }
@@ -380,8 +380,8 @@ void LightModule::end_sync(void)
         GPUShader *sh = inst_.shaders.static_shader_get(CULLING_TILE);
         DRWShadingGroup *grp = DRW_shgroup_create(sh, culling_ps_);
         DRW_shgroup_vertex_buffer(grp, "lights_buf", culling_light_buf);
-        DRW_shgroup_vertex_buffer_ref(grp, "culling_buf", &culling_data);
-        DRW_shgroup_vertex_buffer_ref(grp, "culling_tile_buf", &culling_tile_buf);
+        DRW_shgroup_vertex_buffer_ref(grp, "lights_cull_buf", &culling_data);
+        DRW_shgroup_vertex_buffer_ref(grp, "lights_tile_buf", &culling_tile_buf);
         DRW_shgroup_call_compute_ref(grp, culling_tile_dispatch_size_);
         DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
       }
@@ -403,8 +403,8 @@ void LightModule::debug_end_sync(void)
   GPUShader *sh = inst_.shaders.static_shader_get(CULLING_DEBUG);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, debug_draw_ps_);
   DRW_shgroup_vertex_buffer_ref(grp, "lights_buf", &culling_light_buf);
-  DRW_shgroup_vertex_buffer_ref(grp, "lights_culling_buf", &culling_data);
-  DRW_shgroup_vertex_buffer_ref(grp, "lights_zbins_buf", &culling_zbin_buf);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_cull_buf", &culling_data);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_zbin_buf", &culling_zbin_buf);
   DRW_shgroup_vertex_buffer_ref(grp, "lights_tile_buf", &culling_tile_buf);
   DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
   DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
