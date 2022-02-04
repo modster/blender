@@ -127,7 +127,7 @@ void Shader::print_log(Span<const char *> sources,
       /* error_line is 1 based in this case. */
       int src_line_index = 1;
       while ((src_line_end = strchr(src_line, '\n'))) {
-        if (src_line_index == log_item.cursor.row) {
+        if (src_line_index >= log_item.cursor.row) {
           found_line_id = true;
           break;
         }
