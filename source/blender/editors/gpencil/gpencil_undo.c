@@ -423,16 +423,17 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = (bGPdata *)ob->data;
 
-  bool only_frame_changed = false;
-
   /* TODO: We might need to check if ID_RECALC_ALL is set on the gpd here to test if we need to
    * clear the cache. It might be bad to "start" with some cache and add new update nodes on top.
    */
 
+  bool only_frame_changed = false;
+
   /* In case the step we are about to encode would be the first in the gpencil undo system, ensure
-   * that we do a full-copy. */
-  if (undo_stack->step_active == NULL ||
-      undo_stack->step_active->type != BKE_UNDOSYS_TYPE_GPENCIL) {
+   * that we do a full copy. */
+  const bool force_full_update = undo_stack->step_active == NULL ||
+                                 undo_stack->step_active->type != BKE_UNDOSYS_TYPE_GPENCIL;
+  if (force_full_update) {
     BKE_gpencil_tag_full_update(gpd, NULL, NULL, NULL);
   }
   /* If the ID of the grease pencil object was not tagged or the update cache is empty, we assume
@@ -475,6 +476,14 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
   /* Because the encoding of a gpencil undo step uses the update cache on the gpencil data, we can
    * tag it after the encode so that the update-on-write knows that it can be safely disposed. */
   gpd->flag |= GP_DATA_UPDATE_CACHE_DISPOSABLE;
+
+  /* In case we forced a full update, we want to make sure that the gpd.runtime does not contain a
+   * cache since the eval object already contains the correct data and we don't want to go through
+   * an update-on-write. */
+  if (force_full_update) {
+    BKE_gpencil_free_update_cache(gpd);
+  }
+
   return true;
 }
 
