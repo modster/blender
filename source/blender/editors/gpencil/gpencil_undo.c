@@ -198,10 +198,13 @@ void gpencil_undo_finish(void)
  * \{ */
 
 typedef struct GPencilUndoData {
-  GPencilUpdateCache *gpd_cache_data;
-  /* Scene frame for this step. */
+  /* This is the cache that indicates the differential changes made coming into (one-directional)
+   * this step. The data pointers in the cache are owned by the undo step (i.e. they will be
+   * allocated and freed within the undo system). */
+  GPencilUpdateCache *gpd_cache;
+  /* Scene frame number in this step. */
   int cfra;
-  /* Store the grease pencil mode we are in. */
+  /* The grease pencil mode we are in this step. */
   eObjectMode mode;
 } GPencilUndoData;
 
@@ -210,8 +213,9 @@ typedef struct GPencilUndoStep {
   GPencilUndoData *undo_data;
 } GPencilUndoStep;
 
-static bool change_gpencil_mode(bContext *C, Object *ob, eObjectMode mode)
+static bool change_gpencil_mode_if_needed(bContext *C, Object *ob, eObjectMode mode)
 {
+  /* No mode change needed if they are the same. */
   if (ob->mode == mode) {
     return false;
   }
@@ -222,7 +226,7 @@ static bool change_gpencil_mode(bContext *C, Object *ob, eObjectMode mode)
   return true;
 }
 
-static void gpencil_data_to_undo_data(bGPdata *gpd, GPencilUndoData *gpd_undo_data)
+static void encode_gpencil_data_to_undo_data(bGPdata *gpd, GPencilUndoData *gpd_undo_data)
 {
   GPencilUpdateCache *update_cache = gpd->runtime.update_cache;
 
@@ -232,10 +236,10 @@ static void gpencil_data_to_undo_data(bGPdata *gpd, GPencilUndoData *gpd_undo_da
     BKE_gpencil_data_duplicate(NULL, gpd, &gpd_copy);
     gpd_copy->id.session_uuid = gpd->id.session_uuid;
 
-    gpd_undo_data->gpd_cache_data = BKE_gpencil_create_update_cache(gpd_copy, true);
+    gpd_undo_data->gpd_cache = BKE_gpencil_create_update_cache(gpd_copy, true);
   }
   else {
-    gpd_undo_data->gpd_cache_data = BKE_gpencil_duplicate_update_cache_and_data(update_cache);
+    gpd_undo_data->gpd_cache = BKE_gpencil_duplicate_update_cache_and_data(update_cache);
   }
 }
 
@@ -353,11 +357,11 @@ static bool gpencil_decode_undo_data_stroke_cb(GPencilUpdateCache *gps_cache, vo
   return false;
 }
 
-static bool gpencil_undo_data_to_gpencil_data(GPencilUndoData *gpd_undo_data,
-                                              bGPdata *gpd,
-                                              bool tag_gpd_update_cache)
+static bool decode_undo_data_to_gpencil_data(GPencilUndoData *gpd_undo_data,
+                                             bGPdata *gpd,
+                                             bool tag_gpd_update_cache)
 {
-  GPencilUpdateCache *update_cache = gpd_undo_data->gpd_cache_data;
+  GPencilUpdateCache *update_cache = gpd_undo_data->gpd_cache;
 
   BLI_assert(update_cache != NULL);
 
@@ -450,8 +454,7 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
     }
   }
 
-  /* TODO: Handle this case properly once the update cache is more widly used. We avoid full-copies
-   * for now at the expense of to being able to undo them. */
+  /* TODO: Figure out if doing full-copies and using a lot of memory can be solved in some way. */
 #if 0
   if (!only_frame_changed && gpd->runtime.update_cache == NULL) {
     return false;
@@ -467,7 +470,10 @@ static bool gpencil_undosys_step_encode(struct bContext *C,
     return true;
   }
 
-  gpencil_data_to_undo_data(gpd, us->undo_data);
+  /* Encode the differential changes made to the gpencil data coming into this step. */
+  encode_gpencil_data_to_undo_data(gpd, us->undo_data);
+  /* Because the encoding of a gpencil undo step uses the update cache on the gpencil data, we can
+   * tag it after the encode so that the update-on-write knows that it can be safely disposed. */
   gpd->flag |= GP_DATA_UPDATE_CACHE_DISPOSABLE;
   return true;
 }
@@ -488,65 +494,91 @@ static void gpencil_undosys_step_decode(struct bContext *C,
     return;
   }
 
+  /* The decode step of the undo should be the last time we write to the gpd update cache, so tag
+   * it as disposable here and the update-on-write will be able to free it. */
+  if (is_final) {
+    gpd->flag |= GP_DATA_UPDATE_CACHE_DISPOSABLE;
+  }
+
   Scene *scene = CTX_data_scene(C);
   if (undo_data->cfra != scene->r.cfra) {
     scene->r.cfra = undo_data->cfra;
-    /* TODO: what if we merged a full copy with a frame change? */
-    DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_MUTE);
-    WM_event_add_notifier(C, NC_SCENE | ND_FRAME, NULL);
+    if (is_final) {
+      DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_MUTE);
+      WM_event_add_notifier(C, NC_SCENE | ND_FRAME, NULL);
+    }
   }
 
-  if (change_gpencil_mode(C, ob, undo_data->mode)) {
-    if (is_final) {
-      gpd->flag |= GP_DATA_UPDATE_CACHE_DISPOSABLE;
-      DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
-      WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | ND_GPENCIL_EDITMODE, NULL);
-      WM_event_add_notifier(C, NC_SCENE | ND_MODE, NULL);
-    }
-    return;
+  /* Check if a mode change needs to happen (by comparing the saved mode flags on the undo step
+   * data) and switch to that mode. */
+  const bool mode_changed = change_gpencil_mode_if_needed(C, ob, undo_data->mode);
+
+  /* If the mode was updated, make sure to tag the ID and add notifiers. */
+  if (mode_changed && is_final) {
+    DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+    WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | ND_GPENCIL_EDITMODE, NULL);
+    WM_event_add_notifier(C, NC_SCENE | ND_MODE, NULL);
   }
 
   if (dir == STEP_UNDO) {
     UndoStep *us_iter = us_p;
+    /* Assume that a next steps always exists in case that we undo a step. */
     BLI_assert(us_iter->next != NULL);
     UndoStep *us_next = us_p->next;
+
+    /* If we come from a step that was outside the gpencil undo system, assume that this was a mode
+     * change from object mode and that we don't need to decode anything. */
+    if (us_next->type != BKE_UNDOSYS_TYPE_GPENCIL) {
+      BLI_assert(mode_changed);
+      return;
+    }
 
     GPencilUndoData *data_iter = ((GPencilUndoStep *)us_iter)->undo_data;
     GPencilUndoData *data_next = ((GPencilUndoStep *)us_next)->undo_data;
 
-    if (data_next->gpd_cache_data == NULL) {
+    /* If the next step does not cache any update, then it means that it did not change the gpencil
+     * data. Therefore, we already are in the correct state and can return early. */
+    if (data_next->gpd_cache == NULL) {
       return;
     }
 
-    while (
-        data_iter->gpd_cache_data == NULL ||
-        BKE_gpencil_compare_update_caches(data_iter->gpd_cache_data, data_next->gpd_cache_data)) {
+    /* Find an undo step in the past, that contains enough data to be able to undo (e.g.
+     * potentially recover) the step we came from. Skip over steps with no cache (e.g. a frame
+     * change). */
+    while (data_iter->gpd_cache == NULL ||
+           BKE_gpencil_compare_update_caches(data_iter->gpd_cache, data_next->gpd_cache)) {
       us_iter = us_iter->prev;
+      /* We assume that there are no "gaps" in the undo chain. There should always be a full-copy
+       * at the beginning of a chain. */
       BLI_assert(us_iter != NULL && us_iter->type == BKE_UNDOSYS_TYPE_GPENCIL);
       data_iter = ((GPencilUndoStep *)us_iter)->undo_data;
     }
 
+    /* Once we find a good undo step, we need to go Back to the Future, so re-apply all the steps
+     * until we reach the target step. */
     while (us_iter != us_next) {
-      if (data_iter->gpd_cache_data != NULL) {
-        gpencil_undo_data_to_gpencil_data(data_iter, gpd, true);
+      /* We skip over undo steps that don't store a cache (e.g. a frame change). */
+      if (data_iter->gpd_cache != NULL) {
+        decode_undo_data_to_gpencil_data(data_iter, gpd, true);
       }
       us_iter = us_iter->next;
       data_iter = ((GPencilUndoStep *)us_iter)->undo_data;
     }
   }
   else if (dir == STEP_REDO) {
-    if (undo_data->gpd_cache_data == NULL) {
+    /* If the current step does not cache any update, then we don't need to decode anything.*/
+    if (undo_data->gpd_cache == NULL) {
       return;
     }
-
-    gpencil_undo_data_to_gpencil_data(undo_data, gpd, true);
+    /* Otherwise, we apply the cached changes to the current gpencil data. */
+    decode_undo_data_to_gpencil_data(undo_data, gpd, true);
   }
   else {
     BLI_assert_unreachable();
   }
 
   if (is_final) {
-    gpd->flag |= GP_DATA_UPDATE_CACHE_DISPOSABLE;
+    /* Tag gpencil for depsgraph update. */
     DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
     WM_event_add_notifier(C, NC_GEOM | ND_DATA, NULL);
   }
@@ -557,50 +589,53 @@ static void gpencil_undosys_step_free(UndoStep *us_p)
   GPencilUndoStep *us = (GPencilUndoStep *)us_p;
   GPencilUndoData *us_data = us->undo_data;
 
-  /**
-   * If this undo step is the first, we want to keep its full copy of the grease pencil undo_data
+  /* If this undo step is the first, we want to keep its full copy of the grease pencil undo_data
    * (we assume that the first undo step always has this). Otherwise we free the step and its
-   * undo_data.
-   */
+   * undo_data. */
   if ((us_p->prev == NULL || us_p->prev->type != BKE_UNDOSYS_TYPE_GPENCIL) && us_p->next != NULL &&
       us_p->next->type == BKE_UNDOSYS_TYPE_GPENCIL) {
     GPencilUndoStep *us_next = (GPencilUndoStep *)us_p->next;
     GPencilUndoData *us_next_data = us_next->undo_data;
     /* If e.g. a frame change happend, there is no cache so in this case we move the gpd pointer to
      * that step. */
-    if (us_next_data->gpd_cache_data == NULL) {
-      bGPdata *gpd_copy = us_data->gpd_cache_data->data;
+    if (us_next_data->gpd_cache == NULL) {
+      bGPdata *gpd_copy = us_data->gpd_cache->data;
       BLI_assert(gpd_copy != NULL);
-      BLI_assert(us_data->gpd_cache_data->flag == GP_UPDATE_NODE_FULL_COPY);
+      BLI_assert(us_data->gpd_cache->flag == GP_UPDATE_NODE_FULL_COPY);
 
-      us_next_data->gpd_cache_data = BKE_gpencil_create_update_cache(gpd_copy, true);
+      us_next_data->gpd_cache = BKE_gpencil_create_update_cache(gpd_copy, true);
       /* Make sure the gpd_copy is not freed below. */
-      us_data->gpd_cache_data->data = NULL;
+      us_data->gpd_cache->data = NULL;
     }
     /* If the next step does not have a full copy, we need to apply the changes of the next step
      * to our cached gpencil undo_data copy and move it to the next step (it will now be the
      * full-copy). */
-    else if (us_next_data->gpd_cache_data->flag != GP_UPDATE_NODE_FULL_COPY) {
-      bGPdata *gpd_copy = us_data->gpd_cache_data->data;
+    else if (us_next_data->gpd_cache->flag != GP_UPDATE_NODE_FULL_COPY) {
+      bGPdata *gpd_copy = us_data->gpd_cache->data;
       BLI_assert(gpd_copy != NULL);
-      BLI_assert(us_data->gpd_cache_data->flag == GP_UPDATE_NODE_FULL_COPY);
+      BLI_assert(us_data->gpd_cache->flag == GP_UPDATE_NODE_FULL_COPY);
 
-      gpencil_undo_data_to_gpencil_data(us_next_data, gpd_copy, false);
-      BKE_gpencil_free_update_cache_and_data(us_next_data->gpd_cache_data);
+      /* Apply the changes of the next step to the gpd full copy of the first step to that it
+       * contains both changes. */
+      decode_undo_data_to_gpencil_data(us_next_data, gpd_copy, false);
 
-      us_next_data->gpd_cache_data = BKE_gpencil_create_update_cache(gpd_copy, true);
+      /* Replace the data of the next step with the (now updated) full copy. */
+      BKE_gpencil_free_update_cache_and_data(us_next_data->gpd_cache);
+      us_next_data->gpd_cache = BKE_gpencil_create_update_cache(gpd_copy, true);
 
-      /* Make sure the gpd_copy is not freed below. */
-      us_data->gpd_cache_data->data = NULL;
+      /* Because we just moved the pointer to the next step, set it to NULL in the original first
+       * step to make sure the gpd_copy is not freed below. */
+      us_data->gpd_cache->data = NULL;
     }
     else {
-      /* If the next step is a full copy, we can safely free the current step (since the last step
+      /* If the next step is a full copy, we can safely free the current step (since the first step
        * will be a full-copy). */
     }
   }
 
-  if (us_data->gpd_cache_data) {
-    BKE_gpencil_free_update_cache_and_data(us_data->gpd_cache_data);
+  /* Free the step and its data (because undo steps "own" the data contained in their cache). */
+  if (us_data->gpd_cache) {
+    BKE_gpencil_free_update_cache_and_data(us_data->gpd_cache);
   }
   MEM_freeN(us_data);
 }

@@ -3000,12 +3000,18 @@ void BKE_gpencil_update_on_write(bGPdata *gpd_orig, bGPdata *gpd_eval)
   };
 
   BKE_gpencil_traverse_update_cache(update_cache, &ts, &data);
-
   gpd_eval->flag |= GP_DATA_CACHE_IS_DIRTY;
 
-  /* TODO: This might cause issues when we have multiple depsgraphs? */
-  if ((gpd_orig->flag & GP_DATA_UPDATE_CACHE_DISPOSABLE) || !GPENCIL_ANY_MODE(gpd_orig) ||
-      !U.experimental.use_gpencil_undo_system) {
+  const bool gpencil_undo_system_inactive = !(U.experimental.use_gpencil_undo_system &&
+                                              GPENCIL_ANY_MODE(gpd_orig));
+  /* If the gpencil undo system is active, make sure to only free the cache if
+   * GP_DATA_UPDATE_CACHE_DISPOSABLE is set. Even though we already used the cache to update the
+   * eval object, it might still be needed for the undo system (e.g if a modal operator is running,
+   * it might call the update-on-write multiple times before an undo step is encoded). Only when
+   * the undo system marks the cache as disposable can we safely free it here.*/
+  if (gpencil_undo_system_inactive || (gpd_orig->flag & GP_DATA_UPDATE_CACHE_DISPOSABLE)) {
+    /* TODO: This might cause issues when we have multiple depsgraphs? Because the cache might be
+     * accessed later/concurrently even if it was freed here? */
     BKE_gpencil_free_update_cache(gpd_orig);
   }
 }

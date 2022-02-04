@@ -88,23 +88,40 @@ static void cache_node_update(void *node, void *data)
   GPencilUpdateCache *update_cache = ((GPencilUpdateCacheNode *)node)->cache;
   GPencilUpdateCache *new_update_cache = (GPencilUpdateCache *)data;
 
-  /* If the new cache is already "covered" by the current cache, just free it and return. */
-  if (new_update_cache->flag < update_cache->flag) {
+  /* IMPORTANT: Because we are comparing the values of the flags here, make sure that any potential
+   * new flag either respects this ordering or changes the following logic. */
+  const bool current_cache_covers_new_cache = new_update_cache->flag < update_cache->flag;
+
+  /* In case:
+   * - the new cache is a no copy
+   * - or the new cache is a light copy and the current cache a full copy
+   * then it means we are already caching "more" and we shouldn't update the current cache.
+   * So we free the structure and return early.
+   */
+  if (current_cache_covers_new_cache) {
     update_cache_free(new_update_cache);
     return;
   }
 
+  /* In case:
+   * - the cache types are equal
+   * - or the new cache contains more than the current cache (full copy > light copy > no copy)
+   * the data pointer is updated. If the cache types are equal, this might be a no-op (when the new
+   * data pointer is equal to the previous), but is necessary when the data pointer needs to
+   * change. This can for example happen when the underlying data was reallocated, but the cache
+   * type stayed the same.
+   */
   update_cache->data = new_update_cache->data;
   update_cache->flag = new_update_cache->flag;
 
   /* In case the new cache does a full update, remove its children since they will be all
-   * updated by this cache. */
+   * updated by the new cache. */
   if (new_update_cache->flag == GP_UPDATE_NODE_FULL_COPY && update_cache->children != NULL) {
     /* We don't free the tree itself here, because we just want to clear the children, not delete
      * the whole node. */
     BLI_dlrbTree_free(update_cache->children, cache_node_free);
   }
-
+  /* Once we updated the data pointer and the flag, we can safely free the new cache structure. */
   update_cache_free(new_update_cache);
 }
 
