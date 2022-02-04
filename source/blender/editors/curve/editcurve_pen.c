@@ -133,19 +133,32 @@ typedef enum eExtra_key {
 } eExtra_key;
 
 static const EnumPropertyItem prop_extra_key_types[] = {
-    {NONE, "None", 0, "None", ""},
-    {SHIFT, "Shift", 0, "Shift", ""},
-    {CTRL, "Ctrl", 0, "Ctrl", ""},
-    {ALT, "Alt", 0, "Alt", ""},
-    {CTRL_SHIFT, "Ctrl-Shift", 0, "Ctrl-Shift", ""},
-    {CTRL_ALT, "Ctrl-Alt", 0, "Ctrl-Alt", ""},
-    {SHIFT_ALT, "Shift-Alt", 0, "Shift-Alt", ""},
+    {NONE, "NONE", 0, "None", ""},
+    {SHIFT, "SHIFT", 0, "Shift", ""},
+    {CTRL, "CTRL", 0, "Ctrl", ""},
+    {ALT, "ALT", 0, "Alt", ""},
+    {CTRL_SHIFT, "CTRL_SHIFT", 0, "Ctrl-Shift", ""},
+    {CTRL_ALT, "CTRL_ALT", 0, "Ctrl-Alt", ""},
+    {SHIFT_ALT, "SHIFT_ALT", 0, "Shift-Alt", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
 static const EnumPropertyItem prop_handle_types[] = {
-    {HD_AUTO, "Auto", 0, "Auto", ""},
-    {HD_VECT, "Vector", 0, "Vector", ""},
+    {HD_AUTO, "AUTO", 0, "Auto", ""},
+    {HD_VECT, "VECTOR", 0, "Vector", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+typedef enum eClose_opt {
+  OFF = 0,
+  ON_PRESS = 1,
+  ON_CLICK = 2,
+} eExtra_key;
+
+static const EnumPropertyItem prop_close_spline_opts[] = {
+    {OFF, "OFF", 0, "None", ""},
+    {ON_PRESS, "ON_PRESS", 0, "On Press", "Move handles after closing the spline"},
+    {ON_CLICK, "ON_CLICK", 0, "On Click", "Spline closes on release if not dragged"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -1559,6 +1572,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
   const bool toggle_vector = RNA_boolean_get(op->ptr, "toggle_vector");
   const bool cycle_handle_type = RNA_boolean_get(op->ptr, "cycle_handle_type");
+  const int close_spline_opts = RNA_enum_get(op->ptr, "close_spline_opts");
   const int extrude_handle = RNA_enum_get(op->ptr, "extrude_handle");
   const int free_toggle = RNA_enum_get(op->ptr, "free_toggle");
   const int adj_handle = RNA_enum_get(op->ptr, "adj_handle");
@@ -1665,7 +1679,15 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
         cpd->selection_made = true;
       }
-      if (!cpd->found_point) {
+      if (cpd->found_point) {
+        if (close_spline && close_spline_opts == ON_PRESS && cpd->nu &&
+            !(cpd->nu->flagu & CU_NURB_CYCLIC)) {
+          copy_v2_v2_int(vc.mval, event->mval);
+          cpd->new_point = cpd->acted = cpd->link_handles = make_cyclic_if_endpoints(
+              cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
+        }
+      }
+      else if (!cpd->acted) {
         if (is_spline_nearby(&vc, op, event)) {
           cpd->spline_nearby = true;
 
@@ -1697,7 +1719,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
 
-      if (!cpd->acted && close_spline && cpd->found_point && !cpd->dragging) {
+      if (!cpd->acted && close_spline && close_spline_opts == ON_CLICK && cpd->found_point &&
+          !cpd->dragging) {
         if (cpd->nu && !(cpd->nu->flagu & CU_NURB_CYCLIC)) {
           copy_v2_v2_int(vc.mval, event->mval);
           cpd->acted = make_cyclic_if_endpoints(cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
@@ -1876,9 +1899,15 @@ void CURVE_OT_pen(wmOperatorType *ot)
       ot->srna, "move_point", false, "Move Point", "Move a point or its handles");
   prop = RNA_def_boolean(ot->srna,
                          "close_spline",
-                         false,
+                         true,
                          "Close Spline",
                          "Make a spline cyclic by clicking endpoints");
+  prop = RNA_def_enum(ot->srna,
+                      "close_spline_opts",
+                      prop_close_spline_opts,
+                      OFF,
+                      "Close Spline Method",
+                      "The condition for close spline to activate");
   prop = RNA_def_boolean(
       ot->srna, "toggle_vector", false, "Toggle Vector", "Toggle between Vector and Auto handles");
   prop = RNA_def_boolean(ot->srna,
