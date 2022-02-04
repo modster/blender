@@ -449,7 +449,7 @@ void GPUCodegen::node_serialize(std::stringstream &eval_ss, const GPUNode *node)
   }
   /* Declare temporary variables for node output storage. */
   LISTBASE_FOREACH (GPUOutput *, output, &node->outputs) {
-    eval_ss << gpu_data_type_to_string(output->type) << " " << output << ";\n";
+    eval_ss << output->type << " " << output << ";\n";
   }
 
   /* Function call. */

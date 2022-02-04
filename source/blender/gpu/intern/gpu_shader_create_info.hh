@@ -110,7 +110,12 @@ static inline std::ostream &operator<<(std::ostream &stream, const Type type)
 
 static inline std::ostream &operator<<(std::ostream &stream, const eGPUType type)
 {
-  return stream << to_type(type);
+  switch (type) {
+    case GPU_CLOSURE:
+      return stream << "Closure";
+    default:
+      return stream << to_type(type);
+  }
 }
 
 enum class BuiltinBits {
