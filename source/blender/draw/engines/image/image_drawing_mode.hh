@@ -26,6 +26,8 @@
 
 #include "IMB_imbuf_types.h"
 
+#include "BLI_math_vec_types.hh"
+
 #include "image_batches.hh"
 #include "image_private.hh"
 #include "image_wrappers.hh"
@@ -80,24 +82,31 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
  private:
   DRWPass *create_image_pass() const
   {
-    /* Write depth is needed for background overlay rendering. Near depth is used for
-     * transparency checker and Far depth is used for indicating the image size. */
-    DRWState state = static_cast<DRWState>(DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH |
-                                           DRW_STATE_DEPTH_ALWAYS | DRW_STATE_BLEND_ALPHA_PREMUL);
+    DRWState state = static_cast<DRWState>(DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_ALWAYS |
+                                           DRW_STATE_BLEND_ALPHA_PREMUL);
     return DRW_pass_create("Image", state);
+  }
+
+  DRWPass *create_depth_pass() const
+  {
+    /* Depth is needed for background overlay rendering. Near depth is used for
+     * transparency checker and Far depth is used for indicating the image size. */
+    DRWState state = static_cast<DRWState>(DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL);
+    return DRW_pass_create("Depth", state);
   }
 
   void add_shgroups(const IMAGE_InstanceData *instance_data) const
   {
     const ShaderParameters &sh_params = instance_data->sh_params;
     GPUShader *shader = IMAGE_shader_image_get();
+    DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
 
     DRWShadingGroup *shgrp = DRW_shgroup_create(shader, instance_data->passes.image_pass);
     DRW_shgroup_uniform_vec2_copy(shgrp, "farNearDistances", sh_params.far_near);
     DRW_shgroup_uniform_vec4_copy(shgrp, "shuffle", sh_params.shuffle);
     DRW_shgroup_uniform_int_copy(shgrp, "drawFlags", sh_params.flags);
     DRW_shgroup_uniform_bool_copy(shgrp, "imgPremultiplied", sh_params.use_premul_alpha);
-    DRW_shgroup_uniform_vec2_copy(shgrp, "maxUv", instance_data->max_uv);
+    DRW_shgroup_uniform_texture(shgrp, "depth_texture", dtxl->depth);
     float image_mat[4][4];
     unit_m4(image_mat);
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
@@ -109,6 +118,55 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
       DRWShadingGroup *shgrp_sub = DRW_shgroup_create_sub(shgrp);
       DRW_shgroup_uniform_texture_ex(shgrp_sub, "imageTexture", info.texture, GPU_SAMPLER_DEFAULT);
       DRW_shgroup_call_obmat(shgrp_sub, info.batch, image_mat);
+    }
+  }
+
+  /**
+   * \brief add depth drawing calls.
+   *
+   * The depth is used to identify if the tile exist or transparent.
+   */
+  void add_depth_shgroups(IMAGE_InstanceData &instance_data,
+                          Image *image,
+                          ImageUser *image_user) const
+  {
+    GPUShader *shader = IMAGE_shader_depth_get();
+    DRWShadingGroup *shgrp = DRW_shgroup_create(shader, instance_data.passes.depth_pass);
+
+    float image_mat[4][4];
+    unit_m4(image_mat);
+
+    ImageUser tile_user = {0};
+    if (image_user) {
+      tile_user = *image_user;
+    }
+
+    for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+      const TextureInfo &info = instance_data.texture_infos[i];
+      if (!info.visible) {
+        continue;
+      }
+
+      LISTBASE_FOREACH (ImageTile *, image_tile_ptr, &image->tiles) {
+        const ImageTileWrapper image_tile(image_tile_ptr);
+        const int tile_x = image_tile.get_tile_x_offset();
+        const int tile_y = image_tile.get_tile_y_offset();
+        tile_user.tile = image_tile.get_tile_number();
+
+        /* NOTE: `BKE_image_has_ibuf` doesn't work as it fails for render results. That could be a
+         * bug or a feature. For now we just acquire to determine if there is a texture. */
+        void *lock;
+        ImBuf *tile_buffer = BKE_image_acquire_ibuf(image, &tile_user, &lock);
+        if (tile_buffer == nullptr) {
+          continue;
+        }
+        BKE_image_release_ibuf(image, tile_buffer, lock);
+
+        DRWShadingGroup *shsub = DRW_shgroup_create_sub(shgrp);
+        float4 min_max_uv(tile_x, tile_y, tile_x + 1, tile_y + 1);
+        DRW_shgroup_uniform_vec4_copy(shsub, "min_max_uv", min_max_uv);
+        DRW_shgroup_call_obmat(shsub, info.batch, image_mat);
+      }
     }
   }
 
@@ -149,11 +207,11 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
                          IMAGE_InstanceData &instance_data) const
   {
     while (iterator.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
-      /* Quick exit when tile_buffer isn't availble. */
+      /* Quick exit when tile_buffer isn't available. */
       if (iterator.tile_data.tile_buffer == nullptr) {
         continue;
       }
-      ensure_float_buffer(*iterator.tile_data.tile_buffer);
+      const bool float_buffer_created = ensure_float_buffer(*iterator.tile_data.tile_buffer);
       const float tile_width = static_cast<float>(iterator.tile_data.tile_buffer->x);
       const float tile_height = static_cast<float>(iterator.tile_data.tile_buffer->y);
 
@@ -169,8 +227,7 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
         GPUTexture *texture = info.texture;
         const float texture_width = GPU_texture_width(texture);
         const float texture_height = GPU_texture_height(texture);
-        // TODO
-        // early bound check.
+        /* TODO: early bound check. */
         ImageTileWrapper tile_accessor(iterator.tile_data.tile);
         float tile_offset_x = static_cast<float>(tile_accessor.get_tile_x_offset());
         float tile_offset_y = static_cast<float>(tile_accessor.get_tile_y_offset());
@@ -195,9 +252,9 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
         if (!region_overlap) {
           continue;
         }
-        // convert the overlapping region to texel space and to ss_pixel space...
-        // TODO: first convert to ss_pixel space as integer based. and from there go back to texel
-        // space. But perhaps this isn't needed and we could use an extraction offset somehow.
+        /* Convert the overlapping region to texel space and to ss_pixel space...
+         * TODO: first convert to ss_pixel space as integer based. and from there go back to texel
+         * space. But perhaps this isn't needed and we could use an extraction offset somehow. */
         rcti gpu_texture_region_to_update;
         BLI_rcti_init(&gpu_texture_region_to_update,
                       floor((changed_overlapping_region_in_uv_space.xmin - info.uv_bounds.xmin) *
@@ -217,8 +274,8 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
             ceil((changed_overlapping_region_in_uv_space.ymin - tile_offset_y) * tile_height),
             ceil((changed_overlapping_region_in_uv_space.ymax - tile_offset_y) * tile_height));
 
-        // Create an image buffer with a size
-        // extract and scale into an imbuf
+        /* Create an image buffer with a size.
+         * Extract and scale into an imbuf. */
         const int texture_region_width = BLI_rcti_size_x(&gpu_texture_region_to_update);
         const int texture_region_height = BLI_rcti_size_y(&gpu_texture_region_to_update);
 
@@ -255,6 +312,10 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
                                extracted_buffer.y,
                                0);
         imb_freerectImbuf_all(&extracted_buffer);
+      }
+      /* TODO(jbakker): Find leak when rendering VSE and remove this call. */
+      if (float_buffer_created) {
+        imb_freerectfloatImBuf(iterator.tile_data.tile_buffer);
       }
     }
   }
@@ -309,12 +370,19 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
 
   /**
    * \brief Ensure that the float buffer of the given image buffer is available.
+   *
+   * Returns true when a float buffer was created. Somehow the VSE cache increases the ref
+   * counter, but might use a different mechanism for destructing the image, that doesn't free the
+   * rect_float as the refcounter isn't 0. To work around this we destruct any created local
+   * buffers ourself.
    */
-  void ensure_float_buffer(ImBuf &image_buffer) const
+  bool ensure_float_buffer(ImBuf &image_buffer) const
   {
     if (image_buffer.rect_float == nullptr) {
       IMB_float_from_rect(&image_buffer);
+      return true;
     }
+    return false;
   }
 
   void do_full_update_texture_slot(const IMAGE_InstanceData &instance_data,
@@ -325,7 +393,7 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
   {
     const int texture_width = texture_buffer.x;
     const int texture_height = texture_buffer.y;
-    ensure_float_buffer(tile_buffer);
+    const bool float_buffer_created = ensure_float_buffer(tile_buffer);
 
     /* IMB_transform works in a non-consistent space. This should be documented or fixed!.
      * Construct a variant of the info_uv_to_texture that adds the texel space
@@ -360,6 +428,11 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
                   IMB_FILTER_NEAREST,
                   uv_to_texel,
                   crop_rect_ptr);
+
+    /* TODO(jbakker): Find leak when rendering VSE and remove this call. */
+    if (float_buffer_created) {
+      imb_freerectfloatImBuf(&tile_buffer);
+    }
   }
 
  public:
@@ -367,6 +440,7 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
   {
     IMAGE_InstanceData *instance_data = vedata->instance_data;
     instance_data->passes.image_pass = create_image_pass();
+    instance_data->passes.depth_pass = create_depth_pass();
   }
 
   void cache_image(IMAGE_Data *vedata, Image *image, ImageUser *iuser) const override
@@ -376,21 +450,21 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
     TextureMethod method(instance_data);
 
     instance_data->partial_update.ensure_image(image);
-    instance_data->max_uv_update();
     instance_data->clear_dirty_flag();
 
-    // Step: Find out which screen space textures are needed to draw on the screen. Remove the
-    // screen space textures that aren't needed.
+    /* Step: Find out which screen space textures are needed to draw on the screen. Remove the
+     * screen space textures that aren't needed. */
     const ARegion *region = draw_ctx->region;
     method.update_screen_space_bounds(region);
     method.update_uv_bounds(region);
 
-    // Step: Update the GPU textures based on the changes in the image.
+    /* Step: Update the GPU textures based on the changes in the image. */
     instance_data->update_gpu_texture_allocations();
     update_textures(*instance_data, image, iuser);
 
-    // Step: Add the GPU textures to the shgroup.
+    /* Step: Add the GPU textures to the shgroup. */
     instance_data->update_batches();
+    add_depth_shgroups(*instance_data, image, iuser);
     add_shgroups(instance_data);
   }
 
@@ -408,8 +482,11 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
     GPU_framebuffer_clear_color_depth(dfbl->default_fb, clear_col, 1.0);
 
     DRW_view_set_active(instance_data->view);
+    DRW_draw_pass(instance_data->passes.depth_pass);
+    GPU_framebuffer_bind(dfbl->color_only_fb);
     DRW_draw_pass(instance_data->passes.image_pass);
     DRW_view_set_active(nullptr);
+    GPU_framebuffer_bind(dfbl->default_fb);
   }
 };  // namespace clipping
 
