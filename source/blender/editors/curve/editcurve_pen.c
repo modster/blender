@@ -98,6 +98,8 @@ typedef struct CurvePenData {
   bool spline_nearby;
   /* Whether shortcut for toggling free handles was pressed. */
   bool free_toggle_pressed;
+  /* Whether the current handle type of the moved handle is free. */
+  bool free_toggle;
   /* Whether shortcut for linking handles was pressed. */
   bool link_handles_pressed;
   /* Whether the current state of the moved handle is linked. */
@@ -370,7 +372,7 @@ static void move_all_selected_points(ListBase *nurbs,
   }
   add_v2_v2(change, cpd->move_offset);
 
-  const bool link_handles = cpd->link_handles;
+  const bool link_handles = cpd->link_handles && !cpd->free_toggle;
   const bool lock_angle = cpd->lock_angle;
 
   float change_len = 0.0f;
@@ -1582,15 +1584,17 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   if (!cpd->free_toggle_pressed && is_extra_key_pressed(event, free_toggle)) {
     toggle_bezt_free_align_handles(nurbs);
+    cpd->free_toggle = !cpd->free_toggle;
     cpd->dragging = true;
-    cpd->link_handles = false;
   }
   cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
 
   if (!cpd->link_handles_pressed && is_extra_key_pressed(event, link_handles)) {
     cpd->link_handles = !cpd->link_handles;
     if (cpd->link_handles) {
-      move_all_selected_points(nurbs, false, false, cpd, event, &vc);
+      if (!cpd->free_toggle_pressed) {
+        move_all_selected_points(nurbs, false, false, cpd, event, &vc);
+      }
     }
     else {
       // Recalculate offset after link handles is turned off
