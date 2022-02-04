@@ -45,6 +45,11 @@ namespace blender::gpu {
 
 /* Number of lines before and after the error line to print for compilation errors. */
 #define DEBUG_CONTEXT_LINES 0
+/**
+ * Print dependencies sources list before the shader report.
+ * Useful to debug include order or missing dependencies.
+ */
+#define DEBUG_DEPENDENCIES 0
 
 void Shader::print_log(Span<const char *> sources,
                        char *log,
@@ -60,6 +65,17 @@ void Shader::print_log(Span<const char *> sources,
   char *sources_combined = BLI_string_join_arrayN((const char **)sources.data(), sources.size());
   DynStr *dynstr = BLI_dynstr_new();
 
+  if (!CLG_color_support_get(&LOG)) {
+    err_col[0] = warn_col[0] = info_col[0] = reset_col[0] = '\0';
+  }
+
+  BLI_dynstr_appendf(dynstr, "\n");
+
+#if DEBUG_DEPENDENCIES
+  BLI_dynstr_appendf(
+      dynstr, "%s%sIncluded files (in order):%s\n", info_col, line_prefix, reset_col);
+#endif
+
   Vector<int64_t> sources_end_line;
   for (StringRefNull src : sources) {
     int64_t cursor = 0, line_count = 0;
@@ -70,13 +86,14 @@ void Shader::print_log(Span<const char *> sources,
       line_count += sources_end_line.last();
     }
     sources_end_line.append(line_count);
+#if DEBUG_DEPENDENCIES
+    StringRefNull filename = shader::gpu_shader_dependency_get_filename_from_source_string(src);
+    if (!filename.is_empty()) {
+      BLI_dynstr_appendf(
+          dynstr, "%s%s  %s%s\n", info_col, line_prefix, filename.c_str(), reset_col);
+    }
+#endif
   }
-
-  if (!CLG_color_support_get(&LOG)) {
-    err_col[0] = warn_col[0] = info_col[0] = reset_col[0] = '\0';
-  }
-
-  BLI_dynstr_appendf(dynstr, "\n");
 
   char *log_line = log, *line_end;
 
