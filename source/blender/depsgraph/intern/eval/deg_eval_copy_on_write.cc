@@ -890,35 +890,19 @@ ID *deg_update_copy_on_write_datablock(const Depsgraph *depsgraph, const IDNode 
       update_edit_mode_pointers(depsgraph, id_orig, id_cow);
       return id_cow;
     }
+    /* In case we don't need to do a copy-on-write, we can use the update cache of the grease
+     * pencil data to do an update-on-write.*/
+    else if (id_type == ID_GD && BKE_gpencil_update_on_write_check((const ::Depsgraph *)depsgraph,
+                                                                   (bGPdata *)id_orig)) {
+      BKE_gpencil_update_on_write((bGPdata *)id_orig, (bGPdata *)id_cow);
+      return id_cow;
+    }
   }
 
   RuntimeBackup backup(depsgraph);
   backup.init_from_id(id_cow);
-
-  const ID_Type id_type = GS(id_orig->name);
-  switch (id_type) {
-    /* For grease pencil, we can avoid a full copy of the data-block and only do an update-on-write. */
-    case ID_GD: {
-      if (check_datablock_expanded(id_cow) &&
-          !BKE_gpencil_check_copy_on_write_needed((bGPdata *)id_orig)) {
-        BKE_gpencil_update_on_write((bGPdata *)id_orig, (bGPdata *)id_cow);
-      }
-      else {
-        /* Free gpd update cache and set it to null so that it's not copied to the eval data. */
-        BKE_gpencil_free_update_cache((bGPdata *)id_orig);
-        deg_free_copy_on_write_datablock(id_cow);
-        deg_expand_copy_on_write_datablock(depsgraph, id_node);
-        BKE_gpencil_data_update_orig_pointers((bGPdata *)id_orig, (bGPdata *)id_cow);
-      }
-      break;
-    }
-    default: {
-      deg_free_copy_on_write_datablock(id_cow);
-      deg_expand_copy_on_write_datablock(depsgraph, id_node);
-      break;
-    }
-  }
-
+  deg_free_copy_on_write_datablock(id_cow);
+  deg_expand_copy_on_write_datablock(depsgraph, id_node);
   backup.restore_to_id(id_cow);
   return id_cow;
 }

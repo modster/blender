@@ -741,7 +741,7 @@ int BKE_gpencil_material_find_index_by_name_prefix(struct Object *ob, const char
 
 void BKE_gpencil_blend_read_data(struct BlendDataReader *reader, struct bGPdata *gpd);
 
-bool BKE_gpencil_check_copy_on_write_needed(struct bGPdata *gpd);
+bool BKE_gpencil_update_on_write_check(const struct Depsgraph *depsgraph, struct bGPdata *gpd);
 
 void BKE_gpencil_update_on_write(struct bGPdata *gpd_orig, struct bGPdata *gpd_eval);
 
