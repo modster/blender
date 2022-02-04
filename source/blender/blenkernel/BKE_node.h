@@ -116,6 +116,7 @@ typedef struct bNodeSocketTemplate {
 #ifdef __cplusplus
 namespace blender {
 namespace nodes {
+class CompositorContext;
 class NodeMultiFunctionBuilder;
 class GeoNodeExecParams;
 class NodeDeclarationBuilder;
@@ -128,6 +129,7 @@ class MFDataType;
 }  // namespace blender
 
 using CPPTypeHandle = blender::fn::CPPType;
+using NodeCompositorExecuteFunction = void (*)(blender::nodes::CompositorContext &context);
 using NodeMultiFunctionBuildFunction = void (*)(blender::nodes::NodeMultiFunctionBuilder &builder);
 using NodeGeometryExecFunction = void (*)(blender::nodes::GeoNodeExecParams params);
 using NodeDeclareFunction = void (*)(blender::nodes::NodeDeclarationBuilder &builder);
@@ -140,6 +142,7 @@ using NodeGatherSocketLinkOperationsFunction =
     void (*)(blender::nodes::GatherLinkSearchOpParams &params);
 
 #else
+typedef void *NodeCompositorExecuteFunction;
 typedef void *NodeMultiFunctionBuildFunction;
 typedef void *NodeGeometryExecFunction;
 typedef void *NodeDeclareFunction;
@@ -321,6 +324,9 @@ typedef struct bNodeType {
   NodeExecFunction exec_fn;
   /* gpu */
   NodeGPUExecFunction gpu_fn;
+
+  /* Execute a compositor node. */
+  NodeCompositorExecuteFunction compositor_execute;
 
   /* Build a multi-function for this node. */
   NodeMultiFunctionBuildFunction build_multi_function;

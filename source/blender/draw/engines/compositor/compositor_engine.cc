@@ -25,21 +25,75 @@
 #include "DRW_render.h"
 
 #include "BLI_map.hh"
+#include "BLI_string_ref.hh"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
 #include "BLI_vector_set.hh"
 
 #include "DNA_node_types.h"
+#include "DNA_scene_types.h"
+
+#include "GPU_texture.h"
 
 #include "IMB_colormanagement.h"
 
+#include "NOD_compositor_execute.hh"
 #include "NOD_derived_node_tree.hh"
 
 #include "compositor_shader.hh"
 
 namespace blender::compositor {
 
+using nodes::CompositorContext;
 using namespace nodes::derived_node_tree_types;
+
+class DRWCompositorContext : public CompositorContext {
+ private:
+  /* The node currently being executed. */
+  DNode node_;
+  /* A map associating output sockets with the textures storing their contents. The map only stores
+   * the textures that were already computed by a dependency node and are still needed by one or
+   * more dependent nodes, so the node currently executing can get its inputs and outputs from this
+   * member. See get_input_texture and get_output_texture. */
+  const Map<DSocket, GPUTexture *> &allocated_textures_;
+
+ public:
+  DRWCompositorContext(DNode node, const Map<DSocket, GPUTexture *> &allocated_textures)
+      : node_(node), allocated_textures_(allocated_textures)
+  {
+  }
+
+  const GPUTexture *get_input_texture(StringRef identifier) override
+  {
+    /* Find the output socket connected to the input with the given input identifier and return its
+     * allocated texture. If the input is not linked, return nullptr. */
+    GPUTexture *texture = nullptr;
+    node_.input_by_identifier(identifier).foreach_origin_socket([&](const DSocket origin) {
+      texture = allocated_textures_.lookup(origin);
+    });
+    return texture;
+  }
+
+  const GPUTexture *get_output_texture(StringRef identifier) override
+  {
+    return allocated_textures_.lookup(node_.output_by_identifier(identifier));
+  }
+
+  const GPUTexture *get_viewport_texture() override
+  {
+    return DRW_viewport_texture_list_get()->color;
+  }
+
+  const GPUTexture *get_pass_texture(int view_layer, eScenePassType pass_type) override
+  {
+    return DRW_render_pass_find(DRW_context_state_get()->scene, view_layer, pass_type)->pass_tx;
+  }
+
+  const bNode &node() override
+  {
+    return *node_->bnode();
+  }
+};
 
 class Compiler {
  public:

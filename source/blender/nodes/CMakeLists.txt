@@ -72,6 +72,7 @@ set(SRC
 
   NOD_common.h
   NOD_composite.h
+  NOD_compositor_execute.hh
   NOD_derived_node_tree.hh
   NOD_function.h
   NOD_geometry.h

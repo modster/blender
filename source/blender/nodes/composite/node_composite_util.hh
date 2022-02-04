@@ -45,6 +45,7 @@
 #include "RE_pipeline.h"
 
 #include "NOD_composite.h"
+#include "NOD_compositor_execute.hh"
 #include "NOD_socket.h"
 #include "NOD_socket_declarations.hh"
 
