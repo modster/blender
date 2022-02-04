@@ -10485,6 +10485,36 @@ static void def_geo_point_scale(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static const EnumPropertyItem nonmanifold_thickness_mode_items[] = {
+    {MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_FIXED,
+     "FIXED",
+     0,
+     "Fixed",
+     "Most basic thickness calculation"},
+    {MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_EVEN,
+     "EVEN",
+     0,
+     "Even",
+     "Even thickness calculation which takes the angle between faces into account"},
+    {MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS,
+     "CONSTRAINTS",
+     0,
+     "Constraints",
+     "Thickness calculation using constraints, most advanced"},
+    {0, NULL, 0, NULL, NULL},
+};
+
+static const EnumPropertyItem nonmanifold_boundary_mode_items[] = {
+    {MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_NONE, "NONE", 0, "None", "No shape correction"},
+    {MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_ROUND,
+     "ROUND",
+     0,
+     "Round",
+     "Round open perimeter shape"},
+    {MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_FLAT, "FLAT", 0, "Flat", "Flat open perimeter shape"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 static void def_geo_solidify(StructRNA *srna)
 {
   PropertyRNA *prop;

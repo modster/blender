@@ -140,12 +140,14 @@ static int comp_float_int_pair(const void *a, const void *b)
 }
 
 /* NOLINTNEXTLINE: readability-function-size */
-Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
-                                          const ModifierEvalContext *ctx,
-                                          Mesh *mesh)
+Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
+                           Mesh *mesh,
+                           bool **r_shell_verts,
+                           bool **r_rim_verts,
+                           bool **r_shell_faces,
+                           bool **r_rim_faces)
 {
   Mesh *result;
-  const SolidifyModifierData *smd = (SolidifyModifierData *)md;
 
   MVert *mv, *mvert, *orig_mvert;
   MEdge *ed, *medge, *orig_medge;
@@ -154,39 +156,28 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
   const uint numVerts = (uint)mesh->totvert;
   const uint numEdges = (uint)mesh->totedge;
   const uint numPolys = (uint)mesh->totpoly;
+  const uint numLoops = (uint)mesh->totloop;
 
   if (numPolys == 0 && numVerts != 0) {
     return mesh;
   }
 
-  /* Only use material offsets if we have 2 or more materials. */
-  const short mat_nrs = ctx->object->totcol > 1 ? ctx->object->totcol : 1;
-  const short mat_nr_max = mat_nrs - 1;
-  const short mat_ofs = mat_nrs > 1 ? smd->mat_ofs : 0;
-  const short mat_ofs_rim = mat_nrs > 1 ? smd->mat_ofs_rim : 0;
+  float(*poly_nors)[3] = NULL;
 
-  /* #ofs_front and #ofs_back are the offset from the original
-   * surface along the normal, where #oft_front is along the positive
-   * and #oft_back is along the negative normal. */
-  const float ofs_front = (smd->offset_fac + 1.0f) * 0.5f * smd->offset;
-  const float ofs_back = ofs_front - smd->offset * smd->offset_fac;
-  /* #ofs_front_clamped and #ofs_back_clamped are the same as
-   * #ofs_front and #ofs_back, but never zero. */
-  const float ofs_front_clamped = clamp_nonzero(ofs_front, 1e-5f);
-  const float ofs_back_clamped = clamp_nonzero(ofs_back, 1e-5f);
-  const float offset_fac_vg = smd->offset_fac_vg;
-  const float offset_fac_vg_inv = 1.0f - smd->offset_fac_vg;
-  const float offset = fabsf(smd->offset) * smd->offset_clamp;
-  const bool do_angle_clamp = smd->flag & MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP;
-  /* #do_flip, flips the normals of the result. This is inverted if negative thickness
-   * is used, since simple solidify with negative thickness keeps the faces facing outside. */
-  const bool do_flip = ((smd->flag & MOD_SOLIDIFY_FLIP) != 0) == (smd->offset > 0);
-  const bool do_rim = smd->flag & MOD_SOLIDIFY_RIM;
-  const bool do_shell = ((smd->flag & MOD_SOLIDIFY_RIM) && (smd->flag & MOD_SOLIDIFY_NOSHELL)) ==
-                        0;
-  const bool do_clamp = (smd->offset_clamp != 0.0f);
-
-  const float bevel_convex = smd->bevel_convex;
+  const float ofs_front = (solidify_data->offset_fac + 1.0f) * 0.5f * solidify_data->offset;
+  const float ofs_back = ofs_front - solidify_data->offset * solidify_data->offset_fac;
+  const float ofs_front_clamped = max_ff(1e-5f,
+                                         fabsf(solidify_data->offset > 0 ? ofs_front : ofs_back));
+  const float ofs_back_clamped = max_ff(1e-5f,
+                                        fabsf(solidify_data->offset > 0 ? ofs_back : ofs_front));
+  const float offset_fac_vg = solidify_data->offset_fac_vg;
+  const float offset_fac_vg_inv = 1.0f - solidify_data->offset_fac_vg;
+  const float offset = fabsf(solidify_data->offset) * solidify_data->offset_clamp;
+  const bool do_angle_clamp = solidify_data->flag & MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP;
+  const bool do_flip = (solidify_data->flag & MOD_SOLIDIFY_FLIP) != 0;
+  const bool do_rim = solidify_data->flag & MOD_SOLIDIFY_RIM;
+  const bool do_shell = solidify_data->flag & MOD_SOLIDIFY_SHELL;
+  const bool do_clamp = (solidify_data->offset_clamp != 0.0f);
 
   const float bevel_convex = solidify_data->bevel_convex;
 
@@ -204,9 +195,10 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
 
 #define MOD_SOLIDIFY_EMPTY_TAG ((uint)-1)
 
-  /* Calculate only face normals. Copied because they are modified directly below. */
-  float(*poly_nors)[3] = MEM_malloc_arrayN(numPolys, sizeof(float[3]), __func__);
-  memcpy(poly_nors, BKE_mesh_poly_normals_ensure(mesh), sizeof(float[3]) * numPolys);
+  /* Calculate only face normals. */
+  poly_nors = MEM_malloc_arrayN(numPolys, sizeof(*poly_nors), __func__);
+  BKE_mesh_calc_normals_poly(
+      orig_mvert, (int)numVerts, orig_mloop, (int)numLoops, orig_mpoly, (int)numPolys, poly_nors);
 
   NewFaceRef *face_sides_arr = MEM_malloc_arrayN(
       numPolys * 2, sizeof(*face_sides_arr), "face_sides_arr in solidify");

@@ -434,7 +434,6 @@ DefNode(GeometryNode, GEO_NODE_STRING_TO_CURVES, def_geo_string_to_curves, "STRI
 DefNode(GeometryNode, GEO_NODE_SUBDIVIDE_CURVE, 0, "SUBDIVIDE_CURVE", SubdivideCurve, "Subdivide Curve", "")
 DefNode(GeometryNode, GEO_NODE_SUBDIVIDE_MESH, 0, "SUBDIVIDE_MESH", SubdivideMesh, "Subdivide Mesh", "")
 DefNode(GeometryNode, GEO_NODE_SUBDIVISION_SURFACE, def_geo_subdivision_surface, "SUBDIVISION_SURFACE", SubdivisionSurface, "Subdivision Surface", "")
-DefNode(GeometryNode, GEO_NODE_SUBDIVISION_SURFACE, 0, "SUBDIVISION_SURFACE", SubdivisionSurface, "Subdivision Surface", "")
 DefNode(GeometryNode, GEO_NODE_SWITCH, def_geo_switch, "SWITCH", Switch, "Switch", "")
 DefNode(GeometryNode, GEO_NODE_TRANSFER_ATTRIBUTE, def_geo_transfer_attribute, "ATTRIBUTE_TRANSFER", AttributeTransfer, "Transfer Attribute", "")
 DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform", "")
