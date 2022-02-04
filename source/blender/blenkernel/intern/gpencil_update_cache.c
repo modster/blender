@@ -377,8 +377,8 @@ static bool gpencil_print_update_cache_layer_cb(GPencilUpdateCache *cache, void 
 
 static bool gpencil_print_update_cache_frame_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
 {
-  printf("  - Layer: %s | Index: %d | Flag: %d | Tagged Frames: %d\n",
-         (cache->data ? ((bGPDlayer *)cache->data)->info : "N/A"),
+  printf("  - Frame: %d | Index: %d | Flag: %d | Tagged Strokes: %d\n",
+         (cache->data ? ((bGPDframe *)cache->data)->framenum : -1),
          cache->index,
          cache->flag,
          BLI_listbase_count((ListBase *)cache->children));
@@ -518,17 +518,13 @@ void BKE_gpencil_free_update_cache_and_data(GPencilUpdateCache *gpd_cache)
   update_cache_free(gpd_cache);
 }
 
-void BKE_gpencil_print_update_cache(bGPdata *gpd)
+void BKE_gpencil_print_update_cache(GPencilUpdateCache *update_cache)
 {
-  GPencilUpdateCache *update_cache = gpd->runtime.update_cache;
-
   if (update_cache == NULL) {
     printf("No update cache\n");
     return;
   }
-  printf("Update Cache:\n");
-  printf("- GPdata: %s | Flag: %d | Tagged Layers: %d\n",
-         gpd->id.name,
+  printf("Update cache: - Flag: %d | Tagged Layers: %d\n",
          update_cache->flag,
          BLI_listbase_count((ListBase *)update_cache->children));
 

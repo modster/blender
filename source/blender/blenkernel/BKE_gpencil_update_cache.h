@@ -163,7 +163,7 @@ void BKE_gpencil_free_update_cache_and_data(GPencilUpdateCache *cache);
 /**
  *
  */
-void BKE_gpencil_print_update_cache(struct bGPdata *gpd);
+void BKE_gpencil_print_update_cache(struct GPencilUpdateCache *cache);
 
 #ifdef __cplusplus
 }
