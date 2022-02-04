@@ -2834,13 +2834,20 @@ void BKE_gpencil_frame_selected_hash(bGPdata *gpd, struct GHash *r_list)
   }
 }
 
-bool BKE_gpencil_check_copy_on_write_needed(bGPdata *gpd)
+bool BKE_gpencil_update_on_write_check(const Depsgraph *depsgraph, bGPdata *gpd)
 {
-  GPencilUpdateCache *update_cache = gpd->runtime.update_cache;
   if (!U.experimental.use_gpencil_update_cache) {
-    return true;
+    return false;
   }
-  return update_cache == NULL || update_cache->flag == GP_UPDATE_NODE_FULL_COPY;
+
+  /* For now, we only use the update cache in the active depsgraph. Othwerwise we might access the
+   * cache while another depsgraph frees it. */
+  if (!DEG_is_active(depsgraph)) {
+    return false;
+  }
+
+  GPencilUpdateCache *update_cache = gpd->runtime.update_cache;
+  return update_cache != NULL && update_cache->flag != GP_UPDATE_NODE_FULL_COPY;
 }
 
 typedef struct tGPencilUpdateOnWriteTraverseData {
