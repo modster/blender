@@ -182,6 +182,7 @@ set(SRC
   intern/lib_id_eval.c
   intern/lib_id_remapper.cc
   intern/lib_override.c
+  intern/lib_override_proxy_conversion.c
   intern/lib_query.c
   intern/lib_remap.c
   intern/library.c
@@ -717,10 +718,6 @@ if(WITH_FFTW3)
     ${FFTW3_LIBRARIES}
   )
   add_definitions(-DFFTW3=1)
-endif()
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 if(WITH_FREESTYLE)
