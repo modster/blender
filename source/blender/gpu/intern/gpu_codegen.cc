@@ -423,7 +423,7 @@ void GPUCodegen::generate_resources()
     info.uniform_buf(0, "UniformAttrs", "unf_attrs[DRW_RESOURCE_CHUNK_LEN]", Frequency::BATCH);
   }
 
-  info.typedef_source_generated = extract_c_str(ss);
+  info.typedef_source_generated = ss.str();
 }
 
 void GPUCodegen::generate_library()
