@@ -234,19 +234,19 @@ static bool worldspace_to_screenspace(const float pos_3d[3],
          V3D_PROJ_RET_OK;
 }
 
-static void move_bezt_by_change(BezTriple *bezt, const float change[3])
+static void move_bezt_by_displacement(BezTriple *bezt, const float disp_3d[3])
 {
-  add_v3_v3(bezt->vec[0], change);
-  add_v3_v3(bezt->vec[1], change);
-  add_v3_v3(bezt->vec[2], change);
+  add_v3_v3(bezt->vec[0], disp_3d);
+  add_v3_v3(bezt->vec[1], disp_3d);
+  add_v3_v3(bezt->vec[2], disp_3d);
 }
 
 /* Move entire control point to given worldspace location. */
 static void move_bezt_to_location(BezTriple *bezt, const float location[3])
 {
-  float change[3];
-  sub_v3_v3v3(change, location, bezt->vec[1]);
-  move_bezt_by_change(bezt, change);
+  float disp_3d[3];
+  sub_v3_v3v3(disp_3d, location, bezt->vec[1]);
+  move_bezt_by_displacement(bezt, disp_3d);
 }
 
 /* Alter handle types to allow free movement (Set handles to #FREE or #ALIGN). */
@@ -274,20 +274,21 @@ static void remove_handle_movement_constraints(BezTriple *bezt, const bool f1, c
 
 static void move_bezt_handle_or_vertex_to_location(BezTriple *bezt,
                                                    const float mval[2],
-                                                   const short cp_index,
+                                                   const short bezt_idx,
                                                    const ViewContext *vc)
 {
   float location[3];
-  screenspace_to_worldspace(mval, bezt->vec[cp_index], vc, location);
-  if (cp_index == 1) {
+  screenspace_to_worldspace(mval, bezt->vec[bezt_idx], vc, location);
+  if (bezt_idx == 1) {
     move_bezt_to_location(bezt, location);
   }
   else {
-    copy_v3_v3(bezt->vec[cp_index], location);
+    copy_v3_v3(bezt->vec[bezt_idx], location);
     if (bezt->h1 == HD_ALIGN && bezt->h2 == HD_ALIGN) {
+      /* Move the handle on the opposite side. */
       float handle_vec[3];
       sub_v3_v3v3(handle_vec, bezt->vec[1], location);
-      const short other_handle = cp_index == 2 ? 0 : 2;
+      const short other_handle = bezt_idx == 2 ? 0 : 2;
       normalize_v3_length(handle_vec, len_v3v3(bezt->vec[1], bezt->vec[other_handle]));
       add_v3_v3v3(bezt->vec[other_handle], bezt->vec[1], handle_vec);
     }
@@ -302,6 +303,9 @@ static void move_bp_to_location(BPoint *bp, const float mval[2], const ViewConte
   copy_v3_v3(bp->vec, location);
 }
 
+/* Get the average position of selected points.
+ * `mid_only`: Use only the middle point of the three points on a BezTriple.
+ * `bezt_only`: Use only points of Bezier splines. */
 static bool get_selected_center(const ListBase *nurbs,
                                 float r_center[3],
                                 const bool mid_only,
@@ -359,28 +363,30 @@ static void move_all_selected_points(ListBase *nurbs,
                                      const wmEvent *event,
                                      const ViewContext *vc)
 {
-  float center[3] = {0.0f, 0.0f, 0.0f};
-  float change[2], center_2d[2];
+  float center[3], center_2d[2];
   get_selected_center(nurbs, center, false, bezt_only);
   worldspace_to_screenspace(center, vc, center_2d);
-  float mval[2] = {UNPACK2(event->xy)};
-  sub_v2_v2v2(change, mval, center_2d);
+
+  const float mval[2] = {UNPACK2(event->xy)};
+  float disp_2d[2];
+  sub_v2_v2v2(disp_2d, mval, center_2d);
+
   if (!cpd->offset_calc) {
-    float prev_mval[2] = {UNPACK2(event->prev_xy)};
+    const float prev_mval[2] = {UNPACK2(event->prev_xy)};
     sub_v2_v2v2(cpd->move_offset, center_2d, prev_mval);
     cpd->offset_calc = true;
   }
-  add_v2_v2(change, cpd->move_offset);
+  add_v2_v2(disp_2d, cpd->move_offset);
 
   const bool link_handles = cpd->link_handles && !cpd->free_toggle;
   const bool lock_angle = cpd->lock_angle;
 
-  float change_len = 0.0f;
+  float distance = 0.0f;
   if (lock_angle) {
     float mval_3d[3], center_mid[3];
     get_selected_center(nurbs, center_mid, true, true);
     screenspace_to_worldspace_int(event->mval, center_mid, vc, mval_3d);
-    change_len = len_v3v3(center_mid, mval_3d);
+    distance = len_v3v3(center_mid, mval_3d);
   }
 
   LISTBASE_FOREACH (Nurb *, nu, nurbs) {
@@ -390,7 +396,7 @@ static void move_all_selected_points(ListBase *nurbs,
         if (BEZT_ISSEL_IDX(bezt, 1) || (move_entire && BEZT_ISSEL_ANY(bezt))) {
           float pos[2], dst[2];
           worldspace_to_screenspace(bezt->vec[1], vc, pos);
-          add_v2_v2v2(dst, pos, change);
+          add_v2_v2v2(dst, pos, disp_2d);
           move_bezt_handle_or_vertex_to_location(bezt, dst, 1, vc);
         }
         else {
@@ -398,15 +404,15 @@ static void move_all_selected_points(ListBase *nurbs,
               bezt, BEZT_ISSEL_IDX(bezt, 0), BEZT_ISSEL_IDX(bezt, 2));
           if (BEZT_ISSEL_IDX(bezt, 0)) {
             if (lock_angle) {
-              float change_3d[3];
-              sub_v3_v3v3(change_3d, bezt->vec[0], bezt->vec[1]);
-              normalize_v3_length(change_3d, change_len);
-              add_v3_v3v3(bezt->vec[0], bezt->vec[1], change_3d);
+              float disp_3d[3];
+              sub_v3_v3v3(disp_3d, bezt->vec[0], bezt->vec[1]);
+              normalize_v3_length(disp_3d, distance);
+              add_v3_v3v3(bezt->vec[0], bezt->vec[1], disp_3d);
             }
             else {
               float pos[2], dst[2];
               worldspace_to_screenspace(bezt->vec[0], vc, pos);
-              add_v2_v2v2(dst, pos, change);
+              add_v2_v2v2(dst, pos, disp_2d);
               move_bezt_handle_or_vertex_to_location(bezt, dst, 0, vc);
               if (link_handles) {
                 float handle[3];
@@ -417,15 +423,15 @@ static void move_all_selected_points(ListBase *nurbs,
           }
           else if (BEZT_ISSEL_IDX(bezt, 2)) {
             if (lock_angle) {
-              float change_3d[3];
-              sub_v3_v3v3(change_3d, bezt->vec[2], bezt->vec[1]);
-              normalize_v3_length(change_3d, change_len);
-              add_v3_v3v3(bezt->vec[2], bezt->vec[1], change_3d);
+              float disp_3d[3];
+              sub_v3_v3v3(disp_3d, bezt->vec[2], bezt->vec[1]);
+              normalize_v3_length(disp_3d, distance);
+              add_v3_v3v3(bezt->vec[2], bezt->vec[1], disp_3d);
             }
             else {
               float pos[2], dst[2];
               worldspace_to_screenspace(bezt->vec[2], vc, pos);
-              add_v2_v2v2(dst, pos, change);
+              add_v2_v2v2(dst, pos, disp_2d);
               move_bezt_handle_or_vertex_to_location(bezt, dst, 2, vc);
               if (link_handles) {
                 float handle[3];
@@ -444,7 +450,7 @@ static void move_all_selected_points(ListBase *nurbs,
         if (bp->f1 & SELECT) {
           float pos[2], dst[2];
           worldspace_to_screenspace(bp->vec, vc, pos);
-          add_v2_v2v2(dst, pos, change);
+          add_v2_v2v2(dst, pos, disp_2d);
           move_bp_to_location(bp, dst, vc);
         }
       }
@@ -468,13 +474,13 @@ static int get_nurb_index(const ListBase *nurbs, const Nurb *nurb)
 static void delete_nurb(Curve *cu, Nurb *nu)
 {
   EditNurb *editnurb = cu->editnurb;
-  ListBase *nubase = &editnurb->nurbs;
-  const int nuindex = get_nurb_index(nubase, nu);
-  if (cu->actnu == nuindex) {
+  ListBase *nurbs = &editnurb->nurbs;
+  const int nu_index = get_nurb_index(nurbs, nu);
+  if (cu->actnu == nu_index) {
     cu->actnu = CU_ACT_NONE;
   }
 
-  BLI_remlink(nubase, nu);
+  BLI_remlink(nurbs, nu);
   BKE_nurb_free(nu);
   nu = NULL;
 }
@@ -524,7 +530,7 @@ static bool get_closest_point_on_edge(float r_point[3],
   opposite to each other. If they're the same, that indicates that there is a
   perpendicular line from the mouse to the line.*/
   if ((dot1 > 0) == (dot2 > 0)) {
-    float len_vec3_sq = len_squared_v2(vec3);
+    const float len_vec3_sq = len_squared_v2(vec3);
     *r_fraction = 1 - dot2 / len_vec3_sq;
 
     float pos_dif[3];
@@ -558,8 +564,8 @@ static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
   *r_bezt = NULL;
   *r_bp = NULL;
 
-  float min_distance_bezt = FLT_MAX;
-  float min_distance_bp = FLT_MAX;
+  float min_dist_bezt = FLT_MAX;
+  float min_dist_bp = FLT_MAX;
 
   BezTriple *closest_bezt = NULL;
   short closest_handle = 0;
@@ -580,9 +586,9 @@ static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
         }
         for (short j = start; j < end; j++) {
           if (worldspace_to_screenspace(bezt->vec[j], vc, bezt_vec)) {
-            const float distance = len_manhattan_v2v2(bezt_vec, point);
-            if (distance < min_distance_bezt) {
-              min_distance_bezt = distance;
+            const float dist = len_manhattan_v2v2(bezt_vec, point);
+            if (dist < min_dist_bezt) {
+              min_dist_bezt = dist;
               closest_bezt = bezt;
               closest_bezt_nu = nu;
               closest_handle = j;
@@ -596,9 +602,9 @@ static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
         BPoint *bp = &nu->bp[i];
         float bp_vec[2];
         if (worldspace_to_screenspace(bp->vec, vc, bp_vec)) {
-          const float distance = len_manhattan_v2v2(bp_vec, point);
-          if (distance < min_distance_bp) {
-            min_distance_bp = distance;
+          const float dist = len_manhattan_v2v2(bp_vec, point);
+          if (dist < min_dist_bp) {
+            min_dist_bp = dist;
             closest_bp = bp;
             closest_bp_nu = nu;
           }
@@ -607,9 +613,9 @@ static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
     }
   }
 
-  const float threshold_distance = ED_view3d_select_dist_px() * sel_dist_mul;
-  if (min_distance_bezt < threshold_distance || min_distance_bp < threshold_distance) {
-    if (min_distance_bp < min_distance_bezt) {
+  const float threshold_dist = ED_view3d_select_dist_px() * sel_dist_mul;
+  if (min_dist_bezt < threshold_dist || min_dist_bp < threshold_dist) {
+    if (min_dist_bp < min_dist_bezt) {
       *r_bp = closest_bp;
       *r_nu = closest_bp_nu;
     }
@@ -625,16 +631,16 @@ static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
 
 /* Assign values for several frequently changing attributes of #CutData. */
 static void assign_cut_data(CutData *data,
-                            const float min_dist,
                             Nurb *nu,
-                            const int bext_index,
+                            const float min_dist,
+                            const int bezt_index,
                             const int bp_index,
                             const float parameter,
                             const float cut_loc[3])
 {
   data->min_dist = min_dist;
   data->nurb = nu;
-  data->bezt_index = bext_index;
+  data->bezt_index = bezt_index;
   data->bp_index = bp_index;
   data->parameter = parameter;
   copy_v3_v3(data->cut_loc, cut_loc);
@@ -666,12 +672,12 @@ static void update_data_if_closest_point_in_segment(const BezTriple *bezt1,
 
   for (int k = 0; k <= resolu; k++) {
     float screen_co[2];
-    bool check = worldspace_to_screenspace(points + 3 * k, vc, screen_co);
+    const bool check = worldspace_to_screenspace(points + 3 * k, vc, screen_co);
 
     if (check) {
       const float distance = len_manhattan_v2v2(screen_co, data->mval);
       if (distance < data->min_dist) {
-        assign_cut_data(data, distance, nu, index, -1, ((float)k) / resolu, points + 3 * k);
+        assign_cut_data(data, nu, distance, index, -1, ((float)k) / resolu, points + 3 * k);
 
         data->has_prev = k > 0;
         data->has_next = k < resolu;
@@ -706,8 +712,7 @@ static void get_bezier_interpolated_point(float r_point[3],
 static void update_cut_loc_in_data(CutData *data, const ViewContext *vc)
 {
   bool found_min = false;
-  float point[3];
-  float factor;
+  float point[3], factor;
 
   if (data->has_prev) {
     found_min = get_closest_point_on_edge(
@@ -760,7 +765,7 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
       float screen_co[2];
       if (data->nurb == NULL) {
         worldspace_to_screenspace(nu->bezt->vec[1], vc, screen_co);
-        assign_cut_data(data, FLT_MAX, nu, 0, -1, 0.0f, nu->bezt->vec[1]);
+        assign_cut_data(data, nu, FLT_MAX, 0, -1, 0.0f, nu->bezt->vec[1]);
       }
 
       BezTriple *bezt = NULL;
@@ -773,21 +778,20 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
         update_data_if_closest_point_in_segment(bezt + 1, nu->bezt, nu, nu->pntsu - 1, vc, data);
       }
 
-      float fraction = 0.0f;
-      float point[3];
+      float point[3], fraction = 0.0f;
       if (data->has_next) {
         get_closest_point_on_edge(point, data->mval, data->cut_loc, data->next_loc, vc, &fraction);
         worldspace_to_screenspace(point, vc, screen_co);
-        const float dist1 = len_manhattan_v2v2(screen_co, data->mval);
-        data->min_dist = dist1;
+        const float len = len_manhattan_v2v2(screen_co, data->mval);
+        data->min_dist = len;
       }
 
       if (data->has_prev) {
         get_closest_point_on_edge(point, data->mval, data->cut_loc, data->prev_loc, vc, &fraction);
         worldspace_to_screenspace(point, vc, screen_co);
-        const float dist2 = len_manhattan_v2v2(screen_co, data->mval);
-        if (dist2 < data->min_dist) {
-          data->min_dist = dist2;
+        const float len = len_manhattan_v2v2(screen_co, data->mval);
+        if (len < data->min_dist) {
+          data->min_dist = len;
           fraction = -fraction;
         }
       }
@@ -799,25 +803,21 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
       if (data->nurb == NULL) {
         worldspace_to_screenspace(nu->bp->vec, vc, screen_co);
         assign_cut_data(
-            data, len_manhattan_v2v2(screen_co, data->mval), nu, -1, 0, 0.0f, nu->bp->vec);
+            data, nu, len_manhattan_v2v2(screen_co, data->mval), -1, 0, 0.0f, nu->bp->vec);
       }
 
-      int end = nu->pntsu - 1;
-      if (nu->flagu & CU_NURB_CYCLIC) {
-        end = nu->pntsu;
-      }
-
+      const int end = (nu->flagu & CU_NURB_CYCLIC) ? nu->pntsu : nu->pntsu - 1;
       for (int i = 0; i < end; i++) {
         float point[3], factor;
-        int next_i = (i + 1) % nu->pntsu;
-        bool found_min = get_closest_point_on_edge(
+        const int next_i = (i + 1) % nu->pntsu;
+        const bool found_min = get_closest_point_on_edge(
             point, data->mval, (nu->bp + i)->vec, (nu->bp + next_i)->vec, vc, &factor);
         if (found_min) {
           float point_2d[2];
           if (worldspace_to_screenspace(point, vc, point_2d)) {
             const float dist = len_manhattan_v2v2(point_2d, data->mval);
             if (dist < data->min_dist) {
-              assign_cut_data(data, dist, nu, -1, i, 0.0f, point);
+              assign_cut_data(data, nu, dist, -1, i, 0.0f, point);
             }
           }
         }
@@ -1014,7 +1014,7 @@ static void get_selected_points(
 static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
                                                      ListBase *nurbs,
                                                      Curve *cu,
-                                                     const float change[3])
+                                                     const float disp_3d[3])
 {
   int nu_index = 0;
   LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
@@ -1032,8 +1032,8 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
           BEZT_DESEL_ALL(last_bezt);
           ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
 
-          move_bezt_by_change(new_bezt, change);
-          move_bezt_by_change(new_bezt + nu1->pntsu + 1, change);
+          move_bezt_by_displacement(new_bezt, disp_3d);
+          move_bezt_by_displacement(new_bezt + nu1->pntsu + 1, disp_3d);
           MEM_freeN(nu1->bezt);
           nu1->bezt = new_bezt;
           nu1->pntsu += 2;
@@ -1044,7 +1044,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
           ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, 1);
           BEZT_DESEL_ALL(nu1->bezt);
           ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
-          move_bezt_by_change(new_bezt, change);
+          move_bezt_by_displacement(new_bezt, disp_3d);
           MEM_freeN(nu1->bezt);
           nu1->bezt = new_bezt;
           nu1->pntsu++;
@@ -1057,7 +1057,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         ED_curve_beztcpy(editnurb, new_bezt + nu1->pntsu, last_bezt, 1);
         BEZT_DESEL_ALL(last_bezt);
         ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, nu1->pntsu);
-        move_bezt_by_change(new_bezt + nu1->pntsu, change);
+        move_bezt_by_displacement(new_bezt + nu1->pntsu, disp_3d);
         MEM_freeN(nu1->bezt);
         nu1->bezt = new_bezt;
         nu1->pntsu++;
@@ -1076,8 +1076,8 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
           new_bp->f1 &= ~SELECT;
           last_bp->f1 &= ~SELECT;
           ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
-          add_v3_v3(new_bp->vec, change);
-          add_v3_v3((new_bp + nu1->pntsu + 1)->vec, change);
+          add_v3_v3(new_bp->vec, disp_3d);
+          add_v3_v3((new_bp + nu1->pntsu + 1)->vec, disp_3d);
           MEM_freeN(nu1->bp);
           nu1->bp = new_bp;
           nu1->pntsu += 2;
@@ -1087,7 +1087,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
           ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
           new_bp->f1 &= ~SELECT;
           ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
-          add_v3_v3(new_bp->vec, change);
+          add_v3_v3(new_bp->vec, disp_3d);
           MEM_freeN(nu1->bp);
           nu1->bp = new_bp;
           nu1->pntsu++;
@@ -1101,7 +1101,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu, last_bp, 1);
         last_bp->f1 &= ~SELECT;
         ED_curve_bpcpy(editnurb, new_bp, nu1->bp, nu1->pntsu);
-        add_v3_v3((new_bp + nu1->pntsu)->vec, change);
+        add_v3_v3((new_bp + nu1->pntsu)->vec, disp_3d);
         MEM_freeN(nu1->bp);
         nu1->bp = new_bp;
         nu1->pntsu++;
@@ -1172,10 +1172,10 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
   EditNurb *editnurb = cu->editnurb;
 
   if (!extrude_center && sel_exists) {
-    float change[3];
-    sub_v3_v3v3(change, location, center);
+    float disp_3d[3];
+    sub_v3_v3v3(disp_3d, location, center);
     /* Reimplemenented due to unexpected behavior for extrusion of 2-point spline. */
-    extrude_vertices_from_selected_endpoints(editnurb, nurbs, cu, change);
+    extrude_vertices_from_selected_endpoints(editnurb, nurbs, cu, disp_3d);
   }
   else {
     Nurb *old_last_nu = editnurb->nurbs.last;
@@ -1376,26 +1376,26 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase
 {
   FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
   BezTriple *adj_bezt;
-  int cp_idx;
+  int bezt_idx;
   if (nu->pntsu == 1) {
     continue;
   }
   if (nu->bezt == bezt) {
     adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
-    cp_idx = 0;
+    bezt_idx = 0;
   }
   else if (nu->bezt + nu->pntsu - 1 == bezt) {
     adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
-    cp_idx = 2;
+    bezt_idx = 2;
   }
   else {
     if (BEZT_ISSEL_IDX(bezt, 0)) {
       adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
-      cp_idx = 2;
+      bezt_idx = 2;
     }
     else if (BEZT_ISSEL_IDX(bezt, 2)) {
       adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
-      cp_idx = 0;
+      bezt_idx = 0;
     }
     else {
       continue;
@@ -1406,14 +1406,16 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase
   float screen_co[2];
   int displacement[2];
   /* Get the screen space coordinates of moved handle. */
-  ED_view3d_project_float_object(
-      vc->region, adj_bezt->vec[cp_idx], screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+  ED_view3d_project_float_object(vc->region,
+                                 adj_bezt->vec[bezt_idx],
+                                 screen_co,
+                                 V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
   sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
   const float disp_fl[2] = {UNPACK2(displacement)};
 
   /* Add the displacement of the mouse to the handle position. */
   add_v2_v2v2(screen_co, screen_co, disp_fl);
-  move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co, cp_idx, vc);
+  move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co, bezt_idx, vc);
   BKE_nurb_handles_calc(nu);
   FOREACH_SELECTED_BEZT_END
 }
