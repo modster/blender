@@ -502,6 +502,13 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
     builtin_blocks_[u] = (block != nullptr) ? block->binding : -1;
   }
 
+  /* Builtin Uniforms */
+  for (int32_t u_int = 0; u_int < GPU_NUM_BUFFER_BLOCKS; u_int++) {
+    GPUBufferBlockBuiltin u = static_cast<GPUBufferBlockBuiltin>(u_int);
+    const ShaderInput *buffer = this->ssbo_get(builtin_buffer_block_name(u));
+    builtin_buffers_[u] = (buffer != nullptr) ? buffer->binding : -1;
+  }
+
   this->sort_inputs();
 
   // this->debug_print();
