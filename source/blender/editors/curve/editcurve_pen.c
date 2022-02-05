@@ -979,7 +979,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
           BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 2) * sizeof(BPoint), __func__);
           ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
           ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu + 1, last_bp, 1);
-          new_bp->f1 &= ~SELECT;
+          nu1->bp->f1 &= ~SELECT;
           last_bp->f1 &= ~SELECT;
           ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
           add_v3_v3(new_bp->vec, disp_3d);
@@ -991,7 +991,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         else {
           BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
           ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
-          new_bp->f1 &= ~SELECT;
+          nu1->bp->f1 &= ~SELECT;
           ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
           add_v3_v3(new_bp->vec, disp_3d);
           MEM_freeN(nu1->bp);
