@@ -10,6 +10,10 @@
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
 
+/* Fits the limit of 32KB. */
+shared int zbin_max[CULLING_ZBIN_COUNT];
+shared int zbin_min[CULLING_ZBIN_COUNT];
+
 void main()
 {
   uint src_index = gl_GlobalInvocationID.x;
@@ -47,9 +51,6 @@ void main()
   z_min = clamp(z_min, 0, CULLING_ZBIN_COUNT - 1);
   z_max = clamp(z_max, 0, CULLING_ZBIN_COUNT - 1);
 
-  /* Fits the limit of 32KB. */
-  shared int zbin_max[CULLING_ZBIN_COUNT];
-  shared int zbin_min[CULLING_ZBIN_COUNT];
   /* Compilers do not release shared memory from early declaration.
    * So we are forced to reuse the same variables in another form. */
 #define z_dists zbin_max

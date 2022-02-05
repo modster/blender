@@ -20,6 +20,9 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
+shared ivec2 min_tile;
+shared ivec2 max_tile;
+
 void main()
 {
   ShadowTileMapData tilemap_data = tilemaps_buf[gl_GlobalInvocationID.z];
@@ -80,8 +83,6 @@ void main()
 
     /** Compute area to render and write to buffer for CPU to read. */
     {
-      shared ivec2 min_tile;
-      shared ivec2 max_tile;
       ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
 
       if (gl_GlobalInvocationID.xy == uvec2(0)) {

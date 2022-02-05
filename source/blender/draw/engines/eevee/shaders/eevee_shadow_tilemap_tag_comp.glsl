@@ -27,12 +27,13 @@ vec3 safe_project(ShadowTileMapData tilemap, inout int clipped, vec3 v)
   return tmp.xyz / tmp.w;
 }
 
+/* Bitmap of tile intersection tests. Use one uint per row for each LOD. */
+shared uint flag_map[SHADOW_TILEMAP_RES * 2];
+
 void main()
 {
   ShadowTileMapData tilemap = tilemaps_buf[gl_GlobalInvocationID.z];
 
-  /* Bitmap of tile intersection tests. Use one uint per row for each LOD. */
-  shared uint flag_map[SHADOW_TILEMAP_RES * 2];
   if (gl_LocalInvocationID.x == 0u) {
     for (int i = 0; i < SHADOW_TILEMAP_RES * 2; i++) {
       flag_map[i] = 0u;

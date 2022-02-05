@@ -10,6 +10,9 @@
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
+/* Bitmap of intersection tests. Use one uint per row. */
+shared uint intersect_map[SHADOW_TILEMAP_RES];
+
 void main()
 {
   ShadowTileMapData tilemap = tilemaps_buf[gl_GlobalInvocationID.z];
@@ -79,9 +82,6 @@ void main()
       lod_visible_max = clamp(lod_visible_max, 0, SHADOW_TILEMAP_LOD);
       lod_visible_min = clamp(lod_visible_min, 0, SHADOW_TILEMAP_LOD);
     }
-
-    /* Bitmap of intersection tests. Use one uint per row. */
-    shared uint intersect_map[SHADOW_TILEMAP_RES];
 
     /* Number of lod0 tiles covered by the current lod level (in one dimension). */
     uint lod_stride = 1u;
