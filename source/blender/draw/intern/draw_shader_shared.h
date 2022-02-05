@@ -1,6 +1,10 @@
 
 #ifndef GPU_SHADER
 #  include "GPU_shader_shared_utils.h"
+
+typedef struct ViewInfos ViewInfos;
+typedef struct ObjectMatrices ObjectMatrices;
+typedef struct ObjectInfos ObjectInfos;
 #endif
 
 #define DRW_SHADER_SHARED_H
@@ -23,6 +27,11 @@ struct ViewInfos {
 
   float2 viewport_size;
   float2 viewport_size_inverse;
+
+  /** Frustum culling data. */
+  /** NOTE: vec3 arrays are paded to vec4. */
+  float4 frustum_corners[8];
+  float4 frustum_planes[6];
 };
 BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
 
