@@ -155,7 +155,7 @@ typedef enum eClose_opt {
   OFF = 0,
   ON_PRESS = 1,
   ON_CLICK = 2,
-} eExtra_key;
+} eClose_opt;
 
 static const EnumPropertyItem prop_close_spline_opts[] = {
     {OFF, "OFF", 0, "None", ""},
