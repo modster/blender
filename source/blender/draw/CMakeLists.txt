@@ -140,7 +140,6 @@ set(SRC
   engines/image/image_shader.cc
   engines/eevee/eevee_camera.cc
   engines/eevee/eevee_depth_of_field.cc
-  engines/eevee/eevee_engine.c
   engines/eevee/eevee_engine.cc
   engines/eevee/eevee_film.cc
   engines/eevee/eevee_gpencil.cc
@@ -249,7 +248,6 @@ set(SRC
   engines/eevee/eevee_light.hh
   engines/eevee/eevee_depth_of_field.hh
   engines/eevee/eevee_lut.h
-  engines/eevee/eevee_private.h
   engines/external/external_engine.h
   engines/image/image_batches.hh
   engines/image/image_drawing_mode.hh

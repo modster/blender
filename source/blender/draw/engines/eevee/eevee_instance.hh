@@ -105,8 +105,8 @@ class Instance {
   char info[64];
 
  public:
-  Instance(ShaderModule &shared_shaders)
-      : shaders(shared_shaders),
+  Instance()
+      : shaders(*ShaderModule::module_get()),
         render_passes(*this),
         shading_passes(*this),
         main_view(*this),

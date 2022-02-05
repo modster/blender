@@ -25,36 +25,26 @@
 
 #include "DRW_render.h"
 
-#include "eevee_private.h"
-
 #include "eevee_instance.hh"
 
 using namespace blender::eevee;
 
-static ShaderModule *g_shader_module = nullptr;
+typedef struct EEVEE_Data {
+  DrawEngineType *engine_type;
+  DRWViewportEmptyList *fbl;
+  DRWViewportEmptyList *txl;
+  DRWViewportEmptyList *psl;
+  DRWViewportEmptyList *stl;
+  Instance *instance;
+} EEVEE_Data;
 
-/* -------------------------------------------------------------------- */
-/** \name EEVEE Instance C interface
- * \{ */
-
-EEVEE_Instance *EEVEE_instance_alloc(void)
+static void eevee_engine_init(void *vedata)
 {
-  if (g_shader_module == nullptr) {
-    /* TODO(fclem) threadsafety. */
-    g_shader_module = new ShaderModule();
+  EEVEE_Data *ved = (EEVEE_Data *)vedata;
+
+  if (ved->instance == NULL) {
+    ved->instance = new Instance();
   }
-  return reinterpret_cast<EEVEE_Instance *>(new Instance(*g_shader_module));
-}
-
-void EEVEE_instance_free(EEVEE_Instance *instance_)
-{
-  Instance *instance = reinterpret_cast<Instance *>(instance_);
-  delete instance;
-}
-
-void EEVEE_instance_init(EEVEE_Instance *instance_)
-{
-  Instance *instance = reinterpret_cast<Instance *>(instance_);
 
   const DRWContextState *ctx_state = DRW_context_state_get();
   Depsgraph *depsgraph = ctx_state->depsgraph;
@@ -103,41 +93,47 @@ void EEVEE_instance_init(EEVEE_Instance *instance_)
     }
   }
 
-  instance->init(
+  ved->instance->init(
       size, &rect, nullptr, depsgraph, nullptr, camera, nullptr, default_view, v3d, rv3d);
 }
 
-void EEVEE_instance_cache_init(EEVEE_Instance *instance_)
+static void eevee_draw_scene(void *vedata)
 {
-  Instance *instance = reinterpret_cast<Instance *>(instance_);
-  instance->begin_sync();
+  ((EEVEE_Data *)vedata)->instance->draw_viewport(DRW_viewport_framebuffer_list_get());
 }
 
-void EEVEE_instance_cache_populate(EEVEE_Instance *instance_, Object *object)
+static void eevee_cache_init(void *vedata)
 {
-  Instance *instance = reinterpret_cast<Instance *>(instance_);
-  instance->object_sync(object);
+  ((EEVEE_Data *)vedata)->instance->begin_sync();
 }
 
-void EEVEE_instance_cache_finish(EEVEE_Instance *instance_)
+static void eevee_cache_populate(void *vedata, Object *object)
 {
-  Instance *instance = reinterpret_cast<Instance *>(instance_);
-  instance->end_sync();
+  ((EEVEE_Data *)vedata)->instance->object_sync(object);
 }
 
-void EEVEE_instance_draw_viewport(EEVEE_Instance *instance_)
+static void eevee_cache_finish(void *vedata)
 {
-  Instance *instance = reinterpret_cast<Instance *>(instance_);
-  DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
-
-  instance->draw_viewport(dfbl);
+  ((EEVEE_Data *)vedata)->instance->end_sync();
 }
 
-void EEVEE_instance_render_frame(EEVEE_Instance *instance_,
-                                 struct RenderEngine *engine,
-                                 struct RenderLayer *render_layer)
+static void eevee_engine_free(void)
 {
-  Instance *instance = reinterpret_cast<Instance *>(instance_);
+  ShaderModule::module_free();
+}
+
+static void eevee_instance_free(void *instance)
+{
+  delete reinterpret_cast<Instance *>(instance);
+}
+
+static void eevee_render_to_image(void *UNUSED(vedata),
+                                  struct RenderEngine *engine,
+                                  struct RenderLayer *layer,
+                                  const struct rcti *UNUSED(rect))
+{
+  Instance *instance = new Instance();
+
   Render *render = engine->re;
   Depsgraph *depsgraph = DRW_context_state_get()->depsgraph;
   Object *camera_original_ob = RE_GetCamera(engine->re);
@@ -148,20 +144,104 @@ void EEVEE_instance_render_frame(EEVEE_Instance *instance_,
   rcti rect;
   RE_GetViewPlane(render, &view_rect, &rect);
 
-  instance->init(size, &rect, engine, depsgraph, nullptr, camera_original_ob, render_layer);
-  instance->render_frame(render_layer, viewname);
+  instance->init(size, &rect, engine, depsgraph, nullptr, camera_original_ob, layer);
+  instance->render_frame(layer, viewname);
+
+  delete instance;
 }
 
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name EEVEE Shaders C interface
- * \{ */
-
-void EEVEE_shared_data_free(void)
+static void eevee_render_update_passes(RenderEngine *engine, Scene *scene, ViewLayer *view_layer)
 {
-  delete g_shader_module;
-  g_shader_module = nullptr;
+  RE_engine_register_pass(engine, scene, view_layer, RE_PASSNAME_COMBINED, 4, "RGBA", SOCK_RGBA);
+
+#define CHECK_PASS_LEGACY(name, type, channels, chanid) \
+  if (view_layer->passflag & (SCE_PASS_##name)) { \
+    RE_engine_register_pass( \
+        engine, scene, view_layer, RE_PASSNAME_##name, channels, chanid, type); \
+  } \
+  ((void)0)
+#define CHECK_PASS_EEVEE(name, type, channels, chanid) \
+  if (view_layer->eevee.render_passes & (EEVEE_RENDER_PASS_##name)) { \
+    RE_engine_register_pass( \
+        engine, scene, view_layer, RE_PASSNAME_##name, channels, chanid, type); \
+  } \
+  ((void)0)
+
+  CHECK_PASS_LEGACY(Z, SOCK_FLOAT, 1, "Z");
+  CHECK_PASS_LEGACY(MIST, SOCK_FLOAT, 1, "Z");
+  CHECK_PASS_LEGACY(NORMAL, SOCK_VECTOR, 3, "XYZ");
+  CHECK_PASS_LEGACY(VECTOR, SOCK_RGBA, 4, "RGBA");
+  CHECK_PASS_LEGACY(DIFFUSE_DIRECT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(DIFFUSE_COLOR, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(GLOSSY_DIRECT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(GLOSSY_COLOR, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_EEVEE(VOLUME_LIGHT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(EMIT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(ENVIRONMENT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(SHADOW, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(AO, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_EEVEE(BLOOM, SOCK_RGBA, 3, "RGB");
+
+  LISTBASE_FOREACH (ViewLayerAOV *, aov, &view_layer->aovs) {
+    if ((aov->flag & AOV_CONFLICT) != 0) {
+      continue;
+    }
+    switch (aov->type) {
+      case AOV_TYPE_COLOR:
+        RE_engine_register_pass(engine, scene, view_layer, aov->name, 4, "RGBA", SOCK_RGBA);
+        break;
+      case AOV_TYPE_VALUE:
+        RE_engine_register_pass(engine, scene, view_layer, aov->name, 1, "X", SOCK_FLOAT);
+        break;
+      default:
+        break;
+    }
+  }
+  // EEVEE_cryptomatte_update_passes(engine, scene, view_layer);
+
+#undef CHECK_PASS_LEGACY
+#undef CHECK_PASS_EEVEE
 }
 
-/** \} */
+static const DrawEngineDataSize eevee_data_size = DRW_VIEWPORT_DATA_SIZE(EEVEE_Data);
+
+DrawEngineType draw_engine_eevee_type = {
+    NULL,
+    NULL,
+    N_("Eevee"),
+    &eevee_data_size,
+    &eevee_engine_init,
+    &eevee_engine_free,
+    &eevee_instance_free,
+    &eevee_cache_init,
+    &eevee_cache_populate,
+    &eevee_cache_finish,
+    &eevee_draw_scene,
+    NULL,
+    NULL,
+    &eevee_render_to_image,
+    NULL,
+};
+
+#define EEVEE_ENGINE "BLENDER_EEVEE"
+
+RenderEngineType DRW_engine_viewport_eevee_type = {
+    NULL,
+    NULL,
+    EEVEE_ENGINE,
+    N_("Eevee"),
+    RE_INTERNAL | RE_USE_PREVIEW | RE_USE_STEREO_VIEWPORT | RE_USE_GPU_CONTEXT,
+    NULL,
+    &DRW_render_to_image,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    &eevee_render_update_passes,
+    &draw_engine_eevee_type,
+    {NULL, NULL, NULL},
+};
+
+#undef EEVEE_ENGINE

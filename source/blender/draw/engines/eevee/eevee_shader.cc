@@ -30,12 +30,30 @@
 
 namespace blender::eevee {
 
-/** \} */
-
 /* -------------------------------------------------------------------- */
-/** \name Static shaders
+/** \name Module
  *
  * \{ */
+
+ShaderModule *ShaderModule::g_shader_module = nullptr;
+
+ShaderModule *ShaderModule::module_get()
+{
+  if (g_shader_module == nullptr) {
+    /* TODO(fclem) threadsafety. */
+    g_shader_module = new ShaderModule();
+  }
+  return g_shader_module;
+}
+
+void ShaderModule::module_free()
+{
+  if (g_shader_module != nullptr) {
+    /* TODO(fclem) threadsafety. */
+    delete g_shader_module;
+    g_shader_module = nullptr;
+  }
+}
 
 ShaderModule::ShaderModule()
 {
@@ -64,6 +82,13 @@ ShaderModule::~ShaderModule()
     DRW_SHADER_FREE_SAFE(shader);
   }
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Static shaders
+ *
+ * \{ */
 
 const char *ShaderModule::static_shader_create_info_name_get(eShaderType shader_type)
 {
