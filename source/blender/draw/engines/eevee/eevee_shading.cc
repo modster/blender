@@ -46,6 +46,7 @@ void BackgroundPass::sync(GPUMaterial *gpumat, GPUTexture *lookdev_tx)
   copy_v3_v3(camera_mat[3], inst_.camera.data_get().viewinv[3]);
 
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, background_ps_);
+  DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
   if (lookdev_tx != nullptr) {
     /* HACK(fclem) This particular texture has been left without resource to be set here. */
     DRW_shgroup_uniform_texture(grp, "samp0", lookdev_tx);

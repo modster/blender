@@ -131,7 +131,7 @@ GPU_SHADER_CREATE_INFO(eevee_background_lookdev)
     .push_constant(Type::FLOAT, "blur")
     .fragment_out(0, Type::VEC4, "out_background")
     .fragment_source("eevee_lookdev_background_frag.glsl")
-    .additional_info("draw_fullscreen", "eevee_utility_texture");
+    .additional_info("draw_fullscreen");
 
 /** \} */
 
