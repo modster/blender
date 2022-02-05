@@ -114,9 +114,6 @@ typedef struct CurvePenData {
   bool multi_point;
   /* Whether a point has already been selected. */
   bool selection_made;
-  /* Offset between center of selected points and mouse. */
-  bool offset_calc;
-  float move_offset[2];
   /* Data about found point. Used for closing splines. */
   Nurb *nu;
   BezTriple *bezt;
@@ -363,20 +360,10 @@ static void move_all_selected_points(ListBase *nurbs,
                                      const wmEvent *event,
                                      const ViewContext *vc)
 {
-  float center[3], center_2d[2];
-  get_selected_center(nurbs, center, false, bezt_only);
-  worldspace_to_screenspace(center, vc, center_2d);
-
   const float mval[2] = {UNPACK2(event->xy)};
+  const float prev_mval[2] = {UNPACK2(event->prev_xy)};
   float disp_2d[2];
-  sub_v2_v2v2(disp_2d, mval, center_2d);
-
-  if (!cpd->offset_calc) {
-    const float prev_mval[2] = {UNPACK2(event->prev_xy)};
-    sub_v2_v2v2(cpd->move_offset, center_2d, prev_mval);
-    cpd->offset_calc = true;
-  }
-  add_v2_v2(disp_2d, cpd->move_offset);
+  sub_v2_v2v2(disp_2d, mval, prev_mval);
 
   const bool link_handles = cpd->link_handles && !cpd->free_toggle;
   const bool lock_angle = cpd->lock_angle;
@@ -1514,14 +1501,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   if (!cpd->link_handles_pressed && is_extra_key_pressed(event, link_handles)) {
     cpd->link_handles = !cpd->link_handles;
-    if (cpd->link_handles) {
-      if (!cpd->free_toggle_pressed) {
-        move_all_selected_points(nurbs, false, false, cpd, event, &vc);
-      }
-    }
-    else {
-      // Recalculate offset after link handles is turned off
-      cpd->offset_calc = false;
+    if (cpd->link_handles && !cpd->free_toggle_pressed) {
+      move_all_selected_points(nurbs, false, false, cpd, event, &vc);
     }
   }
   cpd->link_handles_pressed = is_extra_key_pressed(event, link_handles);
