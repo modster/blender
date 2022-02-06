@@ -181,21 +181,21 @@ GPUTexture *ShadingView::render_post(GPUTexture *input_tx)
 
 void ShadingView::update_view(void)
 {
-  float viewmat[4][4], winmat[4][4];
-  DRW_view_viewmat_get(main_view_, viewmat, false);
-  DRW_view_winmat_get(main_view_, winmat, false);
+  float4x4 viewmat, winmat;
+  DRW_view_viewmat_get(main_view_, viewmat.ptr(), false);
+  DRW_view_winmat_get(main_view_, winmat.ptr(), false);
 
   /* Anti-Aliasing / Super-Sampling jitter. */
   float jitter_u = 2.0f * (inst_.sampling.rng_get(SAMPLING_FILTER_U) - 0.5f) / extent_[0];
   float jitter_v = 2.0f * (inst_.sampling.rng_get(SAMPLING_FILTER_V) - 0.5f) / extent_[1];
 
-  window_translate_m4(winmat, winmat, jitter_u, jitter_v);
-  DRW_view_update_sub(sub_view_, viewmat, winmat);
+  window_translate_m4(winmat.ptr(), winmat.ptr(), jitter_u, jitter_v);
+  DRW_view_update_sub(sub_view_, viewmat.ptr(), winmat.ptr());
 
   /* FIXME(fclem): The offset may be is noticeably large and the culling might make object pop
    * out of the blurring radius. To fix this, use custom enlarged culling matrix. */
   dof_.jitter_apply(winmat, viewmat);
-  DRW_view_update_sub(render_view_, viewmat, winmat);
+  DRW_view_update_sub(render_view_, viewmat.ptr(), winmat.ptr());
 
   inst_.lightprobes.set_view(render_view_, extent_);
   inst_.lights.set_view(render_view_, extent_);
@@ -209,11 +209,11 @@ void ShadingView::update_view(void)
 
 void LightProbeView::sync(Texture &color_tx,
                           Texture &depth_tx,
-                          const float4x4 winmat,
-                          const float4x4 viewmat,
+                          const float4x4 &winmat,
+                          const float4x4 &viewmat,
                           bool is_only_background)
 {
-  float4x4 facemat = face_matrix_ * viewmat;
+  float4x4 facemat = float4x4(face_matrix_) * viewmat;
 
   is_only_background_ = is_only_background;
   extent_ = int2(color_tx.width());
