@@ -16,6 +16,8 @@ void main(void)
   interp.layer = filter_buf.target_layer + cube_face;
   interp.coord.z = float(interp.layer);
 
+  gpu_Layer = interp.layer;
+
 #ifdef CUBEMAP
   switch (cube_face) {
     case 0:
