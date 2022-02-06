@@ -47,8 +47,9 @@ void main()
        * LOD). NOTE: There is some inacuracy because we only project one point instead of
        * projecting each individual pixels.  */
       for (int p = 0; p < 6; p++) {
-        float facing = dot(tile_center_dir, -frustum_planes[p].xyz);
-        float d = line_plane_intersect_dist(shape.corners[0], tile_center_dir, frustum_planes[p]);
+        float facing = dot(tile_center_dir, -drw_view.frustum_planes[p].xyz);
+        float d = line_plane_intersect_dist(
+            shape.corners[0], tile_center_dir, drw_view.frustum_planes[p]);
         if (d > 0.0 && facing > 0.0) {
           len = min(d, len);
         }
