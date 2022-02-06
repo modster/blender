@@ -11,7 +11,7 @@
 
 GPU_SHADER_CREATE_INFO(eevee_culling_select)
     .do_static_compilation(true)
-    .additional_info("eevee_shared")
+    .additional_info("eevee_shared", "draw_view")
     .local_group_size(CULLING_BATCH_SIZE)
     .storage_buf(0, Qualifier::READ, "LightData", "lights_buf[]")
     .storage_buf(1, Qualifier::READ_WRITE, "CullingData", "lights_cull_buf")
@@ -20,7 +20,7 @@ GPU_SHADER_CREATE_INFO(eevee_culling_select)
 
 GPU_SHADER_CREATE_INFO(eevee_culling_sort)
     .do_static_compilation(true)
-    .additional_info("eevee_shared")
+    .additional_info("eevee_shared", "draw_view")
     .local_group_size(CULLING_BATCH_SIZE)
     .storage_buf(0, Qualifier::READ, "LightData", "lights_buf[]")
     .storage_buf(1, Qualifier::READ_WRITE, "CullingData", "lights_cull_buf")
@@ -34,7 +34,7 @@ GPU_SHADER_CREATE_INFO(eevee_culling_sort)
 
 GPU_SHADER_CREATE_INFO(eevee_culling_tile)
     .do_static_compilation(true)
-    .additional_info("eevee_shared")
+    .additional_info("eevee_shared", "draw_view")
     .local_group_size(1024)
     .storage_buf(0, Qualifier::READ, "LightData", "lights_buf[]")
     .storage_buf(1, Qualifier::READ, "CullingData", "lights_cull_buf")
@@ -42,7 +42,6 @@ GPU_SHADER_CREATE_INFO(eevee_culling_tile)
     .compute_source("eevee_culling_tile_comp.glsl");
 
 GPU_SHADER_CREATE_INFO(eevee_light_data)
-    .additional_info("eevee_shared")
     .storage_buf(0, Qualifier::READ, "LightData", "lights_buf[]")
     .storage_buf(1, Qualifier::READ, "CullingZBin", "lights_zbin_buf[]")
     .storage_buf(2, Qualifier::READ, "CullingData", "lights_cull_buf")
@@ -58,7 +57,7 @@ GPU_SHADER_CREATE_INFO(eevee_culling_debug)
     .do_static_compilation(true)
     .sampler(0, ImageType::DEPTH_2D, "depth_tx")
     .fragment_out(0, Type::VEC4, "out_debug_color")
-    .additional_info("eevee_shared")
+    .additional_info("eevee_shared", "draw_view")
     .fragment_source("eevee_culling_debug_frag.glsl")
     .additional_info("draw_fullscreen", "eevee_light_data");
 

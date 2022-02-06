@@ -7,7 +7,7 @@
 
 GPU_SHADER_CREATE_INFO(eevee_velocity_camera)
     .do_static_compilation(true)
-    .uniform_buf(0, "CameraData", "cam_prev")
+    .uniform_buf(3, "CameraData", "cam_prev")
     .uniform_buf(1, "CameraData", "cam_curr")
     .uniform_buf(2, "CameraData", "cam_next")
     .sampler(0, ImageType::DEPTH_2D, "depth_tx")
@@ -15,7 +15,7 @@ GPU_SHADER_CREATE_INFO(eevee_velocity_camera)
     .fragment_out(1, Type::VEC4, "out_velocity_view")
     .additional_info("eevee_shared")
     .fragment_source("eevee_velocity_camera_frag.glsl")
-    .additional_info("draw_fullscreen");
+    .additional_info("draw_fullscreen", "draw_view");
 
 /** \} */
 
