@@ -141,10 +141,10 @@ class DepthOfField {
 
   void init();
 
-  void sync(const float4x4 winmat, int2 input_extent);
+  void sync(const float4x4 &winmat, int2 input_extent);
 
   /** Apply Depth Of Field jittering to the view and projection matrices.. */
-  void jitter_apply(float4x4 winmat, float4x4 viewmat);
+  void jitter_apply(float4x4 &winmat, float4x4 &viewmat);
 
   /** Will swap input and output texture if rendering happens. The actual output of this function
    * is in intput_tx. */

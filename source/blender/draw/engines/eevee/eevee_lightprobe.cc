@@ -199,8 +199,7 @@ void LightProbeModule::cubemap_prepare(float3 position,
   int cube_res = sce_eevee.gi_cubemap_resolution;
   int cube_mip_count = (int)log2_ceil_u(cube_res);
 
-  float4x4 viewmat;
-  viewmat.identity();
+  float4x4 viewmat = float4x4::identity();
   negate_v3_v3(viewmat[3], position);
 
   /* TODO(fclem) We might want to have theses as temporary textures. */

@@ -41,8 +41,7 @@ void BackgroundPass::sync(GPUMaterial *gpumat, GPUTexture *lookdev_tx)
   background_ps_ = DRW_pass_create("Background", state);
 
   /* Push a matrix at the same location as the camera. */
-  float4x4 camera_mat;
-  camera_mat.identity();
+  float4x4 camera_mat = float4x4::identity();
   copy_v3_v3(camera_mat[3], inst_.camera.data_get().viewinv[3]);
 
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, background_ps_);

@@ -214,10 +214,10 @@ bool LookDev::sync_world(void)
   return true;
 }
 
-void LookDev::rotation_get(float4x4 r_mat)
+void LookDev::rotation_get(float4x4 &r_mat)
 {
   if (studiolight_ == nullptr) {
-    r_mat.identity();
+    r_mat = float4x4::identity();
   }
   else {
     axis_angle_to_mat4_single(r_mat.ptr(), 'Z', rotation_);

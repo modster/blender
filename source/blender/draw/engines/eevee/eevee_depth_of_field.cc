@@ -69,7 +69,7 @@ void DepthOfField::init(void)
   jitter_radius_ = 0.0f;
 }
 
-void DepthOfField::sync(const float4x4 winmat, int2 input_extent)
+void DepthOfField::sync(const float4x4 &winmat, int2 input_extent)
 {
   const Object *camera_object_eval = inst_.camera_eval_object;
   const ::Camera *cam = (camera_object_eval) ?
@@ -169,7 +169,7 @@ void DepthOfField::sync(const float4x4 winmat, int2 input_extent)
   }
 }
 
-void DepthOfField::jitter_apply(float4x4 winmat, float4x4 viewmat)
+void DepthOfField::jitter_apply(float4x4 &winmat, float4x4 &viewmat)
 {
   if (jitter_radius_ == 0.0f) {
     return;
