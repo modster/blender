@@ -431,7 +431,7 @@ void LightModule::set_view(const DRWView *view, const int2 extent, bool enable_s
   culling_data.tile_size = tile_size;
   culling_data.tile_x_len = tiles_extent.x;
   culling_data.tile_y_len = tiles_extent.y;
-  culling_data.tile_to_uv_fac = tile_size / float2(UNPACK2(extent));
+  culling_data.tile_to_uv_fac = (!no_lights) ? tile_size / float2(extent) : float2(0.0f);
 
   culling_data.enable_specular = enable_specular;
   culling_data.items_count = no_lights ? 0 : light_refs_.size();
