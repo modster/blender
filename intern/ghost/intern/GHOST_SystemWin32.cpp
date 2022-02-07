@@ -105,6 +105,8 @@
  */
 #define BROKEN_PEEK_TOUCHPAD
 
+static bool isStartedFromCommandPrompt();
+
 static void initRawInput()
 {
 #ifdef WITH_INPUT_NDOF
@@ -166,7 +168,10 @@ GHOST_SystemWin32::~GHOST_SystemWin32()
 {
   // Shutdown COM
   OleUninitialize();
-  toggleConsole(1);
+
+  if (isStartedFromCommandPrompt()) {
+    toggleConsole(1);
+  }
 }
 
 uint64_t GHOST_SystemWin32::performanceCounterToMillis(__int64 perf_ticks) const
@@ -1220,7 +1225,7 @@ GHOST_EventKey *GHOST_SystemWin32::processKeyEvent(GHOST_WindowWin32 *window, RA
     }
 
 #ifdef WITH_INPUT_IME
-    if (window->getImeInput()->IsImeKeyEvent(ascii)) {
+    if (window->getImeInput()->IsImeKeyEvent(ascii, key)) {
       return NULL;
     }
 #endif /* WITH_INPUT_IME */

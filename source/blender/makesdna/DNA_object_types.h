@@ -181,6 +181,12 @@ typedef struct Object_Runtime {
    */
   struct Mesh *mesh_deform_eval;
 
+  /* Evaluated mesh cage in edit mode. */
+  struct Mesh *editmesh_eval_cage;
+
+  /** Cached cage bounding box of `editmesh_eval_cage` for selection. */
+  struct BoundBox *editmesh_bb_cage;
+
   /**
    * Original grease pencil bGPdata pointer, before object->data was changed to point
    * to gpd_eval.
@@ -210,6 +216,12 @@ typedef struct Object_Runtime {
 
   unsigned short local_collections_bits;
   short _pad2[3];
+
+  float (*crazyspace_deform_imats)[3][3];
+  float (*crazyspace_deform_cos)[3];
+  int crazyspace_num_verts;
+
+  int _pad3[3];
 } Object_Runtime;
 
 typedef struct ObjectLineArt {
@@ -251,9 +263,10 @@ typedef struct Object {
   /** String describing subobject info, MAX_ID_NAME-2. */
   char parsubstr[64];
   struct Object *parent, *track;
-  /* If `ob->proxy` (or proxy_group), this object is proxy for object `ob->proxy`. */
-  /* proxy_from is set in target back to the proxy. */
-  struct Object *proxy, *proxy_group, *proxy_from;
+  /* Proxy pointer are deprecated, only kept for conversion to liboverrides. */
+  struct Object *proxy DNA_DEPRECATED;
+  struct Object *proxy_group DNA_DEPRECATED;
+  struct Object *proxy_from DNA_DEPRECATED;
   /** Old animation system, deprecated for 2.5. */
   struct Ipo *ipo DNA_DEPRECATED;
   /* struct Path *path; */
@@ -492,7 +505,7 @@ enum {
   /** Grease Pencil object used in 3D view but not used for annotation in 2D. */
   OB_GPENCIL = 26,
 
-  OB_HAIR = 27,
+  OB_CURVES = 27,
 
   OB_POINTCLOUD = 28,
 
@@ -507,7 +520,15 @@ enum {
   (((_type) >= OB_MESH && (_type) <= OB_MBALL) || ((_type) >= OB_GPENCIL && (_type) <= OB_VOLUME))
 /** Does the object have some render-able geometry (unlike empties, cameras, etc.). */
 #define OB_TYPE_IS_GEOMETRY(_type) \
-  (ELEM(_type, OB_MESH, OB_SURF, OB_FONT, OB_MBALL, OB_GPENCIL, OB_HAIR, OB_POINTCLOUD, OB_VOLUME))
+  (ELEM(_type, \
+        OB_MESH, \
+        OB_SURF, \
+        OB_FONT, \
+        OB_MBALL, \
+        OB_GPENCIL, \
+        OB_CURVES, \
+        OB_POINTCLOUD, \
+        OB_VOLUME))
 #define OB_TYPE_SUPPORT_VGROUP(_type) (ELEM(_type, OB_MESH, OB_LATTICE, OB_GPENCIL))
 #define OB_TYPE_SUPPORT_EDITMODE(_type) \
   (ELEM(_type, OB_MESH, OB_FONT, OB_CURVE, OB_SURF, OB_MBALL, OB_LATTICE, OB_ARMATURE))
@@ -529,7 +550,7 @@ enum {
         ID_LT, \
         ID_GD, \
         ID_AR, \
-        ID_HA, \
+        ID_CV, \
         ID_PT, \
         ID_VO))
 
@@ -544,7 +565,7 @@ enum {
   case ID_LT: \
   case ID_GD: \
   case ID_AR: \
-  case ID_HA: \
+  case ID_CV: \
   case ID_PT: \
   case ID_VO
 

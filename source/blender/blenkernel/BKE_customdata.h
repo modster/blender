@@ -254,6 +254,11 @@ bool CustomData_free_layer_active(struct CustomData *data, int type, int totelem
 void CustomData_free_layers(struct CustomData *data, int type, int totelem);
 
 /**
+ * Free all anonymous attributes.
+ */
+void CustomData_free_layers_anonymous(struct CustomData *data, int totelem);
+
+/**
  * Returns true if a layer with the specified type exists.
  */
 bool CustomData_has_layer(const struct CustomData *data, int type);
@@ -435,6 +440,12 @@ int CustomData_get_active_layer(const struct CustomData *data, int type);
 int CustomData_get_render_layer(const struct CustomData *data, int type);
 int CustomData_get_clone_layer(const struct CustomData *data, int type);
 int CustomData_get_stencil_layer(const struct CustomData *data, int type);
+
+/**
+ * Returns name of the active layer of the given type or NULL
+ * if no such active layer is defined.
+ */
+const char *CustomData_get_active_layer_name(const struct CustomData *data, int type);
 
 /**
  * Copies the data from source to the data element at index in the first layer of type

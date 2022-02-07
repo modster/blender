@@ -157,8 +157,9 @@ option(WITH_BLENDER "Build blender (disable to build only the blender player)" O
 mark_as_advanced(WITH_BLENDER)
 
 if(APPLE)
-  # Currently this causes a build error linking, disable.
-  set(WITH_BLENDER_THUMBNAILER OFF)
+  # In future, can be used with `quicklookthumbnailing/qlthumbnailreply` to create file
+  # thumbnails for say Finder. Turn it off for now.
+  option(WITH_BLENDER_THUMBNAILER "Build \"blender-thumbnailer\" thumbnail extraction utility" OFF)
 elseif(WIN32)
   option(WITH_BLENDER_THUMBNAILER "Build \"BlendThumb.dll\" helper for Windows explorer integration" ON)
 else()
@@ -273,11 +274,13 @@ endif()
 
 if(UNIX AND NOT APPLE)
   option(WITH_SYSTEM_GLEW "Use GLEW OpenGL wrapper library provided by the operating system" OFF)
-  option(WITH_SYSTEM_GLES "Use OpenGL ES library provided by the operating system"           ON)
+  option(WITH_SYSTEM_GLEW "Use GLEW OpenGL wrapper library provided by the operating system" OFF)
+  option(WITH_SYSTEM_FREETYPE "Use the freetype library provided by the operating system" OFF)
 else()
   # not an option for other OS's
   set(WITH_SYSTEM_GLEW OFF)
   set(WITH_SYSTEM_GLES OFF)
+  set(WITH_SYSTEM_FREETYPE OFF)
 endif()
 
 
@@ -684,7 +687,7 @@ if(WIN32 OR XCODE)
   option(IDE_GROUP_PROJECTS_IN_FOLDERS "Organize the projects according to source folder structure." ON)
   mark_as_advanced(IDE_GROUP_PROJECTS_IN_FOLDERS)
 
-  if (IDE_GROUP_PROJECTS_IN_FOLDERS)
+  if(IDE_GROUP_PROJECTS_IN_FOLDERS)
     set_property(GLOBAL PROPERTY USE_FOLDERS ON)
   endif()
 endif()

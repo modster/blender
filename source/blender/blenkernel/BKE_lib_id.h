@@ -376,12 +376,18 @@ enum {
   /** Clear asset data (in case the ID can actually be made local, in copy case asset data is never
    * copied over). */
   LIB_ID_MAKELOCAL_ASSET_DATA_CLEAR = 1 << 3,
-
-  /* Special type-specific options. */
-  /** For Objects, do not clear the proxy pointers while making the data-block local. */
-  LIB_ID_MAKELOCAL_OBJECT_NO_PROXY_CLEARING = 1 << 16,
 };
 
+/**
+ * Helper to decide whether given `id` can be directly made local, or needs to be copied.
+ * `r_force_local` and `r_force_copy` cannot be true together. But both can be false, in case no
+ * action should be performed.
+ *
+ * \note low-level helper to de-duplicate logic between `BKE_lib_id_make_local_generic` and the
+ * specific corner-cases implementations needed for objects and brushes.
+ */
+void BKE_lib_id_make_local_generic_action_define(
+    struct Main *bmain, struct ID *id, int flags, bool *r_force_local, bool *r_force_copy);
 /**
  * Generic 'make local' function, works for most of data-block types.
  */

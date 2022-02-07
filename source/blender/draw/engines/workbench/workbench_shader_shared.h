@@ -1,6 +1,6 @@
 
 #ifndef GPU_SHADER
-#  include "gpu_shader_shared_utils.h"
+#  include "GPU_shader_shared_utils.h"
 #endif
 
 #define WORKBENCH_SHADER_SHARED_H
@@ -45,4 +45,3 @@ struct WorldData {
 };
 
 #define viewport_size_inv viewport_size.zw
-#define packed_rough_metal roughness

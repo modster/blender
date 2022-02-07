@@ -791,22 +791,36 @@ ccl_device_forceinline void integrate_volume_direct_light(
 
   /* Write shadow ray and associated state to global memory. */
   integrator_state_write_shadow_ray(kg, shadow_state, &ray);
+  INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 0, object) = ray.self.object;
+  INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 0, prim) = ray.self.prim;
+  INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 1, object) = ray.self.light_object;
+  INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 1, prim) = ray.self.light_prim;
 
   /* Copy state from main path to shadow path. */
   const uint16_t bounce = INTEGRATOR_STATE(state, path, bounce);
   const uint16_t transparent_bounce = INTEGRATOR_STATE(state, path, transparent_bounce);
   uint32_t shadow_flag = INTEGRATOR_STATE(state, path, flag);
   shadow_flag |= (is_light) ? PATH_RAY_SHADOW_FOR_LIGHT : 0;
-  shadow_flag |= (shadow_flag & PATH_RAY_ANY_PASS) ? 0 : PATH_RAY_VOLUME_PASS;
   const float3 throughput_phase = throughput * bsdf_eval_sum(&phase_eval);
 
   if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_PASSES) {
-    const packed_float3 pass_diffuse_weight = (bounce == 0) ?
-                                                  packed_float3(one_float3()) :
-                                                  INTEGRATOR_STATE(
-                                                      state, path, pass_diffuse_weight);
+    packed_float3 pass_diffuse_weight;
+    packed_float3 pass_glossy_weight;
+
+    if (shadow_flag & PATH_RAY_ANY_PASS) {
+      /* Indirect bounce, use weights from earlier surface or volume bounce. */
+      pass_diffuse_weight = INTEGRATOR_STATE(state, path, pass_diffuse_weight);
+      pass_glossy_weight = INTEGRATOR_STATE(state, path, pass_glossy_weight);
+    }
+    else {
+      /* Direct light, no diffuse/glossy distinction needed for volumes. */
+      shadow_flag |= PATH_RAY_VOLUME_PASS;
+      pass_diffuse_weight = packed_float3(one_float3());
+      pass_glossy_weight = packed_float3(zero_float3());
+    }
+
     INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, pass_diffuse_weight) = pass_diffuse_weight;
-    INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, pass_glossy_weight) = zero_float3();
+    INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, pass_glossy_weight) = pass_glossy_weight;
   }
 
   INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, render_pixel_index) = INTEGRATOR_STATE(
@@ -873,11 +887,13 @@ ccl_device_forceinline bool integrate_volume_phase_scatter(
   INTEGRATOR_STATE_WRITE(state, ray, P) = sd->P;
   INTEGRATOR_STATE_WRITE(state, ray, D) = normalize(phase_omega_in);
   INTEGRATOR_STATE_WRITE(state, ray, t) = FLT_MAX;
-
 #  ifdef __RAY_DIFFERENTIALS__
   INTEGRATOR_STATE_WRITE(state, ray, dP) = differential_make_compact(sd->dP);
   INTEGRATOR_STATE_WRITE(state, ray, dD) = differential_make_compact(phase_domega_in);
 #  endif
+  // Save memory by storing last hit prim and object in isect
+  INTEGRATOR_STATE_WRITE(state, isect, prim) = sd->prim;
+  INTEGRATOR_STATE_WRITE(state, isect, object) = sd->object;
 
   /* Update throughput. */
   const float3 throughput = INTEGRATOR_STATE(state, path, throughput);

@@ -69,6 +69,7 @@ class GLShader : public Shader {
   std::string fragment_interface_declare(const shader::ShaderCreateInfo &info) const override;
   std::string geometry_interface_declare(const shader::ShaderCreateInfo &info) const override;
   std::string geometry_layout_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string compute_layout_declare(const shader::ShaderCreateInfo &info) const override;
 
   /** Should be called before linking. */
   void transform_feedback_names_set(Span<const char *> name_list,
@@ -92,6 +93,14 @@ class GLShader : public Shader {
 
   /** Create, compile and attach the shader stage to the shader program. */
   GLuint create_shader_stage(GLenum gl_stage, MutableSpan<const char *> sources);
+
+  /**
+   * \brief features available on newer implementation such as native barycentric coordinates
+   * and layered rendering, necessitate a geometry shader to work on older hardware.
+   */
+  std::string workaround_geometry_shader_source_create(const shader::ShaderCreateInfo &info);
+
+  bool do_geometry_shader_injection(const shader::ShaderCreateInfo *info);
 
   MEM_CXX_CLASS_ALLOC_FUNCS("GLShader");
 };

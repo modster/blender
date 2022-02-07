@@ -31,7 +31,6 @@
 
 #include "DNA_ID.h"
 #include "DNA_customdata_types.h"
-#include "DNA_hair_types.h"
 #include "DNA_meshdata_types.h"
 
 #include "BLI_bitmap.h"
@@ -1793,10 +1792,10 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
     {sizeof(float[3]), "vec3f", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
     /* 44: CD_RADIUS */
     {sizeof(float), "MFloatProperty", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
-    /* 45: CD_HAIRCURVE */
-    {sizeof(HairCurve), "HairCurve", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
-    /* 46: CD_HAIRMAPPING */
-    {sizeof(HairMapping), "HairMapping", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
+    /* 45: CD_PROP_INT8 */
+    {sizeof(int8_t), "MInt8Property", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
+    /* 46: CD_HAIRMAPPING */ /* UNUSED */
+    {-1, "", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
     /* 47: CD_PROP_COLOR */
     {sizeof(MPropCol),
      "MPropCol",
@@ -1914,7 +1913,7 @@ static const char *LAYERTYPENAMES[CD_NUMTYPES] = {
     "CDCustomLoopNormal",
     "CDSculptFaceGroups",
     /* 43-46 */ "CDHairPoint",
-    "CDHairCurve",
+    "CDPropInt8",
     "CDHairMapping",
     "CDPoint",
     "CDPropCol",
@@ -2427,6 +2426,13 @@ int CustomData_get_stencil_layer(const CustomData *data, int type)
   return (layer_index != -1) ? data->layers[layer_index].active_mask : -1;
 }
 
+const char *CustomData_get_active_layer_name(const struct CustomData *data, const int type)
+{
+  /* Get the layer index of the active layer of this type. */
+  const int layer_index = CustomData_get_active_layer_index(data, type);
+  return layer_index < 0 ? nullptr : data->layers[layer_index].name;
+}
+
 void CustomData_set_layer_active(CustomData *data, int type, int n)
 {
   for (int i = 0; i < data->totlayer; i++) {
@@ -2770,6 +2776,24 @@ void CustomData_free_layers(CustomData *data, int type, int totelem)
   const int index = CustomData_get_layer_index(data, type);
   while (CustomData_free_layer(data, type, totelem, index)) {
     /* pass */
+  }
+}
+
+void CustomData_free_layers_anonymous(struct CustomData *data, int totelem)
+{
+  while (true) {
+    bool found_anonymous_layer = false;
+    for (int i = 0; i < data->totlayer; i++) {
+      const CustomDataLayer *layer = &data->layers[i];
+      if (layer->anonymous_id != nullptr) {
+        CustomData_free_layer(data, layer->type, totelem, i);
+        found_anonymous_layer = true;
+        break;
+      }
+    }
+    if (!found_anonymous_layer) {
+      break;
+    }
   }
 }
 

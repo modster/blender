@@ -66,6 +66,15 @@
 /** \name Allocate / Free Functions
  * \{ */
 
+StripProxy *seq_strip_proxy_alloc(void)
+{
+  StripProxy *strip_proxy = MEM_callocN(sizeof(struct StripProxy), "StripProxy");
+  strip_proxy->quality = 50;
+  strip_proxy->build_tc_flags = SEQ_PROXY_TC_ALL;
+  strip_proxy->tc = SEQ_PROXY_TC_RECORD_RUN;
+  return strip_proxy;
+}
+
 static Strip *seq_strip_alloc(int type)
 {
   Strip *strip = MEM_callocN(sizeof(Strip), "strip");
@@ -76,6 +85,7 @@ static Strip *seq_strip_alloc(int type)
     strip->transform->scale_y = 1;
     strip->transform->origin[0] = 0.5f;
     strip->transform->origin[1] = 0.5f;
+    strip->transform->filter = SEQ_TRANSFORM_FILTER_BILINEAR;
     strip->crop = MEM_callocN(sizeof(struct StripCrop), "StripCrop");
   }
 

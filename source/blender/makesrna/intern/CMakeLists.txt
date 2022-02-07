@@ -70,6 +70,7 @@ set(DEFSRC
   rna_packedfile.c
   rna_palette.c
   rna_particle.c
+  rna_pointcloud.c
   rna_pose.c
   rna_render.c
   rna_rigidbody.c
@@ -100,11 +101,9 @@ set(DEFSRC
 
 if(WITH_EXPERIMENTAL_FEATURES)
   add_definitions(-DWITH_SIMULATION_DATABLOCK)
-  add_definitions(-DWITH_POINT_CLOUD)
-  add_definitions(-DWITH_HAIR_NODES)
+  add_definitions(-DWITH_NEW_CURVES_TYPE)
   list(APPEND DEFSRC
-    rna_hair.c
-    rna_pointcloud.c
+    rna_curves.c
     rna_simulation.c
   )
 endif()
