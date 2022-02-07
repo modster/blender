@@ -39,11 +39,11 @@ struct GPencilUpdateCache;
 /* GPencilUpdateCache.flag */
 typedef enum eGPUpdateCacheNodeFlag {
   /* Node is a placeholder (e.g. when only an index is needed). */
-  GP_UPDATE_NODE_NO_COPY = -1,
-  /* Copy the element as well as all of its content. */
-  GP_UPDATE_NODE_FULL_COPY = 0,
+  GP_UPDATE_NODE_NO_COPY = 0,
   /* Copy only element, not the content. */
-  GP_UPDATE_NODE_STRUCT_COPY = 1,
+  GP_UPDATE_NODE_LIGHT_COPY = 1,
+  /* Copy the element as well as all of its content. */
+  GP_UPDATE_NODE_FULL_COPY = 2,
 } eGPUpdateCacheNodeFlag;
 
 /**
@@ -100,7 +100,7 @@ typedef struct GPencilUpdateCacheTraverseSettings {
  * \param data: A data pointer to populate the initial cache with.
  * \param full_copy: If true, will mark this update cache as a full copy
  * (GP_UPDATE_NODE_FULL_COPY). If false, it will be marked as a struct copy
- * (GP_UPDATE_NODE_STRUCT_COPY).
+ * (GP_UPDATE_NODE_LIGHT_COPY).
  */
 GPencilUpdateCache *BKE_gpencil_create_update_cache(void *data, bool full_copy);
 
@@ -134,10 +134,10 @@ void BKE_gpencil_tag_full_update(struct bGPdata *gpd,
  * The function assumes that when a parameter is NULL all of the following parameters are NULL too.
  * E.g. in order to tag a layer (gpl), the parameters would *have* to be (gpd, gpl, NULL, NULL).
  */
-void BKE_gpencil_tag_struct_update(struct bGPdata *gpd,
-                                   struct bGPDlayer *gpl,
-                                   struct bGPDframe *gpf,
-                                   struct bGPDstroke *gps);
+void BKE_gpencil_tag_light_update(struct bGPdata *gpd,
+                                  struct bGPDlayer *gpl,
+                                  struct bGPDframe *gpf,
+                                  struct bGPDstroke *gps);
 
 /**
  * Frees the GPencilUpdateCache on the gpd->runtime. This will not free the data that the cache

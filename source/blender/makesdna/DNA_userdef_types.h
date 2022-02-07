@@ -651,7 +651,6 @@ typedef struct UserDef_Experimental {
   /* Debug options, always available. */
   char use_undo_legacy;
   char no_override_auto_resync;
-  char no_proxy_to_override_conversion;
   char use_cycles_debug;
   char use_geometry_nodes_legacy;
   char show_asset_debug_info;
