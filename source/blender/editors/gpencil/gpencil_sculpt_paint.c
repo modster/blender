@@ -317,7 +317,7 @@ static void gpencil_update_geometry(bGPdata *gpd)
     }
   }
   if (changed) {
-    DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY | ID_RECALC_COPY_ON_WRITE);
+    DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
     WM_main_add_notifier(NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
   }
 }
@@ -1360,7 +1360,7 @@ static void gpencil_sculpt_brush_init_stroke(bContext *C, tGP_BrushEditData *gso
         BKE_gpencil_frame_addcopy(gpl, cfra);
         BKE_gpencil_tag_full_update(gpd, gpl, NULL, NULL);
         /* Need tag to recalculate evaluated data to avoid crashes. */
-        DEG_id_tag_update(&gso->gpd->id, ID_RECALC_GEOMETRY | ID_RECALC_COPY_ON_WRITE);
+        DEG_id_tag_update(&gso->gpd->id, ID_RECALC_GEOMETRY);
         WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
       }
     }
