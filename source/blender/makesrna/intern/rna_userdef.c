@@ -38,6 +38,7 @@
 #include "BKE_appdir.h"
 #include "BKE_sound.h"
 #include "BKE_studiolight.h"
+#include "BKE_undo_system.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -345,6 +346,26 @@ static void rna_userdef_language_update(Main *UNUSED(bmain),
   }
 
   USERDEF_TAG_DIRTY;
+}
+
+static void rna_userdef_experimental_gpencil_use_update_cache_set(PointerRNA *ptr,
+                                                                  const bool value)
+{
+  UserDef_Experimental *experimental = (UserDef_Experimental *)ptr->data;
+  experimental->use_gpencil_update_cache = (char)value;
+  if (!value) {
+    RNA_boolean_set(ptr, "use_gpencil_undo_system", false);
+  }
+}
+
+static void rna_userdef_experimental_use_gpencil_undo_system_set(PointerRNA *ptr, const bool value)
+{
+  if (!value) {
+    wmWindowManager *wm = G_MAIN->wm.first;
+    BKE_undosys_stack_clear(wm->undo_stack);
+  }
+  UserDef_Experimental *experimental = (UserDef_Experimental *)ptr->data;
+  experimental->use_gpencil_undo_system = (char)value;
 }
 
 static void rna_userdef_asset_library_name_set(PointerRNA *ptr, const char *value)
@@ -6451,6 +6472,16 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_gpencil_update_cache", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_gpencil_update_cache", 1);
   RNA_def_property_ui_text(prop, "GPencil Update Cache", "Enable the grease pencil update cache");
+  RNA_def_property_boolean_funcs(
+      prop, NULL, "rna_userdef_experimental_gpencil_use_update_cache_set");
+
+  prop = RNA_def_property(srna, "use_gpencil_undo_system", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "use_gpencil_undo_system", 1);
+  RNA_def_property_ui_text(prop,
+                           "GPencil Undo System",
+                           "Enable the grease pencil undo system that uses the update cache");
+  RNA_def_property_boolean_funcs(
+      prop, NULL, "rna_userdef_experimental_use_gpencil_undo_system_set");
 }
 
 static void rna_def_userdef_addon_collection(BlenderRNA *brna, PropertyRNA *cprop)

@@ -656,6 +656,7 @@ typedef struct UserDef_Experimental {
   char show_asset_debug_info;
   char no_asset_indexing;
   char use_gpencil_update_cache;
+  char use_gpencil_undo_system;
   char SANITIZE_AFTER_HERE;
   /* The following options are automatically sanitized (set to 0)
    * when the release cycle is not alpha. */
