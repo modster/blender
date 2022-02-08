@@ -708,9 +708,9 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_SETUP);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_setup_ps_);
-    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
-    DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
-    DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
+    DRW_shgroup_storage_block(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_storage_block(grp, "pages_free_buf", pages_free_data_);
+    DRW_shgroup_storage_block(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_bool(grp, "do_tilemap_setup", &do_tilemap_setup_, 1);
     int64_t tilemaps_updated_len = tilemaps_len + tilemap_allocator.deleted_maps_len;
@@ -729,7 +729,7 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_TAG_VISIBILITY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_visibility_ps_);
-    DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
+    DRW_shgroup_storage_block(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_float(grp, "tilemap_pixel_radius", &tilemap_pixel_radius_, 1);
     DRW_shgroup_uniform_float(grp, "screen_pixel_radius_inv", &screen_pixel_radius_inv_, 1);
@@ -747,7 +747,7 @@ void ShadowModule::end_sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_TAG_USAGE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_usage_tag_ps_);
     DRW_shgroup_vertex_buffer(grp, "aabbs_buf", receivers_aabbs);
-    DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
+    DRW_shgroup_storage_block(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_float(grp, "tilemap_pixel_radius", &tilemap_pixel_radius_, 1);
     DRW_shgroup_uniform_float(grp, "screen_pixel_radius_inv", &screen_pixel_radius_inv_, 1);
@@ -764,10 +764,10 @@ void ShadowModule::end_sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_DEPTH_SCAN);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_depth_scan_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
-    DRW_shgroup_vertex_buffer_ref(grp, "lights_buf", &inst_.lights.culling_light_buf);
-    DRW_shgroup_vertex_buffer_ref(grp, "lights_cull_buf", &inst_.lights.culling_data);
-    DRW_shgroup_vertex_buffer_ref(grp, "lights_zbin_buf", &inst_.lights.culling_zbin_buf);
-    DRW_shgroup_vertex_buffer_ref(grp, "lights_tile_buf", &inst_.lights.culling_tile_buf);
+    DRW_shgroup_storage_block_ref(grp, "lights_buf", &inst_.lights.culling_light_buf);
+    DRW_shgroup_storage_block_ref(grp, "lights_cull_buf", &inst_.lights.culling_data);
+    DRW_shgroup_storage_block_ref(grp, "lights_zbin_buf", &inst_.lights.culling_zbin_buf);
+    DRW_shgroup_storage_block_ref(grp, "lights_tile_buf", &inst_.lights.culling_tile_buf);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_float(grp, "tilemap_pixel_radius", &tilemap_pixel_radius_, 1);
     DRW_shgroup_uniform_float(grp, "screen_pixel_radius_inv", &screen_pixel_radius_inv_, 1);
@@ -783,7 +783,7 @@ void ShadowModule::end_sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_TAG_UPDATE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_update_tag_ps_);
     DRW_shgroup_vertex_buffer(grp, "aabbs_buf", casters_aabbs);
-    DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
+    DRW_shgroup_storage_block(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_int_copy(grp, "aabb_len", GPU_vertbuf_get_vertex_len(casters_aabbs));
     if (tilemaps_len > 0 && aabb_len > 0) {
@@ -797,7 +797,7 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_LOD_MASK);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_lod_mask_ps_);
-    DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
+    DRW_shgroup_storage_block(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     if (tilemaps_len > 0) {
       DRW_shgroup_call_compute(grp, 1, 1, tilemaps_len);
@@ -814,8 +814,8 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_INIT);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_init_ps_);
-    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
-    DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
+    DRW_shgroup_storage_block(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_storage_block(grp, "pages_free_buf", pages_free_data_);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_call_compute(grp, SHADOW_MAX_PAGE / SHADOW_PAGE_PER_ROW, 1, 1);
     DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS | GPU_BARRIER_SHADER_STORAGE);
@@ -829,9 +829,9 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_FREE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_free_ps_);
-    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
-    DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
-    DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
+    DRW_shgroup_storage_block(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_storage_block(grp, "pages_free_buf", pages_free_data_);
+    DRW_shgroup_storage_block(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     int64_t tilemaps_updated_len = tilemaps_len + tilemap_allocator.deleted_maps_len;
     if (tilemaps_updated_len > 0) {
@@ -848,8 +848,8 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_DEFRAG);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_defrag_ps_);
-    DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
-    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_storage_block(grp, "pages_free_buf", pages_free_data_);
+    DRW_shgroup_storage_block(grp, "pages_infos_buf", pages_infos_data_);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_call_compute(grp, 1, 1, 1);
     DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS | GPU_BARRIER_SHADER_STORAGE);
@@ -859,9 +859,9 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_ALLOC);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_alloc_ps_);
-    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
-    DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
-    DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
+    DRW_shgroup_storage_block(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_storage_block(grp, "pages_free_buf", pages_free_data_);
+    DRW_shgroup_storage_block(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_image(grp, "tilemap_rects_img", tilemap_allocator.tilemap_rects_tx);
     if (tilemaps_len > 0) {
@@ -914,7 +914,7 @@ void ShadowModule::debug_page_map_call(DRWPass *pass)
 
   GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_DEBUG);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, pass);
-  DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
+  DRW_shgroup_storage_block(grp, "pages_free_buf", pages_free_data_);
   DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
   DRW_shgroup_uniform_image(grp, "debug_img", debug_page_tx_);
   DRW_shgroup_call_compute(grp, 1, 1, 1);
@@ -981,7 +981,7 @@ void ShadowModule::debug_end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_DEBUG);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, debug_draw_ps_);
-    DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
+    DRW_shgroup_storage_block(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_uniform_texture(grp, "atlas_tx", atlas_tx_);
