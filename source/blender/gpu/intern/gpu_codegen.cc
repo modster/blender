@@ -325,14 +325,11 @@ void GPUCodegen::generate_attribs()
 
   int slot = 15;
   LISTBASE_FOREACH (GPUMaterialAttribute *, attr, &graph.attributes) {
-    eGPUType input_type = attr->gputype;
 
     /* NOTE: Replicate changes to mesh_render_data_create() in draw_cache_impl_mesh.c */
     if (attr->type == CD_ORCO) {
       /* OPTI: orco is computed from local positions, but only if no modifier is present. */
       info.additional_info("draw_object_infos");
-      /* Need vec4 to detect usage of default attribute. */
-      input_type = GPU_VEC4;
       STRNCPY(info.name_buffer->attr_names[slot], "orco");
     }
     else {
@@ -349,27 +346,36 @@ void GPUCodegen::generate_attribs()
     blender::StringRefNull attr_name = info.name_buffer->attr_names[slot];
     blender::StringRefNull var_name = info.name_buffer->var_names[slot];
 
-    info.vertex_in(slot--, to_type(input_type), attr_name);
-    iface.smooth(to_type(attr->gputype), var_name);
+    eGPUType input_type, iface_type;
 
     load_ss << "var_attrs." << var_name;
     switch (attr->type) {
       case CD_ORCO:
+        /* Need vec4 to detect usage of default attribute. */
+        input_type = GPU_VEC4;
+        iface_type = GPU_VEC3;
         load_ss << " = attr_load_orco(" << attr_name << ");\n";
         break;
       case CD_TANGENT:
+        iface_type = input_type = GPU_VEC4;
         load_ss << " = attr_load_tangent(" << attr_name << ");\n";
         break;
       case CD_MTFACE:
+        iface_type = input_type = GPU_VEC3;
         load_ss << " = attr_load_uv(" << attr_name << ");\n";
         break;
       case CD_MCOL:
+        iface_type = input_type = GPU_VEC4;
         load_ss << " = attr_load_color(" << attr_name << ");\n";
         break;
       default:
-        load_ss << " = attr_load_" << attr->gputype << "(" << attr_name << ");\n";
+        iface_type = input_type = GPU_VEC4;
+        load_ss << " = attr_load_" << input_type << "(" << attr_name << ");\n";
         break;
     }
+
+    info.vertex_in(slot--, to_type(input_type), attr_name);
+    iface.smooth(to_type(iface_type), var_name);
   }
 
   output.attr_load = extract_c_str(load_ss);
