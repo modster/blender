@@ -270,24 +270,45 @@ static void remove_handle_movement_constraints(BezTriple *bezt, const bool f1, c
 }
 
 static void move_bezt_handle_or_vertex_to_location(BezTriple *bezt,
-                                                   const float mval[2],
                                                    const short bezt_idx,
+                                                   const float disp_2d[2],
+                                                   const bool link_handles,
+                                                   const bool lock_angle,
+                                                   const float distance,
                                                    const ViewContext *vc)
 {
-  float location[3];
-  screenspace_to_worldspace(mval, bezt->vec[bezt_idx], vc, location);
-  if (bezt_idx == 1) {
-    move_bezt_to_location(bezt, location);
+  if (lock_angle) {
+    float disp_3d[3];
+    sub_v3_v3v3(disp_3d, bezt->vec[bezt_idx], bezt->vec[1]);
+    normalize_v3_length(disp_3d, distance);
+    add_v3_v3v3(bezt->vec[bezt_idx], bezt->vec[1], disp_3d);
   }
   else {
-    copy_v3_v3(bezt->vec[bezt_idx], location);
-    if (bezt->h1 == HD_ALIGN && bezt->h2 == HD_ALIGN) {
-      /* Move the handle on the opposite side. */
-      float handle_vec[3];
-      sub_v3_v3v3(handle_vec, bezt->vec[1], location);
-      const short other_handle = bezt_idx == 2 ? 0 : 2;
-      normalize_v3_length(handle_vec, len_v3v3(bezt->vec[1], bezt->vec[other_handle]));
-      add_v3_v3v3(bezt->vec[other_handle], bezt->vec[1], handle_vec);
+    float pos[2], dst[2];
+    worldspace_to_screenspace(bezt->vec[bezt_idx], vc, pos);
+    add_v2_v2v2(dst, pos, disp_2d);
+
+    float location[3];
+    screenspace_to_worldspace(dst, bezt->vec[bezt_idx], vc, location);
+    if (bezt_idx == 1) {
+      move_bezt_to_location(bezt, location);
+    }
+    else {
+      copy_v3_v3(bezt->vec[bezt_idx], location);
+      if (bezt->h1 == HD_ALIGN && bezt->h2 == HD_ALIGN) {
+        /* Move the handle on the opposite side. */
+        float handle_vec[3];
+        sub_v3_v3v3(handle_vec, bezt->vec[1], location);
+        const short other_handle = bezt_idx == 2 ? 0 : 2;
+        normalize_v3_length(handle_vec, len_v3v3(bezt->vec[1], bezt->vec[other_handle]));
+        add_v3_v3v3(bezt->vec[other_handle], bezt->vec[1], handle_vec);
+      }
+    }
+
+    if (link_handles) {
+      float handle[3];
+      sub_v3_v3v3(handle, bezt->vec[1], bezt->vec[bezt_idx]);
+      add_v3_v3v3(bezt->vec[(bezt_idx + 2) % 4], bezt->vec[1], handle);
     }
   }
 }
@@ -381,51 +402,18 @@ static void move_all_selected_points(ListBase *nurbs,
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = nu->bezt + i;
         if (BEZT_ISSEL_IDX(bezt, 1) || (move_entire && BEZT_ISSEL_ANY(bezt))) {
-          float pos[2], dst[2];
-          worldspace_to_screenspace(bezt->vec[1], vc, pos);
-          add_v2_v2v2(dst, pos, disp_2d);
-          move_bezt_handle_or_vertex_to_location(bezt, dst, 1, vc);
+          move_bezt_handle_or_vertex_to_location(bezt, 1, disp_2d, false, false, 0.0f, vc);
         }
         else {
           remove_handle_movement_constraints(
               bezt, BEZT_ISSEL_IDX(bezt, 0), BEZT_ISSEL_IDX(bezt, 2));
           if (BEZT_ISSEL_IDX(bezt, 0)) {
-            if (lock_angle) {
-              float disp_3d[3];
-              sub_v3_v3v3(disp_3d, bezt->vec[0], bezt->vec[1]);
-              normalize_v3_length(disp_3d, distance);
-              add_v3_v3v3(bezt->vec[0], bezt->vec[1], disp_3d);
-            }
-            else {
-              float pos[2], dst[2];
-              worldspace_to_screenspace(bezt->vec[0], vc, pos);
-              add_v2_v2v2(dst, pos, disp_2d);
-              move_bezt_handle_or_vertex_to_location(bezt, dst, 0, vc);
-              if (link_handles) {
-                float handle[3];
-                sub_v3_v3v3(handle, bezt->vec[1], bezt->vec[0]);
-                add_v3_v3v3(bezt->vec[2], bezt->vec[1], handle);
-              }
-            }
+            move_bezt_handle_or_vertex_to_location(
+                bezt, 0, disp_2d, link_handles, lock_angle, distance, vc);
           }
           else if (BEZT_ISSEL_IDX(bezt, 2)) {
-            if (lock_angle) {
-              float disp_3d[3];
-              sub_v3_v3v3(disp_3d, bezt->vec[2], bezt->vec[1]);
-              normalize_v3_length(disp_3d, distance);
-              add_v3_v3v3(bezt->vec[2], bezt->vec[1], disp_3d);
-            }
-            else {
-              float pos[2], dst[2];
-              worldspace_to_screenspace(bezt->vec[2], vc, pos);
-              add_v2_v2v2(dst, pos, disp_2d);
-              move_bezt_handle_or_vertex_to_location(bezt, dst, 2, vc);
-              if (link_handles) {
-                float handle[3];
-                sub_v3_v3v3(handle, bezt->vec[1], bezt->vec[2]);
-                add_v3_v3v3(bezt->vec[0], bezt->vec[1], handle);
-              }
-            }
+            move_bezt_handle_or_vertex_to_location(
+                bezt, 2, disp_2d, link_handles, lock_angle, distance, vc);
           }
         }
       }
@@ -1311,19 +1299,10 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase
   }
   adj_bezt->h1 = adj_bezt->h2 = HD_FREE;
 
-  float screen_co[2];
   int displacement[2];
-  /* Get the screen space coordinates of moved handle. */
-  ED_view3d_project_float_object(vc->region,
-                                 adj_bezt->vec[bezt_idx],
-                                 screen_co,
-                                 V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
   sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
   const float disp_fl[2] = {UNPACK2(displacement)};
-
-  /* Add the displacement of the mouse to the handle position. */
-  add_v2_v2v2(screen_co, screen_co, disp_fl);
-  move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co, bezt_idx, vc);
+  move_bezt_handle_or_vertex_to_location(adj_bezt, bezt_idx, disp_fl, false, false, 0.0f, vc);
   BKE_nurb_handles_calc(nu);
   FOREACH_SELECTED_BEZT_END
 }
