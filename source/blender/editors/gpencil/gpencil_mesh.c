@@ -15,11 +15,11 @@
  *
  * The Original Code is Copyright (C) 2008, Blender Foundation
  * This is a new part of Blender
- * Operator for converting Grease Pencil data to geometry
  */
 
 /** \file
  * \ingroup edgpencil
+ * Operator for converting Grease Pencil data to geometry.
  */
 
 #include "MEM_guardedalloc.h"
@@ -142,6 +142,9 @@ static bool gpencil_bake_ob_list(bContext *C, Depsgraph *depsgraph, Scene *scene
 
   /* Add active object. In some files this could not be in selected array. */
   Object *obact = CTX_data_active_object(C);
+  if (obact == NULL) {
+    return false;
+  }
 
   if (obact->type == OB_MESH) {
     elem = MEM_callocN(sizeof(GpBakeOb), __func__);

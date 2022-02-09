@@ -13,11 +13,9 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * - Blender Foundation, 2003-2009
- * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved.
+ *           2003-2009 Blender Foundation.
+ *           2005-2006 Peter Schlaile <peter [at] schlaile [dot] de>
  */
 
 /** \file
@@ -40,7 +38,6 @@ void seq_anim_add_suffix(Scene *scene, struct anim *anim, const int view_id)
   IMB_suffix_anim(anim, suffix);
 }
 
-/* the number of files will vary according to the stereo format */
 int seq_num_files(Scene *scene, char views_format, const bool is_multiview)
 {
   if (!is_multiview) {

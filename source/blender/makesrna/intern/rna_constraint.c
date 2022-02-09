@@ -3446,7 +3446,8 @@ static void rna_def_constraint_transform_cache(BlenderRNA *brna)
   RNA_define_lib_overridable(false);
 }
 
-/* base struct for constraints */
+/* Define the base struct for constraints. */
+
 void RNA_def_constraint(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -3541,14 +3542,6 @@ void RNA_def_constraint(BlenderRNA *brna)
   prop = RNA_def_property(srna, "active", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", CONSTRAINT_ACTIVE);
   RNA_def_property_ui_text(prop, "Active", "Constraint is the one being edited");
-
-  prop = RNA_def_property(srna, "is_proxy_local", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", CONSTRAINT_PROXY_LOCAL);
-  RNA_def_property_ui_text(
-      prop,
-      "Proxy Local",
-      "Constraint was added in this proxy instance (i.e. did not belong to source Armature)");
 
   /* values */
   prop = RNA_def_property(srna, "influence", PROP_FLOAT, PROP_FACTOR);

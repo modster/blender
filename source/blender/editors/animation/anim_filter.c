@@ -47,8 +47,8 @@
 #include "DNA_brush_types.h"
 #include "DNA_cachefile_types.h"
 #include "DNA_camera_types.h"
+#include "DNA_curves_types.h"
 #include "DNA_gpencil_types.h"
-#include "DNA_hair_types.h"
 #include "DNA_key_types.h"
 #include "DNA_lattice_types.h"
 #include "DNA_layer_types.h"
@@ -362,11 +362,6 @@ static bool nlaedit_get_context(bAnimContext *ac, SpaceNla *snla)
 
 /* ----------- Public API --------------- */
 
-/* Obtain current anim-data context,
- * given that context info from Blender context has already been set:
- * - AnimContext to write to is provided as pointer to var on stack so that we don't have
- *   allocation/freeing costs (which are not that avoidable with channels).
- */
 bool ANIM_animdata_context_getdata(bAnimContext *ac)
 {
   SpaceLink *sl = ac->sl;
@@ -397,11 +392,6 @@ bool ANIM_animdata_context_getdata(bAnimContext *ac)
   return (ok && ac->data);
 }
 
-/* Obtain current anim-data context from Blender Context info
- * - AnimContext to write to is provided as pointer to var on stack so that we don't have
- *   allocation/freeing costs (which are not that avoidable with channels).
- * - Clears data and sets the information from Blender Context which is useful
- */
 bool ANIM_animdata_get_context(const bContext *C, bAnimContext *ac)
 {
   Main *bmain = CTX_data_main(C);
@@ -801,10 +791,10 @@ static bAnimListElem *make_new_animlistelem(void *data,
         break;
       }
       case ANIMTYPE_DSHAIR: {
-        Hair *hair = (Hair *)data;
-        AnimData *adt = hair->adt;
+        Curves *curves = (Curves *)data;
+        AnimData *adt = curves->adt;
 
-        ale->flag = FILTER_HAIR_OBJD(hair);
+        ale->flag = FILTER_CURVES_OBJD(curves);
 
         ale->key_data = (adt) ? adt->action : NULL;
         ale->datatype = ALE_ACT;
@@ -2626,16 +2616,16 @@ static size_t animdata_filter_ds_obdata(
       expanded = FILTER_SPK_OBJD(spk);
       break;
     }
-    case OB_HAIR: /* ---------- Hair ----------- */
+    case OB_CURVES: /* ---------- Curves ----------- */
     {
-      Hair *hair = (Hair *)ob->data;
+      Curves *curves = (Curves *)ob->data;
 
       if (ads->filterflag2 & ADS_FILTER_NOHAIR) {
         return 0;
       }
 
       type = ANIMTYPE_DSHAIR;
-      expanded = FILTER_HAIR_OBJD(hair);
+      expanded = FILTER_CURVES_OBJD(curves);
       break;
     }
     case OB_POINTCLOUD: /* ---------- PointCloud ----------- */
@@ -3460,14 +3450,6 @@ static size_t animdata_filter_remove_duplis(ListBase *anim_data)
 
 /* ----------- Public API --------------- */
 
-/**
- * This function filters the active data source to leave only animation channels suitable for
- * usage by the caller. It will return the length of the list
- *
- * \param anim_data: Is a pointer to a #ListBase,
- * to which the filtered animation channels will be placed for use.
- * \param filter_mode: how should the data be filtered - bit-mapping accessed flags.
- */
 size_t ANIM_animdata_filter(bAnimContext *ac,
                             ListBase *anim_data,
                             eAnimFilter_Flags filter_mode,

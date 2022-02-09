@@ -118,6 +118,7 @@ struct wmOperator;
 struct wmWindowManager;
 
 #include "BLI_compiler_attrs.h"
+#include "BLI_utildefines.h"
 #include "DNA_listBase.h"
 #include "DNA_uuid_types.h"
 #include "DNA_vec_types.h"
@@ -972,10 +973,11 @@ typedef void (*wmPaintCursorDraw)(struct bContext *C, int, int, void *customdata
 #define WM_DRAG_DATASTACK 8
 #define WM_DRAG_ASSET_CATALOG 9
 
-typedef enum wmDragFlags {
+typedef enum eWM_DragFlags {
   WM_DRAG_NOP = 0,
   WM_DRAG_FREE_DATA = 1,
-} wmDragFlags;
+} eWM_DragFlags;
+ENUM_OPERATORS(eWM_DragFlags, WM_DRAG_FREE_DATA)
 
 /* NOTE: structs need not exported? */
 
@@ -1046,6 +1048,10 @@ typedef struct wmDragActiveDropState {
    * it as needed. */
   struct ARegion *region_from;
 
+  /** If `active_dropbox` is set, additional context provided by the active (i.e. hovered) button.
+   * Activated before context sensitive operations (polling, drawing, dropping). */
+  struct bContextStore *ui_context;
+
   /** Text to show when a dropbox poll succeeds (so the dropbox itself is available) but the
    * operator poll fails. Typically the message the operator set with
    * CTX_wm_operator_poll_msg_set(). */
@@ -1070,7 +1076,7 @@ typedef struct wmDrag {
 
   wmDragActiveDropState drop_state;
 
-  unsigned int flags;
+  eWM_DragFlags flags;
 
   /** List of wmDragIDs, all are guaranteed to have the same ID type. */
   ListBase ids;

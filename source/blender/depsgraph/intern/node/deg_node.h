@@ -77,13 +77,11 @@ enum class NodeType {
   /* Parameters Component - Default when nothing else fits
    * (i.e. just SDNA property setting). */
   PARAMETERS,
-  /* Generic "Proxy-Inherit" Component. */
-  PROXY,
   /* Animation Component */
   ANIMATION,
   /* Transform Component (Parenting/Constraints) */
   TRANSFORM,
-  /* Geometry Component (Mesh/Displist) */
+  /* Geometry Component (#Mesh / #DispList) */
   GEOMETRY,
   /* Sequencer Component (Scene Only) */
   SEQUENCER,
@@ -112,11 +110,11 @@ enum class NodeType {
    * which simplifies common algorithms which are dealing with relations and visibility.
    *
    * The fact that the visibility operates on the ID level basically means that all components in
-   * NodeA will be considered as affecting directly visible when NodeB's visibility is
+   * the NodeA will be considered as affecting directly visible when NodeB's visibility is
    * affecting directly visible ID.
    *
    * This is the way to ensure objects needed for visualization without any actual data dependency
-   * are properly evaluated. Example of this is custom shapes for bones. */
+   * properly evaluated. Example of this is custom shapes for bones. */
   VISIBILITY,
 
   /* **** Evaluation-Related Outer Types (with Subdata) **** */
@@ -147,6 +145,8 @@ enum class NodeType {
   SYNCHRONIZATION,
   /* Simulation component. */
   SIMULATION,
+  /* Node tree output component. */
+  NTREE_OUTPUT,
 
   /* Total number of meaningful node types. */
   NUM_TYPES,
@@ -201,6 +201,7 @@ struct Node {
   Node();
   virtual ~Node();
 
+  /** Generic identifier for Depsgraph Nodes. */
   virtual string identifier() const;
 
   virtual void init(const ID * /*id*/, const char * /*subdata*/)

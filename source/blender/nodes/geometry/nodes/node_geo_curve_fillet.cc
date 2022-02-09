@@ -27,17 +27,26 @@
 
 namespace blender::nodes::node_geo_curve_fillet_cc {
 
+NODE_STORAGE_FUNCS(NodeGeometryCurveFillet)
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
-  b.add_input<decl::Int>(N_("Count")).default_value(1).min(1).max(1000).supports_field();
+  b.add_input<decl::Int>(N_("Count"))
+      .default_value(1)
+      .min(1)
+      .max(1000)
+      .supports_field()
+      .make_available([](bNode &node) { node_storage(node).mode = GEO_NODE_CURVE_FILLET_POLY; });
   b.add_input<decl::Float>(N_("Radius"))
       .min(0.0f)
       .max(FLT_MAX)
       .subtype(PropertySubType::PROP_DISTANCE)
       .default_value(0.25f)
       .supports_field();
-  b.add_input<decl::Bool>(N_("Limit Radius"));
+  b.add_input<decl::Bool>(N_("Limit Radius"))
+      .description(
+          N_("Limit the maximum value of the radius in order to avoid overlapping fillets"));
   b.add_output<decl::Geometry>(N_("Curve"));
 }
 
@@ -48,8 +57,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryCurveFillet *data = (NodeGeometryCurveFillet *)MEM_callocN(
-      sizeof(NodeGeometryCurveFillet), __func__);
+  NodeGeometryCurveFillet *data = MEM_cnew<NodeGeometryCurveFillet>(__func__);
 
   data->mode = GEO_NODE_CURVE_FILLET_BEZIER;
   node->storage = data;
@@ -78,8 +86,8 @@ struct FilletData {
 
 static void node_update(bNodeTree *ntree, bNode *node)
 {
-  NodeGeometryCurveFillet &node_storage = *(NodeGeometryCurveFillet *)node->storage;
-  const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)node_storage.mode;
+  const NodeGeometryCurveFillet &storage = node_storage(*node);
+  const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)storage.mode;
 
   bNodeSocket *poly_socket = ((bNodeSocket *)node->inputs.first)->next;
 
@@ -116,9 +124,9 @@ static Array<float3> calculate_directions(const Span<float3> positions)
   Array<float3> directions(size);
 
   for (const int i : IndexRange(size - 1)) {
-    directions[i] = (positions[i + 1] - positions[i]).normalized();
+    directions[i] = math::normalize(positions[i + 1] - positions[i]);
   }
-  directions[size - 1] = (positions[0] - positions[size - 1]).normalized();
+  directions[size - 1] = math::normalize(positions[0] - positions[size - 1]);
 
   return directions;
 }
@@ -129,9 +137,9 @@ static Array<float3> calculate_axes(const Span<float3> directions)
   const int size = directions.size();
   Array<float3> axes(size);
 
-  axes[0] = float3::cross(-directions[size - 1], directions[0]).normalized();
+  axes[0] = math::normalize(math::cross(-directions[size - 1], directions[0]));
   for (const int i : IndexRange(1, size - 1)) {
-    axes[i] = float3::cross(-directions[i - 1], directions[i]).normalized();
+    axes[i] = math::normalize(math::cross(-directions[i - 1], directions[i]));
   }
 
   return axes;
@@ -242,8 +250,8 @@ static void limit_radii(FilletData &fd, const bool cyclic)
 
   if (cyclic) {
     /* Calculate lengths between adjacent control points. */
-    const float len_prev = float3::distance(positions[0], positions[size - 1]);
-    const float len_next = float3::distance(positions[0], positions[1]);
+    const float len_prev = math::distance(positions[0], positions[size - 1]);
+    const float len_next = math::distance(positions[0], positions[1]);
 
     /* Calculate tangent lengths of fillets in control points. */
     const float tan_len = radii[0] * tan(angles[0] / 2.0f);
@@ -265,16 +273,16 @@ static void limit_radii(FilletData &fd, const bool cyclic)
   }
 
   /* Initialize max_radii to largest possible radii. */
-  float prev_dist = float3::distance(positions[1], positions[0]);
+  float prev_dist = math::distance(positions[1], positions[0]);
   for (const int i : IndexRange(1, size - 2)) {
-    const float temp_dist = float3::distance(positions[i], positions[i + 1]);
+    const float temp_dist = math::distance(positions[i], positions[i + 1]);
     max_radii[i] = std::min(prev_dist, temp_dist) / tan(angles[i] / 2.0f);
     prev_dist = temp_dist;
   }
 
   /* Max radii calculations for each index. */
   for (const int i : IndexRange(start, fillet_count - 1)) {
-    const float len_next = float3::distance(positions[i], positions[i + 1]);
+    const float len_next = math::distance(positions[i], positions[i + 1]);
     const float tan_len = radii[i] * tan(angles[i] / 2.0f);
     const float tan_len_next = radii[i + 1] * tan(angles[i + 1] / 2.0f);
 
@@ -409,7 +417,8 @@ static void update_bezier_positions(const FilletData &fd,
     const float3 center = get_center(dst_spline.positions()[i_dst] - positions[i_src], fd, i_src);
     /* Calculate the vector of the radius formed by the first vertex. */
     float3 radius_vec = dst_spline.positions()[i_dst] - center;
-    const float radius = radius_vec.normalize_and_get_length();
+    float radius;
+    radius_vec = math::normalize_and_get_length(radius_vec, radius);
 
     dst_spline.handle_types_right().slice(1, count - 2).fill(BezierSpline::HandleType::Align);
     dst_spline.handle_types_left().slice(1, count - 2).fill(BezierSpline::HandleType::Align);
@@ -614,8 +623,8 @@ static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
 
-  NodeGeometryCurveFillet &node_storage = *(NodeGeometryCurveFillet *)params.node().storage;
-  const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)node_storage.mode;
+  const NodeGeometryCurveFillet &storage = node_storage(params.node());
+  const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)storage.mode;
 
   Field<float> radius_field = params.extract_input<Field<float>>("Radius");
   const bool limit_radius = params.extract_input<bool>("Limit Radius");
@@ -640,7 +649,7 @@ void register_node_type_geo_curve_fillet()
 
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_FILLET_CURVE, "Fillet Curve", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_FILLET_CURVE, "Fillet Curve", NODE_CLASS_GEOMETRY);
   ntype.draw_buttons = file_ns::node_layout;
   node_type_storage(
       &ntype, "NodeGeometryCurveFillet", node_free_standard_storage, node_copy_standard_storage);

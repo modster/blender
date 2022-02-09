@@ -556,7 +556,6 @@ static void get_cpa_texture(Mesh *mesh,
                             int event,
                             float cfra);
 
-/* few helpers for countall etc. */
 int count_particles(ParticleSystem *psys)
 {
   ParticleSettings *part = psys->part;
@@ -646,7 +645,7 @@ static void psys_free_path_cache_buffers(ParticleCacheKey **cache, ListBase *buf
 /************************************************/
 /*          Getting stuff                       */
 /************************************************/
-/* get object's active particle system safely */
+
 ParticleSystem *psys_get_current(Object *ob)
 {
   ParticleSystem *psys;
@@ -914,9 +913,11 @@ int psys_uses_gravity(ParticleSimulationData *sim)
   return sim->scene->physics_settings.flag & PHYS_GLOBAL_GRAVITY && sim->psys->part &&
          sim->psys->part->effector_weights->global_gravity != 0.0f;
 }
+
 /************************************************/
 /*          Freeing stuff                       */
 /************************************************/
+
 static void fluid_free_settings(SPHFluidSettings *fluid)
 {
   if (fluid) {
@@ -1056,7 +1057,6 @@ void psys_free_pdd(ParticleSystem *psys)
     psys->pdd->partsize = 0;
   }
 }
-/* free everything */
 void psys_free(Object *ob, ParticleSystem *psys)
 {
   if (psys) {
@@ -1204,6 +1204,7 @@ void psys_copy_particles(ParticleSystem *psys_dst, ParticleSystem *psys_src)
 /************************************************/
 /*          Interpolation                       */
 /************************************************/
+
 static float interpolate_particle_value(
     float v1, float v2, float v3, float v4, const float w[4], int four)
 {
@@ -1671,8 +1672,9 @@ static void interpolate_pathcache(ParticleCacheKey *first, float t, ParticleCach
 /************************************************/
 /*          Particles on a dm                   */
 /************************************************/
-/* interpolate a location on a face based on face coordinates */
+
 void psys_interpolate_face(MVert *mvert,
+                           const float (*vert_normals)[3],
                            MFace *mface,
                            MTFace *tface,
                            float (*orcodata)[3],
@@ -1694,13 +1696,13 @@ void psys_interpolate_face(MVert *mvert,
   v2 = mvert[mface->v2].co;
   v3 = mvert[mface->v3].co;
 
-  normal_short_to_float_v3(n1, mvert[mface->v1].no);
-  normal_short_to_float_v3(n2, mvert[mface->v2].no);
-  normal_short_to_float_v3(n3, mvert[mface->v3].no);
+  copy_v3_v3(n1, vert_normals[mface->v1]);
+  copy_v3_v3(n2, vert_normals[mface->v2]);
+  copy_v3_v3(n3, vert_normals[mface->v3]);
 
   if (mface->v4) {
     v4 = mvert[mface->v4].co;
-    normal_short_to_float_v3(n4, mvert[mface->v4].no);
+    copy_v3_v3(n4, vert_normals[mface->v4]);
 
     interp_v3_v3v3v3v3(vec, v1, v2, v3, v4, w);
 
@@ -1903,18 +1905,6 @@ static void psys_origspace_to_w(OrigSpaceFace *osface, int quad, const float w[4
   }
 }
 
-/**
- * Find the final derived mesh tessface for a particle, from its original tessface index.
- * This is slow and can be optimized but only for many lookups.
- *
- * \param mesh_final: Final mesh, it may not have the same topology as original mesh.
- * \param mesh_original: Original mesh, use for accessing #MPoly to #MFace mapping.
- * \param findex_orig: The input tessface index.
- * \param fw: Face weights (position of the particle inside the \a findex_orig tessface).
- * \param poly_nodes: May be NULL, otherwise an array of linked list,
- * one for each final \a mesh_final polygon, containing all its tessfaces indices.
- * \return The \a mesh_final tessface index.
- */
 int psys_particle_dm_face_lookup(Mesh *mesh_final,
                                  Mesh *mesh_original,
                                  int findex_orig,
@@ -2096,7 +2086,6 @@ static int psys_map_index_on_dm(Mesh *mesh,
   return 1;
 }
 
-/* interprets particle data to get a point on a mesh in object space */
 void psys_particle_on_dm(Mesh *mesh_final,
                          int from,
                          int index,
@@ -2136,13 +2125,13 @@ void psys_particle_on_dm(Mesh *mesh_final,
   }
 
   orcodata = CustomData_get_layer(&mesh_final->vdata, CD_ORCO);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh_final);
 
   if (from == PART_FROM_VERT) {
     copy_v3_v3(vec, mesh_final->mvert[mapindex].co);
 
     if (nor) {
-      normal_short_to_float_v3(nor, mesh_final->mvert[mapindex].no);
-      normalize_v3(nor);
+      copy_v3_v3(nor, vert_normals[mapindex]);
     }
 
     if (orco) {
@@ -2173,7 +2162,8 @@ void psys_particle_on_dm(Mesh *mesh_final,
     }
 
     if (from == PART_FROM_VOLUME) {
-      psys_interpolate_face(mvert, mface, mtface, orcodata, mapfw, vec, tmpnor, utan, vtan, orco);
+      psys_interpolate_face(
+          mvert, vert_normals, mface, mtface, orcodata, mapfw, vec, tmpnor, utan, vtan, orco);
       if (nor) {
         copy_v3_v3(nor, tmpnor);
       }
@@ -2185,7 +2175,8 @@ void psys_particle_on_dm(Mesh *mesh_final,
       add_v3_v3(vec, tmpnor);
     }
     else {
-      psys_interpolate_face(mvert, mface, mtface, orcodata, mapfw, vec, nor, utan, vtan, orco);
+      psys_interpolate_face(
+          mvert, vert_normals, mface, mtface, orcodata, mapfw, vec, nor, utan, vtan, orco);
     }
   }
 }
@@ -2218,9 +2209,11 @@ ParticleSystemModifierData *psys_get_modifier(Object *ob, ParticleSystem *psys)
   }
   return NULL;
 }
+
 /************************************************/
 /*          Particles on a shape                */
 /************************************************/
+
 /* ready for future use */
 static void psys_particle_on_shape(int UNUSED(distr),
                                    int UNUSED(index),
@@ -2249,6 +2242,7 @@ static void psys_particle_on_shape(int UNUSED(distr),
     copy_v3_v3(orco, zerovec);
   }
 }
+
 /************************************************/
 /*          Particles on emitter                */
 /************************************************/
@@ -2323,6 +2317,7 @@ void psys_particle_on_emitter(ParticleSystemModifierData *psmd,
     psys_particle_on_shape(from, index, fuv, vec, nor, utan, vtan, orco);
   }
 }
+
 /************************************************/
 /*          Path Cache                          */
 /************************************************/
@@ -3276,11 +3271,6 @@ static void cache_key_incremental_rotation(ParticleCacheKey *key0,
   }
 }
 
-/**
- * Calculates paths ready for drawing/rendering
- * - Useful for making use of opengl vertex arrays for super fast strand drawing.
- * - Makes child strands possible and creates them too into the cache.
- * - Cached path data is also used to determine cut position for the editmode tool. */
 void psys_cache_paths(ParticleSimulationData *sim, float cfra, const bool use_render_params)
 {
   PARTICLE_PSMD;
@@ -3763,9 +3753,11 @@ void psys_cache_edit_paths(Depsgraph *depsgraph,
     }
   }
 }
+
 /************************************************/
 /*          Particle Key handling               */
 /************************************************/
+
 void copy_particle_key(ParticleKey *to, ParticleKey *from, int time)
 {
   if (time) {
@@ -3925,6 +3917,7 @@ void psys_mat_hair_to_global(
 /************************************************/
 /*          ParticleSettings handling           */
 /************************************************/
+
 static ModifierData *object_add_or_copy_particle_system(
     Main *bmain, Scene *scene, Object *ob, const char *name, const ParticleSystem *psys_orig)
 {
@@ -4461,9 +4454,11 @@ void psys_get_texture(
   CLAMP_WARP_PARTICLE_TEXTURE_POS(PAMAP_DAMP, ptex->damp);
   CLAMP_PARTICLE_TEXTURE_POS(PAMAP_LENGTH, ptex->length);
 }
+
 /************************************************/
 /*          Particle State                      */
 /************************************************/
+
 float psys_get_timestep(ParticleSimulationData *sim)
 {
   return 0.04f * sim->psys->part->timetweak;
@@ -4589,7 +4584,6 @@ static void get_child_modifier_parameters(ParticleSettings *part,
         ctx->mesh, cpa_from, cpa_num, cpa_fuv, ctx->vg_twist);
   }
 }
-/* gets hair (or keyed) particles state at the "path time" specified in state->time */
 void psys_get_particle_on_path(ParticleSimulationData *sim,
                                int p,
                                ParticleKey *state,
@@ -4647,7 +4641,7 @@ void psys_get_particle_on_path(ParticleSimulationData *sim,
        * account when subdividing for instance. */
       pind.mesh = psys_in_edit_mode(sim->depsgraph, psys) ?
                       NULL :
-                      psys->hair_out_mesh; /* XXX(@sybren) EEK. */
+                      psys->hair_out_mesh; /* XXX(@sybren): EEK. */
       init_particle_interpolation(sim->ob, psys, pa, &pind);
       do_particle_interpolation(psys, p, pa, t, &pind, state);
 
@@ -4858,8 +4852,10 @@ void psys_get_particle_on_path(ParticleSimulationData *sim,
     }
   }
 }
-/* gets particle's state at a time, returns 1 if particle exists and can be seen and 0 if not */
-int psys_get_particle_state(ParticleSimulationData *sim, int p, ParticleKey *state, int always)
+bool psys_get_particle_state(ParticleSimulationData *sim,
+                             int p,
+                             ParticleKey *state,
+                             const bool always)
 {
   ParticleSystem *psys = sim->psys;
   ParticleSettings *part = psys->part;
@@ -4874,12 +4870,12 @@ int psys_get_particle_state(ParticleSimulationData *sim, int p, ParticleKey *sta
 
   if (p >= totpart) {
     if (!psys->totchild) {
-      return 0;
+      return false;
     }
 
     if (part->childtype == PART_CHILD_FACES) {
       if (!(psys->flag & PSYS_KEYED)) {
-        return 0;
+        return false;
       }
 
       cpa = psys->child + p - totpart;
@@ -4889,7 +4885,7 @@ int psys_get_particle_state(ParticleSimulationData *sim, int p, ParticleKey *sta
       if (!always) {
         if ((state->time < 0.0f && !(part->flag & PART_UNBORN)) ||
             (state->time > 1.0f && !(part->flag & PART_DIED))) {
-          return 0;
+          return false;
         }
       }
 
@@ -4897,7 +4893,7 @@ int psys_get_particle_state(ParticleSimulationData *sim, int p, ParticleKey *sta
                     (part->lifetime * psys_frand(psys, p + 24));
 
       psys_get_particle_on_path(sim, p, state, 1);
-      return 1;
+      return true;
     }
 
     cpa = sim->psys->child + p - totpart;
@@ -4911,7 +4907,7 @@ int psys_get_particle_state(ParticleSimulationData *sim, int p, ParticleKey *sta
     if (!always) {
       if ((cfra < pa->time && (part->flag & PART_UNBORN) == 0) ||
           (cfra >= pa->dietime && (part->flag & PART_DIED) == 0)) {
-        return 0;
+        return false;
       }
     }
 
@@ -4921,7 +4917,7 @@ int psys_get_particle_state(ParticleSimulationData *sim, int p, ParticleKey *sta
   if (sim->psys->flag & PSYS_KEYED) {
     state->time = -cfra;
     psys_get_particle_on_path(sim, p, state, 1);
-    return 1;
+    return true;
   }
 
   if (cpa) {
@@ -5021,7 +5017,7 @@ int psys_get_particle_state(ParticleSimulationData *sim, int p, ParticleKey *sta
     }
   }
 
-  return 1;
+  return true;
 }
 
 void psys_get_dupli_texture(ParticleSystem *psys,

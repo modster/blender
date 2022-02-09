@@ -87,6 +87,7 @@ typedef struct FFMpegContext {
   AVStream *video_stream;
   AVStream *audio_stream;
   AVFrame *current_frame; /* Image frame in output pixel format. */
+  int video_time;
 
   /* Image frame in Blender's own pixel format, may need conversion to the output pixel format. */
   AVFrame *img_convert_frame;
@@ -96,6 +97,7 @@ typedef struct FFMpegContext {
   uint8_t *audio_deinterleave_buffer;
   int audio_input_samples;
   double audio_time;
+  double audio_time_total;
   bool audio_deinterleave;
   int audio_sample_size;
 
@@ -318,14 +320,15 @@ static const char **get_file_extensions(int format)
 }
 
 /* Write a frame to the output file */
-static int write_video_frame(FFMpegContext *context, int cfra, AVFrame *frame, ReportList *reports)
+static int write_video_frame(FFMpegContext *context, AVFrame *frame, ReportList *reports)
 {
   int ret, success = 1;
   AVPacket *packet = av_packet_alloc();
 
   AVCodecContext *c = context->video_codec;
 
-  frame->pts = cfra;
+  frame->pts = context->video_time;
+  context->video_time++;
 
   ret = avcodec_send_frame(c, frame);
   if (ret < 0) {
@@ -723,14 +726,12 @@ static AVStream *alloc_video_stream(FFMpegContext *context,
     }
   }
 
-  if (codec_id == AV_CODEC_ID_VP9) {
-    if (rd->im_format.planes == R_IMF_PLANES_RGBA) {
-      c->pix_fmt = AV_PIX_FMT_YUVA420P;
-    }
+  if (codec_id == AV_CODEC_ID_VP9 && rd->im_format.planes == R_IMF_PLANES_RGBA) {
+    c->pix_fmt = AV_PIX_FMT_YUVA420P;
   }
-
-  /* Use 4:4:4 instead of 4:2:0 pixel format for lossless rendering. */
-  if ((codec_id == AV_CODEC_ID_H264 || codec_id == AV_CODEC_ID_VP9) && context->ffmpeg_crf == 0) {
+  else if ((codec_id == AV_CODEC_ID_H264 || codec_id == AV_CODEC_ID_VP9) &&
+           context->ffmpeg_crf == 0) {
+    /* Use 4:4:4 instead of 4:2:0 pixel format for lossless rendering. */
     c->pix_fmt = AV_PIX_FMT_YUV444P;
   }
 
@@ -803,6 +804,8 @@ static AVStream *alloc_video_stream(FFMpegContext *context,
   }
 
   avcodec_parameters_from_context(st->codecpar, c);
+
+  context->video_time = 0.0f;
 
   return st;
 }
@@ -1397,9 +1400,10 @@ static void write_audio_frames(FFMpegContext *context, double to_pts)
   AVCodecContext *c = context->audio_codec;
 
   while (context->audio_stream) {
-    if ((context->audio_time >= to_pts) || !write_audio_frame(context)) {
+    if ((context->audio_time_total >= to_pts) || !write_audio_frame(context)) {
       break;
     }
+    context->audio_time_total += (double)context->audio_input_samples / (double)c->sample_rate;
     context->audio_time += (double)context->audio_input_samples / (double)c->sample_rate;
   }
 }
@@ -1423,22 +1427,25 @@ int BKE_ffmpeg_append(void *context_v,
 
   if (context->video_stream) {
     avframe = generate_video_frame(context, (unsigned char *)pixels);
-    success = (avframe && write_video_frame(context, frame - start_frame, avframe, reports));
+    success = (avframe && write_video_frame(context, avframe, reports));
+#  ifdef WITH_AUDASPACE
+    /* Add +1 frame because we want to encode audio up until the next video frame. */
+    write_audio_frames(
+        context, (frame - start_frame + 1) / (((double)rd->frs_sec) / (double)rd->frs_sec_base));
+#  else
+    UNUSED_VARS(start_frame);
+#  endif
 
     if (context->ffmpeg_autosplit) {
       if (avio_tell(context->outfile->pb) > FFMPEG_AUTOSPLIT_SIZE) {
         end_ffmpeg_impl(context, true);
         context->ffmpeg_autosplit_count++;
+
         success &= start_ffmpeg_impl(context, rd, rectx, recty, suffix, reports);
       }
     }
   }
 
-#  ifdef WITH_AUDASPACE
-  /* Add +1 frame because we want to encode audio up until the next video frame. */
-  write_audio_frames(
-      context, (frame - start_frame + 1) / (((double)rd->frs_sec) / (double)rd->frs_sec_base));
-#  endif
   return success;
 }
 
@@ -1881,6 +1888,7 @@ void *BKE_ffmpeg_context_create(void)
   context->ffmpeg_autosplit_count = 0;
   context->ffmpeg_preview = false;
   context->stamp_data = NULL;
+  context->audio_time_total = 0.0;
 
   return context;
 }

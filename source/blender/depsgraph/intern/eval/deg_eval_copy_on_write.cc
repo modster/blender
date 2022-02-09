@@ -646,8 +646,8 @@ void set_particle_system_modifiers_loaded(Object *object_cow)
 
 void reset_particle_system_edit_eval(const Depsgraph *depsgraph, Object *object_cow)
 {
-  /* Inactive (and render) dependency graphs are living in own little bubble, should not care about
-   * edit mode at all. */
+  /* Inactive (and render) dependency graphs are living in their own little bubble, should not care
+   * about edit mode at all. */
   if (!DEG_is_active(reinterpret_cast<const ::Depsgraph *>(depsgraph))) {
     return;
   }
@@ -672,12 +672,6 @@ void update_particles_after_copy(const Depsgraph *depsgraph,
 void update_pose_orig_pointers(const bPose *pose_orig, bPose *pose_cow)
 {
   update_list_orig_pointers(&pose_orig->chanbase, &pose_cow->chanbase, &bPoseChannel::orig_pchan);
-}
-
-void update_modifiers_orig_pointers(const Object *object_orig, Object *object_cow)
-{
-  update_list_orig_pointers(
-      &object_orig->modifiers, &object_cow->modifiers, &ModifierData::orig_modifier_data);
 }
 
 void update_nla_strips_orig_pointers(const ListBase *strips_orig, ListBase *strips_cow)
@@ -714,25 +708,6 @@ void update_animation_data_after_copy(const ID *id_orig, ID *id_cow)
   update_nla_tracks_orig_pointers(&anim_data_orig->nla_tracks, &anim_data_cow->nla_tracks);
 }
 
-/* Some builders (like motion path one) will ignore proxies from being built. This code makes it so
- * proxy and proxy_group pointers never point to an original objects, preventing evaluation code
- * from assign evaluated pointer to an original proxy->proxy_from. */
-void update_proxy_pointers_after_copy(const Depsgraph *depsgraph,
-                                      const Object *object_orig,
-                                      Object *object_cow)
-{
-  if (object_cow->proxy != nullptr) {
-    if (!deg_check_id_in_depsgraph(depsgraph, &object_orig->proxy->id)) {
-      object_cow->proxy = nullptr;
-    }
-  }
-  if (object_cow->proxy_group != nullptr) {
-    if (!deg_check_id_in_depsgraph(depsgraph, &object_orig->proxy_group->id)) {
-      object_cow->proxy_group = nullptr;
-    }
-  }
-}
-
 /* Do some special treatment of data transfer from original ID to its
  * CoW complementary part.
  *
@@ -766,8 +741,6 @@ void update_id_after_copy(const Depsgraph *depsgraph,
         BKE_gpencil_update_orig_pointers(object_orig, object_cow);
       }
       update_particles_after_copy(depsgraph, object_orig, object_cow);
-      update_modifiers_orig_pointers(object_orig, object_cow);
-      update_proxy_pointers_after_copy(depsgraph, object_orig, object_cow);
       break;
     }
     case ID_SCE: {
@@ -898,6 +871,29 @@ ID *deg_update_copy_on_write_datablock(const Depsgraph *depsgraph, const IDNode 
   if (!deg_copy_on_write_is_needed(id_orig)) {
     return id_cow;
   }
+
+  /* When updating object data in edit-mode, don't request COW update since this will duplicate
+   * all object data which is unnecessary when the edit-mode data is used for calculating
+   * modifiers.
+   *
+   * TODO: Investigate modes besides edit-mode. */
+  if (check_datablock_expanded(id_cow) && !id_node->is_cow_explicitly_tagged) {
+    const ID_Type id_type = GS(id_orig->name);
+    if (OB_DATA_SUPPORT_EDITMODE(id_type) && BKE_object_data_is_in_editmode(id_orig)) {
+      /* Make sure pointers in the edit mode data are updated in the copy.
+       * This allows depsgraph to pick up changes made in another context after it has been
+       * evaluated. Consider the following scenario:
+       *
+       *  - ObjectA in SceneA is using Mesh.
+       *  - ObjectB in SceneB is using Mesh (same exact datablock).
+       *  - Depsgraph of SceneA is evaluated.
+       *  - Depsgraph of SceneB is evaluated.
+       *  - User enters edit mode of ObjectA in SceneA. */
+      update_edit_mode_pointers(depsgraph, id_orig, id_cow);
+      return id_cow;
+    }
+  }
+
   RuntimeBackup backup(depsgraph);
   backup.init_from_id(id_cow);
   deg_free_copy_on_write_datablock(id_cow);
@@ -906,7 +902,9 @@ ID *deg_update_copy_on_write_datablock(const Depsgraph *depsgraph, const IDNode 
   return id_cow;
 }
 
-/* NOTE: Depsgraph is supposed to have ID node already. */
+/**
+ * \note Depsgraph is supposed to have ID node already.
+ */
 ID *deg_update_copy_on_write_datablock(const Depsgraph *depsgraph, ID *id_orig)
 {
   IDNode *id_node = depsgraph->find_id_node(id_orig);
@@ -987,10 +985,12 @@ void discard_edit_mode_pointers(ID *id_cow)
 
 }  // namespace
 
-/* Free content of the CoW data-block
+/**
+   Free content of the CoW data-block.
  * Notes:
  * - Does not recurse into nested ID data-blocks.
- * - Does not free data-block itself. */
+ * - Does not free data-block itself.
+ */
 void deg_free_copy_on_write_datablock(ID *id_cow)
 {
   if (!check_datablock_expanded(id_cow)) {
@@ -1006,7 +1006,7 @@ void deg_free_copy_on_write_datablock(ID *id_cow)
     case ID_OB: {
       /* TODO(sergey): This workaround is only to prevent free derived
        * caches from modifying object->data. This is currently happening
-       * due to mesh/curve datablock boundbox tagging dirty. */
+       * due to mesh/curve data-block bound-box tagging dirty. */
       Object *ob_cow = (Object *)id_cow;
       ob_cow->data = nullptr;
       ob_cow->sculpt = nullptr;

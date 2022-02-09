@@ -596,9 +596,11 @@ class USERPREF_PT_system_cycles_devices(SystemPanel, CenterAlignMixIn, Panel):
 
     @classmethod
     def poll(cls, _context):
-        # No GPU rendering on macOS currently.
+        # No GPU rendering on macOS x86_64 currently.
+        import platform
         import sys
-        return bpy.app.build_options.cycles and sys.platform != "darwin"
+        return bpy.app.build_options.cycles and \
+               (sys.platform != "darwin" or platform.machine() == "arm64")
 
     def draw_centered(self, context, layout):
         prefs = context.preferences
@@ -768,6 +770,17 @@ class USERPREF_PT_viewport_selection(ViewportPanel, CenterAlignMixIn, Panel):
         system = prefs.system
 
         layout.prop(system, "use_select_pick_depth")
+
+
+class USERPREF_PT_viewport_subdivision(ViewportPanel, CenterAlignMixIn, Panel):
+    bl_label = "Subdivision"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_centered(self, context, layout):
+        prefs = context.preferences
+        system = prefs.system
+
+        layout.prop(system, "use_gpu_subdivision")
 
 
 # -----------------------------------------------------------------------------
@@ -1966,13 +1979,7 @@ class USERPREF_PT_addons(AddOnPanel, Panel):
                 sub.active = is_enabled
                 sub.label(text="%s: %s" % (info["category"], info["name"]))
 
-                # WARNING: 2.8x exception, may be removed
-                # use disabled state for old add-ons, chances are they are broken.
-                if is_addon_27x:
-                    sub.label(text="Upgrade to 2.8x required")
-                    sub.label(icon='ERROR')
-                # Remove code above after 2.8x migration is complete.
-                elif info["warning"]:
+                if info["warning"]:
                     sub.label(icon='ERROR')
 
                 # icon showing support level.
@@ -2288,7 +2295,7 @@ class USERPREF_PT_experimental_prototypes(ExperimentalPanel, Panel):
     def draw(self, context):
         self._draw_items(
             context, (
-                ({"property": "use_new_hair_type"}, "T68981"),
+                ({"property": "use_new_curves_type"}, "T68981"),
                 ({"property": "use_new_point_cloud_type"}, "T75717"),
                 ({"property": "use_full_frame_compositor"}, "T88150"),
             ),
@@ -2309,10 +2316,10 @@ class USERPREF_PT_experimental_debugging(ExperimentalPanel, Panel):
             context, (
                 ({"property": "use_undo_legacy"}, "T60695"),
                 ({"property": "override_auto_resync"}, "T83811"),
-                ({"property": "proxy_to_override_auto_conversion"}, "T91671"),
                 ({"property": "use_cycles_debug"}, None),
                 ({"property": "use_geometry_nodes_legacy"}, "T91274"),
                 ({"property": "show_asset_debug_info"}, None),
+                ({"property": "use_asset_indexing"}, None),
             ),
         )
 
@@ -2346,6 +2353,7 @@ classes = (
     USERPREF_PT_viewport_quality,
     USERPREF_PT_viewport_textures,
     USERPREF_PT_viewport_selection,
+    USERPREF_PT_viewport_subdivision,
 
     USERPREF_PT_edit_objects,
     USERPREF_PT_edit_objects_new,

@@ -237,7 +237,7 @@ static void rna_AssetMetaData_catalog_id_set(PointerRNA *ptr, const char *value)
   }
 
   if (!BLI_uuid_parse_string(&new_uuid, value)) {
-    // TODO(Sybren): raise ValueError exception once that's possible from an RNA setter.
+    /* TODO(@sybren): raise ValueError exception once that's possible from an RNA setter. */
     printf("UUID %s not formatted correctly, ignoring new value\n", value);
     return;
   }
@@ -493,9 +493,6 @@ static void rna_def_asset_library_reference(BlenderRNA *brna)
       srna, "Asset Library Reference", "Identifier to refer to the asset library");
 }
 
-/**
- * \note the UI text and updating has to be set by the caller.
- */
 PropertyRNA *rna_def_asset_library_reference_common(struct StructRNA *srna,
                                                     const char *get,
                                                     const char *set)

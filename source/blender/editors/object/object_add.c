@@ -62,6 +62,7 @@
 #include "BKE_constraint.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
+#include "BKE_curves.h"
 #include "BKE_displist.h"
 #include "BKE_duplilist.h"
 #include "BKE_effect.h"
@@ -69,7 +70,6 @@
 #include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
 #include "BKE_gpencil_modifier.h"
-#include "BKE_hair.h"
 #include "BKE_key.h"
 #include "BKE_lattice.h"
 #include "BKE_layer.h"
@@ -130,7 +130,7 @@
 /** \name Local Enum Declarations
  * \{ */
 
-/* this is an exact copy of the define in rna_light.c
+/* This is an exact copy of the define in `rna_light.c`
  * kept here because of linking order.
  * Icons are only defined here */
 const EnumPropertyItem rna_enum_light_type_items[] = {
@@ -331,8 +331,6 @@ void ED_object_base_init_transform_on_add(Object *object, const float loc[3], co
   BKE_object_to_mat4(object, object->obmat);
 }
 
-/* Uses context to figure out transform for primitive.
- * Returns standard diameter. */
 float ED_object_new_primitive_matrix(bContext *C,
                                      Object *obedit,
                                      const float loc[3],
@@ -603,12 +601,6 @@ bool ED_object_add_generic_get_opts(bContext *C,
   return true;
 }
 
-/**
- * For object add primitive operators, or for object creation when `obdata != NULL`.
- * \param obdata: Assigned to #Object.data, with increased user count.
- *
- * \note Do not call undo push in this function (users of this function have to).
- */
 Object *ED_object_add_type_with_obdata(bContext *C,
                                        const int type,
                                        const char *name,
@@ -1724,7 +1716,6 @@ static int object_instance_add_invoke(bContext *C, wmOperator *op, const wmEvent
   return op->type->exec(C, op);
 }
 
-/* only used as menu */
 void OBJECT_OT_collection_instance_add(wmOperatorType *ot)
 {
   PropertyRNA *prop;
@@ -1751,15 +1742,16 @@ void OBJECT_OT_collection_instance_add(wmOperatorType *ot)
   ot->prop = prop;
   ED_object_add_generic_props(ot, false);
 
-  RNA_def_int(ot->srna,
-              "session_uuid",
-              0,
-              INT32_MIN,
-              INT32_MAX,
-              "Session UUID",
-              "Session UUID of the collection to add",
-              INT32_MIN,
-              INT32_MAX);
+  prop = RNA_def_int(ot->srna,
+                     "session_uuid",
+                     0,
+                     INT32_MIN,
+                     INT32_MAX,
+                     "Session UUID",
+                     "Session UUID of the collection to add",
+                     INT32_MIN,
+                     INT32_MAX);
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE | PROP_HIDDEN);
 
   object_add_drop_xy_props(ot);
 }
@@ -1902,18 +1894,18 @@ void OBJECT_OT_speaker_add(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Add Hair Operator
+/** \name Add Hair Curves Operator
  * \{ */
 
-static bool object_hair_add_poll(bContext *C)
+static bool object_hair_curves_add_poll(bContext *C)
 {
-  if (!U.experimental.use_new_hair_type) {
+  if (!U.experimental.use_new_curves_type) {
     return false;
   }
   return ED_operator_objectmode(C);
 }
 
-static int object_hair_add_exec(bContext *C, wmOperator *op)
+static int object_hair_curves_add_exec(bContext *C, wmOperator *op)
 {
   ushort local_view_bits;
   float loc[3], rot[3];
@@ -1921,22 +1913,22 @@ static int object_hair_add_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  Object *object = ED_object_add_type(C, OB_HAIR, NULL, loc, rot, false, local_view_bits);
+  Object *object = ED_object_add_type(C, OB_CURVES, NULL, loc, rot, false, local_view_bits);
   object->dtx |= OB_DRAWBOUNDOX; /* TODO: remove once there is actual drawing. */
 
   return OPERATOR_FINISHED;
 }
 
-void OBJECT_OT_hair_add(wmOperatorType *ot)
+void OBJECT_OT_hair_curves_add(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Add Hair";
-  ot->description = "Add a hair object to the scene";
-  ot->idname = "OBJECT_OT_hair_add";
+  ot->name = "Add Hair Curves";
+  ot->description = "Add a hair curves object to the scene";
+  ot->idname = "OBJECT_OT_hair_curves_add";
 
   /* api callbacks */
-  ot->exec = object_hair_add_exec;
-  ot->poll = object_hair_add_poll;
+  ot->exec = object_hair_curves_add_exec;
+  ot->poll = object_hair_curves_add_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -1994,8 +1986,7 @@ void OBJECT_OT_pointcloud_add(wmOperatorType *ot)
 /* -------------------------------------------------------------------- */
 /** \name Delete Object Operator
  * \{ */
-/* remove base from a specific scene */
-/* NOTE: now unlinks constraints as well. */
+
 void ED_object_base_free_and_unlink(Main *bmain, Scene *scene, Object *ob)
 {
   if (ID_REAL_USERS(ob) <= 1 && ID_EXTRA_USERS(ob) == 0 &&
@@ -2007,16 +1998,16 @@ void ED_object_base_free_and_unlink(Main *bmain, Scene *scene, Object *ob)
         ob->id.name + 2);
     return;
   }
+  if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
+    /* Do not delete objects used by overrides of collections. */
+    return;
+  }
 
   DEG_id_tag_update_ex(bmain, &ob->id, ID_RECALC_BASE_FLAGS);
 
   BKE_scene_collections_object_remove(bmain, scene, ob, true);
 }
 
-/**
- * Remove base from a specific scene.
- * `ob` must not be indirectly used.
- */
 void ED_object_base_free_and_unlink_no_indirect_check(Main *bmain, Scene *scene, Object *ob)
 {
   BLI_assert(!BKE_library_ID_is_indirectly_used(bmain, ob));
@@ -2051,10 +2042,9 @@ static int object_delete_exec(bContext *C, wmOperator *op)
     }
 
     if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
-      /* Can this case ever happen? */
       BKE_reportf(op->reports,
                   RPT_WARNING,
-                  "Cannot delete object '%s' as it used by override collections",
+                  "Cannot delete object '%s' as it is used by override collections",
                   ob->id.name + 2);
       continue;
     }
@@ -2357,11 +2347,6 @@ static void make_object_duplilist_real(bContext *C,
     BKE_animdata_free(&ob_dst->id, true);
     ob_dst->adt = NULL;
 
-    /* Proxies are not to be copied. */
-    ob_dst->proxy_from = NULL;
-    ob_dst->proxy_group = NULL;
-    ob_dst->proxy = NULL;
-
     ob_dst->parent = NULL;
     BKE_constraints_free(&ob_dst->constraints);
     ob_dst->runtime.curve_cache = NULL;
@@ -2476,13 +2461,6 @@ static void make_object_duplilist_real(bContext *C,
   }
 
   if (base->object->transflag & OB_DUPLICOLLECTION && base->object->instance_collection) {
-    LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
-      if (ob->proxy_group == base->object) {
-        ob->proxy = NULL;
-        ob->proxy_from = NULL;
-        DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
-      }
-    }
     base->object->instance_collection = NULL;
   }
 
@@ -3115,11 +3093,11 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         basen = duplibase_for_convert(bmain, depsgraph, scene, view_layer, base, NULL);
         newob = basen->object;
 
-        /* Decrement original point-cloud's usage count. */
+        /* Decrement original point cloud's usage count. */
         PointCloud *pointcloud = newob->data;
         id_us_min(&pointcloud->id);
 
-        /* Make a new copy of the point-cloud. */
+        /* Make a new copy of the point cloud. */
         newob->data = BKE_id_copy(bmain, &pointcloud->id);
       }
       else {
@@ -3371,11 +3349,6 @@ static Base *object_add_duplicate_internal(Main *bmain,
   return basen;
 }
 
-/* single object duplicate, if dupflag==0, fully linked, else it uses the flags given */
-/* leaves selection of base/object unaltered.
- * NOTE: don't call this within a loop since clear_* funcs loop over the entire database.
- * NOTE: caller must do DAG_relations_tag_update(bmain);
- *       this is not done automatic since we may duplicate many objects in a batch */
 Base *ED_object_add_duplicate(
     Main *bmain, Scene *scene, ViewLayer *view_layer, Base *base, const eDupli_ID_Flags dupflag)
 {
@@ -3545,6 +3518,8 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
   }
 
   basen->object->visibility_flag &= ~OB_HIDE_VIEWPORT;
+  /* Do immediately, as #copy_object_set_idnew() below operates on visible objects. */
+  BKE_base_eval_flags(basen);
 
   /* object_add_duplicate_internal() doesn't deselect other objects, unlike object_add_common() or
    * BKE_view_layer_base_deselect_all(). */
@@ -3747,6 +3722,7 @@ static bool object_join_poll(bContext *C)
 
 static int object_join_exec(bContext *C, wmOperator *op)
 {
+  Main *bmain = CTX_data_main(C);
   Object *ob = CTX_data_active_object(C);
 
   if (ob->mode & OB_MODE_EDIT) {
@@ -3757,6 +3733,14 @@ static int object_join_exec(bContext *C, wmOperator *op)
     BKE_report(op->reports, RPT_ERROR, "Cannot edit external library data");
     return OPERATOR_CANCELLED;
   }
+  if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
+    BKE_reportf(op->reports,
+                RPT_WARNING,
+                "Cannot edit object '%s' as it is used by override collections",
+                ob->id.name + 2);
+    return OPERATOR_CANCELLED;
+  }
+
   if (ob->type == OB_GPENCIL) {
     bGPdata *gpd = (bGPdata *)ob->data;
     if ((!gpd) || GPENCIL_ANY_MODE(gpd)) {
@@ -3845,6 +3829,7 @@ static bool join_shapes_poll(bContext *C)
 
 static int join_shapes_exec(bContext *C, wmOperator *op)
 {
+  Main *bmain = CTX_data_main(C);
   Object *ob = CTX_data_active_object(C);
 
   if (ob->mode & OB_MODE_EDIT) {
@@ -3853,6 +3838,13 @@ static int join_shapes_exec(bContext *C, wmOperator *op)
   }
   if (BKE_object_obdata_is_libdata(ob)) {
     BKE_report(op->reports, RPT_ERROR, "Cannot edit external library data");
+    return OPERATOR_CANCELLED;
+  }
+  if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
+    BKE_reportf(op->reports,
+                RPT_WARNING,
+                "Cannot edit object '%s' as it is used by override collections",
+                ob->id.name + 2);
     return OPERATOR_CANCELLED;
   }
 

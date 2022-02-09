@@ -63,11 +63,11 @@
 #include "BKE_constraint.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
+#include "BKE_curves.h"
 #include "BKE_displist.h"
 #include "BKE_editmesh.h"
 #include "BKE_fcurve.h"
 #include "BKE_gpencil.h"
-#include "BKE_hair.h"
 #include "BKE_idprop.h"
 #include "BKE_idtype.h"
 #include "BKE_lattice.h"
@@ -583,8 +583,8 @@ bool ED_object_parent_set(ReportList *reports,
     }
     case PAR_BONE:
     case PAR_BONE_RELATIVE:
-      pchan = BKE_pose_channel_active(par);
-      pchan_eval = BKE_pose_channel_active(parent_eval);
+      pchan = BKE_pose_channel_active_if_layer_visible(par);
+      pchan_eval = BKE_pose_channel_active_if_layer_visible(parent_eval);
 
       if (pchan == NULL) {
         BKE_report(reports, RPT_ERROR, "No active bone");
@@ -1783,8 +1783,6 @@ static void single_object_users(
   BKE_main_collection_sync_remap(bmain);
 }
 
-/* not an especially efficient function, only added so the single user
- * button can be functional. */
 void ED_object_single_user(Main *bmain, Scene *scene, Object *ob)
 {
   FOREACH_SCENE_OBJECT_BEGIN (scene, ob_iter) {
@@ -1874,7 +1872,7 @@ static void single_obdata_users(
                 ob->data,
                 BKE_id_copy_ex(bmain, ob->data, NULL, LIB_ID_COPY_DEFAULT | LIB_ID_COPY_ACTIONS));
             break;
-          case OB_HAIR:
+          case OB_CURVES:
             ob->data = ID_NEW_SET(
                 ob->data,
                 BKE_id_copy_ex(bmain, ob->data, NULL, LIB_ID_COPY_DEFAULT | LIB_ID_COPY_ACTIONS));
@@ -2336,7 +2334,7 @@ static int make_override_library_exec(bContext *C, wmOperator *op)
   BKE_main_id_tag_all(bmain, LIB_TAG_DOIT, false);
 
   const bool success = BKE_lib_override_library_create(
-      bmain, scene, view_layer, id_root, &obact->id, NULL);
+      bmain, scene, view_layer, NULL, id_root, &obact->id, NULL);
 
   /* Remove the instance empty from this scene, the items now have an overridden collection
    * instead. */
@@ -2357,7 +2355,8 @@ static bool make_override_library_poll(bContext *C)
   /* Object must be directly linked to be overridable. */
   return (ED_operator_objectmode(C) && obact != NULL &&
           (ID_IS_LINKED(obact) || (obact->instance_collection != NULL &&
-                                   ID_IS_OVERRIDABLE_LIBRARY(obact->instance_collection))));
+                                   ID_IS_OVERRIDABLE_LIBRARY(obact->instance_collection) &&
+                                   !ID_IS_OVERRIDE_LIBRARY(obact))));
 }
 
 static const EnumPropertyItem *make_override_collections_of_linked_object_itemf(
@@ -2418,63 +2417,6 @@ void OBJECT_OT_make_override_library(wmOperatorType *ot)
   RNA_def_enum_funcs(prop, make_override_collections_of_linked_object_itemf);
   RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
   ot->prop = prop;
-}
-
-static bool convert_proxy_to_override_poll(bContext *C)
-{
-  Object *obact = CTX_data_active_object(C);
-
-  return obact != NULL && obact->proxy != NULL;
-}
-
-static int convert_proxy_to_override_exec(bContext *C, wmOperator *op)
-{
-  Main *bmain = CTX_data_main(C);
-  Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
-
-  BKE_main_id_tag_all(bmain, LIB_TAG_DOIT, false);
-
-  Object *ob_proxy = CTX_data_active_object(C);
-  Object *ob_proxy_group = ob_proxy->proxy_group;
-  const bool is_override_instancing_object = ob_proxy_group != NULL;
-
-  const bool success = BKE_lib_override_library_proxy_convert(bmain, scene, view_layer, ob_proxy);
-
-  if (!success) {
-    BKE_reportf(
-        op->reports,
-        RPT_ERROR_INVALID_INPUT,
-        "Could not create a library override from proxy '%s' (might use already local data?)",
-        ob_proxy->id.name + 2);
-    return OPERATOR_CANCELLED;
-  }
-
-  /* Remove the instance empty from this scene, the items now have an overridden collection
-   * instead. */
-  if (is_override_instancing_object) {
-    ED_object_base_free_and_unlink(bmain, scene, ob_proxy_group);
-  }
-
-  DEG_id_tag_update(&CTX_data_scene(C)->id, ID_RECALC_BASE_FLAGS | ID_RECALC_COPY_ON_WRITE);
-  WM_event_add_notifier(C, NC_WINDOW, NULL);
-
-  return OPERATOR_FINISHED;
-}
-
-void OBJECT_OT_convert_proxy_to_override(wmOperatorType *ot)
-{
-  /* identifiers */
-  ot->name = "Convert Proxy to Override";
-  ot->description = "Convert a proxy to a local library override";
-  ot->idname = "OBJECT_OT_convert_proxy_to_override";
-
-  /* api callbacks */
-  ot->exec = convert_proxy_to_override_exec;
-  ot->poll = convert_proxy_to_override_poll;
-
-  /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
 /** \} */
@@ -2644,10 +2586,6 @@ static int drop_named_material_invoke(bContext *C, wmOperator *op, const wmEvent
   return OPERATOR_FINISHED;
 }
 
-/**
- * Used for drop-box.
- * Assigns to object under cursor, only first material slot.
- */
 void OBJECT_OT_drop_named_material(wmOperatorType *ot)
 {
   /* identifiers */
@@ -2706,9 +2644,6 @@ static int object_unlink_data_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-/**
- * \note Only for empty-image objects, this operator is needed
- */
 void OBJECT_OT_unlink_data(wmOperatorType *ot)
 {
   /* identifiers */

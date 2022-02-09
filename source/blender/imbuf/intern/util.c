@@ -15,7 +15,6 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- * util.c
  */
 
 /** \file
@@ -98,7 +97,7 @@ const char *imb_ext_movie[] = {
     ".mpg2", ".vob", ".mkv", ".flv",   ".divx", ".xvid", ".mxf", ".webm", NULL,
 };
 
-/* sort of wrong being here... */
+/** Sort of wrong having audio extensions in imbuf. */
 const char *imb_ext_audio[] = {
     ".wav",
     ".ogg",

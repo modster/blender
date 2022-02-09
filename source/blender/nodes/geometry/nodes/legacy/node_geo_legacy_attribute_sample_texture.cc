@@ -93,7 +93,7 @@ static void execute_on_component(GeometryComponent &component, const GeoNodeExec
       /* For legacy reasons we have to map [0, 1] to [-1, 1] to support uv mappings. */
       const float3 remapped_position = position * 2.0f - float3(1.0f);
       BKE_texture_get_value(nullptr, texture, remapped_position, &texture_result, false);
-      colors[i] = {texture_result.tr, texture_result.tg, texture_result.tb, texture_result.ta};
+      copy_v4_v4(colors[i], texture_result.trgba);
     }
   });
 
@@ -104,7 +104,7 @@ static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  geometry_set = geometry_set_realize_instances(geometry_set);
+  geometry_set = geometry::realize_instances_legacy(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
     execute_on_component(geometry_set.get_component_for_write<MeshComponent>(), params);
@@ -130,8 +130,7 @@ void register_node_type_geo_sample_texture()
   geo_node_type_base(&ntype,
                      GEO_NODE_LEGACY_ATTRIBUTE_SAMPLE_TEXTURE,
                      "Attribute Sample Texture",
-                     NODE_CLASS_ATTRIBUTE,
-                     0);
+                     NODE_CLASS_ATTRIBUTE);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
   ntype.declare = file_ns::node_declare;
   ntype.geometry_node_execute = file_ns::node_geo_exec;

@@ -43,7 +43,9 @@ namespace blender::deg {
 /* *********** */
 /* Outer Nodes */
 
-/* Standard Component Methods ============================= */
+/* -------------------------------------------------------------------- */
+/** \name Standard Component Methods
+ * \{ */
 
 ComponentNode::OperationIDKey::OperationIDKey()
     : opcode(OperationCode::OPERATION), name(""), name_tag(-1)
@@ -86,7 +88,6 @@ ComponentNode::ComponentNode()
   operations_map = new Map<ComponentNode::OperationIDKey, OperationNode *>();
 }
 
-/* Initialize 'component' node - from pointer data given */
 void ComponentNode::init(const ID * /*id*/, const char * /*subdata*/)
 {
   /* hook up eval context? */
@@ -297,9 +298,12 @@ void ComponentNode::finalize_build(Depsgraph * /*graph*/)
   operations_map = nullptr;
 }
 
-/* Bone Component ========================================= */
+/** \} */
 
-/* Initialize 'bone component' node - from pointer data given */
+/* -------------------------------------------------------------------- */
+/** \name Bone Component
+ * \{ */
+
 void BoneComponentNode::init(const ID *id, const char *subdata)
 {
   /* generic component-node... */
@@ -315,7 +319,11 @@ void BoneComponentNode::init(const ID *id, const char *subdata)
   this->pchan = BKE_pose_channel_find_name(object->pose, subdata);
 }
 
-/* Register all components. =============================== */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Register All Components
+ * \{ */
 
 DEG_COMPONENT_NODE_DEFINE(Animation, ANIMATION, ID_RECALC_ANIMATION);
 /* TODO(sergey): Is this a correct tag? */
@@ -331,7 +339,6 @@ DEG_COMPONENT_NODE_DEFINE(Particles, PARTICLE_SYSTEM, ID_RECALC_GEOMETRY);
 DEG_COMPONENT_NODE_DEFINE(ParticleSettings, PARTICLE_SETTINGS, 0);
 DEG_COMPONENT_NODE_DEFINE(PointCache, POINT_CACHE, 0);
 DEG_COMPONENT_NODE_DEFINE(Pose, EVAL_POSE, ID_RECALC_GEOMETRY);
-DEG_COMPONENT_NODE_DEFINE(Proxy, PROXY, ID_RECALC_GEOMETRY);
 DEG_COMPONENT_NODE_DEFINE(Sequencer, SEQUENCER, 0);
 DEG_COMPONENT_NODE_DEFINE(Shading, SHADING, ID_RECALC_SHADING);
 DEG_COMPONENT_NODE_DEFINE(Transform, TRANSFORM, ID_RECALC_TRANSFORM);
@@ -343,8 +350,13 @@ DEG_COMPONENT_NODE_DEFINE(Armature, ARMATURE, 0);
 DEG_COMPONENT_NODE_DEFINE(GenericDatablock, GENERIC_DATABLOCK, 0);
 DEG_COMPONENT_NODE_DEFINE(Visibility, VISIBILITY, 0);
 DEG_COMPONENT_NODE_DEFINE(Simulation, SIMULATION, 0);
+DEG_COMPONENT_NODE_DEFINE(NTreeOutput, NTREE_OUTPUT, ID_RECALC_NTREE_OUTPUT);
 
-/* Node Types Register =================================== */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Node Types Register
+ * \{ */
 
 void deg_register_component_depsnodes()
 {
@@ -360,7 +372,6 @@ void deg_register_component_depsnodes()
   register_node_typeinfo(&DNTI_PARTICLE_SETTINGS);
   register_node_typeinfo(&DNTI_POINT_CACHE);
   register_node_typeinfo(&DNTI_IMAGE_ANIMATION);
-  register_node_typeinfo(&DNTI_PROXY);
   register_node_typeinfo(&DNTI_EVAL_POSE);
   register_node_typeinfo(&DNTI_SEQUENCER);
   register_node_typeinfo(&DNTI_SHADING);
@@ -373,6 +384,9 @@ void deg_register_component_depsnodes()
   register_node_typeinfo(&DNTI_GENERIC_DATABLOCK);
   register_node_typeinfo(&DNTI_VISIBILITY);
   register_node_typeinfo(&DNTI_SIMULATION);
+  register_node_typeinfo(&DNTI_NTREE_OUTPUT);
 }
+
+/** \} */
 
 }  // namespace blender::deg

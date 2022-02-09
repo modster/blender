@@ -33,7 +33,7 @@
 #include "BKE_paint.h"
 #include "BKE_particle.h"
 
-#include "DNA_hair_types.h"
+#include "DNA_curves_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
@@ -76,9 +76,6 @@ struct GPUTexture *EEVEE_materials_get_util_tex(void)
   return e_data.util_tex;
 }
 
-/**
- * ssr_id can be null to disable ssr contribution.
- */
 void EEVEE_material_bind_resources(DRWShadingGroup *shgrp,
                                    GPUMaterial *gpumat,
                                    EEVEE_ViewLayerData *sldata,
@@ -356,7 +353,7 @@ void EEVEE_materials_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
   EEVEE_StorageList *stl = ((EEVEE_Data *)vedata)->stl;
   const DRWContextState *draw_ctx = DRW_context_state_get();
 
-  /* Create Material Ghash */
+  /* Create Material #GHash. */
   {
     stl->g_data->material_hash = BLI_ghash_ptr_new("Eevee_material ghash");
 
@@ -928,7 +925,7 @@ void EEVEE_object_hair_cache_populate(EEVEE_Data *vedata,
                                       Object *ob,
                                       bool *cast_shadow)
 {
-  eevee_hair_cache_populate(vedata, sldata, ob, NULL, NULL, HAIR_MATERIAL_NR, cast_shadow);
+  eevee_hair_cache_populate(vedata, sldata, ob, NULL, NULL, CURVES_MATERIAL_NR, cast_shadow);
 }
 
 void EEVEE_materials_cache_finish(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_Data *vedata)

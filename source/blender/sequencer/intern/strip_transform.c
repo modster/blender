@@ -13,11 +13,9 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * - Blender Foundation, 2003-2009
- * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved.
+ *           2003-2009 Blender Foundation.
+ *           2005-2006 Peter Schlaile <peter [at] schlaile [dot] de>
  */
 
 /** \file
@@ -33,6 +31,7 @@
 #include "BKE_scene.h"
 #include "BKE_sound.h"
 
+#include "SEQ_animation.h"
 #include "SEQ_effects.h"
 #include "SEQ_iterator.h"
 #include "SEQ_relations.h"
@@ -86,8 +85,6 @@ void SEQ_transform_set_right_handle_frame(Sequence *seq, int val)
   }
 }
 
-/* used so we can do a quick check for single image seq
- * since they work a bit differently to normal image seq's (during transform) */
 bool SEQ_transform_single_image_check(Sequence *seq)
 {
   return ((seq->len == 1) &&
@@ -95,7 +92,6 @@ bool SEQ_transform_single_image_check(Sequence *seq)
            ((seq->type & SEQ_TYPE_EFFECT) && SEQ_effect_get_num_inputs(seq->type) == 0)));
 }
 
-/* check if the selected seq's reference unselected seq's */
 bool SEQ_transform_seqbase_isolated_sel_check(ListBase *seqbase)
 {
   Sequence *seq;
@@ -137,10 +133,6 @@ bool SEQ_transform_seqbase_isolated_sel_check(ListBase *seqbase)
   return true;
 }
 
-/**
- * Use to impose limits when dragging/extending - so impossible situations don't happen.
- * Can't use the #SEQ_LEFTSEL and #SEQ_LEFTSEL directly because the strip may be in a meta-strip.
- */
 void SEQ_transform_handle_xlimits(Sequence *seq, int leftflag, int rightflag)
 {
   if (leftflag) {
@@ -257,7 +249,6 @@ void SEQ_transform_translate_sequence(Scene *evil_scene, Sequence *seq, int delt
   SEQ_time_update_sequence(evil_scene, seqbase, seq);
 }
 
-/* return 0 if there weren't enough space */
 bool SEQ_transform_seqbase_shuffle_ex(ListBase *seqbasep,
                                       Sequence *test,
                                       Scene *evil_scene,
@@ -393,14 +384,6 @@ bool SEQ_transform_seqbase_shuffle_time(SeqCollection *strips_to_shuffle,
   return offset ? false : true;
 }
 
-/**
- * Move strips and markers (if not locked) that start after timeline_frame by delta frames
- *
- * \param scene: Scene in which strips are located
- * \param seqbase: ListBase in which strips are located
- * \param delta: offset in frames to be applied
- * \param timeline_frame: frame on timeline from where strips are moved
- */
 void SEQ_transform_offset_after_frame(Scene *scene,
                                       ListBase *seqbase,
                                       const int delta,
@@ -436,14 +419,6 @@ void SEQ_image_transform_mirror_factor_get(const Sequence *seq, float r_mirror[2
   }
 }
 
-/**
- * Get strip transform origin offset from image center
- * NOTE: This function does not apply axis mirror.
- *
- * \param scene: Scene in which strips are located
- * \param seq: Sequence to calculate image transform origin
- * \param r_origin: return value
- */
 void SEQ_image_transform_origin_offset_pixelspace_get(const Scene *scene,
                                                       const Sequence *seq,
                                                       float r_origin[2])
@@ -523,15 +498,6 @@ static void seq_image_transform_quad_get_ex(const Scene *scene,
   }
 }
 
-/**
- * Get 4 corner points of strip image, optionally without rotation component applied.
- * Corner vectors are in viewport space.
- *
- * \param scene: Scene in which strips are located
- * \param seq: Sequence to calculate transformed image quad
- * \param apply_rotation: Apply sequence rotation transform to the quad
- * \param r_quad: array of 4 2D vectors
- */
 void SEQ_image_transform_quad_get(const Scene *scene,
                                   const Sequence *seq,
                                   bool apply_rotation,
@@ -540,13 +506,6 @@ void SEQ_image_transform_quad_get(const Scene *scene,
   seq_image_transform_quad_get_ex(scene, seq, apply_rotation, r_quad);
 }
 
-/**
- * Get 4 corner points of strip image. Corner vectors are in viewport space.
- *
- * \param scene: Scene in which strips are located
- * \param seq: Sequence to calculate transformed image quad
- * \param r_quad: array of 4 2D vectors
- */
 void SEQ_image_transform_final_quad_get(const Scene *scene,
                                         const Sequence *seq,
                                         float r_quad[4][2])

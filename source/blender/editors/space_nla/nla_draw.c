@@ -65,9 +65,6 @@
 
 /* Action-Line ---------------------- */
 
-/* get colors for drawing Action-Line
- * NOTE: color returned includes fine-tuned alpha!
- */
 void nla_action_get_color(AnimData *adt, bAction *act, float color[4])
 {
   if (adt && (adt->flag & ADT_NLA_EDIT_ON)) {
@@ -327,7 +324,7 @@ static void nla_draw_strip_curves(NlaStrip *strip, float yminc, float ymaxc, uin
   GPU_line_smooth(true);
   GPU_blend(GPU_BLEND_ALPHA);
 
-  /* Fully opaque line on selected strips.  */
+  /* Fully opaque line on selected strips. */
   if (strip->flag & NLASTRIP_FLAG_SELECT) {
     /* TODO: Use theme setting. */
     immUniformColor3f(1.0f, 1.0f, 1.0f);

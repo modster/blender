@@ -135,7 +135,6 @@ static void draw_render_info(
   }
 }
 
-/* used by node view too */
 void ED_image_draw_info(Scene *scene,
                         ARegion *region,
                         bool color_manage,
@@ -592,7 +591,7 @@ float ED_space_image_zoom_level(const View2D *v2d, const int grid_dimension)
    * - Default grid size on startup, which is 256x256 pixels
    * - How blend factor for grid lines is set up in the fragment shader `grid_frag.glsl`. */
   float zoom_factor;
-  zoom_factor = (xzoom + yzoom) / 2.0f; /* Average for accuracy.  */
+  zoom_factor = (xzoom + yzoom) / 2.0f; /* Average for accuracy. */
   zoom_factor *= 256.0f / (powf(grid_dimension, 2));
   return zoom_factor;
 }
@@ -614,11 +613,6 @@ void ED_space_image_grid_steps(SpaceImage *sima,
   }
 }
 
-/**
- * Calculate the increment snapping value for UV/image editor based on the zoom factor
- * The code in here (except the offset part) is used in `grid_frag.glsl` (see `grid_res`) for
- * drawing the grid overlay for the UV/Image editor.
- */
 float ED_space_image_increment_snap_value(const int grid_dimesnions,
                                           const float grid_steps[SI_GRID_STEPS_LEN],
                                           const float zoom_factor)

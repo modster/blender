@@ -44,30 +44,25 @@ const char *BLT_translate_do_iface(const char *msgctxt, const char *msgid);
 const char *BLT_translate_do_tooltip(const char *msgctxt, const char *msgid);
 const char *BLT_translate_do_new_dataname(const char *msgctxt, const char *msgid);
 
+/**
+ * Note that "lang" here is the _output_ display language. We used to restrict
+ * IME for keyboard _input_ language because our multilingual font was only used
+ * when some output languages were selected. That font is used all the time now.
+ */
 bool BLT_lang_is_ime_supported(void);
 
 /* The "translation-marker" macro. */
 #define N_(msgid) msgid
 #define CTX_N_(context, msgid) msgid
 
-/* Those macros should be used everywhere in UI code. */
-#ifdef WITH_INTERNATIONAL
+/* These macros should be used everywhere in UI code. */
 /*#  define _(msgid) BLT_gettext(msgid) */
-#  define IFACE_(msgid) BLT_translate_do_iface(NULL, msgid)
-#  define TIP_(msgid) BLT_translate_do_tooltip(NULL, msgid)
-#  define DATA_(msgid) BLT_translate_do_new_dataname(NULL, msgid)
-#  define CTX_IFACE_(context, msgid) BLT_translate_do_iface(context, msgid)
-#  define CTX_TIP_(context, msgid) BLT_translate_do_tooltip(context, msgid)
-#  define CTX_DATA_(context, msgid) BLT_translate_do_new_dataname(context, msgid)
-#else
-/*#  define _(msgid) msgid */
-#  define IFACE_(msgid) msgid
-#  define TIP_(msgid) msgid
-#  define DATA_(msgid) msgid
-#  define CTX_IFACE_(context, msgid) ((void)(0 ? (context) : 0), msgid)
-#  define CTX_TIP_(context, msgid) ((void)(0 ? (context) : 0), msgid)
-#  define CTX_DATA_(context, msgid) ((void)(0 ? (context) : 0), msgid)
-#endif
+#define IFACE_(msgid) BLT_translate_do_iface(NULL, msgid)
+#define TIP_(msgid) BLT_translate_do_tooltip(NULL, msgid)
+#define DATA_(msgid) BLT_translate_do_new_dataname(NULL, msgid)
+#define CTX_IFACE_(context, msgid) BLT_translate_do_iface(context, msgid)
+#define CTX_TIP_(context, msgid) BLT_translate_do_tooltip(context, msgid)
+#define CTX_DATA_(context, msgid) BLT_translate_do_new_dataname(context, msgid)
 
 /* Helper macro, when we want to define a same msgid for multiple msgctxt...
  * Does nothing in C, but is "parsed" by our i18n py tools.
@@ -116,7 +111,7 @@ bool BLT_lang_is_ime_supported(void);
 #define BLT_I18NCONTEXT_ID_CURVE "Curve"
 #define BLT_I18NCONTEXT_ID_FREESTYLELINESTYLE "FreestyleLineStyle"
 #define BLT_I18NCONTEXT_ID_GPENCIL "GPencil"
-#define BLT_I18NCONTEXT_ID_HAIR "Hair"
+#define BLT_I18NCONTEXT_ID_CURVES "Curves"
 #define BLT_I18NCONTEXT_ID_ID "ID"
 #define BLT_I18NCONTEXT_ID_IMAGE "Image"
 // #define BLT_I18NCONTEXT_ID_IPO "Ipo" /* DEPRECATED */
@@ -178,7 +173,7 @@ typedef struct {
         BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_CURVE, "id_curve"), \
         BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_FREESTYLELINESTYLE, "id_fs_linestyle"), \
         BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_GPENCIL, "id_gpencil"), \
-        BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_HAIR, "id_hair"), \
+        BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_CURVES, "id_curves"), \
         BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_ID, "id_id"), \
         BLT_I18NCONTEXTS_ITEM( \
             BLT_I18NCONTEXT_ID_IMAGE, \

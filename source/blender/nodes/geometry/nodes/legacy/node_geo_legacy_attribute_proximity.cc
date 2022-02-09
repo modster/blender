@@ -44,8 +44,8 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometryAttributeProximity *node_storage = (NodeGeometryAttributeProximity *)MEM_callocN(
-      sizeof(NodeGeometryAttributeProximity), __func__);
+  NodeGeometryAttributeProximity *node_storage = MEM_cnew<NodeGeometryAttributeProximity>(
+      __func__);
 
   node_storage->target_geometry_element = GEO_NODE_PROXIMITY_TARGET_FACES;
   node->storage = node_storage;
@@ -81,7 +81,7 @@ static void calculate_mesh_proximity(const VArray<float3> &positions,
 
     for (int i : range) {
       /* Use the distance to the last found point as upper bound to speedup the bvh lookup. */
-      nearest.dist_sq = float3::distance_squared(nearest.co, positions[i]);
+      nearest.dist_sq = math::distance_squared(float3(nearest.co), positions[i]);
 
       BLI_bvhtree_find_nearest(
           bvh_data.tree, positions[i], &nearest, bvh_data.nearest_callback, &bvh_data);
@@ -206,11 +206,11 @@ static void node_geo_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   GeometrySet geometry_set_target = params.extract_input<GeometrySet>("Target");
 
-  geometry_set = geometry_set_realize_instances(geometry_set);
+  geometry_set = geometry::realize_instances_legacy(geometry_set);
 
   /* This isn't required. This node should be rewritten to handle instances
    * for the target geometry set. However, the generic BVH API complicates this. */
-  geometry_set_target = geometry_set_realize_instances(geometry_set_target);
+  geometry_set_target = geometry::realize_instances_legacy(geometry_set_target);
 
   if (geometry_set.has<MeshComponent>()) {
     attribute_calc_proximity(
@@ -237,7 +237,7 @@ void register_node_type_geo_legacy_attribute_proximity()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_LEGACY_ATTRIBUTE_PROXIMITY, "Attribute Proximity", NODE_CLASS_ATTRIBUTE, 0);
+      &ntype, GEO_NODE_LEGACY_ATTRIBUTE_PROXIMITY, "Attribute Proximity", NODE_CLASS_ATTRIBUTE);
   node_type_init(&ntype, file_ns::node_init);
   node_type_storage(&ntype,
                     "NodeGeometryAttributeProximity",

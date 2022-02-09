@@ -1419,7 +1419,6 @@ static void pe_iterate_lengths(Scene *scene, PTCacheEdit *edit)
   BLI_task_parallel_range(0, edit->totpoint, &iter_data, iterate_lengths_iter, &settings);
 }
 
-/* set current distances to be kept between neighboring keys */
 void recalc_lengths(PTCacheEdit *edit)
 {
   POINT_P;
@@ -1437,13 +1436,12 @@ void recalc_lengths(PTCacheEdit *edit)
   }
 }
 
-/* calculate a tree for finding nearest emitter's vertice */
 void recalc_emitter_field(Depsgraph *UNUSED(depsgraph), Object *UNUSED(ob), ParticleSystem *psys)
 {
   PTCacheEdit *edit = psys->edit;
   Mesh *mesh = edit->psmd_eval->mesh_final;
   float *vec, *nor;
-  int i, totface /*, totvert*/;
+  int i, totface;
 
   if (!mesh) {
     return;
@@ -1456,7 +1454,7 @@ void recalc_emitter_field(Depsgraph *UNUSED(depsgraph), Object *UNUSED(ob), Part
   BLI_kdtree_3d_free(edit->emitter_field);
 
   totface = mesh->totface;
-  // totvert = dm->getNumVerts(dm); /* UNUSED */
+  // int totvert = dm->getNumVerts(dm); /* UNUSED */
 
   edit->emitter_cosnos = MEM_callocN(sizeof(float[6]) * totface, "emitter cosnos");
 
@@ -1465,26 +1463,28 @@ void recalc_emitter_field(Depsgraph *UNUSED(depsgraph), Object *UNUSED(ob), Part
   vec = edit->emitter_cosnos;
   nor = vec + 3;
 
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
+
   for (i = 0; i < totface; i++, vec += 6, nor += 6) {
     MFace *mface = &mesh->mface[i];
     MVert *mvert;
 
     mvert = &mesh->mvert[mface->v1];
     copy_v3_v3(vec, mvert->co);
-    copy_v3fl_v3s(nor, mvert->no);
+    copy_v3_v3(nor, vert_normals[mface->v1]);
 
     mvert = &mesh->mvert[mface->v2];
     add_v3_v3v3(vec, vec, mvert->co);
-    add_v3fl_v3fl_v3s(nor, nor, mvert->no);
+    add_v3_v3(nor, vert_normals[mface->v2]);
 
     mvert = &mesh->mvert[mface->v3];
     add_v3_v3v3(vec, vec, mvert->co);
-    add_v3fl_v3fl_v3s(nor, nor, mvert->no);
+    add_v3_v3(nor, vert_normals[mface->v3]);
 
     if (mface->v4) {
       mvert = &mesh->mvert[mface->v4];
       add_v3_v3v3(vec, vec, mvert->co);
-      add_v3fl_v3fl_v3s(nor, nor, mvert->no);
+      add_v3_v3(nor, vert_normals[mface->v4]);
 
       mul_v3_fl(vec, 0.25);
     }
@@ -5261,7 +5261,6 @@ void PARTICLE_OT_shape_cut(wmOperatorType *ot)
 /** \name Particle Edit Toggle Operator
  * \{ */
 
-/* initialize needed data for bake edit */
 void PE_create_particle_edit(
     Depsgraph *depsgraph, Scene *scene, Object *ob, PointCache *cache, ParticleSystem *psys)
 {

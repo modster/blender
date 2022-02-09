@@ -195,7 +195,7 @@ typedef struct AudioData {
 /* *************************************************************** */
 /* Render Layers */
 
-/* Render Layer */
+/** Render Layer. */
 typedef struct SceneRenderLayer {
   struct SceneRenderLayer *next, *prev;
 
@@ -323,7 +323,7 @@ typedef enum eScenePassType {
 #define RE_PASSNAME_BLOOM "BloomCol"
 #define RE_PASSNAME_VOLUME_LIGHT "VolumeDir"
 
-/* View - MultiView */
+/** View - MultiView. */
 typedef struct SceneRenderView {
   struct SceneRenderView *next, *prev;
 
@@ -563,10 +563,17 @@ typedef struct BakeData {
 
   char target;
   char save_mode;
-  char _pad[6];
+  char margin_type;
+  char _pad[5];
 
   struct Object *cage_object;
 } BakeData;
+
+/** #BakeData.margin_type (char) */
+typedef enum eBakeMarginType {
+  R_BAKE_ADJACENT_FACES = 0,
+  R_BAKE_EXTEND = 1,
+} eBakeMarginType;
 
 /** #BakeData.normal_swizzle (char) */
 typedef enum eBakeNormalSwizzle {
@@ -715,7 +722,9 @@ typedef struct RenderData {
 
   /* Bake Render options */
   short bake_mode, bake_flag;
-  short bake_filter, bake_samples;
+  short bake_margin, bake_samples;
+  short bake_margin_type;
+  char _pad9[6];
   float bake_biasdist, bake_user_scale;
 
   /* path to render output */
@@ -785,12 +794,12 @@ typedef struct RenderData {
   struct CurveMapping mblur_shutter_curve;
 } RenderData;
 
-/* RenderData.quality_flag */
+/** #RenderData.quality_flag */
 typedef enum eQualityOption {
   SCE_PERF_HQ_NORMALS = (1 << 0),
 } eQualityOption;
 
-/* RenderData.hair_type */
+/** #RenderData.hair_type */
 typedef enum eHairType {
   SCE_HAIR_SHAPE_STRAND = 0,
   SCE_HAIR_SHAPE_STRIP = 1,
@@ -799,7 +808,7 @@ typedef enum eHairType {
 /* *************************************************************** */
 /* Render Conversion/Simplification Settings */
 
-/* control render convert and shading engine */
+/** Control render convert and shading engine. */
 typedef struct RenderProfile {
   struct RenderProfile *next, *prev;
   char name[32];
@@ -829,7 +838,7 @@ typedef struct RenderProfile {
 #define STEREO_RIGHT_SUFFIX "_R"
 #define STEREO_LEFT_SUFFIX "_L"
 
-/* View3D.stereo3d_camera / View3D.multiview_eye / ImageUser.multiview_eye */
+/** #View3D.stereo3d_camera / #View3D.multiview_eye / #ImageUser.multiview_eye */
 typedef enum eStereoViews {
   STEREO_LEFT_ID = 0,
   STEREO_RIGHT_ID = 1,
@@ -861,12 +870,12 @@ typedef struct Paint_Runtime {
   char _pad[2];
 } Paint_Runtime;
 
-/* We might want to store other things here. */
+/** We might want to store other things here. */
 typedef struct PaintToolSlot {
   struct Brush *brush;
 } PaintToolSlot;
 
-/* Paint Tool Base */
+/** Paint Tool Base. */
 typedef struct Paint {
   struct Brush *brush;
 
@@ -903,7 +912,7 @@ typedef struct Paint {
 /* ------------------------------------------- */
 /* Image Paint */
 
-/* Texture/Image Editor */
+/** Texture/Image Editor. */
 typedef struct ImagePaintSettings {
   Paint paint;
 
@@ -934,7 +943,7 @@ typedef struct ImagePaintSettings {
 /* ------------------------------------------- */
 /* Particle Edit */
 
-/* Settings for a Particle Editing Brush */
+/** Settings for a Particle Editing Brush. */
 typedef struct ParticleBrushData {
   /** Common setting. */
   short size;
@@ -944,7 +953,7 @@ typedef struct ParticleBrushData {
   float strength;
 } ParticleBrushData;
 
-/* Particle Edit Mode Settings */
+/** Particle Edit Mode Settings. */
 typedef struct ParticleEditSettings {
   short flag;
   short totrekey;
@@ -971,7 +980,7 @@ typedef struct ParticleEditSettings {
 /* ------------------------------------------- */
 /* Sculpt */
 
-/* Sculpt */
+/** Sculpt. */
 typedef struct Sculpt {
   Paint paint;
 
@@ -1006,7 +1015,7 @@ typedef struct UvSculpt {
   Paint paint;
 } UvSculpt;
 
-/* grease pencil drawing brushes */
+/** Grease pencil drawing brushes. */
 typedef struct GpPaint {
   Paint paint;
   int flag;
@@ -1020,21 +1029,21 @@ enum {
   GPPAINT_FLAG_USE_VERTEXCOLOR = 1,
 };
 
-/* Grease pencil vertex paint. */
+/** Grease pencil vertex paint. */
 typedef struct GpVertexPaint {
   Paint paint;
   int flag;
   char _pad[4];
 } GpVertexPaint;
 
-/* Grease pencil sculpt paint. */
+/** Grease pencil sculpt paint. */
 typedef struct GpSculptPaint {
   Paint paint;
   int flag;
   char _pad[4];
 } GpSculptPaint;
 
-/* Grease pencil weight paint. */
+/** Grease pencil weight paint. */
 typedef struct GpWeightPaint {
   Paint paint;
   int flag;
@@ -1044,7 +1053,7 @@ typedef struct GpWeightPaint {
 /* ------------------------------------------- */
 /* Vertex Paint */
 
-/* Vertex Paint */
+/** Vertex Paint. */
 typedef struct VPaint {
   Paint paint;
   char flag;
@@ -1062,7 +1071,7 @@ enum {
 /* ------------------------------------------- */
 /* GPencil Stroke Sculpting */
 
-/* GP_Sculpt_Settings.lock_axis */
+/** #GP_Sculpt_Settings.lock_axis */
 typedef enum eGP_Lockaxis_Types {
   GP_LOCKAXIS_VIEW = 0,
   GP_LOCKAXIS_X = 1,
@@ -1071,7 +1080,7 @@ typedef enum eGP_Lockaxis_Types {
   GP_LOCKAXIS_CURSOR = 4,
 } eGP_Lockaxis_Types;
 
-/* Settings for a GPencil Speed Guide */
+/** Settings for a GPencil Speed Guide. */
 typedef struct GP_Sculpt_Guide {
   char use_guide;
   char use_snapping;
@@ -1085,7 +1094,7 @@ typedef struct GP_Sculpt_Guide {
   struct Object *reference_object;
 } GP_Sculpt_Guide;
 
-/* GPencil Stroke Sculpting Settings */
+/** GPencil Stroke Sculpting Settings. */
 typedef struct GP_Sculpt_Settings {
   /** Runtime. */
   void *paintcursor;
@@ -1134,7 +1143,7 @@ typedef enum eGP_vertex_SelectMaskFlag {
   GP_VERTEX_MASK_SELECTMODE_SEGMENT = (1 << 2),
 } eGP_Vertex_SelectMaskFlag;
 
-/* Settings for GP Interpolation Operators */
+/** Settings for GP Interpolation Operators. */
 typedef struct GP_Interpolate_Settings {
   /** Custom interpolation curve (for use with GP_IPO_CURVEMAP). */
   struct CurveMapping *custom_ipo;
@@ -1255,7 +1264,7 @@ typedef struct UnifiedPaintSettings {
   struct ColorSpace *colorspace;
 } UnifiedPaintSettings;
 
-/* UnifiedPaintSettings.flag */
+/** #UnifiedPaintSettings.flag */
 typedef enum {
   UNIFIED_PAINT_SIZE = (1 << 0),
   UNIFIED_PAINT_ALPHA = (1 << 1),
@@ -1313,7 +1322,7 @@ enum {
 /* *************************************************************** */
 /* Stats */
 
-/* Stats for Meshes */
+/** Stats for Meshes. */
 typedef struct MeshStatVis {
   char type;
   char _pad1[2];
@@ -1341,8 +1350,10 @@ typedef struct SequencerToolSettings {
   short snap_flag;
   /* eSeqOverlapMode */
   int overlap_mode;
-  /** When there are many snap points, 0-1 range corresponds to resolution from boundbox to all
-   * possible snap points. */
+  /**
+   * When there are many snap points,
+   * 0-1 range corresponds to resolution from bound-box to all possible snap points.
+   */
   int snap_distance;
   int pivot_point;
 } SequencerToolSettings;
@@ -1570,8 +1581,8 @@ typedef struct PhysicsSettings {
   char _pad0[4];
 } PhysicsSettings;
 
-/* ------------------------------------------- */
-/* Safe Area options used in Camera View & Sequencer
+/**
+ * Safe Area options used in Camera View & Sequencer.
  */
 typedef struct DisplaySafeAreas {
   /* each value represents the (x,y) margins as a multiplier.
@@ -1587,8 +1598,9 @@ typedef struct DisplaySafeAreas {
   float action_center[2];
 } DisplaySafeAreas;
 
-/* ------------------------------------------- */
-/* Scene Display - used for store scene specific display settings for the 3d view */
+/**
+ * Scene Display - used for store scene specific display settings for the 3d view.
+ */
 typedef struct SceneDisplay {
   /** Light direction for shadows/highlight. */
   float light_direction[3];

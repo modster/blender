@@ -71,8 +71,8 @@ struct Scene;
 struct Simulation;
 struct Speaker;
 struct Tex;
-struct ViewLayer;
 struct VFont;
+struct ViewLayer;
 struct World;
 struct bAction;
 struct bArmature;
@@ -216,8 +216,6 @@ class DepsgraphRelationBuilder : public DepsgraphBuilder {
                                 Object *object,
                                 Collection *collection);
   virtual void build_object(Object *object);
-  virtual void build_object_proxy_from(Object *object);
-  virtual void build_object_proxy_group(Object *object);
   virtual void build_object_from_layer_relations(Object *object);
   virtual void build_object_data(Object *object);
   virtual void build_object_data_camera(Object *object);
@@ -273,7 +271,6 @@ class DepsgraphRelationBuilder : public DepsgraphBuilder {
                                      const bPoseChannel *rootchan,
                                      const RootPChanMap *root_map);
   virtual void build_rig(Object *object);
-  virtual void build_proxy_rig(Object *object);
   virtual void build_shapekeys(Key *key);
   virtual void build_armature(bArmature *armature);
   virtual void build_armature_bones(ListBase *bones);
@@ -299,7 +296,7 @@ class DepsgraphRelationBuilder : public DepsgraphBuilder {
   virtual void build_scene_speakers(Scene *scene, ViewLayer *view_layer);
   virtual void build_vfont(VFont *vfont);
 
-  virtual void build_nested_datablock(ID *owner, ID *id);
+  virtual void build_nested_datablock(ID *owner, ID *id, bool flush_cow_changes);
   virtual void build_nested_nodetree(ID *owner, bNodeTree *ntree);
   virtual void build_nested_shapekey(ID *owner, Key *key);
 

@@ -36,6 +36,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_customdata.h"
+#include "BKE_mesh.h"
 
 /* NOTE: for now only UVs and Vertex Colors are supported for streaming.
  * Although Alembic only allows for a single UV layer per {I|O}Schema, and does
@@ -253,7 +254,8 @@ static void write_mcol(const OCompoundProperty &prop,
 
 void write_generated_coordinates(const OCompoundProperty &prop, CDStreamConfig &config)
 {
-  const void *customdata = CustomData_get_layer(&config.mesh->vdata, CD_ORCO);
+  Mesh *mesh = config.mesh;
+  const void *customdata = CustomData_get_layer(&mesh->vdata, CD_ORCO);
   if (customdata == nullptr) {
     /* Data not available, so don't even bother creating an Alembic property for it. */
     return;
@@ -267,6 +269,11 @@ void write_generated_coordinates(const OCompoundProperty &prop, CDStreamConfig &
     copy_yup_from_zup(orco_yup, orcodata[vertex_idx]);
     coords[vertex_idx].setValue(orco_yup[0], orco_yup[1], orco_yup[2]);
   }
+
+  /* ORCOs are always stored in the normalized 0..1 range in Blender, but Alembic stores them
+   * unnormalized, so we need to unnormalize (invert transform) them. */
+  BKE_mesh_orco_verts_transform(
+      mesh, reinterpret_cast<float(*)[3]>(&coords[0]), mesh->totvert, true);
 
   if (!config.abc_orco.valid()) {
     /* Create the Alembic property and keep a reference so future frames can reuse it. */
@@ -534,22 +541,33 @@ void read_generated_coordinates(const ICompoundProperty &prop,
   }
 
   IV3fGeomParam::Sample sample = param.getExpandedValue(iss);
-  Alembic::AbcGeom::V3fArraySamplePtr abc_ocro = sample.getVals();
-  const size_t totvert = abc_ocro.get()->size();
+  Alembic::AbcGeom::V3fArraySamplePtr abc_orco = sample.getVals();
+  const size_t totvert = abc_orco.get()->size();
+  Mesh *mesh = config.mesh;
+
+  if (totvert != mesh->totvert) {
+    /* Either the data is somehow corrupted, or we have a dynamic simulation where only the ORCOs
+     * for the first frame were exported. */
+    return;
+  }
 
   void *cd_data;
-  if (CustomData_has_layer(&config.mesh->vdata, CD_ORCO)) {
-    cd_data = CustomData_get_layer(&config.mesh->vdata, CD_ORCO);
+  if (CustomData_has_layer(&mesh->vdata, CD_ORCO)) {
+    cd_data = CustomData_get_layer(&mesh->vdata, CD_ORCO);
   }
   else {
-    cd_data = CustomData_add_layer(&config.mesh->vdata, CD_ORCO, CD_CALLOC, nullptr, totvert);
+    cd_data = CustomData_add_layer(&mesh->vdata, CD_ORCO, CD_CALLOC, nullptr, totvert);
   }
 
   float(*orcodata)[3] = static_cast<float(*)[3]>(cd_data);
   for (int vertex_idx = 0; vertex_idx < totvert; ++vertex_idx) {
-    const Imath::V3f &abc_coords = (*abc_ocro)[vertex_idx];
+    const Imath::V3f &abc_coords = (*abc_orco)[vertex_idx];
     copy_zup_from_yup(orcodata[vertex_idx], abc_coords.getValue());
   }
+
+  /* ORCOs are always stored in the normalized 0..1 range in Blender, but Alembic stores them
+   * unnormalized, so we need to normalize them. */
+  BKE_mesh_orco_verts_transform(mesh, orcodata, mesh->totvert, false);
 }
 
 void read_custom_data(const std::string &iobject_full_name,
@@ -591,12 +609,6 @@ void read_custom_data(const std::string &iobject_full_name,
   }
 }
 
-/* UVs can be defined per-loop (one value per vertex per face), or per-vertex (one value per
- * vertex). The first case is the most common, as this is the standard way of storing this data
- * given that some vertices might be on UV seams and have multiple possible UV coordinates; the
- * second case can happen when the mesh is split according to the UV islands, in which case storing
- * a single UV value per vertex allows to deduplicate data and thus to reduce the file size since
- * vertices are guaranteed to only have a single UV coordinate. */
 AbcUvScope get_uv_scope(const Alembic::AbcGeom::GeometryScope scope,
                         const CDStreamConfig &config,
                         const Alembic::AbcGeom::UInt32ArraySamplePtr &indices)
@@ -608,7 +620,7 @@ AbcUvScope get_uv_scope(const Alembic::AbcGeom::GeometryScope scope,
   /* kVaryingScope is sometimes used for vertex scopes as the values vary across the vertices. To
    * be sure, one has to check the size of the data against the number of vertices, as it could
    * also be a varying attribute across the faces (i.e. one value per face). */
-  if ((scope == kVaryingScope || scope == kVertexScope) && indices->size() == config.totvert) {
+  if ((ELEM(scope, kVaryingScope, kVertexScope)) && indices->size() == config.totvert) {
     return ABC_UV_SCOPE_VERTEX;
   }
 

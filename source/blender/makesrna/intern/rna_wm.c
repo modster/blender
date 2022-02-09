@@ -142,9 +142,10 @@ static const EnumPropertyItem event_ndof_type_items[] = {
 };
 #endif /* RNA_RUNTIME */
 
-/* not returned: CAPSLOCKKEY, UNKNOWNKEY */
 const EnumPropertyItem rna_enum_event_type_items[] = {
-    /* Note we abuse 'tooltip' message here to store a 'compact' form of some (too) long names. */
+    /* - Note we abuse 'tooltip' message here to store a 'compact' form of some (too) long names.
+     * - Intentionally excluded: #CAPSLOCKKEY, #UNKNOWNKEY.
+     */
     {0, "NONE", 0, "", ""},
     {LEFTMOUSE, "LEFTMOUSE", 0, "Left Mouse", "LMB"},
     {MIDDLEMOUSE, "MIDDLEMOUSE", 0, "Middle Mouse", "MMB"},
@@ -964,7 +965,7 @@ static void rna_wmKeyMapItem_keymodifier_set(PointerRNA *ptr, int value)
   if (value == EVT_ESCKEY) {
     /* pass */
   }
-  else if (value >= EVT_AKEY) {
+  else if (ISKEYBOARD(value) && !ISKEYMODIFIER(value)) {
     kmi->keymodifier = value;
   }
   else {
@@ -2174,7 +2175,8 @@ static void rna_def_event(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Mouse Previous Y Position", "The window relative vertical location of the mouse");
 
-  prop = RNA_def_property(srna, "pressure", PROP_FLOAT, PROP_NONE);
+  prop = RNA_def_property(srna, "pressure", PROP_FLOAT, PROP_FACTOR);
+  RNA_def_property_float_default(prop, 1.0f);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_float_funcs(prop, "rna_Event_pressure_get", NULL, NULL);
   RNA_def_property_ui_text(

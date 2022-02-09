@@ -168,7 +168,7 @@ static void rna_ImageUser_update(Main *bmain, Scene *scene, PointerRNA *ptr)
   if (id) {
     if (GS(id->name) == ID_NT) {
       /* Special update for nodetrees to find parent datablock. */
-      ED_node_tag_update_nodetree(bmain, (bNodeTree *)id, NULL);
+      ED_node_tree_propagate_change(NULL, bmain, NULL);
     }
     else {
       /* Update material or texture for render preview. */
@@ -1107,7 +1107,7 @@ static void rna_def_image(BlenderRNA *brna)
       prop, "Duration", "Duration (in frames) of the image (1 when not a video/sequence)");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
-  /* NOTE about pixels/channels/is_float:
+  /* NOTE: About pixels/channels/is_float:
    * These properties describe how the image is stored internally (inside of ImBuf),
    * not how it was saved to disk or how it'll be saved on disk.
    */

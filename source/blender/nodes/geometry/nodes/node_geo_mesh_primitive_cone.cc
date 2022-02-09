@@ -676,8 +676,6 @@ static Mesh *create_vertex_mesh()
   /* Returns a mesh with a single vertex at the origin. */
   Mesh *mesh = BKE_mesh_new_nomain(1, 0, 0, 0, 0);
   copy_v3_fl3(mesh->mvert[0].co, 0.0f, 0.0f, 0.0f);
-  const short up[3] = {0, 0, SHRT_MAX};
-  copy_v3_v3_short(mesh->mvert[0].no, up);
   return mesh;
 }
 
@@ -720,14 +718,14 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
   calculate_cone_uvs(mesh, config);
   calculate_selection_outputs(mesh, config, attribute_outputs);
 
-  BKE_mesh_normals_tag_dirty(mesh);
-
   return mesh;
 }
 
 }  // namespace blender::nodes
 
 namespace blender::nodes::node_geo_mesh_primitive_cone_cc {
+
+NODE_STORAGE_FUNCS(NodeGeometryMeshCone)
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
@@ -768,8 +766,7 @@ static void node_declare(NodeDeclarationBuilder &b)
 
 static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometryMeshCone *node_storage = (NodeGeometryMeshCone *)MEM_callocN(
-      sizeof(NodeGeometryMeshCone), __func__);
+  NodeGeometryMeshCone *node_storage = MEM_cnew<NodeGeometryMeshCone>(__func__);
 
   node_storage->fill_type = GEO_NODE_MESH_CIRCLE_FILL_NGON;
 
@@ -782,10 +779,9 @@ static void node_update(bNodeTree *ntree, bNode *node)
   bNodeSocket *rings_socket = vertices_socket->next;
   bNodeSocket *fill_subdiv_socket = rings_socket->next;
 
-  const NodeGeometryMeshCone &storage = *(const NodeGeometryMeshCone *)node->storage;
-  const GeometryNodeMeshCircleFillType fill_type =
-      static_cast<const GeometryNodeMeshCircleFillType>(storage.fill_type);
-  const bool has_fill = fill_type != GEO_NODE_MESH_CIRCLE_FILL_NONE;
+  const NodeGeometryMeshCone &storage = node_storage(*node);
+  const GeometryNodeMeshCircleFillType fill = (GeometryNodeMeshCircleFillType)storage.fill_type;
+  const bool has_fill = fill != GEO_NODE_MESH_CIRCLE_FILL_NONE;
   nodeSetSocketAvailability(ntree, fill_subdiv_socket, has_fill);
 }
 
@@ -798,10 +794,8 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  const bNode &node = params.node();
-  const NodeGeometryMeshCone &storage = *(const NodeGeometryMeshCone *)node.storage;
-  const GeometryNodeMeshCircleFillType fill_type = (const GeometryNodeMeshCircleFillType)
-                                                       storage.fill_type;
+  const NodeGeometryMeshCone &storage = node_storage(params.node());
+  const GeometryNodeMeshCircleFillType fill = (GeometryNodeMeshCircleFillType)storage.fill_type;
 
   const int circle_segments = params.extract_input<int>("Vertices");
   if (circle_segments < 3) {
@@ -817,7 +811,7 @@ static void node_geo_exec(GeoNodeExecParams params)
     return;
   }
 
-  const bool no_fill = fill_type == GEO_NODE_MESH_CIRCLE_FILL_NONE;
+  const bool no_fill = fill == GEO_NODE_MESH_CIRCLE_FILL_NONE;
   const int fill_segments = no_fill ? 1 : params.extract_input<int>("Fill Segments");
   if (fill_segments < 1) {
     params.error_message_add(NodeWarningType::Info, TIP_("Fill Segments must be at least 1"));
@@ -846,7 +840,7 @@ static void node_geo_exec(GeoNodeExecParams params)
                                             circle_segments,
                                             side_segments,
                                             fill_segments,
-                                            fill_type,
+                                            fill,
                                             attribute_outputs);
 
   /* Transform the mesh so that the base of the cone is at the origin. */
@@ -880,7 +874,7 @@ void register_node_type_geo_mesh_primitive_cone()
 
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_MESH_PRIMITIVE_CONE, "Cone", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_MESH_PRIMITIVE_CONE, "Cone", NODE_CLASS_GEOMETRY);
   node_type_init(&ntype, file_ns::node_init);
   node_type_update(&ntype, file_ns::node_update);
   node_type_storage(

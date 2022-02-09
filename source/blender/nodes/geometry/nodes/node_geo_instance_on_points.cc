@@ -36,7 +36,8 @@ static void node_declare(NodeDeclarationBuilder &b)
       .description(N_("Geometry that is instanced on the points"));
   b.add_input<decl::Bool>(N_("Pick Instance"))
       .supports_field()
-      .description("Place different instances on different points");
+      .description(N_("Choose instances from the \"Instance\" input at each point instead of "
+                      "instancing the entire geometry"));
   b.add_input<decl::Int>(N_("Instance Index"))
       .implicit_field()
       .description(N_(
@@ -65,12 +66,24 @@ static void add_instances_from_component(
   const AttributeDomain domain = ATTR_DOMAIN_POINT;
   const int domain_size = src_component.attribute_domain_size(domain);
 
+  VArray<bool> pick_instance;
+  VArray<int> indices;
+  VArray<float3> rotations;
+  VArray<float3> scales;
+
   GeometryComponentFieldContext field_context{src_component, domain};
   const Field<bool> selection_field = params.get_input<Field<bool>>("Selection");
-  fn::FieldEvaluator selection_evaluator{field_context, domain_size};
-  selection_evaluator.add(selection_field);
-  selection_evaluator.evaluate();
-  const IndexMask selection = selection_evaluator.get_evaluated_as_mask(0);
+  fn::FieldEvaluator evaluator{field_context, domain_size};
+  evaluator.set_selection(selection_field);
+  /* The evaluator could use the component's stable IDs as a destination directly, but only the
+   * selected indices should be copied. */
+  evaluator.add(params.get_input<Field<bool>>("Pick Instance"), &pick_instance);
+  evaluator.add(params.get_input<Field<int>>("Instance Index"), &indices);
+  evaluator.add(params.get_input<Field<float3>>("Rotation"), &rotations);
+  evaluator.add(params.get_input<Field<float3>>("Scale"), &scales);
+  evaluator.evaluate();
+
+  const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
 
   /* The initial size of the component might be non-zero when this function is called for multiple
    * component types. */
@@ -82,19 +95,6 @@ static void add_instances_from_component(
                                                                                   select_len);
   MutableSpan<float4x4> dst_transforms = dst_component.instance_transforms().slice(start_len,
                                                                                    select_len);
-
-  FieldEvaluator field_evaluator{field_context, domain_size};
-  VArray<bool> pick_instance;
-  VArray<int> indices;
-  VArray<float3> rotations;
-  VArray<float3> scales;
-  /* The evaluator could use the component's stable IDs as a destination directly, but only the
-   * selected indices should be copied. */
-  field_evaluator.add(params.get_input<Field<bool>>("Pick Instance"), &pick_instance);
-  field_evaluator.add(params.get_input<Field<int>>("Instance Index"), &indices);
-  field_evaluator.add(params.get_input<Field<float3>>("Rotation"), &rotations);
-  field_evaluator.add(params.get_input<Field<float3>>("Scale"), &scales);
-  field_evaluator.evaluate();
 
   VArray<float3> positions = src_component.attribute_get_for_read<float3>(
       "position", domain, {0, 0, 0});
@@ -158,17 +158,6 @@ static void add_instances_from_component(
     }
   });
 
-  VArray<int> ids = src_component
-                        .attribute_try_get_for_read("id", ATTR_DOMAIN_POINT, CD_PROP_INT32)
-                        .typed<int>();
-  if (ids) {
-    VArray_Span<int> ids_span{ids};
-    MutableSpan<int> dst_ids = dst_component.instance_ids_ensure();
-    for (const int64_t i : selection.index_range()) {
-      dst_ids[i] = ids_span[selection[i]];
-    }
-  }
-
   if (pick_instance.is_single()) {
     if (pick_instance.get_internal_single()) {
       if (instance.has_realized_data()) {
@@ -180,7 +169,7 @@ static void add_instances_from_component(
   }
 
   bke::CustomDataAttributes &instance_attributes = dst_component.attributes();
-  for (const auto &item : attributes_to_propagate.items()) {
+  for (const auto item : attributes_to_propagate.items()) {
     const AttributeIDRef &attribute_id = item.key;
     const AttributeKind attribute_kind = item.value;
 
@@ -271,7 +260,7 @@ void register_node_type_geo_instance_on_points()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_INSTANCE_ON_POINTS, "Instance on Points", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_INSTANCE_ON_POINTS, "Instance on Points", NODE_CLASS_GEOMETRY);
   ntype.declare = file_ns::node_declare;
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   nodeRegisterType(&ntype);

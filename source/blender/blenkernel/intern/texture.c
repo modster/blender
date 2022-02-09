@@ -67,6 +67,8 @@
 #include "BKE_scene.h"
 #include "BKE_texture.h"
 
+#include "NOD_texture.h"
+
 #include "RE_texture.h"
 
 #include "BLO_read_write.h"
@@ -232,7 +234,6 @@ IDTypeInfo IDType_ID_TE = {
     .lib_override_apply_post = NULL,
 };
 
-/* Utils for all IDs using those texture slots. */
 void BKE_texture_mtex_foreach_id(LibraryForeachIDData *data, MTex *mtex)
 {
   BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, mtex->object, IDWALK_CB_NOP);
@@ -414,7 +415,6 @@ MTex *BKE_texture_mtex_add(void)
   return mtex;
 }
 
-/* slot -1 for first free ID */
 MTex *BKE_texture_mtex_add_id(ID *id, int slot)
 {
   MTex **mtex_ar;
@@ -672,9 +672,6 @@ void BKE_texture_pointdensity_free(PointDensity *pd)
 }
 /* ------------------------------------------------------------------------- */
 
-/**
- * \returns true if this texture can use its #Texture.ima (even if its NULL)
- */
 bool BKE_texture_is_image_user(const struct Tex *tex)
 {
   switch (tex->type) {
@@ -686,7 +683,6 @@ bool BKE_texture_is_image_user(const struct Tex *tex)
   return false;
 }
 
-/* ------------------------------------------------------------------------- */
 bool BKE_texture_dependsOnTime(const struct Tex *texture)
 {
   if (texture->ima && BKE_image_is_animated(texture->ima)) {
@@ -727,10 +723,10 @@ void BKE_texture_get_value_ex(const Scene *scene,
    * if the texture didn't give an RGB value, copy the intensity across
    */
   if (result_type & TEX_RGB) {
-    texres->tin = (1.0f / 3.0f) * (texres->tr + texres->tg + texres->tb);
+    texres->tin = (1.0f / 3.0f) * (texres->trgba[0] + texres->trgba[1] + texres->trgba[2]);
   }
   else {
-    copy_v3_fl(&texres->tr, texres->tin);
+    copy_v3_fl(texres->trgba, texres->tin);
   }
 }
 
@@ -760,7 +756,6 @@ static void texture_nodes_fetch_images_for_pool(Tex *texture,
   }
 }
 
-/* Make sure all images used by texture are loaded into pool. */
 void BKE_texture_fetch_images_for_pool(Tex *texture, struct ImagePool *pool)
 {
   if (texture->nodetree != NULL) {

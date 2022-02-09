@@ -140,6 +140,13 @@ typedef enum {
   // GHOST_kWindowStateUnModified,
 } GHOST_TWindowState;
 
+typedef enum {
+  GHOST_kConsoleWindowStateHide = 0,
+  GHOST_kConsoleWindowStateShow,
+  GHOST_kConsoleWindowStateToggle,
+  GHOST_kConsoleWindowStateHideForNonConsoleLaunch
+} GHOST_TConsoleWindowState;
+
 typedef enum { GHOST_kWindowOrderTop = 0, GHOST_kWindowOrderBottom } GHOST_TWindowOrder;
 
 typedef enum {
@@ -496,8 +503,6 @@ typedef struct {
   int target_start;
   /** Represents the position of the end of the selection */
   int target_end;
-  /** custom temporal data */
-  GHOST_TUserDataPtr tmp;
 } GHOST_TEventImeData;
 
 typedef struct {

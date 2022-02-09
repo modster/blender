@@ -39,6 +39,8 @@
 /* XXX needs access to the file list, should all be done via the asset system in future. */
 #include "ED_fileselect.h"
 
+#include "BLT_translation.h"
+
 #include "RNA_access.h"
 #include "RNA_define.h"
 
@@ -342,8 +344,8 @@ static bool asset_clear_poll(bContext *C)
   IDVecStats ctx_stats = asset_operation_get_id_vec_stats_from_context(C);
 
   if (!ctx_stats.has_asset) {
-    const char *msg_single = "Data-block is not marked as asset";
-    const char *msg_multiple = "No data-block selected that is marked as asset";
+    const char *msg_single = TIP_("Data-block is not marked as asset");
+    const char *msg_multiple = TIP_("No data-block selected that is marked as asset");
     CTX_wm_operator_poll_msg_set(C, ctx_stats.is_single ? msg_single : msg_multiple);
     return false;
   }
@@ -365,8 +367,8 @@ static char *asset_clear_get_description(struct bContext *UNUSED(C),
   }
 
   return BLI_strdup(
-      "Delete all asset metadata, turning the selected asset data-blocks back into normal "
-      "data-blocks, and set Fake User to ensure the data-blocks will still be saved");
+      TIP_("Delete all asset metadata, turning the selected asset data-blocks back into normal "
+           "data-blocks, and set Fake User to ensure the data-blocks will still be saved"));
 }
 
 static void ASSET_OT_clear(wmOperatorType *ot)
@@ -637,7 +639,7 @@ static bool asset_catalogs_save_poll(bContext *C)
   }
 
   const Main *bmain = CTX_data_main(C);
-  if (!bmain->name[0]) {
+  if (!bmain->filepath[0]) {
     CTX_wm_operator_poll_msg_set(C, "Cannot save asset catalogs before the Blender file is saved");
     return false;
   }
@@ -703,7 +705,7 @@ static bool asset_bundle_install_poll(bContext *C)
 
   /* Check whether this file is already located inside any asset library. */
   const struct bUserAssetLibrary *asset_lib = BKE_preferences_asset_library_containing_path(
-      &U, bmain->name);
+      &U, bmain->filepath);
   if (asset_lib) {
     return false;
   }
@@ -779,7 +781,7 @@ static int asset_bundle_install_exec(bContext *C, wmOperator *op)
   BKE_reportf(op->reports,
               RPT_INFO,
               R"(Saved "%s" to asset library "%s")",
-              BLI_path_basename(bmain->name),
+              BLI_path_basename(bmain->filepath),
               lib->name);
   return OPERATOR_FINISHED;
 }
@@ -830,7 +832,7 @@ static void ASSET_OT_bundle_install(struct wmOperatorType *ot)
  * referenced. */
 static bool could_be_asset_bundle(const Main *bmain)
 {
-  return fnmatch("*_bundle.blend", bmain->name, FNM_CASEFOLD) == 0;
+  return fnmatch("*_bundle.blend", bmain->filepath, FNM_CASEFOLD) == 0;
 }
 
 static const bUserAssetLibrary *selected_asset_library(struct wmOperator *op)
@@ -864,7 +866,7 @@ static bool set_filepath_for_asset_lib(const Main *bmain, struct wmOperator *op)
   }
 
   /* Concatenate the filename of the current blend file. */
-  const char *blend_filename = BLI_path_basename(bmain->name);
+  const char *blend_filename = BLI_path_basename(bmain->filepath);
   if (blend_filename == nullptr || blend_filename[0] == '\0') {
     return false;
   }
@@ -934,10 +936,10 @@ static bool has_external_files(Main *bmain, struct ReportList *reports)
   BKE_reportf(
       callback_info.reports,
       RPT_ERROR,
-      "Unable to copy bundle due to %ld external dependencies; more details on the console",
-      callback_info.external_files.size());
-  printf("Unable to copy bundle due to %ld external dependencies:\n",
-         callback_info.external_files.size());
+      "Unable to copy bundle due to %zu external dependencies; more details on the console",
+      (size_t)callback_info.external_files.size());
+  printf("Unable to copy bundle due to %zu external dependencies:\n",
+         (size_t)callback_info.external_files.size());
   for (const std::string &path : callback_info.external_files) {
     printf("   \"%s\"\n", path.c_str());
   }
@@ -946,7 +948,7 @@ static bool has_external_files(Main *bmain, struct ReportList *reports)
 
 /* -------------------------------------------------------------------- */
 
-void ED_operatortypes_asset(void)
+void ED_operatortypes_asset()
 {
   WM_operatortype_append(ASSET_OT_mark);
   WM_operatortype_append(ASSET_OT_clear);

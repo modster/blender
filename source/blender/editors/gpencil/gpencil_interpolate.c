@@ -15,11 +15,11 @@
  *
  * The Original Code is Copyright (C) 2016, Blender Foundation
  * This is a new part of Blender
- * Operators for interpolating new Grease Pencil frames from existing strokes
  */
 
 /** \file
  * \ingroup edgpencil
+ * Operators for interpolating new Grease Pencil frames from existing strokes.
  */
 
 #include <math.h>
@@ -336,7 +336,7 @@ static void gpencil_interpolate_smooth_stroke(bGPDstroke *gps,
   float reduce = 0.0f;
   for (int r = 0; r < smooth_steps; r++) {
     for (int i = 0; i < gps->totpoints - 1; i++) {
-      BKE_gpencil_stroke_smooth_point(gps, i, smooth_factor - reduce);
+      BKE_gpencil_stroke_smooth_point(gps, i, smooth_factor - reduce, false);
       BKE_gpencil_stroke_smooth_strength(gps, i, smooth_factor);
     }
     reduce += 0.25f; /* reduce the factor */

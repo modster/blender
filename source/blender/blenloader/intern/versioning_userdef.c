@@ -399,7 +399,6 @@ static bool keymap_item_has_invalid_wm_context_data_path(wmKeyMapItem *kmi,
   return false;
 }
 
-/* patching UserDef struct and Themes */
 void blo_do_versions_userdef(UserDef *userdef)
 {
   /* #UserDef & #Main happen to have the same struct member. */
@@ -570,8 +569,8 @@ void blo_do_versions_userdef(UserDef *userdef)
   }
 
   if (!USER_VERSION_ATLEAST(257, 0)) {
-    /* clear "AUTOKEY_FLAG_ONLYKEYINGSET" flag from userprefs,
-     * so that it doesn't linger around from old configs like a ghost */
+    /* Clear #AUTOKEY_FLAG_ONLYKEYINGSET flag from user-preferences,
+     * so that it doesn't linger around from old configurations like a ghost. */
     userdef->autokey_flag &= ~AUTOKEY_FLAG_ONLYKEYINGSET;
   }
 
@@ -974,6 +973,13 @@ void blo_do_versions_userdef(UserDef *userdef)
    */
   {
     /* Keep this block, even when empty. */
+    if (!USER_VERSION_ATLEAST(301, 7)) {
+      /* io_scene_obj directory is gone, split into io_import_obj and io_export_obj,
+       * with io_import_obj enabled by default and io_export_obj replaced by the C++ version.
+       */
+      BKE_addon_remove_safe(&userdef->addons, "io_scene_obj");
+      BKE_addon_ensure(&userdef->addons, "io_import_obj");
+    }
   }
 
   LISTBASE_FOREACH (bTheme *, btheme, &userdef->themes) {

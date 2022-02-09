@@ -15,11 +15,11 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- * Functions for writing avi-format files.
- * Added interface for generic movie support (ton)
  */
 
 /** \file
+ * Functions for writing avi-format files.
+ * Added interface for generic movie support (ton)
  * \ingroup bke
  */
 
@@ -315,7 +315,6 @@ static void context_free_avi(void *context_v)
 
 #endif /* WITH_AVI */
 
-/* similar to BKE_image_path_from_imformat() */
 void BKE_movie_filepath_get(char *string, const RenderData *rd, bool preview, const char *suffix)
 {
   bMovieHandle *mh = BKE_movie_handle_get(rd->im_format.imtype);

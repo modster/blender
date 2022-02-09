@@ -56,9 +56,10 @@ static void rna_Main_use_autopack_set(PointerRNA *UNUSED(ptr), bool value)
   }
 }
 
-static bool rna_Main_is_saved_get(PointerRNA *UNUSED(ptr))
+static bool rna_Main_is_saved_get(PointerRNA *ptr)
 {
-  return G.relbase_valid;
+  const Main *bmain = (Main *)ptr->data;
+  return (bmain->filepath[0] != '\0');
 }
 
 static bool rna_Main_is_dirty_get(PointerRNA *ptr)
@@ -76,20 +77,20 @@ static bool rna_Main_is_dirty_get(PointerRNA *ptr)
 static void rna_Main_filepath_get(PointerRNA *ptr, char *value)
 {
   Main *bmain = (Main *)ptr->data;
-  BLI_strncpy(value, bmain->name, sizeof(bmain->name));
+  BLI_strncpy(value, bmain->filepath, sizeof(bmain->filepath));
 }
 
 static int rna_Main_filepath_length(PointerRNA *ptr)
 {
   Main *bmain = (Main *)ptr->data;
-  return strlen(bmain->name);
+  return strlen(bmain->filepath);
 }
 
 #  if 0
 static void rna_Main_filepath_set(PointerRNA *ptr, const char *value)
 {
   Main *bmain = (Main *)ptr->data;
-  BLI_strncpy(bmain->name, value, sizeof(bmain->name));
+  STRNCPY(bmain->filepath, value);
 }
 #  endif
 
@@ -109,8 +110,8 @@ RNA_MAIN_LISTBASE_FUNCS_DEF(collections)
 RNA_MAIN_LISTBASE_FUNCS_DEF(curves)
 RNA_MAIN_LISTBASE_FUNCS_DEF(fonts)
 RNA_MAIN_LISTBASE_FUNCS_DEF(gpencils)
-#  ifdef WITH_HAIR_NODES
-RNA_MAIN_LISTBASE_FUNCS_DEF(hairs)
+#  ifdef WITH_NEW_CURVES_TYPE
+RNA_MAIN_LISTBASE_FUNCS_DEF(hair_curves)
 #  endif
 RNA_MAIN_LISTBASE_FUNCS_DEF(images)
 RNA_MAIN_LISTBASE_FUNCS_DEF(lattices)
@@ -128,9 +129,7 @@ RNA_MAIN_LISTBASE_FUNCS_DEF(objects)
 RNA_MAIN_LISTBASE_FUNCS_DEF(paintcurves)
 RNA_MAIN_LISTBASE_FUNCS_DEF(palettes)
 RNA_MAIN_LISTBASE_FUNCS_DEF(particles)
-#  ifdef WITH_POINT_CLOUD
 RNA_MAIN_LISTBASE_FUNCS_DEF(pointclouds)
-#  endif
 RNA_MAIN_LISTBASE_FUNCS_DEF(scenes)
 RNA_MAIN_LISTBASE_FUNCS_DEF(screens)
 RNA_MAIN_LISTBASE_FUNCS_DEF(shapekeys)
@@ -390,17 +389,24 @@ void RNA_def_main(BlenderRNA *brna)
        "Light Probes",
        "Light Probe data-blocks",
        RNA_def_main_lightprobes},
-#  ifdef WITH_HAIR_NODES
-      {"hairs", "Hair", "rna_Main_hairs_begin", "Hairs", "Hair data-blocks", RNA_def_main_hairs},
+#  ifdef WITH_NEW_CURVES_TYPE
+      /**
+       * \note The name `hair_curves` is chosen to be different than `curves`,
+       * but they are generic curve data-blocks, not just for hair.
+       */
+      {"hair_curves",
+       "Curves",
+       "rna_Main_hair_curves_begin",
+       "Hair Curves",
+       "Hair curve data-blocks",
+       RNA_def_main_hair_curves},
 #  endif
-#  ifdef WITH_POINT_CLOUD
       {"pointclouds",
        "PointCloud",
        "rna_Main_pointclouds_begin",
        "Point Clouds",
        "Point cloud data-blocks",
        RNA_def_main_pointclouds},
-#  endif
       {"volumes",
        "Volume",
        "rna_Main_volumes_begin",

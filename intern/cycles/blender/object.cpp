@@ -72,7 +72,8 @@ bool BlenderSync::object_is_geometry(BObjectInfo &b_ob_info)
 
   BL::Object::type_enum type = b_ob_info.iter_object.type();
 
-  if (type == BL::Object::type_VOLUME || type == BL::Object::type_HAIR) {
+  if (type == BL::Object::type_VOLUME || type == BL::Object::type_CURVES ||
+      type == BL::Object::type_POINTCLOUD) {
     /* Will be exported attached to mesh. */
     return true;
   }
@@ -96,7 +97,7 @@ bool BlenderSync::object_can_have_geometry(BL::Object &b_ob)
     case BL::Object::type_SURFACE:
     case BL::Object::type_META:
     case BL::Object::type_FONT:
-    case BL::Object::type_HAIR:
+    case BL::Object::type_CURVES:
     case BL::Object::type_POINTCLOUD:
     case BL::Object::type_VOLUME:
       return true;
@@ -206,7 +207,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
     return NULL;
   }
 
-  /* only interested in object that we can create meshes from */
+  /* only interested in object that we can create geometry from */
   if (!object_is_geometry(b_ob_info)) {
     return NULL;
   }
@@ -527,6 +528,17 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
 
   string absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
   procedural->set_filepath(ustring(absolute_path));
+
+  array<ustring> layers;
+  for (BL::CacheFileLayer &layer : cache_file.layers) {
+    if (layer.hide_layer()) {
+      continue;
+    }
+
+    absolute_path = blender_absolute_path(b_data, b_ob, layer.filepath());
+    layers.push_back_slow(ustring(absolute_path));
+  }
+  procedural->set_layers(layers);
 
   procedural->set_scale(cache_file.scale());
 

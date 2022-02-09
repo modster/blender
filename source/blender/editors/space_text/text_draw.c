@@ -79,10 +79,8 @@ static void text_font_end(const TextDrawContext *UNUSED(tdc))
 
 static int text_font_draw(const TextDrawContext *tdc, int x, int y, const char *str)
 {
-  int columns;
-
   BLF_position(tdc->font_id, x, y, 0);
-  columns = BLF_draw_mono(tdc->font_id, str, BLF_DRAW_STR_DUMMY_MAX, tdc->cwidth_px);
+  const int columns = BLF_draw_mono(tdc->font_id, str, BLF_DRAW_STR_DUMMY_MAX, tdc->cwidth_px);
 
   return tdc->cwidth_px * columns;
 }
@@ -90,18 +88,17 @@ static int text_font_draw(const TextDrawContext *tdc, int x, int y, const char *
 static int text_font_draw_character(const TextDrawContext *tdc, int x, int y, char c)
 {
   BLF_position(tdc->font_id, x, y, 0);
-  BLF_draw(tdc->font_id, &c, 1);
+  BLF_draw_mono(tdc->font_id, &c, 1, tdc->cwidth_px);
 
   return tdc->cwidth_px;
 }
 
-static int text_font_draw_character_utf8(const TextDrawContext *tdc, int x, int y, const char *c)
+static int text_font_draw_character_utf8(
+    const TextDrawContext *tdc, int x, int y, const char *c, const int c_len)
 {
-  int columns;
-
-  const size_t len = BLI_str_utf8_size_safe(c);
+  BLI_assert(c_len == BLI_str_utf8_size_safe(c));
   BLF_position(tdc->font_id, x, y, 0);
-  columns = BLF_draw_mono(tdc->font_id, c, len, tdc->cwidth_px);
+  const int columns = BLF_draw_mono(tdc->font_id, c, c_len, tdc->cwidth_px);
 
   return tdc->cwidth_px * columns;
 }
@@ -200,7 +197,6 @@ int wrap_width(const SpaceText *st, ARegion *region)
   return max > 8 ? max : 8;
 }
 
-/* Sets (offl, offc) for transforming (line, curs) to its wrapped position */
 void wrap_offset(
     const SpaceText *st, ARegion *region, TextLine *linein, int cursin, int *offl, int *offc)
 {
@@ -305,7 +301,6 @@ void wrap_offset(
   }
 }
 
-/* cursin - mem, offc - view */
 void wrap_offset_in_line(
     const SpaceText *st, ARegion *region, TextLine *linein, int cursin, int *offl, int *offc)
 {
@@ -465,13 +460,15 @@ static int text_draw_wrapped(const SpaceText *st,
       }
 
       /* Draw the visible portion of text on the overshot line */
-      for (a = fstart, ma = mstart; ma < mend; a++, ma += BLI_str_utf8_size_safe(str + ma)) {
+      for (a = fstart, ma = mstart; ma < mend; a++) {
         if (use_syntax) {
           if (fmt_prev != format[a]) {
             format_draw_color(tdc, fmt_prev = format[a]);
           }
         }
-        x += text_font_draw_character_utf8(tdc, x, y, str + ma);
+        const int c_len = BLI_str_utf8_size_safe(str + ma);
+        x += text_font_draw_character_utf8(tdc, x, y, str + ma, c_len);
+        ma += c_len;
         fpos++;
       }
       y -= TXT_LINE_HEIGHT(st);
@@ -493,15 +490,16 @@ static int text_draw_wrapped(const SpaceText *st,
   }
 
   /* Draw the remaining text */
-  for (a = fstart, ma = mstart; str[ma] && y > clip_min_y;
-       a++, ma += BLI_str_utf8_size_safe(str + ma)) {
+  for (a = fstart, ma = mstart; str[ma] && y > clip_min_y; a++) {
     if (use_syntax) {
       if (fmt_prev != format[a]) {
         format_draw_color(tdc, fmt_prev = format[a]);
       }
     }
 
-    x += text_font_draw_character_utf8(tdc, x, y, str + ma);
+    const int c_len = BLI_str_utf8_size_safe(str + ma);
+    x += text_font_draw_character_utf8(tdc, x, y, str + ma, c_len);
+    ma += c_len;
   }
 
   flatten_string_free(&fs);
@@ -561,8 +559,9 @@ static void text_draw(const SpaceText *st,
       if (format[a] != fmt_prev) {
         format_draw_color(tdc, fmt_prev = format[a]);
       }
-      x += text_font_draw_character_utf8(tdc, x, y, in + str_shift);
-      str_shift += BLI_str_utf8_size_safe(in + str_shift);
+      const int c_len = BLI_str_utf8_size_safe(in + str_shift);
+      x += text_font_draw_character_utf8(tdc, x, y, in + str_shift, c_len);
+      str_shift += c_len;
     }
   }
   else {
@@ -1754,8 +1753,6 @@ bool ED_text_activate_in_screen(bContext *C, Text *text)
   return false;
 }
 
-/* Moves the view to the cursor location,
- * also used to make sure the view isn't outside the file */
 void ED_text_scroll_to_cursor(SpaceText *st, ARegion *region, const bool center)
 {
   Text *text;
@@ -1823,7 +1820,6 @@ void ED_text_scroll_to_cursor(SpaceText *st, ARegion *region, const bool center)
   st->runtime.scroll_ofs_px[1] = 0;
 }
 
-/* takes an area instead of a region, use for listeners */
 void text_scroll_to_cursor__area(SpaceText *st, ScrArea *area, const bool center)
 {
   ARegion *region;
@@ -1847,9 +1843,6 @@ void text_update_cursor_moved(bContext *C)
   text_scroll_to_cursor__area(st, area, true);
 }
 
-/**
- * Takes a cursor (row, character) and returns x,y pixel coords.
- */
 bool ED_text_region_location_from_cursor(SpaceText *st,
                                          ARegion *region,
                                          const int cursor_co[2],

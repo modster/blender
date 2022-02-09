@@ -54,6 +54,7 @@ class Object;
 class ObjectManager;
 class ParticleSystemManager;
 class ParticleSystem;
+class PointCloud;
 class Procedural;
 class ProceduralManager;
 class CurveSystemManager;
@@ -93,6 +94,10 @@ class DeviceScene {
   device_vector<KernelCurveSegment> curve_segments;
 
   device_vector<uint> patches;
+
+  /* pointcloud */
+  device_vector<float4> points;
+  device_vector<uint> points_shader;
 
   /* objects */
   device_vector<KernelObject> objects;
@@ -155,6 +160,7 @@ class SceneParams {
 
   BVHType bvh_type;
   bool use_bvh_spatial_split;
+  bool use_bvh_compact_structure;
   bool use_bvh_unaligned_nodes;
   int num_bvh_time_steps;
   int hair_subdivisions;
@@ -169,6 +175,7 @@ class SceneParams {
     bvh_layout = BVH_LAYOUT_BVH2;
     bvh_type = BVH_TYPE_DYNAMIC;
     use_bvh_spatial_split = false;
+    use_bvh_compact_structure = true;
     use_bvh_unaligned_nodes = true;
     num_bvh_time_steps = 0;
     hair_subdivisions = 3;
@@ -182,6 +189,7 @@ class SceneParams {
     return !(shadingsystem == params.shadingsystem && bvh_layout == params.bvh_layout &&
              bvh_type == params.bvh_type &&
              use_bvh_spatial_split == params.use_bvh_spatial_split &&
+             use_bvh_compact_structure == params.use_bvh_compact_structure &&
              use_bvh_unaligned_nodes == params.use_bvh_unaligned_nodes &&
              num_bvh_time_steps == params.num_bvh_time_steps &&
              hair_subdivisions == params.hair_subdivisions && hair_shape == params.hair_shape &&
@@ -365,6 +373,8 @@ template<> Hair *Scene::create_node<Hair>();
 
 template<> Volume *Scene::create_node<Volume>();
 
+template<> PointCloud *Scene::create_node<PointCloud>();
+
 template<> ParticleSystem *Scene::create_node<ParticleSystem>();
 
 template<> Shader *Scene::create_node<Shader>();
@@ -378,6 +388,8 @@ template<> void Scene::delete_node_impl(Light *node);
 template<> void Scene::delete_node_impl(Mesh *node);
 
 template<> void Scene::delete_node_impl(Volume *node);
+
+template<> void Scene::delete_node_impl(PointCloud *node);
 
 template<> void Scene::delete_node_impl(Hair *node);
 

@@ -157,8 +157,9 @@ option(WITH_BLENDER "Build blender (disable to build only the blender player)" O
 mark_as_advanced(WITH_BLENDER)
 
 if(APPLE)
-  # Currently this causes a build error linking, disable.
-  set(WITH_BLENDER_THUMBNAILER OFF)
+  # In future, can be used with `quicklookthumbnailing/qlthumbnailreply` to create file
+  # thumbnails for say Finder. Turn it off for now.
+  option(WITH_BLENDER_THUMBNAILER "Build \"blender-thumbnailer\" thumbnail extraction utility" OFF)
 elseif(WIN32)
   option(WITH_BLENDER_THUMBNAILER "Build \"BlendThumb.dll\" helper for Windows explorer integration" ON)
 else()
@@ -273,11 +274,13 @@ endif()
 
 if(UNIX AND NOT APPLE)
   option(WITH_SYSTEM_GLEW "Use GLEW OpenGL wrapper library provided by the operating system" OFF)
-  option(WITH_SYSTEM_GLES "Use OpenGL ES library provided by the operating system"           ON)
+  option(WITH_SYSTEM_GLEW "Use GLEW OpenGL wrapper library provided by the operating system" OFF)
+  option(WITH_SYSTEM_FREETYPE "Use the freetype library provided by the operating system" OFF)
 else()
   # not an option for other OS's
   set(WITH_SYSTEM_GLEW OFF)
   set(WITH_SYSTEM_GLES OFF)
+  set(WITH_SYSTEM_FREETYPE OFF)
 endif()
 
 
@@ -433,30 +436,40 @@ mark_as_advanced(WITH_CYCLES_DEBUG_NAN)
 mark_as_advanced(WITH_CYCLES_NATIVE_ONLY)
 
 # NVIDIA CUDA & OptiX
-option(WITH_CYCLES_DEVICE_CUDA       "Enable Cycles NVIDIA CUDA compute support" ON)
-option(WITH_CYCLES_DEVICE_OPTIX      "Enable Cycles NVIDIA OptiX support" ON)
-mark_as_advanced(WITH_CYCLES_DEVICE_CUDA)
+if(NOT APPLE)
+  option(WITH_CYCLES_DEVICE_CUDA       "Enable Cycles NVIDIA CUDA compute support" ON)
+  option(WITH_CYCLES_DEVICE_OPTIX      "Enable Cycles NVIDIA OptiX support" ON)
+  mark_as_advanced(WITH_CYCLES_DEVICE_CUDA)
 
-option(WITH_CYCLES_CUDA_BINARIES     "Build Cycles NVIDIA CUDA binaries" OFF)
-set(CYCLES_CUDA_BINARIES_ARCH sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_61 sm_70 sm_75 sm_86 compute_75 CACHE STRING "CUDA architectures to build binaries for")
-option(WITH_CYCLES_CUBIN_COMPILER    "Build cubins with nvrtc based compiler instead of nvcc" OFF)
-option(WITH_CYCLES_CUDA_BUILD_SERIAL "Build cubins one after another (useful on machines with limited RAM)" OFF)
-option(WITH_CUDA_DYNLOAD             "Dynamically load CUDA libraries at runtime (for developers, makes cuda-gdb work)" ON)
-mark_as_advanced(CYCLES_CUDA_BINARIES_ARCH)
-mark_as_advanced(WITH_CYCLES_CUBIN_COMPILER)
-mark_as_advanced(WITH_CYCLES_CUDA_BUILD_SERIAL)
-mark_as_advanced(WITH_CUDA_DYNLOAD)
+  option(WITH_CYCLES_CUDA_BINARIES     "Build Cycles NVIDIA CUDA binaries" OFF)
+  set(CYCLES_CUDA_BINARIES_ARCH sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_61 sm_70 sm_75 sm_86 compute_75 CACHE STRING "CUDA architectures to build binaries for")
+  option(WITH_CYCLES_CUBIN_COMPILER    "Build cubins with nvrtc based compiler instead of nvcc" OFF)
+  option(WITH_CYCLES_CUDA_BUILD_SERIAL "Build cubins one after another (useful on machines with limited RAM)" OFF)
+  option(WITH_CUDA_DYNLOAD             "Dynamically load CUDA libraries at runtime (for developers, makes cuda-gdb work)" ON)
+  mark_as_advanced(CYCLES_CUDA_BINARIES_ARCH)
+  mark_as_advanced(WITH_CYCLES_CUBIN_COMPILER)
+  mark_as_advanced(WITH_CYCLES_CUDA_BUILD_SERIAL)
+  mark_as_advanced(WITH_CUDA_DYNLOAD)
+endif()
 
 # AMD HIP
-if(WIN32)
-  option(WITH_CYCLES_DEVICE_HIP        "Enable Cycles AMD HIP support" ON)
-else()
-  option(WITH_CYCLES_DEVICE_HIP        "Enable Cycles AMD HIP support" OFF)
+if(NOT APPLE)
+  if(WIN32)
+    option(WITH_CYCLES_DEVICE_HIP        "Enable Cycles AMD HIP support" ON)
+  else()
+    option(WITH_CYCLES_DEVICE_HIP        "Enable Cycles AMD HIP support" OFF)
+  endif()
+
+  option(WITH_CYCLES_HIP_BINARIES      "Build Cycles AMD HIP binaries" OFF)
+  set(CYCLES_HIP_BINARIES_ARCH gfx1010 gfx1011 gfx1012 gfx1030 gfx1031 gfx1032 gfx1034 CACHE STRING "AMD HIP architectures to build binaries for")
+  mark_as_advanced(WITH_CYCLES_DEVICE_HIP)
+  mark_as_advanced(CYCLES_HIP_BINARIES_ARCH)
 endif()
-option(WITH_CYCLES_HIP_BINARIES      "Build Cycles AMD HIP binaries" OFF)
-set(CYCLES_HIP_BINARIES_ARCH gfx1010 gfx1011 gfx1012 gfx1030 gfx1031 gfx1032 gfx1034 CACHE STRING "AMD HIP architectures to build binaries for")
-mark_as_advanced(WITH_CYCLES_DEVICE_HIP)
-mark_as_advanced(CYCLES_HIP_BINARIES_ARCH)
+
+# Apple Metal
+if(APPLE)
+  option(WITH_CYCLES_DEVICE_METAL       "Enable Cycles Apple Metal compute support" ON)
+endif()
 
 # Draw Manager
 option(WITH_DRAW_DEBUG "Add extra debug capabilities to Draw Manager" OFF)
@@ -526,12 +539,14 @@ option(WITH_OPENGL              "When off limits visibility of the opengl header
 option(WITH_GLEW_ES             "Switches to experimental copy of GLEW that has support for OpenGL ES. (temporary option for development purposes)" OFF)
 option(WITH_GL_EGL              "Use the EGL OpenGL system library instead of the platform specific OpenGL system library (CGL, glX, or WGL)"       OFF)
 option(WITH_GL_PROFILE_ES20     "Support using OpenGL ES 2.0. (through either EGL or the AGL/WGL/XGL 'es20' profile)"                               OFF)
+option(WITH_GPU_SHADER_BUILDER  "Shader builder is a developer option enabling linting on GLSL during compilation"                                  OFF)
 
 mark_as_advanced(
   WITH_OPENGL
   WITH_GLEW_ES
   WITH_GL_EGL
   WITH_GL_PROFILE_ES20
+  WITH_GPU_SHADER_BUILDER
 )
 
 if(WIN32)
@@ -549,12 +564,18 @@ if(WIN32)
   set(CPACK_INSTALL_PREFIX ${CMAKE_GENERIC_PROGRAM_FILES}/${})
 endif()
 
-# Compiler toolchain
-if(CMAKE_COMPILER_IS_GNUCC)
-  option(WITH_LINKER_GOLD "Use ld.gold linker which is usually faster than ld.bfd" ON)
-  mark_as_advanced(WITH_LINKER_GOLD)
-  option(WITH_LINKER_LLD "Use ld.lld linker which is usually faster than ld.gold" OFF)
-  mark_as_advanced(WITH_LINKER_LLD)
+# Compiler tool-chain.
+if(UNIX AND NOT APPLE)
+  if(CMAKE_COMPILER_IS_GNUCC)
+    option(WITH_LINKER_GOLD "Use ld.gold linker which is usually faster than ld.bfd" ON)
+    mark_as_advanced(WITH_LINKER_GOLD)
+    option(WITH_LINKER_LLD "Use ld.lld linker which is usually faster than ld.gold" OFF)
+    mark_as_advanced(WITH_LINKER_LLD)
+  endif()
+  if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+    option(WITH_LINKER_MOLD "Use ld.mold linker which is usually faster than ld.gold & ld.lld." OFF)
+    mark_as_advanced(WITH_LINKER_MOLD)
+  endif()
 endif()
 
 option(WITH_COMPILER_ASAN "Build and link against address sanitizer (only for Debug & RelWithDebInfo targets)." OFF)
@@ -665,7 +686,7 @@ if(WIN32 OR XCODE)
   option(IDE_GROUP_PROJECTS_IN_FOLDERS "Organize the projects according to source folder structure." ON)
   mark_as_advanced(IDE_GROUP_PROJECTS_IN_FOLDERS)
 
-  if (IDE_GROUP_PROJECTS_IN_FOLDERS)
+  if(IDE_GROUP_PROJECTS_IN_FOLDERS)
     set_property(GLOBAL PROPERTY USE_FOLDERS ON)
   endif()
 endif()
@@ -690,8 +711,11 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # Installation process.
-option(POSTINSTALL_SCRIPT "Run given CMake script after installation process" OFF)
+set(POSTINSTALL_SCRIPT "" CACHE FILEPATH "Run given CMake script after installation process")
 mark_as_advanced(POSTINSTALL_SCRIPT)
+
+set(POSTCONFIGURE_SCRIPT "" CACHE FILEPATH "Run given CMake script as the last step of CMake configuration")
+mark_as_advanced(POSTCONFIGURE_SCRIPT)
 
 # end option(...)
 
@@ -846,7 +870,7 @@ if(WITH_AUDASPACE)
 endif()
 
 # Auto-enable CUDA dynload if toolkit is not found.
-if(NOT WITH_CUDA_DYNLOAD)
+if(WITH_CYCLES AND WITH_CYCLES_DEVICE_CUDA AND NOT WITH_CUDA_DYNLOAD)
   find_package(CUDA)
   if(NOT CUDA_FOUND)
     message(STATUS "CUDA toolkit not found, using dynamic runtime loading of libraries (WITH_CUDA_DYNLOAD) instead")
@@ -2055,4 +2079,9 @@ endif()
 
 if(0)
   print_all_vars()
+endif()
+
+# Should be the last step of configuration.
+if(POSTCONFIGURE_SCRIPT)
+  include(${POSTCONFIGURE_SCRIPT})
 endif()

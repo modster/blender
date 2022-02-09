@@ -26,6 +26,7 @@ set(INC
   ../blentranslation
   ../depsgraph
   ../draw
+  ../editors/include
   ../imbuf
   ../makesdna
   ../makesrna
@@ -34,7 +35,6 @@ set(INC
   ../sequencer
   ../windowmanager
   ../../../intern/clog
-  ../../../intern/ghost
   ../../../intern/guardedalloc
 
   # for writefile.c: dna_type_offsets.h
@@ -86,10 +86,6 @@ if(WITH_BUILDINFO)
   add_definitions(-DWITH_BUILDINFO)
 endif()
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
 if(WITH_CODEC_FFMPEG)
   add_definitions(-DWITH_FFMPEG)
 endif()
@@ -114,6 +110,7 @@ if(WITH_GTESTS)
     tests/blendfile_loading_base_test.h
   )
   set(TEST_INC
+    ../../../intern/ghost
   )
   set(TEST_LIB
     bf_blenloader

@@ -67,8 +67,6 @@ const char *nodeTypeAsString(NodeType type)
     /* **** Outer Types **** */
     case NodeType::PARAMETERS:
       return "PARAMETERS";
-    case NodeType::PROXY:
-      return "PROXY";
     case NodeType::ANIMATION:
       return "ANIMATION";
     case NodeType::TRANSFORM:
@@ -116,6 +114,8 @@ const char *nodeTypeAsString(NodeType type)
       return "VISIBILITY";
     case NodeType::SIMULATION:
       return "SIMULATION";
+    case NodeType::NTREE_OUTPUT:
+      return "NTREE_OUTPUT";
 
     /* Total number of meaningful node types. */
     case NodeType::NUM_TYPES:
@@ -172,8 +172,8 @@ eDepsSceneComponentType nodeTypeToSceneComponent(NodeType type)
     case NodeType::BONE:
     case NodeType::SHADING:
     case NodeType::CACHE:
-    case NodeType::PROXY:
     case NodeType::SIMULATION:
+    case NodeType::NTREE_OUTPUT:
       return DEG_SCENE_COMP_PARAMETERS;
 
     case NodeType::VISIBILITY:
@@ -191,8 +191,6 @@ NodeType nodeTypeFromObjectComponent(eDepsObjectComponentType component_type)
       return NodeType::UNDEFINED;
     case DEG_OB_COMP_PARAMETERS:
       return NodeType::PARAMETERS;
-    case DEG_OB_COMP_PROXY:
-      return NodeType::PROXY;
     case DEG_OB_COMP_ANIMATION:
       return NodeType::ANIMATION;
     case DEG_OB_COMP_TRANSFORM:
@@ -216,8 +214,6 @@ eDepsObjectComponentType nodeTypeToObjectComponent(NodeType type)
   switch (type) {
     case NodeType::PARAMETERS:
       return DEG_OB_COMP_PARAMETERS;
-    case NodeType::PROXY:
-      return DEG_OB_COMP_PROXY;
     case NodeType::ANIMATION:
       return DEG_OB_COMP_ANIMATION;
     case NodeType::TRANSFORM:
@@ -251,6 +247,7 @@ eDepsObjectComponentType nodeTypeToObjectComponent(NodeType type)
     case NodeType::DUPLI:
     case NodeType::SYNCHRONIZATION:
     case NodeType::SIMULATION:
+    case NodeType::NTREE_OUTPUT:
     case NodeType::UNDEFINED:
     case NodeType::NUM_TYPES:
       return DEG_OB_COMP_PARAMETERS;
@@ -311,7 +308,6 @@ Node::~Node()
   }
 }
 
-/* Generic identifier for Depsgraph Nodes. */
 string Node::identifier() const
 {
   return string(nodeTypeAsString(type)) + " : " + name;

@@ -35,6 +35,8 @@
 
 #include "node_intern.hh" /* own include */
 
+namespace blender::ed::space_node {
+
 void node_operatortypes()
 {
   WM_operatortype_append(NODE_OT_select);
@@ -127,7 +129,18 @@ void node_operatortypes()
   WM_operatortype_append(NODE_OT_cryptomatte_layer_remove);
 }
 
-void ED_operatormacros_node(void)
+void node_keymap(struct wmKeyConfig *keyconf)
+{
+  /* Entire Editor only ----------------- */
+  WM_keymap_ensure(keyconf, "Node Generic", SPACE_NODE, 0);
+
+  /* Main Region only ----------------- */
+  WM_keymap_ensure(keyconf, "Node Editor", SPACE_NODE, 0);
+}
+
+}  // namespace blender::ed::space_node
+
+void ED_operatormacros_node()
 {
   wmOperatorType *ot;
   wmOperatorTypeMacro *mot;
@@ -202,13 +215,4 @@ void ED_operatormacros_node(void)
                                     OPTYPE_UNDO | OPTYPE_REGISTER);
   WM_operatortype_macro_define(ot, "NODE_OT_links_detach");
   WM_operatortype_macro_define(ot, "NODE_OT_translate_attach");
-}
-
-void node_keymap(struct wmKeyConfig *keyconf)
-{
-  /* Entire Editor only ----------------- */
-  WM_keymap_ensure(keyconf, "Node Generic", SPACE_NODE, 0);
-
-  /* Main Region only ----------------- */
-  WM_keymap_ensure(keyconf, "Node Editor", SPACE_NODE, 0);
 }
