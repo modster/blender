@@ -506,7 +506,7 @@ data_to_c_simple(engines/overlay/shaders/xray_fade_frag.glsl SRC)
 
 data_to_c_simple(engines/image/shaders/engine_image_frag.glsl SRC)
 data_to_c_simple(engines/image/shaders/engine_image_vert.glsl SRC)
-=======
+
 set(GLSL_SRC
   engines/eevee/shaders/ambient_occlusion_lib.glsl
   engines/eevee/shaders/background_vert.glsl
