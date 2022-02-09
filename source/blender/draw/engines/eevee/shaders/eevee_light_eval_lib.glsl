@@ -88,7 +88,7 @@ void light_eval(ClosureDiffuse diffuse,
   }
   LIGHT_FOREACH_END
 
-  uvec2 px = uvec2(gl_FragCoord.xy);
+  vec2 px = gl_FragCoord.xy;
   LIGHT_FOREACH_BEGIN_LOCAL (lights_cull_buf, lights_zbin_buf, lights_tile_buf, px, vP_z, l_idx) {
     light_eval_ex(
         diffuse, reflection, P, V, vP_z, thickness, ltc_mat, l_idx, out_diffuse, out_specular);

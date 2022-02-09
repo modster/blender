@@ -19,7 +19,7 @@ void main(void)
 
   float lights_count = 0.0;
   uint lights_cull = 0u;
-  uvec2 px = uvec2(gl_FragCoord.xy);
+  vec2 px = gl_FragCoord.xy;
   LIGHT_FOREACH_BEGIN_LOCAL (lights_cull_buf, lights_zbin_buf, lights_tile_buf, px, vP_z, l_idx) {
     LightData light = lights_buf[l_idx];
     lights_cull |= 1u << l_idx;

@@ -367,7 +367,7 @@ struct CullingData {
   /** Will disable specular during light data copy.. */
   bool1 enable_specular;
   /** Extent of one square tile in pixels. */
-  uint tile_size;
+  float tile_size;
   /** Number of tiles on the X/Y axis. */
   uint tile_x_len;
   uint tile_y_len;
