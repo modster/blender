@@ -326,7 +326,7 @@ struct GPUSource {
         /* Separator. */
         "[\\s]*"
         /* Type. */
-        "(void|[iu]?vec[234]|float|u?int|Closure|sampler[123]D(?:Array)?)"
+        "(void|[iu]?vec[234]|mat4|float|u?int|Closure|sampler[123]D(?:Array)?)"
         /* Separator. */
         "[\\s]+"
         /* Name. */
