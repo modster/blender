@@ -435,6 +435,7 @@ void LightModule::set_view(const DRWView *view, const int2 extent, bool enable_s
 
   culling_data.enable_specular = enable_specular;
   culling_data.items_count = no_lights ? 0 : light_refs_.size();
+  culling_data.items_no_cull_count = no_lights ? 0 : culling_data.items_no_cull_count;
   culling_data.visible_count = 0;
   culling_data.push_update();
 
@@ -445,7 +446,7 @@ void LightModule::set_view(const DRWView *view, const int2 extent, bool enable_s
   uint word_count = tiles_extent.x * tiles_extent.y * tiles_extent.z * culling_data.tile_word_len;
 
   /* TODO(fclem) Only resize once per redraw. */
-  culling_tile_buf.resize(word_count);
+  culling_tile_buf.resize(ceil_multiple_u(word_count, 4u));
 
   culling_tile_dispatch_size_.x = divide_ceil_u(word_count, 1024);
   culling_tile_dispatch_size_.y = 1;
