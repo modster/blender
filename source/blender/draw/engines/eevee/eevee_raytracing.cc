@@ -63,7 +63,7 @@ void RaytracingModule::sync(void)
   refraction_data_.push_update();
   diffuse_data_.push_update();
 
-  enabled_ = (sce_eevee.flag & SCE_EEVEE_RAYTRACING_ENABLED) != 0;
+  // enabled_ = (sce_eevee.flag & SCE_EEVEE_RAYTRACING_ENABLED) != 0;
 }
 
 /** \} */

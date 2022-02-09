@@ -97,6 +97,7 @@ DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMa
   DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? opaque_culled_ps_ : opaque_ps_;
   LightModule &lights = inst_.lights;
   LightProbeModule &lightprobes = inst_.lightprobes;
+  RaytracingModule &raytracing = inst_.raytracing;
   eGPUSamplerState no_interp = GPU_SAMPLER_DEFAULT;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
   lights.shgroup_resources(grp);
@@ -112,13 +113,13 @@ DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMa
     DRW_shgroup_uniform_texture_ref(
         grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
   }
-  if (true) {
-    DRW_shgroup_uniform_block(grp, "rt_diffuse_buf", inst_.raytracing.diffuse_ubo_get());
-    DRW_shgroup_uniform_block(grp, "rt_reflection_buf", inst_.raytracing.reflection_ubo_get());
-    DRW_shgroup_uniform_block(grp, "rt_refraction_buf", inst_.raytracing.refraction_ubo_get());
+  if (raytracing.enabled()) {
+    DRW_shgroup_uniform_block(grp, "rt_diffuse_buf", raytracing.diffuse_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_reflection_buf", raytracing.reflection_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_refraction_buf", raytracing.refraction_ubo_get());
     DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_radiance_tx_, no_interp);
   }
-  if (true) {
+  if (raytracing.enabled()) {
     DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
   }
@@ -138,6 +139,7 @@ DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
 {
   LightModule &lights = inst_.lights;
   LightProbeModule &lightprobes = inst_.lightprobes;
+  RaytracingModule &raytracing = inst_.raytracing;
   eGPUSamplerState no_interp = GPU_SAMPLER_DEFAULT;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, transparent_ps_);
   lights.shgroup_resources(grp);
@@ -153,13 +155,13 @@ DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
     DRW_shgroup_uniform_texture_ref(
         grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
   }
-  if (true) {
-    DRW_shgroup_uniform_block(grp, "rt_diffuse_buf", inst_.raytracing.diffuse_ubo_get());
-    DRW_shgroup_uniform_block(grp, "rt_reflection_buf", inst_.raytracing.reflection_ubo_get());
-    DRW_shgroup_uniform_block(grp, "rt_refraction_buf", inst_.raytracing.refraction_ubo_get());
+  if (raytracing.enabled()) {
+    DRW_shgroup_uniform_block(grp, "rt_diffuse_buf", raytracing.diffuse_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_reflection_buf", raytracing.reflection_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_refraction_buf", raytracing.refraction_ubo_get());
     DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_radiance_tx_, no_interp);
   }
-  if (true) {
+  if (raytracing.enabled()) {
     DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
   }

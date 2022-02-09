@@ -20,19 +20,7 @@
 #pragma BLENDER_REQUIRE(eevee_lightprobe_eval_grid_lib.glsl)
 
 /* TODO(fclem) Option. */
-#define USE_RAYTRACING
-
-/* Prototypes. */
-void light_eval(ClosureDiffuse diffuse,
-                ClosureReflection reflection,
-                vec3 P,
-                vec3 V,
-                float vP_z,
-                float thickness,
-                inout vec3 out_diffuse,
-                inout vec3 out_specular);
-vec3 lightprobe_grid_eval(vec3 P, vec3 N, float random_threshold);
-vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold);
+// #define USE_RAYTRACING
 
 void main(void)
 {

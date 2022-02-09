@@ -11,9 +11,6 @@
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_lightprobe_eval_cubemap_lib.glsl)
 
-/* Prototypes. */
-vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold);
-
 void main()
 {
   vec2 uv = uvcoordsvar.xy;
