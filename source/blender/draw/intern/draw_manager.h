@@ -382,6 +382,10 @@ struct DRWUniform {
   uint8_t type;      /* #DRWUniformType */
   uint8_t length;    /* Length of vector types. */
   uint8_t arraysize; /* Array size of scalar/vector types. */
+#ifdef DEBUG
+  /** Name pointer for debugging. Hopefully still points to a valid string. */
+  const char *name;
+#endif
 };
 
 struct DRWShadingGroup {

@@ -599,6 +599,12 @@ static void draw_update_uniforms(DRWShadingGroup *shgroup,
                                  DRWCommandsState *state,
                                  bool *use_tfeedback)
 {
+#define CHECK(a) \
+  if (a == NULL) { \
+    printf("Resource %s is null\n", uni->name); \
+    break; \
+  }
+
   for (DRWUniformChunk *unichunk = shgroup->uniforms; unichunk; unichunk = unichunk->next) {
     DRWUniform *uni = unichunk->uniforms;
     for (int i = 0; i < unichunk->uniform_used; i++, uni++) {
@@ -620,27 +626,35 @@ static void draw_update_uniforms(DRWShadingGroup *shgroup,
               shgroup->shader, uni->location, uni->length, uni->arraysize, uni->pvalue);
           break;
         case DRW_UNIFORM_TEXTURE:
+          CHECK(uni->texture);
           GPU_texture_bind_ex(uni->texture, uni->sampler_state, uni->location, false);
           break;
         case DRW_UNIFORM_TEXTURE_REF:
+          CHECK(*uni->texture_ref);
           GPU_texture_bind_ex(*uni->texture_ref, uni->sampler_state, uni->location, false);
           break;
         case DRW_UNIFORM_IMAGE:
+          CHECK(uni->texture);
           GPU_texture_image_bind(uni->texture, uni->location);
           break;
         case DRW_UNIFORM_IMAGE_REF:
+          CHECK(*uni->texture_ref);
           GPU_texture_image_bind(*uni->texture_ref, uni->location);
           break;
         case DRW_UNIFORM_BLOCK:
+          CHECK(uni->block);
           GPU_uniformbuf_bind(uni->block, uni->location);
           break;
         case DRW_UNIFORM_BLOCK_REF:
+          CHECK(*uni->block_ref);
           GPU_uniformbuf_bind(*uni->block_ref, uni->location);
           break;
         case DRW_UNIFORM_STORAGE_BLOCK:
+          CHECK(uni->ssbo);
           GPU_storagebuf_bind(uni->ssbo, uni->location);
           break;
         case DRW_UNIFORM_STORAGE_BLOCK_REF:
+          CHECK(*uni->ssbo_ref);
           GPU_storagebuf_bind(*uni->ssbo_ref, uni->location);
           break;
         case DRW_UNIFORM_BLOCK_OBMATS:
