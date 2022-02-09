@@ -138,6 +138,7 @@ EEVEE_DOF_GROUND_VARIATIONS(eevee_depth_of_field_gather, "eevee_depth_of_field_g
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_depth_of_field_gather_holefill)
+    .do_static_compilation(true)
     .additional_info("eevee_shared", "draw_view")
     .uniform_buf(2, "DepthOfFieldData", "dof_buf")
     .uniform_buf(1, "SamplingData", "sampling_buf")
