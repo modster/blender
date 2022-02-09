@@ -16,6 +16,7 @@
 /* TODO(fclem): We could reduce register pressure by only having static branches for sun lights. */
 void light_eval_ex(ClosureDiffuse diffuse,
                    ClosureReflection reflection,
+                   const bool is_directional,
                    vec3 P,
                    vec3 V,
                    float vP_z,
@@ -42,10 +43,15 @@ void light_eval_ex(ClosureDiffuse diffuse,
     if (diffuse.sss_id != 0u && light.diffuse_power > 0.0) {
       float delta = max(thickness, shadow_delta);
 
-      vec3 intensity =
-          visibility * light.transmit_power *
-          light_translucent(
-              sss_transmittance_tx, light, diffuse.N, L, dist, diffuse.sss_radius, delta);
+      vec3 intensity = visibility * light.transmit_power *
+                       light_translucent(sss_transmittance_tx,
+                                         is_directional,
+                                         light,
+                                         diffuse.N,
+                                         L,
+                                         dist,
+                                         diffuse.sss_radius,
+                                         delta);
       out_diffuse += light.color * intensity;
     }
 
@@ -58,13 +64,14 @@ void light_eval_ex(ClosureDiffuse diffuse,
 
   if (light.diffuse_power > 0.0) {
     float intensity = visibility * light.diffuse_power *
-                      light_diffuse(utility_tx, light, diffuse.N, V, L, dist);
+                      light_diffuse(utility_tx, is_directional, light, diffuse.N, V, L, dist);
     out_diffuse += light.color * intensity;
   }
 
   if (light.specular_power > 0.0) {
     float intensity = visibility * light.specular_power *
-                      light_ltc(utility_tx, light, reflection.N, V, L, dist, ltc_mat);
+                      light_ltc(
+                          utility_tx, is_directional, light, reflection.N, V, L, dist, ltc_mat);
     out_specular += light.color * intensity;
   }
 }
@@ -83,15 +90,33 @@ void light_eval(ClosureDiffuse diffuse,
   vec4 ltc_mat = utility_tx_sample(utility_tx, uv, UTIL_LTC_MAT_LAYER);
 
   LIGHT_FOREACH_BEGIN_DIRECTIONAL (lights_cull_buf, l_idx) {
-    light_eval_ex(
-        diffuse, reflection, P, V, vP_z, thickness, ltc_mat, l_idx, out_diffuse, out_specular);
+    light_eval_ex(diffuse,
+                  reflection,
+                  true,
+                  P,
+                  V,
+                  vP_z,
+                  thickness,
+                  ltc_mat,
+                  l_idx,
+                  out_diffuse,
+                  out_specular);
   }
   LIGHT_FOREACH_END
 
   vec2 px = gl_FragCoord.xy;
   LIGHT_FOREACH_BEGIN_LOCAL (lights_cull_buf, lights_zbin_buf, lights_tile_buf, px, vP_z, l_idx) {
-    light_eval_ex(
-        diffuse, reflection, P, V, vP_z, thickness, ltc_mat, l_idx, out_diffuse, out_specular);
+    light_eval_ex(diffuse,
+                  reflection,
+                  false,
+                  P,
+                  V,
+                  vP_z,
+                  thickness,
+                  ltc_mat,
+                  l_idx,
+                  out_diffuse,
+                  out_specular);
   }
   LIGHT_FOREACH_END
 }
