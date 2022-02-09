@@ -26,6 +26,7 @@
 
 #include <iostream>
 #include <regex>
+#include <sstream>
 
 #include "BLI_ghash.h"
 #include "BLI_map.hh"
@@ -110,6 +111,14 @@ struct GPUSource {
     /* Limit to shared header files to avoid the temptation to use C++ syntax in .glsl files. */
     if (filename.endswith(".h") || filename.endswith(".hh")) {
       enum_preprocess();
+    }
+
+    if (source.find("'")) {
+      char_literals_preprocess();
+    }
+
+    if (source.find("print")) {
+      string_preprocess();
     }
 
     if (is_from_material_library()) {
@@ -443,6 +452,187 @@ struct GPUSource {
         func->totparam++;
       }
     }
+  }
+
+  void char_literals_preprocess()
+  {
+    const StringRefNull input = source;
+    std::stringstream output;
+    int64_t cursor = -1;
+    int64_t last_pos = 0;
+
+    while (true) {
+      cursor = find_token(input, '\'', cursor + 1);
+      if (cursor == -1) {
+        break;
+      }
+      /* Output anything between 2 print statement. */
+      output << input.substr(last_pos, cursor - last_pos);
+
+      /* Extract string. */
+      int64_t char_start = cursor + 1;
+      int64_t char_end = find_token(input, '\'', char_start);
+      CHECK(char_end, input, cursor, "Malformed char literal. Missing ending `'`.");
+
+      StringRef input_char = input.substr(char_start, char_end - char_start);
+      if (input_char.size() == 0) {
+        CHECK(-1, input, cursor, "Malformed char literal. Empty character constant");
+      }
+
+      uint8_t char_value = input_char[0];
+
+      if (input_char[0] == '\\') {
+        if (input_char[1] == 'n') {
+          char_value = '\n';
+        }
+        else {
+          CHECK(-1, input, cursor, "Unsupported escaped character");
+        }
+      }
+      else {
+        if (input_char.size() > 1) {
+          CHECK(-1, input, cursor, "Malformed char literal. Multi-character character constant");
+        }
+      }
+
+      char hex[8];
+      SNPRINTF(hex, "0x%.2Xu", char_value);
+      output << hex;
+
+      cursor = last_pos = char_end + 1;
+    }
+    /* If nothing has been changed, do not allocate processed_source. */
+    if (last_pos == 0) {
+      return;
+    }
+
+    if (last_pos != 0) {
+      output << input.substr(last_pos);
+    }
+    processed_source = output.str();
+    source = processed_source.c_str();
+  }
+
+  /* Replace print(string) by equivalent print_char4() sequence. */
+  void string_preprocess()
+  {
+    const StringRefNull input = source;
+    std::stringstream output;
+    int64_t cursor = -1;
+    int64_t last_pos = 0;
+
+    while (true) {
+      cursor = find_keyword(input, "print", cursor + 1);
+      if (cursor == -1) {
+        break;
+      }
+
+      bool do_endl = false;
+      StringRef func = input.substr(cursor);
+      if (func.startswith("print(")) {
+        do_endl = true;
+      }
+      else if (func.startswith("print_no_endl(")) {
+        do_endl = false;
+      }
+      else {
+        continue;
+      }
+
+      /* Output anything between 2 print statement. */
+      output << input.substr(last_pos, cursor - last_pos);
+
+      /* Extract string. */
+      int64_t str_start = input.find('(', cursor) + 1;
+      int64_t semicolon = find_token(input, ';', str_start + 1);
+      CHECK(semicolon, input, cursor, "Malformed print(). Missing `;` .");
+      int64_t str_end = rfind_token(input, ')', semicolon);
+      if (str_end < str_start) {
+        CHECK(-1, input, cursor, "Malformed print(). Missing closing `)` .");
+      }
+
+      std::stringstream sub_output;
+      StringRef input_args = input.substr(str_start, str_end - str_start);
+
+      auto print_string = [&](std::string str) -> int {
+        size_t len_before_pad = str.length();
+        /* Pad string to uint size. */
+        while (str.length() % 4 != 0) {
+          str += " ";
+        }
+        /* Keep everything in one line to not mess with the shader logs. */
+        sub_output << "/* " << str << "*/";
+        sub_output << "print_string_start(" << len_before_pad << ");";
+        for (size_t i = 0; i < len_before_pad; i += 4) {
+          uint8_t chars[4] = {*(reinterpret_cast<const uint8_t *>(str.c_str()) + i + 0),
+                              *(reinterpret_cast<const uint8_t *>(str.c_str()) + i + 1),
+                              *(reinterpret_cast<const uint8_t *>(str.c_str()) + i + 2),
+                              *(reinterpret_cast<const uint8_t *>(str.c_str()) + i + 3)};
+          if (i + 4 > len_before_pad) {
+            chars[len_before_pad - i] = '\0';
+          }
+          char uint_hex[12];
+          SNPRINTF(uint_hex, "0x%.2X%.2X%.2X%.2Xu", chars[3], chars[2], chars[1], chars[0]);
+          sub_output << "print_char4(" << StringRefNull(uint_hex) << ");";
+        }
+        return 0;
+      };
+
+      const bool print_as_variable = (input_args[0] != '"') && find_token(input_args, ',') == -1;
+      if (print_as_variable) {
+        /* Variable or expression debuging. */
+        std::string arg = input_args;
+        /* Pad align most values. */
+        while (arg.length() % 4 != 0) {
+          arg += " ";
+        }
+        print_string(arg);
+        print_string("= ");
+        sub_output << "print_value(" << input_args << ");";
+      }
+      else {
+        const std::regex arg_regex(
+            /* String args. */
+            "\"([^\\r\\n\\t\\f\\v\"]+)\""
+            /* OR. */
+            "|"
+            /* value args. */
+            "[\\s]+([^\\r\\n\\t\\f\\v\"]+),");
+        std::smatch args_match;
+        std::string func_args = input_args;
+        std::string::const_iterator args_search_start(func_args.cbegin());
+        while (std::regex_search(args_search_start, func_args.cend(), args_match, arg_regex)) {
+          args_search_start = args_match.suffix().first;
+          std::string arg_string = args_match[1].str();
+          std::string arg_val = args_match[2].str();
+
+          if (arg_string.empty()) {
+            sub_output << "print_value(" << arg_val << ");";
+          }
+          else {
+            print_string(arg_string);
+          }
+        }
+      }
+
+      if (do_endl) {
+        sub_output << "print_newline();";
+      }
+
+      output << sub_output.str();
+
+      cursor = last_pos = str_end + 1;
+    }
+    /* If nothing has been changed, do not allocate processed_source. */
+    if (last_pos == 0) {
+      return;
+    }
+
+    if (last_pos != 0) {
+      output << input.substr(last_pos);
+    }
+    processed_source = output.str();
+    source = processed_source.c_str();
   }
 
 #undef find_keyword

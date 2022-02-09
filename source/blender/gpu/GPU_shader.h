@@ -164,7 +164,8 @@ typedef enum {
 } GPUUniformBlockBuiltin;
 
 typedef enum {
-  GPU_BUFFER_BLOCK_DEBUG = 0, /* debugBuf */
+  GPU_BUFFER_BLOCK_DEBUG = 0,   /* debugBuf */
+  GPU_BUFFER_BLOCK_DEBUG_PRINT, /* drw_print_buf */
 
   GPU_NUM_BUFFER_BLOCKS, /* Special value, denotes number of builtin buffer blocks. */
 } GPUBufferBlockBuiltin;

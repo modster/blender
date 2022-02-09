@@ -39,6 +39,7 @@ extern char datatoc_gpu_shader_3D_smooth_color_frag_glsl[];
 
 static struct {
   struct GPUShader *hair_refine_sh[PART_REFINE_MAX_SHADER];
+  struct GPUShader *debug_print_display_sh;
 } e_data = {{NULL}};
 
 /* -------------------------------------------------------------------- */
@@ -107,6 +108,14 @@ GPUShader *DRW_shader_hair_refine_get(ParticleRefineShader refinement,
   return e_data.hair_refine_sh[refinement];
 }
 
+GPUShader *DRW_shader_debug_print_display_get()
+{
+  if (e_data.debug_print_display_sh == NULL) {
+    e_data.debug_print_display_sh = GPU_shader_create_from_info_name("draw_debug_print_display");
+  }
+  return e_data.debug_print_display_sh;
+}
+
 /** \} */
 
 void DRW_shaders_free(void)
@@ -114,4 +123,5 @@ void DRW_shaders_free(void)
   for (int i = 0; i < PART_REFINE_MAX_SHADER; i++) {
     DRW_SHADER_FREE_SAFE(e_data.hair_refine_sh[i]);
   }
+  DRW_SHADER_FREE_SAFE(e_data.debug_print_display_sh);
 }

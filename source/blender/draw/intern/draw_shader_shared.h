@@ -32,6 +32,12 @@ struct ViewInfos {
   /** NOTE: vec3 arrays are paded to vec4. */
   float4 frustum_corners[8];
   float4 frustum_planes[6];
+
+  /** For debugging purpose */
+  /* Mouse pixel. */
+  int2 mouse_pixel;
+
+  int2 _pad0;
 };
 BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
 

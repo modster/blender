@@ -241,6 +241,8 @@ inline const char *ShaderInterface::builtin_buffer_block_name(GPUBufferBlockBuil
   switch (u) {
     case GPU_BUFFER_BLOCK_DEBUG:
       return "debugBuf";
+    case GPU_BUFFER_BLOCK_DEBUG_PRINT:
+      return "drw_print_buf";
     default:
       return NULL;
   }

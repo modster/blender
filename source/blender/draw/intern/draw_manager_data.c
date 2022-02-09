@@ -22,6 +22,7 @@
 
 #include "draw_manager.h"
 
+#include "BKE_context.h"
 #include "BKE_curve.h"
 #include "BKE_duplilist.h"
 #include "BKE_global.h"
@@ -30,6 +31,9 @@
 #include "BKE_object.h"
 #include "BKE_paint.h"
 #include "BKE_pbvh.h"
+
+#include "WM_api.h"
+#include "wm_window.h"
 
 #include "DNA_curve_types.h"
 #include "DNA_gpencil_types.h"
@@ -53,6 +57,9 @@
 #include "GPU_uniform_buffer.h"
 
 #include "intern/gpu_codegen.h"
+
+/* We add */
+//#define DISABLE_DEBUG_SHADER_PRINT_BARRIER
 
 /* -------------------------------------------------------------------- */
 /** \name Uniform Buffer Object (DRW_uniformbuffer)
@@ -1473,6 +1480,17 @@ static void drw_shgroup_init(DRWShadingGroup *shgroup, GPUShader *shader)
     GPUVertBuf *vertbuf = drw_debug_line_buffer_get();
     drw_shgroup_uniform_create_ex(
         shgroup, debugbuf_location, DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE, vertbuf, 0, 0, 1);
+
+  int debug_print_location = GPU_shader_get_builtin_ssbo(shader, GPU_BUFFER_BLOCK_DEBUG_PRINT);
+  if (debug_print_location != -1) {
+    GPUVertBuf *vertbuf = drw_debug_print_buffer_get();
+    drw_shgroup_uniform_create_ex(
+        shgroup, debug_print_location, DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE, vertbuf, 0, 0, 1);
+    /* Add a barrier to allow multiple shader writting to the same buffer. */
+#  ifndef DISABLE_DEBUG_SHADER_PRINT_BARRIER
+    /** IMPORTANT: This might change the application behavior. Comment if needed. */
+    DRW_shgroup_barrier(shgroup, GPU_BARRIER_SHADER_STORAGE);
+#  endif
   }
 #endif
 
@@ -1967,6 +1985,13 @@ DRWView *DRW_view_create(const float viewmat[4][4],
   view->parent = NULL;
 
   copy_v4_fl4(view->storage.viewcamtexcofac, 1.0f, 1.0f, 0.0f, 0.0f);
+
+  if (DST.draw_ctx.evil_C && DST.draw_ctx.region) {
+    int region_origin[2] = {DST.draw_ctx.region->winrct.xmin, DST.draw_ctx.region->winrct.ymin};
+    struct wmWindow *win = CTX_wm_window(DST.draw_ctx.evil_C);
+    wm_cursor_position_get(win, &view->storage.mouse_pixel[0], &view->storage.mouse_pixel[1]);
+    sub_v2_v2v2_int(view->storage.mouse_pixel, view->storage.mouse_pixel, region_origin);
+  }
 
   DRW_view_update(view, viewmat, winmat, culling_viewmat, culling_winmat);
 

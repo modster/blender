@@ -415,6 +415,7 @@ set(GLSL_SRC
   intern/shaders/common_attribute_lib.glsl
   intern/shaders/common_colormanagement_lib.glsl
   intern/shaders/common_debug_lib.glsl
+  intern/shaders/common_debug_print_lib.glsl
   intern/shaders/common_fullscreen_vert.glsl
   intern/shaders/common_fxaa_lib.glsl
   intern/shaders/common_globals_lib.glsl
@@ -443,6 +444,9 @@ set(GLSL_SRC
   intern/shaders/common_subdiv_vbo_edituv_strech_area_comp.glsl
   intern/shaders/common_subdiv_vbo_lnor_comp.glsl
   intern/shaders/common_subdiv_vbo_sculpt_data_comp.glsl
+
+  intern/shaders/draw_debug_print_display_vert.glsl
+  intern/shaders/draw_debug_print_display_frag.glsl
 
   intern/draw_shader_shared.h
 

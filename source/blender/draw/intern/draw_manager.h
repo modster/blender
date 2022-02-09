@@ -657,6 +657,7 @@ typedef struct DRWManager {
     DRWDebugLine *lines;
     DRWDebugSphere *spheres;
     DRWDebugBuffer *line_buffers;
+    GPUVertBuf *print_buffer;
   } debug;
 } DRWManager;
 
@@ -671,6 +672,7 @@ void *drw_viewport_engine_data_ensure(void *engine_type);
 void drw_state_set(DRWState state);
 
 GPUVertBuf *drw_debug_line_buffer_get(void);
+GPUVertBuf *drw_debug_print_buffer_get(void);
 void drw_debug_draw(void);
 void drw_debug_init(void);
 
