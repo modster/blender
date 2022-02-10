@@ -1333,7 +1333,7 @@ static Vector<ParsedAttributeDesc> parse_attributes(const AttributeSelector *att
   for (size_t i = 0; i < arb_geom_params.getNumProperties(); ++i) {
     const PropertyHeader &prop = arb_geom_params.getPropertyHeader(i);
 
-    /* TODO(kevindietrich): support scalar properties. */
+    /* Blender does not support scalar (object domain) attributes at the moment. */
     if (prop.isScalar()) {
       continue;
     }
