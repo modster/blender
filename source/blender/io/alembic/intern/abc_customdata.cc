@@ -1156,7 +1156,8 @@ template<typename TRAIT>
 static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &config,
                                                      const CacheAttributeMapping *mapping,
                                                      const ITypedGeomParam<TRAIT> &param,
-                                                     ISampleSelector iss)
+                                                     ISampleSelector iss,
+                                                     const float velocity_scale)
 {
   typename ITypedGeomParam<TRAIT>::Sample sample;
   param.getIndexed(sample, iss);
@@ -1224,8 +1225,10 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
     case CD_ORCO:
     case CD_PROP_FLOAT3: {
       std::string param_name = param.getName();
+      bool is_velocity = false;
       if (param.getName() == attr_sel.velocity_name()) {
         param_name = "velocity";
+        is_velocity = true;
 
         /* Check that we indeed have an attribute on the points. */
         if (bl_scope != BlenderScope::POINT) {
@@ -1235,7 +1238,9 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
 
       create_layer_for_scope<float3>(
           config, bl_scope, abc_mapping.type, param_name, [&](size_t i) {
-            return value_type_converter<abc_scalar_type>::map_to_float3(&input_data[i * 3]);
+            const float3 value = value_type_converter<abc_scalar_type>::map_to_float3(
+                &input_data[i * 3]);
+            return is_velocity ? value * velocity_scale : value;
           });
       return AbcAttributeReadError::READ_SUCCESS;
     }
@@ -1553,7 +1558,7 @@ struct AttributeReadOperator {
   template<typename GeomParamType> void operator()(const GeomParamType &param)
   {
     AbcAttributeReadError error = process_typed_attribute(
-        config, desc->mapping, param, sample_sel);
+        config, desc->mapping, param, sample_sel, velocity_scale);
     handle_error(error, desc->prop_header.getName());
   }
 };
