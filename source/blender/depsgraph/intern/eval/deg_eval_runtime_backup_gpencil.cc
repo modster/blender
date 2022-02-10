@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
+ * The Original Code is Copyright (C) 2022 Blender Foundation.
  * All rights reserved.
  */
 
@@ -35,17 +35,24 @@ GPencilBackup::GPencilBackup(const Depsgraph *depsgraph) : depsgraph(depsgraph)
 {
 }
 
-void GPencilBackup::init_from_gpencil(bGPdata *gpd)
+void GPencilBackup::init_from_gpencil(bGPdata *UNUSED(gpd))
 {
 }
 
 void GPencilBackup::restore_to_gpencil(bGPdata *gpd)
 {
   bGPdata *gpd_orig = reinterpret_cast<bGPdata *>(gpd->id.orig_id);
+
+  /* We check for the active depsgraph here to avoid freeing the cache on the original object
+   * multiple times. This free is only needed for the case where we tagged a full update in the
+   * update cache and did not do an update-on-write. */
   if (depsgraph->is_active) {
     BKE_gpencil_free_update_cache(gpd_orig);
-    gpd->runtime.update_cache = NULL;
   }
+  /* Doing a copy-on-write copies the update cache pointer. Make sure to reset it
+   * to NULL as we should never use the update cache from eval data. */
+  gpd->runtime.update_cache = NULL;
+  /* Make sure to update the original runtime pointers in the eval data. */
   BKE_gpencil_data_update_orig_pointers(gpd_orig, gpd);
 }
 

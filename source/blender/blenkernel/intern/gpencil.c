@@ -1076,6 +1076,32 @@ void BKE_gpencil_stroke_copy_settings(const bGPDstroke *gps_src, bGPDstroke *gps
   copy_v4_v4(gps_dst->vert_color_fill, gps_src->vert_color_fill);
 }
 
+bGPdata *BKE_gpencil_data_duplicate(Main *bmain, const bGPdata *gpd_src, bool internal_copy)
+{
+  gpf_dst->flag = gpf_src->flag;
+  gpf_dst->key_type = gpf_src->key_type;
+  gpf_dst->framenum = gpf_src->framenum;
+}
+
+void BKE_gpencil_stroke_copy_settings(const bGPDstroke *gps_src, bGPDstroke *gps_dst)
+{
+  gps_dst->thickness = gps_src->thickness;
+  gps_dst->flag = gps_src->flag;
+  gps_dst->inittime = gps_src->inittime;
+  gps_dst->mat_nr = gps_src->mat_nr;
+  copy_v2_v2_short(gps_dst->caps, gps_src->caps);
+  gps_dst->hardeness = gps_src->hardeness;
+  copy_v2_v2(gps_dst->aspect_ratio, gps_src->aspect_ratio);
+  gps_dst->fill_opacity_fac = gps_dst->fill_opacity_fac;
+  copy_v3_v3(gps_dst->boundbox_min, gps_src->boundbox_min);
+  copy_v3_v3(gps_dst->boundbox_max, gps_src->boundbox_max);
+  gps_dst->uv_rotation = gps_src->uv_rotation;
+  copy_v2_v2(gps_dst->uv_translation, gps_src->uv_translation);
+  gps_dst->uv_scale = gps_src->uv_scale;
+  gps_dst->select_index = gps_src->select_index;
+  copy_v4_v4(gps_dst->vert_color_fill, gps_src->vert_color_fill);
+}
+
 void BKE_gpencil_data_duplicate(Main *bmain, const bGPdata *gpd_src, bGPdata **gpd_dst)
 {
   /* error checking */
@@ -2834,12 +2860,8 @@ void BKE_gpencil_frame_selected_hash(bGPdata *gpd, struct GHash *r_list)
   }
 }
 
-bool BKE_gpencil_update_on_write_check(const Depsgraph *depsgraph, bGPdata *gpd)
+bool BKE_gpencil_can_avoid_full_copy_on_write(const Depsgraph *depsgraph, bGPdata *gpd)
 {
-  if (!U.experimental.use_gpencil_update_cache) {
-    return false;
-  }
-
   /* For now, we only use the update cache in the active depsgraph. Othwerwise we might access the
    * cache while another depsgraph frees it. */
   if (!DEG_is_active(depsgraph)) {
@@ -3007,20 +3029,11 @@ void BKE_gpencil_update_on_write(bGPdata *gpd_orig, bGPdata *gpd_eval)
   };
 
   BKE_gpencil_traverse_update_cache(update_cache, &ts, &data);
+
   gpd_eval->flag |= GP_DATA_CACHE_IS_DIRTY;
 
-  const bool gpencil_undo_system_inactive = !(U.experimental.use_gpencil_undo_system &&
-                                              GPENCIL_ANY_MODE(gpd_orig));
-  /* If the gpencil undo system is active, make sure to only free the cache if
-   * GP_DATA_UPDATE_CACHE_DISPOSABLE is set. Even though we already used the cache to update the
-   * eval object, it might still be needed for the undo system (e.g if a modal operator is running,
-   * it might call the update-on-write multiple times before an undo step is encoded). Only when
-   * the undo system marks the cache as disposable can we safely free it here.*/
-  if (gpencil_undo_system_inactive || (gpd_orig->flag & GP_DATA_UPDATE_CACHE_DISPOSABLE)) {
-    /* TODO: This might cause issues when we have multiple depsgraphs? Because the cache might be
-     * accessed later/concurrently even if it was freed here? */
-    BKE_gpencil_free_update_cache(gpd_orig);
-  }
+  /* TODO: This might cause issues when we have multiple depsgraphs? */
+  BKE_gpencil_free_update_cache(gpd_orig);
 }
 
 /** \} */

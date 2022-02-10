@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2008, Blender Foundation
+ * The Original Code is Copyright (C) 2022, Blender Foundation
  * This is a new part of Blender
  */
 
@@ -83,9 +83,11 @@ typedef struct GPencilUpdateCacheNode {
 } GPencilUpdateCacheNode;
 
 /**
- * Callback that is called in BKE_gpencil_traverse_update_cache at each level.
+ * Callback that is called in BKE_gpencil_traverse_update_cache at each level. If the callback
+ * returns true, then the children will not be iterated over and instead continue.
  * \param cache: The cache at this level.
  * \param user_data: Pointer to the user_data passed to BKE_gpencil_traverse_update_cache.
+ * \returns true, if iterating over the children of \a cache should be skipped, false if not.
  */
 typedef bool (*GPencilUpdateCacheIter_Cb)(GPencilUpdateCache *cache, void *user_data);
 
@@ -140,30 +142,10 @@ void BKE_gpencil_tag_light_update(struct bGPdata *gpd,
                                   struct bGPDstroke *gps);
 
 /**
- *
- */
-GPencilUpdateCache *BKE_gpencil_duplicate_update_cache_and_data(GPencilUpdateCache *gpd_cache);
-
-/**
- *
- */
-bool BKE_gpencil_compare_update_caches(GPencilUpdateCache *cache_a, GPencilUpdateCache *cache_b);
-
-/**
  * Frees the GPencilUpdateCache on the gpd->runtime. This will not free the data that the cache
  * node might point to. It assumes that the cache does not own the data.
  */
 void BKE_gpencil_free_update_cache(struct bGPdata *gpd);
-
-/**
- *
- */
-void BKE_gpencil_free_update_cache_and_data(GPencilUpdateCache *cache);
-
-/**
- *
- */
-void BKE_gpencil_print_update_cache(struct GPencilUpdateCache *cache);
 
 #ifdef __cplusplus
 }

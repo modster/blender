@@ -103,8 +103,12 @@ struct ID *BKE_lib_override_library_create_from_id(struct Main *bmain,
  * \param owner_library: the library in which the overrides should be created. Besides versioning
  * and resync code path, this should always be NULL (i.e. the local .blend file).
  *
- * \param reference_library: the library from which the linked data being overridden come from
- * (i.e. the library of the linked reference ID).
+ * \param id_root_reference: the linked ID that is considered as the root of the overridden
+ * hierarchy.
+ *
+ * \param id_hierarchy_root: the override ID that is the root of the hierarchy. May be NULL, in
+ * which case it is assumed that the given `id_root_reference` is tagged for override, and its
+ * newly created override will be used as hierarchy root.
  *
  * \param do_no_main: Create the new override data outside of Main database.
  * Used for resyncing of linked overrides.
@@ -113,7 +117,8 @@ struct ID *BKE_lib_override_library_create_from_id(struct Main *bmain,
  */
 bool BKE_lib_override_library_create_from_tag(struct Main *bmain,
                                               struct Library *owner_library,
-                                              const struct Library *reference_library,
+                                              const struct ID *id_root_reference,
+                                              struct ID *id_hierarchy_root,
                                               bool do_no_main);
 /**
  * Advanced 'smart' function to create fully functional overrides.
@@ -172,6 +177,15 @@ bool BKE_lib_override_library_proxy_convert(struct Main *bmain,
  */
 void BKE_lib_override_library_main_proxy_convert(struct Main *bmain,
                                                  struct BlendFileReadReport *reports);
+
+/**
+ * Find and set the 'hierarchy root' ID pointer of all library overrides in given `bmain`.
+ *
+ * NOTE: Cannot be called from `do_versions_after_linking` as this code needs a single complete
+ * Main database, not a split-by-libraries one.
+ */
+void BKE_lib_override_library_main_hierarchy_root_ensure(struct Main *bmain);
+
 /**
  * Advanced 'smart' function to resync, re-create fully functional overrides up-to-date with linked
  * data, from an existing override hierarchy.

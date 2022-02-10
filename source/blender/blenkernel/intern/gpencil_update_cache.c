@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2008, Blender Foundation
+ * The Original Code is Copyright (C) 2022, Blender Foundation
  * This is a new part of Blender
  */
 
@@ -88,40 +88,22 @@ static void cache_node_update(void *node, void *data)
   GPencilUpdateCache *update_cache = ((GPencilUpdateCacheNode *)node)->cache;
   GPencilUpdateCache *new_update_cache = (GPencilUpdateCache *)data;
 
-  /* IMPORTANT: Because we are comparing the values of the flags here, make sure that any potential
-   * new flag either respects this ordering or changes the following logic. */
-  const bool current_cache_covers_new_cache = new_update_cache->flag < update_cache->flag;
-
-  /* In case:
-   * - the new cache is a no copy
-   * - or the new cache is a light copy and the current cache a full copy
-   * then it means we are already caching "more" and we shouldn't update the current cache.
-   * So we free the structure and return early.
-   */
-  if (current_cache_covers_new_cache) {
+  /* If the new cache is already "covered" by the current cache, just free it and return. */
+  if (new_update_cache->flag <= update_cache->flag) {
     update_cache_free(new_update_cache);
     return;
   }
 
-  /* In case:
-   * - the cache types are equal
-   * - or the new cache contains more than the current cache (full copy > light copy > no copy)
-   * the data pointer is updated. If the cache types are equal, this might be a no-op (when the new
-   * data pointer is equal to the previous), but is necessary when the data pointer needs to
-   * change. This can for example happen when the underlying data was reallocated, but the cache
-   * type stayed the same.
-   */
   update_cache->data = new_update_cache->data;
   update_cache->flag = new_update_cache->flag;
 
   /* In case the new cache does a full update, remove its children since they will be all
-   * updated by the new cache. */
+   * updated by this cache. */
   if (new_update_cache->flag == GP_UPDATE_NODE_FULL_COPY && update_cache->children != NULL) {
-    /* We don't free the tree itself here, because we just want to clear the children, not delete
-     * the whole node. */
     BLI_dlrbTree_free(update_cache->children, cache_node_free);
+    MEM_freeN(update_cache->children);
   }
-  /* Once we updated the data pointer and the flag, we can safely free the new cache structure. */
+
   update_cache_free(new_update_cache);
 }
 
@@ -185,11 +167,8 @@ static void update_cache_node_create_ex(GPencilUpdateCache *root_cache,
   }
 
   GPencilUpdateCache *gps_cache = update_cache_alloc(gps_index, node_flag, (bGPDstroke *)data);
-  BLI_dlrbTree_add(gpf_node->cache->children,
-                   cache_node_compare,
-                   cache_node_alloc,
-                   cache_node_update,
-                   gps_cache);
+  BLI_dlrbTree_add(
+      gpf_node->cache->children, cache_node_compare, cache_node_alloc, cache_node_update, gps_cache);
 
   BLI_dlrbTree_linkedlist_sync(gpf_node->cache->children);
 }
@@ -255,143 +234,6 @@ static void gpencil_traverse_update_cache_ex(GPencilUpdateCache *parent_cache,
   }
 }
 
-typedef struct GPencilUpdateCacheDuplicateTraverseData {
-  GPencilUpdateCache *new_cache;
-  int gpl_index;
-  int gpf_index;
-} GPencilUpdateCacheDuplicateTraverseData;
-
-static bool gpencil_duplicate_update_cache_layer_cb(GPencilUpdateCache *cache, void *user_data)
-{
-  GPencilUpdateCacheDuplicateTraverseData *td = (GPencilUpdateCacheDuplicateTraverseData *)
-      user_data;
-
-  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    /* Do a full copy of the layer. */
-    bGPDlayer *gpl = (bGPDlayer *)cache->data;
-    bGPDlayer *gpl_new = BKE_gpencil_layer_duplicate(gpl, true, true);
-    update_cache_node_create_ex(td->new_cache, gpl_new, cache->index, -1, -1, true);
-    return true;
-  }
-  else if (cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
-    bGPDlayer *gpl = (bGPDlayer *)cache->data;
-    bGPDlayer *gpl_new = (bGPDlayer *)MEM_dupallocN(gpl);
-
-    gpl_new->prev = gpl_new->next = NULL;
-    BLI_listbase_clear(&gpl_new->frames);
-    BLI_listbase_clear(&gpl_new->mask_layers);
-    update_cache_node_create_ex(td->new_cache, gpl_new, cache->index, -1, -1, false);
-  }
-  td->gpl_index = cache->index;
-  return false;
-}
-
-static bool gpencil_duplicate_update_cache_frame_cb(GPencilUpdateCache *cache, void *user_data)
-{
-  GPencilUpdateCacheDuplicateTraverseData *td = (GPencilUpdateCacheDuplicateTraverseData *)
-      user_data;
-  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    bGPDframe *gpf = (bGPDframe *)cache->data;
-    bGPDframe *gpf_new = BKE_gpencil_frame_duplicate(gpf, true);
-    update_cache_node_create_ex(td->new_cache, gpf_new, td->gpl_index, cache->index, -1, true);
-    return true;
-  }
-  else if (cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
-    bGPDframe *gpf = (bGPDframe *)cache->data;
-    bGPDframe *gpf_new = MEM_dupallocN(gpf);
-    gpf_new->prev = gpf_new->next = NULL;
-    BLI_listbase_clear(&gpf_new->strokes);
-    update_cache_node_create_ex(td->new_cache, gpf_new, td->gpl_index, cache->index, -1, false);
-  }
-  td->gpf_index = cache->index;
-  return false;
-}
-
-static bool gpencil_duplicate_update_cache_stroke_cb(GPencilUpdateCache *cache, void *user_data)
-{
-  GPencilUpdateCacheDuplicateTraverseData *td = (GPencilUpdateCacheDuplicateTraverseData *)
-      user_data;
-
-  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    bGPDstroke *gps = (bGPDstroke *)cache->data;
-    bGPDstroke *gps_new = BKE_gpencil_stroke_duplicate(gps, true, true);
-    update_cache_node_create_ex(
-        td->new_cache, gps_new, td->gpl_index, td->gpf_index, cache->index, true);
-  }
-  else if (cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
-    bGPDstroke *gps = (bGPDstroke *)cache->data;
-    bGPDstroke *gps_new = MEM_dupallocN(gps);
-
-    gps_new->prev = gps_new->next = NULL;
-    gps_new->points = NULL;
-    gps_new->triangles = NULL;
-    gps_new->dvert = NULL;
-    gps_new->editcurve = NULL;
-
-    update_cache_node_create_ex(
-        td->new_cache, gps_new, td->gpl_index, td->gpf_index, cache->index, false);
-  }
-  return true;
-}
-
-static bool gpencil_free_update_cache_layer_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
-{
-  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    BKE_gpencil_free_frames(cache->data);
-    BKE_gpencil_free_layer_masks(cache->data);
-  }
-  if (cache->data) {
-    MEM_freeN(cache->data);
-  }
-  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
-}
-
-static bool gpencil_free_update_cache_frame_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
-{
-  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    BKE_gpencil_free_strokes(cache->data);
-  }
-  if (cache->data) {
-    MEM_freeN(cache->data);
-  }
-  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
-}
-
-static bool gpencil_free_update_cache_stroke_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
-{
-  if (cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    BKE_gpencil_free_stroke(cache->data);
-  }
-  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
-}
-
-static bool gpencil_print_update_cache_layer_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
-{
-  printf("  - Layer: %s | Index: %d | Flag: %d | Tagged Frames: %d\n",
-         (cache->data ? ((bGPDlayer *)cache->data)->info : "N/A"),
-         cache->index,
-         cache->flag,
-         BLI_listbase_count((ListBase *)cache->children));
-  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
-}
-
-static bool gpencil_print_update_cache_frame_cb(GPencilUpdateCache *cache, void *UNUSED(user_data))
-{
-  printf("  - Frame: %d | Index: %d | Flag: %d | Tagged Strokes: %d\n",
-         (cache->data ? ((bGPDframe *)cache->data)->framenum : -1),
-         cache->index,
-         cache->flag,
-         BLI_listbase_count((ListBase *)cache->children));
-  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
-}
-
-static bool gpencil_print_update_cache_stroke_cb(GPencilUpdateCache *cache,
-                                                 void *UNUSED(user_data))
-{
-  printf("     - Stroke Index: %d | | Flag: %d\n", cache->index, cache->flag);
-  return cache->flag == GP_UPDATE_NODE_FULL_COPY;
-}
-
 /* -------------------------------------------------------------------- */
 /** \name Update Cache API
  *
@@ -412,80 +254,12 @@ void BKE_gpencil_traverse_update_cache(GPencilUpdateCache *cache,
 
 void BKE_gpencil_tag_full_update(bGPdata *gpd, bGPDlayer *gpl, bGPDframe *gpf, bGPDstroke *gps)
 {
-  if (U.experimental.use_gpencil_update_cache) {
-    update_cache_node_create(gpd, gpl, gpf, gps, true);
-  }
+  update_cache_node_create(gpd, gpl, gpf, gps, true);
 }
 
 void BKE_gpencil_tag_light_update(bGPdata *gpd, bGPDlayer *gpl, bGPDframe *gpf, bGPDstroke *gps)
 {
-  if (U.experimental.use_gpencil_update_cache) {
-    update_cache_node_create(gpd, gpl, gpf, gps, false);
-  }
-}
-
-GPencilUpdateCache *BKE_gpencil_duplicate_update_cache_and_data(GPencilUpdateCache *gpd_cache)
-{
-  GPencilUpdateCache *new_cache = update_cache_alloc(0, gpd_cache->flag, NULL);
-  bGPdata *gpd_new = NULL;
-  if (gpd_cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    BKE_gpencil_data_duplicate(NULL, gpd_cache->data, &gpd_new);
-    new_cache->data = gpd_new;
-    return new_cache;
-  }
-  else if (gpd_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
-    gpd_new = MEM_dupallocN(gpd_cache->data);
-
-    /* Clear all the pointers, since they shouldn't store anything. */
-    BLI_listbase_clear(&gpd_new->layers);
-    BLI_listbase_clear(&gpd_new->vertex_group_names);
-    gpd_new->adt = NULL;
-    gpd_new->mat = NULL;
-    gpd_new->runtime.update_cache = NULL;
-
-    new_cache->data = gpd_new;
-  }
-
-  GPencilUpdateCacheTraverseSettings ts = {{gpencil_duplicate_update_cache_layer_cb,
-                                            gpencil_duplicate_update_cache_frame_cb,
-                                            gpencil_duplicate_update_cache_stroke_cb}};
-
-  GPencilUpdateCacheDuplicateTraverseData td = {
-      .new_cache = new_cache,
-      .gpl_index = -1,
-      .gpf_index = -1,
-  };
-
-  BKE_gpencil_traverse_update_cache(gpd_cache, &ts, &td);
-  return new_cache;
-}
-
-/**
- *  Return true if any of the branches in gpd_cache_b are "strictly greater than" the branches in
- * gpd_cache_a, e.g. one of them contains more data than their counterpart.
- */
-bool BKE_gpencil_compare_update_caches(GPencilUpdateCache *gpd_cache_a,
-                                       GPencilUpdateCache *gpd_cache_b)
-{
-  if (gpd_cache_b->flag == GP_UPDATE_NODE_FULL_COPY) {
-    return gpd_cache_a->flag != GP_UPDATE_NODE_FULL_COPY;
-  }
-  if (gpd_cache_a->flag == GP_UPDATE_NODE_FULL_COPY) {
-    return false;
-  }
-
-  LISTBASE_FOREACH (GPencilUpdateCacheNode *, node_b, gpd_cache_b->children) {
-    GPencilUpdateCacheNode *node_a = (GPencilUpdateCacheNode *)BLI_dlrbTree_search_exact(
-        gpd_cache_a->children, cache_node_compare, node_b->cache);
-    if (node_a == NULL) {
-      return true;
-    }
-
-    if (BKE_gpencil_compare_update_caches(node_a->cache, node_b->cache)) {
-      return true;
-    }
-  }
-  return false;
+  update_cache_node_create(gpd, gpl, gpf, gps, false);
 }
 
 void BKE_gpencil_free_update_cache(bGPdata *gpd)
@@ -495,43 +269,6 @@ void BKE_gpencil_free_update_cache(bGPdata *gpd)
     update_cache_free(gpd_cache);
     gpd->runtime.update_cache = NULL;
   }
-  gpd->flag &= ~GP_DATA_UPDATE_CACHE_DISPOSABLE;
-}
-
-void BKE_gpencil_free_update_cache_and_data(GPencilUpdateCache *gpd_cache)
-{
-  if (gpd_cache->data != NULL) {
-    if (gpd_cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-      BKE_gpencil_free_data(gpd_cache->data, true);
-      MEM_freeN(gpd_cache->data);
-      update_cache_free(gpd_cache);
-      return;
-    }
-    MEM_freeN(gpd_cache->data);
-  }
-
-  GPencilUpdateCacheTraverseSettings ts = {{gpencil_free_update_cache_layer_cb,
-                                            gpencil_free_update_cache_frame_cb,
-                                            gpencil_free_update_cache_stroke_cb}};
-
-  BKE_gpencil_traverse_update_cache(gpd_cache, &ts, NULL);
-  update_cache_free(gpd_cache);
-}
-
-void BKE_gpencil_print_update_cache(GPencilUpdateCache *update_cache)
-{
-  if (update_cache == NULL) {
-    printf("No update cache\n");
-    return;
-  }
-  printf("Update cache: - Flag: %d | Tagged Layers: %d\n",
-         update_cache->flag,
-         BLI_listbase_count((ListBase *)update_cache->children));
-
-  GPencilUpdateCacheTraverseSettings ts = {{gpencil_print_update_cache_layer_cb,
-                                            gpencil_print_update_cache_frame_cb,
-                                            gpencil_print_update_cache_stroke_cb}};
-  BKE_gpencil_traverse_update_cache(update_cache, &ts, NULL);
 }
 
 /** \} */

@@ -15,13 +15,13 @@
  *
  * The Original Code is Copyright (C) 2006 Blender Foundation.
  * All rights reserved.
- * Implementation of CustomData.
- *
- * BKE_customdata.h contains the function prototypes for this file.
  */
 
 /** \file
  * \ingroup bke
+ * Implementation of CustomData.
+ *
+ * BKE_customdata.h contains the function prototypes for this file.
  */
 
 #include "MEM_guardedalloc.h"
@@ -31,7 +31,6 @@
 
 #include "DNA_ID.h"
 #include "DNA_customdata_types.h"
-#include "DNA_hair_types.h"
 #include "DNA_meshdata_types.h"
 
 #include "BLI_bitmap.h"

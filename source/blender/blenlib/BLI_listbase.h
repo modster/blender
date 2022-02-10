@@ -62,8 +62,7 @@ void *BLI_findlink(const struct ListBase *listbase, int number) ATTR_WARN_UNUSED
 /**
  * Returns the nth element after \a link, numbering from 0.
  */
-void *BLI_findlinkfrom(struct Link *start, int number) ATTR_WARN_UNUSED_RESULT
-    ATTR_NONNULL(1);
+void *BLI_findlinkfrom(struct Link *start, int number) ATTR_WARN_UNUSED_RESULT;
 
 /**
  * Finds the first element of \a listbase which contains the null-terminated
