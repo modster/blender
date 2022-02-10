@@ -954,9 +954,10 @@ enum class AbcAttributeReadError {
   INVALID_DOMAIN,
   /* The mapping selected by the user is not possible. */
   MAPPING_IMPOSSIBLE,
-  /* The limit of a attribute for the CustomData layer is reached (this should only concern UVs and
+  /* The limit of attributes for the CustomData layer is reached (this should only concern UVs and
    * vertex colors). */
-  TOO_MANY_ATTRIBUTES,
+  TOO_MANY_UVS_ATTRIBUTES,
+  TOO_MANY_VCOLS_ATTRIBUTES,
 };
 
 static CustomDataType custom_data_type_for_pod(PlainOldDataType pod_type, uint extent)
@@ -1200,7 +1201,7 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
     }
     case CD_MLOOPUV: {
       if (!can_add_uv_layer(config)) {
-        return AbcAttributeReadError::TOO_MANY_ATTRIBUTES;
+        return AbcAttributeReadError::TOO_MANY_UVS_ATTRIBUTES;
       }
 
       create_loop_layer_for_domain<float2>(
@@ -1213,7 +1214,7 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
     }
     case CD_MCOL: {
       if (!can_add_vertex_color_layer(config)) {
-        return AbcAttributeReadError::TOO_MANY_ATTRIBUTES;
+        return AbcAttributeReadError::TOO_MANY_VCOLS_ATTRIBUTES;
       }
 
       const bool is_facevarying = domain == ATTR_DOMAIN_CORNER;
@@ -1456,9 +1457,15 @@ struct AttributeReadOperator {
       case AbcAttributeReadError::READ_SUCCESS: {
         return;
       }
-      case AbcAttributeReadError::TOO_MANY_ATTRIBUTES: {
+      case AbcAttributeReadError::TOO_MANY_UVS_ATTRIBUTES: {
         std::cerr << "Cannot read attribute \"" << attribute_name
-                  << "\", too many attributes of the same type have been read!\n";
+                  << "\" as a UV map as the limit of UV maps has been reached!\n";
+        return;
+      }
+      case AbcAttributeReadError::TOO_MANY_VCOLS_ATTRIBUTES: {
+        std::cerr << "Cannot read attribute \"" << attribute_name
+                  << "\" as a Vertex Color layer as the limit of Vertex Color layers has been "
+                     "reached!\n";
         return;
       }
       case AbcAttributeReadError::INVALID_ATTRIBUTE: {
