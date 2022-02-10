@@ -28,6 +28,7 @@ extern "C" {
 struct CacheArchiveHandle;
 struct CacheFileLayer;
 struct CacheReader;
+struct Curves;
 struct GeometrySet;
 struct ListBase;
 struct Main;
@@ -131,6 +132,12 @@ void ABC_read_geometry(CacheReader *reader,
                        const ABCReadParams *params,
                        const char **err_str);
 #endif
+
+struct Curves *ABC_read_curves(struct CacheReader *reader,
+                               struct Object *ob,
+                               struct Curves *curves,
+                               const ABCReadParams *params,
+                               const char **err_str);
 
 bool ABC_mesh_topology_changed(struct CacheReader *reader,
                                struct Object *ob,

@@ -23,6 +23,7 @@
 
 #include "abc_reader_curves.h"
 #include "abc_axis_conversion.h"
+#include "abc_customdata.h"
 #include "abc_reader_transform.h"
 #include "abc_util.h"
 
@@ -30,12 +31,12 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "DNA_curve_types.h"
+#include "DNA_curves_types.h"
 #include "DNA_object_types.h"
 
 #include "BLI_listbase.h"
 
-#include "BKE_curve.h"
+#include "BKE_curves.h"
 #include "BKE_geometry_set.hh"
 #include "BKE_mesh.h"
 #include "BKE_object.h"
@@ -84,7 +85,7 @@ bool AbcCurveReader::accepts_object_type(
     return false;
   }
 
-  if (ob->type != OB_CURVE) {
+  if (ob->type != OB_CURVES) {
     *err_str = "Object type mismatch, Alembic object path points to Curves.";
     return false;
   }
@@ -170,25 +171,105 @@ void AbcCurveReader::readObjectData(Main *bmain,
                                     const AbcReaderManager & /*manager*/,
                                     const Alembic::Abc::ISampleSelector &sample_sel)
 {
-  Curve *cu = BKE_curve_add(bmain, m_data_name.c_str(), OB_CURVE);
+  Curves *curves = static_cast<Curves *>(BKE_curves_add(bmain, m_data_name.c_str()));
 
-  cu->flag |= CU_3D;
-  cu->actvert = CU_ACT_NONE;
-  cu->resolu = get_curve_resolution(m_curves_schema, sample_sel);
+  // TODO(kevindietrich)
+  // cu->flag |= CU_3D;
+  // cu->actvert = CU_ACT_NONE;
+  // cu->resolu = get_curve_resolution(m_curves_schema, sample_sel);
 
-  m_object = BKE_object_add_only_object(bmain, OB_CURVE, m_object_name.c_str());
-  m_object->data = cu;
+  m_object = BKE_object_add_only_object(bmain, OB_CURVES, m_object_name.c_str());
+  m_object->data = curves;
 
-  read_curve_sample(cu, m_curves_schema, sample_sel);
+  read_curves_sample(curves, m_curves_schema, sample_sel);
 
   if (m_settings->always_add_cache_reader || has_animations(m_curves_schema, m_settings)) {
     addCacheModifier();
   }
 }
 
-void AbcCurveReader::read_curve_sample(Curve *cu,
-                                       const ICurvesSchema &schema,
-                                       const ISampleSelector &sample_sel)
+static int abc_curves_get_total_point_size(const Int32ArraySamplePtr num_vertices)
+{
+  if (!num_vertices) {
+    return 0;
+  }
+
+  int result = 0;
+  for (size_t i = 0; i < num_vertices->size(); i++) {
+    result += (*num_vertices)[i];
+  }
+  return result;
+}
+
+static void read_curves_sample_ex(Curves *curves,
+                                  const ICurvesSchema &schema,
+                                  const ICurvesSchema::Sample &sample,
+                                  const ISampleSelector sample_sel,
+                                  const AttributeSelector *attribute_selector,
+                                  const float velocity_scale)
+{
+  CurvesGeometry &geometry = curves->geometry;
+  const Int32ArraySamplePtr num_vertices = sample.getCurvesNumVertices();
+  const P3fArraySamplePtr positions = sample.getPositions();
+
+  const IFloatGeomParam widths_param = schema.getWidthsParam();
+  FloatArraySamplePtr radiuses;
+
+  if (widths_param.valid()) {
+    IFloatGeomParam::Sample wsample = widths_param.getExpandedValue(sample_sel);
+    radiuses = wsample.getVals();
+  }
+
+  const bool do_radius = (radiuses != nullptr) && (radiuses->size() > 1);
+  float radius = (radiuses && radiuses->size() == 1) ? (*radiuses)[0] : 1.0f;
+
+  int offset = 0;
+  size_t position_offset = 0;
+  for (size_t i = 0; i < num_vertices->size(); i++) {
+    const int num_verts = (*num_vertices)[i];
+
+    geometry.offsets[i] = offset;
+
+    for (int j = 0; j < num_verts; j++, position_offset++) {
+      const Imath::V3f &pos = (*positions)[position_offset];
+
+      if (do_radius) {
+        radius = (*radiuses)[position_offset];
+      }
+
+      copy_zup_from_yup(geometry.position[position_offset], pos.getValue());
+
+      geometry.radius[position_offset] = radius;
+
+      //  if (do_weights) {
+      //    weight = (*weights)[idx];
+      //   }
+
+      //   bp->vec[3] = weight;
+    }
+
+    offset += num_verts;
+  }
+
+  geometry.offsets[geometry.curve_size] = offset;
+
+  /* Attributes. */
+  ScopeCustomDataPointers custom_data_pointers = {
+      &geometry.point_data, &geometry.curve_data, nullptr};
+  ScopeSizeInfo scope_sizes = {geometry.point_size, geometry.curve_size, 0};
+  CDStreamConfig config;
+  config.custom_data_pointers = custom_data_pointers;
+  config.scope_sizes = scope_sizes;
+  config.id = &curves->id;
+  config.attr_selector = attribute_selector;
+  config.time = sample_sel.getRequestedTime();
+
+  read_arbitrary_attributes(config, schema, {}, sample_sel, velocity_scale);
+}
+
+void AbcCurveReader::read_curves_sample(Curves *curves,
+                                        const ICurvesSchema &schema,
+                                        const ISampleSelector &sample_sel)
 {
   ICurvesSchema::Sample smp;
   try {
@@ -205,6 +286,19 @@ void AbcCurveReader::read_curve_sample(Curve *cu,
 
   const Int32ArraySamplePtr num_vertices = smp.getCurvesNumVertices();
   const P3fArraySamplePtr positions = smp.getPositions();
+
+#if 1
+  CurvesGeometry &geometry = curves->geometry;
+  geometry.point_size = abc_curves_get_total_point_size(num_vertices);
+  geometry.curve_size = static_cast<int>(num_vertices->size());
+
+  geometry.offsets = (int *)MEM_calloc_arrayN(geometry.curve_size + 1, sizeof(int), __func__);
+  CustomData_realloc(&geometry.point_data, geometry.point_size);
+  CustomData_realloc(&geometry.curve_data, geometry.curve_size);
+  BKE_curves_update_customdata_pointers(curves);
+
+  read_curves_sample_ex(curves, m_curves_schema, smp, sample_sel, nullptr, 0.0f);
+#else
   const FloatArraySamplePtr weights = smp.getPositionWeights();
   const FloatArraySamplePtr knots = smp.getKnots();
   const CurvePeriodicity periodicity = smp.getWrap();
@@ -296,33 +390,47 @@ void AbcCurveReader::read_curve_sample(Curve *cu,
 
     BLI_addtail(BKE_curve_nurbs_get(cu), nu);
   }
+#endif
 }
 
-static bool topology_changed(CurveEval *curve_eval, const Int32ArraySamplePtr &num_vertices)
+Curves *AbcCurveReader::read_curves(Curves *curves_input,
+                                    const Alembic::Abc::v12::ISampleSelector &sample_sel,
+                                    const AttributeSelector *attribute_selector,
+                                    const float velocity_scale,
+                                    const char **err_str)
 {
-  if (!curve_eval) {
-    return true;
+  ICurvesSchema::Sample sample;
+
+  try {
+    sample = m_curves_schema.getValue(sample_sel);
+  }
+  catch (Alembic::Util::Exception &ex) {
+    *err_str = "Error reading curve sample; more detail on the console";
+    printf("Alembic: error reading curve sample for '%s/%s' at time %f: %s\n",
+           m_iobject.getFullName().c_str(),
+           m_curves_schema.getName().c_str(),
+           sample_sel.getRequestedTime(),
+           ex.what());
+    return curves_input;
   }
 
-  const size_t num_curves = num_vertices->size();
-  if (num_curves != curve_eval->splines().size()) {
-    return true;
+  const Int32ArraySamplePtr num_vertices = sample.getCurvesNumVertices();
+  const P3fArraySamplePtr positions = sample.getPositions();
+
+  const int point_size = abc_curves_get_total_point_size(num_vertices);
+  const int curve_size = static_cast<int>(num_vertices->size());
+
+  if (point_size != curves_input->geometry.point_size ||
+      curve_size != curves_input->geometry.curve_size) {
+    Curves *new_curves = BKE_curves_new_for_eval(curves_input, point_size, curve_size);
+    read_curves_sample_ex(
+        new_curves, m_curves_schema, sample, sample_sel, attribute_selector, velocity_scale);
+    return new_curves;
   }
 
-  for (size_t i = 0; i < num_vertices->size(); i++) {
-    const Spline *spline = curve_eval->splines()[i].get();
-
-    if (!spline) {
-      return true;
-    }
-
-    // TODO(kevindietrich) : this should check for the overlap.
-    if (spline->positions().size() != (*num_vertices)[i]) {
-      return true;
-    }
-  }
-
-  return false;
+  read_curves_sample_ex(
+      curves_input, m_curves_schema, sample, sample_sel, attribute_selector, velocity_scale);
+  return curves_input;
 }
 
 void AbcCurveReader::read_geometry(GeometrySet &geometry_set,
@@ -347,6 +455,7 @@ void AbcCurveReader::read_geometry(GeometrySet &geometry_set,
     return;
   }
 
+#if 0
   CurveEval *curve_eval = geometry_set.get_curve_for_write();
 
   const Int32ArraySamplePtr num_vertices = sample.getCurvesNumVertices();
@@ -387,6 +496,7 @@ void AbcCurveReader::read_geometry(GeometrySet &geometry_set,
       }
     }
   }
+#endif
 }
 
 }  // namespace blender::io::alembic

@@ -54,6 +54,12 @@
 
 #include "BLO_read_write.h"
 
+#include "ABC_alembic.h"
+#include "BKE_cachefile.h"
+#include "DNA_cachefile_types.h"
+#include "DNA_modifier_types.h"
+#include "DNA_scene_types.h"
+
 using blender::float3;
 using blender::IndexRange;
 using blender::MutableSpan;
@@ -416,8 +422,46 @@ static Curves *curves_evaluate_modifiers(struct Depsgraph *depsgraph,
       continue;
     }
 
-    if ((mti->type == eModifierTypeType_OnlyDeform) &&
-        (mti->flags & eModifierTypeFlag_AcceptsVertexCosOnly)) {
+    if (md->type == eModifierType_MeshSequenceCache) {
+      MeshSeqCacheModifierData *mcmd = reinterpret_cast<MeshSeqCacheModifierData *>(md);
+
+      if (!mcmd->reader || !STREQ(mcmd->reader_object_path, mcmd->object_path)) {
+        STRNCPY(mcmd->reader_object_path, mcmd->object_path);
+        BKE_cachefile_reader_open(mcmd->cache_file, &mcmd->reader, object, mcmd->object_path);
+      }
+
+      CacheReader *reader = mcmd->reader;
+      if (reader && mcmd->cache_file) {
+        float velocity_scale = mcmd->velocity_scale;
+        if (mcmd->cache_file->velocity_unit == CACHEFILE_VELOCITY_UNIT_FRAME) {
+          velocity_scale *= FPS;
+        }
+        const float frame = DEG_get_ctime(depsgraph);
+        const float time = BKE_cachefile_time_offset(mcmd->cache_file, frame, FPS);
+        ABCReadParams params;
+        params.time = time;
+        params.read_flags = mcmd->read_flag;
+        params.velocity_name = mcmd->cache_file->velocity_name;
+        params.velocity_scale = velocity_scale;
+        params.mappings = &mcmd->cache_file->attribute_mappings;
+
+        /* Ensure we are not modifying the input. */
+        if (curves == curves_input) {
+          curves = BKE_curves_copy_for_eval(curves, true);
+        }
+
+        Curves *new_curves = ABC_read_curves(reader, object, curves, &params, nullptr);
+
+        if (curves != new_curves) {
+          BKE_id_free(nullptr, &curves->id);
+          curves = new_curves;
+        }
+
+        BKE_curves_update_customdata_pointers(curves);
+      }
+    }
+    else if ((mti->type == eModifierTypeType_OnlyDeform) &&
+             (mti->flags & eModifierTypeFlag_AcceptsVertexCosOnly)) {
       /* Ensure we are not modifying the input. */
       if (curves == curves_input) {
         curves = BKE_curves_copy_for_eval(curves, true);

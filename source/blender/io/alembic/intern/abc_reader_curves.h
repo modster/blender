@@ -25,7 +25,7 @@
 #include "abc_reader_mesh.h"
 #include "abc_reader_object.h"
 
-struct Curve;
+struct Curves;
 
 #define ABC_CURVE_RESOLUTION_U_PROPNAME "blender:resolution"
 
@@ -60,9 +60,15 @@ class AbcCurveReader final : public AbcObjectReader {
                      const float velocity_scale,
                      const char **err_str) override;
 
-  void read_curve_sample(Curve *cu,
-                         const Alembic::AbcGeom::ICurvesSchema &schema,
-                         const Alembic::Abc::ISampleSelector &sample_selector);
+  void read_curves_sample(Curves *curves,
+                          const Alembic::AbcGeom::ICurvesSchema &schema,
+                          const Alembic::Abc::ISampleSelector &sample_selector);
+
+  Curves *read_curves(Curves *curves_input,
+                      const Alembic::Abc::ISampleSelector &sample_sel,
+                      const AttributeSelector *attribute_selector,
+                      const float velocity_scale,
+                      const char **err_str);
 };
 
 }  // namespace blender::io::alembic
