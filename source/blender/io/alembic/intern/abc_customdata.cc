@@ -343,124 +343,87 @@ using Alembic::AbcGeom::IV3fGeomParam;
 
 /* -------------------------------------------------------------------- */
 
-/** \name BlenderScope
- *
- * This enumeration is used to translate the Alembic scope to a scope more suitable for Blender's
- * possible CustomData and attribute domains.
- * It is defined as a bit field in case routines need to resolve the scope for a set of potential
- * scopes. This can be done by or-ing the candidate scopes together, and validate by checking that
- * only a single bit is set.
- * \{ */
-
-enum class BlenderScope : uint32_t {
-  UNKNOWN = 0,
-  POINT = (1 << 0),
-  POLYGON = (1 << 1),
-  LOOPS = (1 << 2),
-};
-
-static BlenderScope &operator|=(BlenderScope &lhs, BlenderScope rhs)
+/* Check the bits and return an AttributeDomain it if only one of the bits is active. */
+static AttributeDomain valid_domain_or_unknown(uint32_t domain_bits)
 {
-  lhs = static_cast<BlenderScope>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
-  return lhs;
-}
-
-/* Check the bits for the scope and return it if only one of them is active. */
-static BlenderScope valid_scope_or_unknown(BlenderScope scope)
-{
-  if (count_bits_i(static_cast<uint32_t>(scope)) == 1) {
-    return scope;
+  if (count_bits_i(domain_bits) == 1) {
+    return static_cast<AttributeDomain>(bitscan_forward_uint(domain_bits));
   }
 
-  return BlenderScope::UNKNOWN;
+  return ATTR_DOMAIN_NUM;
 }
 
-/* Determine the matching scope given some number of values. The dimensions parameter is used to
- * scale the scope_sizes and is meant to be used (not equal to 1) when processing a scalar array
- * for a possible remapping to some n-dimensionnal data type. */
-static BlenderScope matching_scope(const ScopeSizeInfo scope_sizes,
-                                   int dimensions,
-                                   size_t num_values,
-                                   char requested_domain)
+/* Determine the matching domain given some number of values. The dimensions parameter is used to
+ * scale the DomainInfo.length and is meant to be used (i.e. greater than 1) when processing a
+ * scalar array for a possible remapping to some n-dimensionnal data type. */
+static AttributeDomain matching_domain(const DomainInfo info[ATTR_DOMAIN_NUM],
+                                       int dimensions,
+                                       size_t num_values,
+                                       char requested_domain)
 {
   if (requested_domain != CACHEFILE_ATTR_MAP_DOMAIN_AUTO) {
     if (requested_domain == CACHEFILE_ATTR_MAP_DOMAIN_POINT) {
-      if (static_cast<size_t>(scope_sizes.point_scope_size * dimensions) == num_values) {
-        return BlenderScope::POINT;
+      if (static_cast<size_t>(info[ATTR_DOMAIN_POINT].length * dimensions) == num_values) {
+        return ATTR_DOMAIN_POINT;
       }
 
-      return BlenderScope::UNKNOWN;
+      return ATTR_DOMAIN_NUM;
     }
 
     if (requested_domain == CACHEFILE_ATTR_MAP_DOMAIN_FACE_CORNER) {
-      if (static_cast<size_t>(scope_sizes.loop_scope_size * dimensions) == num_values) {
-        return BlenderScope::LOOPS;
+      if (static_cast<size_t>(info[ATTR_DOMAIN_CORNER].length * dimensions) == num_values) {
+        return ATTR_DOMAIN_CORNER;
       }
 
-      return BlenderScope::UNKNOWN;
+      return ATTR_DOMAIN_NUM;
     }
 
     if (requested_domain == CACHEFILE_ATTR_MAP_DOMAIN_FACE) {
-      if (static_cast<size_t>(scope_sizes.polygon_scope_size * dimensions) == num_values) {
-        return BlenderScope::POLYGON;
+      if (static_cast<size_t>(info[ATTR_DOMAIN_FACE].length * dimensions) == num_values) {
+        return ATTR_DOMAIN_FACE;
       }
 
-      return BlenderScope::UNKNOWN;
+      return ATTR_DOMAIN_NUM;
     }
 
-    return BlenderScope::UNKNOWN;
+    return ATTR_DOMAIN_NUM;
   }
 
-  BlenderScope scope = BlenderScope::UNKNOWN;
+  /* Use the AttributeDomains as bits in a bitfield, if multiple domains match the data size we
+   * will have more than one bit active therefore we cannot determine what domain the data is
+   * actually on. We will then delegate to the user the task of telling us through a remapping. */
+  uint32_t domain_bits = 0;
 
-  if (static_cast<size_t>(scope_sizes.loop_scope_size * dimensions) == num_values) {
-    scope |= BlenderScope::LOOPS;
+  if (static_cast<size_t>(info[ATTR_DOMAIN_CORNER].length * dimensions) == num_values) {
+    domain_bits |= (1 << ATTR_DOMAIN_CORNER);
   }
 
-  if (static_cast<size_t>(scope_sizes.polygon_scope_size * dimensions) == num_values) {
-    scope |= BlenderScope::POLYGON;
+  if (static_cast<size_t>(info[ATTR_DOMAIN_FACE].length * dimensions) == num_values) {
+    domain_bits |= (1 << ATTR_DOMAIN_FACE);
   }
 
-  if (static_cast<size_t>(scope_sizes.point_scope_size * dimensions) == num_values) {
-    scope |= BlenderScope::POINT;
+  if (static_cast<size_t>(info[ATTR_DOMAIN_POINT].length * dimensions) == num_values) {
+    domain_bits |= (1 << ATTR_DOMAIN_POINT);
   }
 
-  return valid_scope_or_unknown(scope);
-}
-
-static CustomData *custom_data_for_scope(ScopeCustomDataPointers custom_data_pointers,
-                                         BlenderScope bl_scope)
-{
-  if (bl_scope == BlenderScope::POINT) {
-    return custom_data_pointers.point_custom_data;
-  }
-
-  if (bl_scope == BlenderScope::POLYGON) {
-    return custom_data_pointers.polygon_custom_data;
-  }
-
-  if (bl_scope == BlenderScope::LOOPS) {
-    return custom_data_pointers.loop_custom_data;
-  }
-
-  return nullptr;
+  return valid_domain_or_unknown(domain_bits);
 }
 
 #if 0
 /* Useful for debugging. Turned off to quiet warnings. */
-static std::ostream &operator<<(std::ostream &os, BlenderScope bl_scope)
+static std::ostream &operator<<(std::ostream &os, AttributeDomain bl_domain)
 {
-  switch (bl_scope) {
-    case BlenderScope::POINT: {
+  switch (bl_domain) {
+    case ATTR_DOMAIN_POINT: {
       os << "POINT";
       break;
     }
-    case BlenderScope::LOOPS: {
-      os << "LOOPS";
+    case ATTR_DOMAIN_CORNER: {
+      os << "CORNER";
       break;
     }
-    case BlenderScope::POLYGON: {
-      os << "POLYGON";
+    case ATTR_DOMAIN_FACE: {
+      os << "FACE";
       break;
     }
     default: {
@@ -472,133 +435,96 @@ static std::ostream &operator<<(std::ostream &os, BlenderScope bl_scope)
 }
 #endif
 
-static int size_for_scope(const ScopeSizeInfo scope_sizes, BlenderScope scope)
-{
-  if (scope == BlenderScope::POINT) {
-    return scope_sizes.point_scope_size;
-  }
-
-  if (scope == BlenderScope::LOOPS) {
-    return scope_sizes.loop_scope_size;
-  }
-
-  if (scope == BlenderScope::POLYGON) {
-    return scope_sizes.polygon_scope_size;
-  }
-
-  return 0;
-}
-
 /* UVs can be defined per-loop (one value per vertex per face), or per-vertex (one value per
  * vertex). The first case is the most common, as this is the standard way of storing this data
  * given that some vertices might be on UV seams and have multiple possible UV coordinates; the
  * second case can happen when the mesh is split according to the UV islands, in which case storing
  * a single UV value per vertex allows to deduplicate data and thus to reduce the file size since
  * vertices are guaranteed to only have a single UV coordinate. */
-static bool is_valid_uv_scope(BlenderScope scope)
+static bool is_valid_uv_domain(AttributeDomain domain)
 {
-  return scope == BlenderScope::LOOPS || scope == BlenderScope::POINT;
+  return domain == ATTR_DOMAIN_CORNER || domain == ATTR_DOMAIN_POINT;
 }
 
-static bool is_valid_vertex_color_scope(BlenderScope scope)
+static bool is_valid_vertex_color_domain(AttributeDomain domain)
 {
-  return scope == BlenderScope::LOOPS || scope == BlenderScope::POINT;
+  return domain == ATTR_DOMAIN_CORNER || domain == ATTR_DOMAIN_POINT;
 }
 
-static bool is_valid_vertex_group_scope(BlenderScope scope)
+static bool is_valid_vertex_group_domain(AttributeDomain domain)
 {
-  return scope == BlenderScope::POINT;
+  return domain == ATTR_DOMAIN_POINT;
 }
 
-static bool is_valid_scope_for_layer(BlenderScope scope, CustomDataType custom_data_type)
+static bool is_valid_domain_for_layer(AttributeDomain domain, CustomDataType custom_data_type)
 {
-  if (scope == BlenderScope::UNKNOWN) {
+  if (domain == ATTR_DOMAIN_NUM) {
     return false;
   }
 
   if (custom_data_type == CD_MLOOPUV) {
-    return is_valid_uv_scope(scope);
+    return is_valid_uv_domain(domain);
   }
 
   if (custom_data_type == CD_MCOL) {
-    return is_valid_vertex_color_scope(scope);
+    return is_valid_vertex_color_domain(domain);
   }
 
   if (custom_data_type == CD_ORCO) {
-    return scope == BlenderScope::POINT;
+    return domain == ATTR_DOMAIN_POINT;
   }
 
   return true;
 }
 
-/* Converts an Alembic scope to a Blender one. We need to be careful as some Alembic scopes depend
- * on the domain on which they appear. For example, kVaryingScope could mean that the data is
- * varying across the polygons or the vertices. To resolve this, we also use the expected number of
- * elements for each scopes, and the matching scope is returned based on this.
- * If we cannot resolve the scope, BlenderScope::UNKNOWN is returned.
+/* Converts an Alembic scope to a Blender domain. We need to be careful as some Alembic scopes
+ * depend on the domain on which they appear. For example, kVaryingScope could mean that the data
+ * is varying across the polygons or the vertices. To resolve this, we also use the expected number
+ * of elements for each scopes, and the matching domain is returned based on this. If we cannot
+ * resolve the domain, ATTR_DOMAIN_NUM is returned.
  */
-static BlenderScope to_blender_scope(Alembic::AbcGeom::GeometryScope abc_scope,
-                                     size_t element_size,
-                                     ScopeSizeInfo scope_sizes)
+static AttributeDomain to_blender_domain(Alembic::AbcGeom::GeometryScope abc_scope,
+                                         size_t element_size,
+                                         const DomainInfo info[ATTR_DOMAIN_NUM])
 {
   switch (abc_scope) {
     case kConstantScope: {
-      return matching_scope(scope_sizes, 1, element_size, CACHEFILE_ATTR_MAP_DOMAIN_AUTO);
+      return matching_domain(info, 1, element_size, CACHEFILE_ATTR_MAP_DOMAIN_AUTO);
     }
     case kUniformScope: {
       /* This would mean one value for the whole object, but we don't support that yet. */
-      return BlenderScope::UNKNOWN;
+      return ATTR_DOMAIN_NUM;
     }
     case kVertexScope: {
       /* This is pretty straightforward, just ensure that the sizes match. */
-      if (static_cast<size_t>(scope_sizes.point_scope_size) == element_size) {
-        return BlenderScope::POINT;
+      if (static_cast<size_t>(info[ATTR_DOMAIN_POINT].length) == element_size) {
+        return ATTR_DOMAIN_POINT;
       }
-      return BlenderScope::UNKNOWN;
+      return ATTR_DOMAIN_NUM;
     }
     case kFacevaryingScope: {
       /* Fist check that the loops size match, since this is the right domain. */
-      if (static_cast<size_t>(scope_sizes.loop_scope_size) == element_size) {
-        return BlenderScope::LOOPS;
+      if (static_cast<size_t>(info[ATTR_DOMAIN_CORNER].length) == element_size) {
+        return ATTR_DOMAIN_CORNER;
       }
       /* If not, we may have some data that is face varying, but was written for each vertex
        * instead (e.g. vertex colors). */
-      if (static_cast<size_t>(scope_sizes.point_scope_size) == element_size) {
-        return BlenderScope::POINT;
+      if (static_cast<size_t>(info[ATTR_DOMAIN_POINT].length) == element_size) {
+        return ATTR_DOMAIN_POINT;
       }
-      return BlenderScope::UNKNOWN;
+      return ATTR_DOMAIN_NUM;
     }
     case kVaryingScope: {
       /* We have a varying field over some domain, which we need to determine. */
-      return matching_scope(scope_sizes, 1, element_size, CACHEFILE_ATTR_MAP_DOMAIN_AUTO);
+      return matching_domain(info, 1, element_size, CACHEFILE_ATTR_MAP_DOMAIN_AUTO);
     }
     case kUnknownScope: {
-      return BlenderScope::UNKNOWN;
+      return ATTR_DOMAIN_NUM;
     }
   }
 
-  return BlenderScope::UNKNOWN;
-}
-
-static AttributeDomain attribute_domain_from_blender_scope(BlenderScope scope)
-{
-  if (scope == BlenderScope::POINT) {
-    return ATTR_DOMAIN_POINT;
-  }
-
-  if (scope == BlenderScope::LOOPS) {
-    return ATTR_DOMAIN_CORNER;
-  }
-
-  if (scope == BlenderScope::POLYGON) {
-    return ATTR_DOMAIN_FACE;
-  }
-
-  BLI_assert_msg(0, "Obtained an invalid scope when converting to an AttributeDomain");
   return ATTR_DOMAIN_NUM;
 }
-
-/** \} */
 
 /* -------------------------------------------------------------------- */
 
@@ -771,7 +697,7 @@ static size_t mcols_out_of_bounds_check(const size_t color_index,
 
 struct AbcAttributeMapping {
   CustomDataType type;
-  BlenderScope scope;
+  AttributeDomain domain;
   /* This is to differentiate between RGB and RGBA colors. */
   bool is_rgba = false;
 };
@@ -780,7 +706,7 @@ struct AbcAttributeMapping {
  * sample and the mapping as desired by the user. */
 static std::optional<AbcAttributeMapping> final_mapping_from_cache_mapping(
     const CacheAttributeMapping &mapping,
-    const ScopeSizeInfo scope_sizes,
+    const DomainInfo info[ATTR_DOMAIN_NUM],
     AbcAttributeMapping original_mapping,
     const uint num_elements)
 {
@@ -791,75 +717,73 @@ static std::optional<AbcAttributeMapping> final_mapping_from_cache_mapping(
   switch (mapping.mapping) {
     case CACHEFILE_ATTRIBUTE_MAP_NONE: {
       if (mapping.domain == CACHEFILE_ATTR_MAP_DOMAIN_POINT) {
-        original_mapping.scope = BlenderScope::POINT;
+        original_mapping.domain = ATTR_DOMAIN_POINT;
       }
       if (mapping.domain == CACHEFILE_ATTR_MAP_DOMAIN_FACE_CORNER) {
-        original_mapping.scope = BlenderScope::LOOPS;
+        original_mapping.domain = ATTR_DOMAIN_CORNER;
       }
       return original_mapping;
     }
     case CACHEFILE_ATTRIBUTE_MAP_TO_UVS: {
       /* UVs have 2 values per element. */
-      const BlenderScope scope_hint = matching_scope(scope_sizes, 2, num_elements, mapping.domain);
-      if (!is_valid_uv_scope(scope_hint)) {
+      const AttributeDomain domain_hint = matching_domain(info, 2, num_elements, mapping.domain);
+      if (!is_valid_uv_domain(domain_hint)) {
         return {};
       }
-      return AbcAttributeMapping{CD_MLOOPUV, scope_hint};
+      return AbcAttributeMapping{CD_MLOOPUV, domain_hint};
     }
     case CACHEFILE_ATTRIBUTE_MAP_TO_VERTEX_COLORS: {
       /* 3 values for RGB, 4 for RGBA */
-      BlenderScope rgb_scope_hint = matching_scope(scope_sizes, 3, num_elements, mapping.domain);
-      BlenderScope rgba_scope_hint = matching_scope(scope_sizes, 4, num_elements, mapping.domain);
+      AttributeDomain rgb_domain_hint = matching_domain(info, 3, num_elements, mapping.domain);
+      AttributeDomain rgba_domain_hint = matching_domain(info, 4, num_elements, mapping.domain);
 
-      if (is_valid_vertex_color_scope(rgb_scope_hint) &&
-          rgba_scope_hint == BlenderScope::UNKNOWN) {
-        return AbcAttributeMapping{CD_MCOL, rgb_scope_hint, false};
+      if (is_valid_vertex_color_domain(rgb_domain_hint) && rgba_domain_hint == ATTR_DOMAIN_NUM) {
+        return AbcAttributeMapping{CD_MCOL, rgb_domain_hint, false};
       }
 
-      if (rgb_scope_hint == BlenderScope::UNKNOWN &&
-          is_valid_vertex_color_scope(rgba_scope_hint)) {
-        return AbcAttributeMapping{CD_MCOL, rgba_scope_hint, true};
+      if (rgb_domain_hint == ATTR_DOMAIN_NUM && is_valid_vertex_color_domain(rgba_domain_hint)) {
+        return AbcAttributeMapping{CD_MCOL, rgba_domain_hint, true};
       }
 
-      /* Either both are unknown, or we matched two different scopes in which case we cannot
+      /* Either both are unknown, or we matched two different domains in which case we cannot
        * resolve the ambiguity. */
       return {};
     }
     case CACHEFILE_ATTRIBUTE_MAP_TO_WEIGHT_GROUPS: {
-      BlenderScope r_scope_hint = matching_scope(scope_sizes, 1, num_elements, mapping.domain);
-      if (!is_valid_vertex_group_scope(r_scope_hint)) {
+      AttributeDomain r_domain_hint = matching_domain(info, 1, num_elements, mapping.domain);
+      if (!is_valid_vertex_group_domain(r_domain_hint)) {
         return {};
       }
-      return AbcAttributeMapping{CD_BWEIGHT, r_scope_hint};
+      return AbcAttributeMapping{CD_BWEIGHT, r_domain_hint};
     }
     case CACHEFILE_ATTRIBUTE_MAP_TO_FLOAT2: {
-      BlenderScope r_scope_hint = matching_scope(scope_sizes, 2, num_elements, mapping.domain);
-      if (r_scope_hint == BlenderScope::UNKNOWN) {
+      AttributeDomain r_domain_hint = matching_domain(info, 2, num_elements, mapping.domain);
+      if (r_domain_hint == ATTR_DOMAIN_NUM) {
         return {};
       }
-      return AbcAttributeMapping{CD_PROP_FLOAT2, r_scope_hint};
+      return AbcAttributeMapping{CD_PROP_FLOAT2, r_domain_hint};
     }
     case CACHEFILE_ATTRIBUTE_MAP_TO_FLOAT3: {
-      BlenderScope r_scope_hint = matching_scope(scope_sizes, 3, num_elements, mapping.domain);
-      if (r_scope_hint == BlenderScope::UNKNOWN) {
+      AttributeDomain r_domain_hint = matching_domain(info, 3, num_elements, mapping.domain);
+      if (r_domain_hint == ATTR_DOMAIN_NUM) {
         return {};
       }
-      return AbcAttributeMapping{CD_PROP_FLOAT3, r_scope_hint};
+      return AbcAttributeMapping{CD_PROP_FLOAT3, r_domain_hint};
     }
     case CACHEFILE_ATTRIBUTE_MAP_TO_COLOR: {
       /* 3 values for RGB, 4 for RGBA */
-      BlenderScope rgb_scope_hint = matching_scope(scope_sizes, 3, num_elements, mapping.domain);
-      BlenderScope rgba_scope_hint = matching_scope(scope_sizes, 4, num_elements, mapping.domain);
+      AttributeDomain rgb_domain_hint = matching_domain(info, 3, num_elements, mapping.domain);
+      AttributeDomain rgba_domain_hint = matching_domain(info, 4, num_elements, mapping.domain);
 
-      if (rgb_scope_hint != BlenderScope::UNKNOWN && rgba_scope_hint == BlenderScope::UNKNOWN) {
-        return AbcAttributeMapping{CD_PROP_COLOR, rgb_scope_hint, false};
+      if (rgb_domain_hint != ATTR_DOMAIN_NUM && rgba_domain_hint == ATTR_DOMAIN_NUM) {
+        return AbcAttributeMapping{CD_PROP_COLOR, rgb_domain_hint, false};
       }
 
-      if (rgb_scope_hint == BlenderScope::UNKNOWN && rgba_scope_hint != BlenderScope::UNKNOWN) {
-        return AbcAttributeMapping{CD_PROP_COLOR, rgba_scope_hint, true};
+      if (rgb_domain_hint == ATTR_DOMAIN_NUM && rgba_domain_hint != ATTR_DOMAIN_NUM) {
+        return AbcAttributeMapping{CD_PROP_COLOR, rgba_domain_hint, true};
       }
 
-      /* Either both are unknown, or we matched two different scopes in which case we cannot
+      /* Either both are unknown, or we matched two different domains in which case we cannot
        * resolve the ambiguity. */
       return {};
     }
@@ -887,30 +811,30 @@ static bool can_add_custom_data_layer(const CustomData *data,
 static bool can_add_vertex_color_layer(const CDStreamConfig &config)
 {
   return can_add_custom_data_layer(
-      config.custom_data_pointers.loop_custom_data, CD_MLOOPCOL, MAX_MCOL);
+      config.domain_info[ATTR_DOMAIN_CORNER].customdata, CD_MLOOPCOL, MAX_MCOL);
 }
 
 /* Check if we do not already have reached the maximum allowed number of UV layers. */
 static bool can_add_uv_layer(const CDStreamConfig &config)
 {
   return can_add_custom_data_layer(
-      config.custom_data_pointers.loop_custom_data, CD_MLOOPUV, MAX_MTFACE);
+      config.domain_info[ATTR_DOMAIN_CORNER].customdata, CD_MLOOPUV, MAX_MTFACE);
 }
 
-/* For converting attributes with a loop scope, we need to convert the polygon winding order as
+/* For converting attributes with a loop domain, we need to convert the polygon winding order as
  * well, as viewed from Blender, Alembic orders vertices around a polygon in reverse.
- * The callback will called for each loop, and the index passed to it will be the index of the data
- * in the source_scope. If source_scope is POINT, the passed index will be that of the point of the
- * corresponding loop vertex. If it is LOOPS, it will be that of the loop.
- * For now, we do support POLYGON scope as a source_scope.
+ * The callback will be called for each loop, and the index passed to it will be the index of the
+ * data in the source_domain. If source_domain is POINT, the passed index will be that of the point
+ * of the corresponding loop vertex. If it is CORNER, it will be that of the loop. For now, we do
+ * not support POLYGON domain as a source_domain.
  */
 template<typename BlenderType, typename Callback>
-static void iterate_attribute_loop_scope(const CDStreamConfig &config,
-                                         BlenderType *attribute_data,
-                                         BlenderScope source_scope,
-                                         Callback callback)
+static void iterate_attribute_loop_domain(const CDStreamConfig &config,
+                                          BlenderType *attribute_data,
+                                          AttributeDomain source_domain,
+                                          Callback callback)
 {
-  if (source_scope != BlenderScope::LOOPS && source_scope != BlenderScope::POINT) {
+  if (source_domain != ATTR_DOMAIN_CORNER && source_domain != ATTR_DOMAIN_POINT) {
     return;
   }
 
@@ -918,7 +842,7 @@ static void iterate_attribute_loop_scope(const CDStreamConfig &config,
   MPoly *mpolys = mesh->mpoly;
   MLoop *mloops = mesh->mloop;
   unsigned int loop_index, rev_loop_index;
-  const bool index_per_loop = source_scope == BlenderScope::LOOPS;
+  const bool index_per_loop = source_domain == ATTR_DOMAIN_CORNER;
 
   for (int i = 0; i < mesh->totpoly; i++) {
     MPoly &poly = mpolys[i];
@@ -936,71 +860,70 @@ static void iterate_attribute_loop_scope(const CDStreamConfig &config,
  *
  * The callback is responsible for converting filling the custom data layer, one value at a time.
  * Its signature should be : BlenderType(size_t). The parameter is the current index of the
- * iteration, and is dependant on the target_scope.
+ * iteration, and is dependant on the target_domain.
  *
- * The source_scope is the resolved scope for the Alembic data, while the target_scope is the scope
- * of the final Blender data. We split these as they can be different either due to remapping, or
- * because we have an attribute that is always on one scope in Blender, but can be expressed in
- * multiple scopes in Alembic (e.g. UV maps are loop scope in Blender, but loop or vertex in
- * Alembic).
+ * The source_domain is the resolved domain for the Alembic data, while the target_domain is the
+ * domain of the final Blender data. We split these as they can be different either due to
+ * remapping, or because we have an attribute that is always on one domain in Blender, but can be
+ * expressed in multiple scopes in Alembic (e.g. UV maps are loop domain in Blender, but loop or
+ * vertex in Alembic).
  */
 template<typename BlenderType, typename Callback>
-static void create_layer_for_scope(const CDStreamConfig &config,
-                                   BlenderScope source_scope,
-                                   BlenderScope target_scope,
-                                   CustomDataType cd_type,
-                                   const std::string &name,
-                                   Callback callback)
+static void create_layer_for_domain(const CDStreamConfig &config,
+                                    AttributeDomain source_domain,
+                                    AttributeDomain target_domain,
+                                    CustomDataType cd_type,
+                                    const std::string &name,
+                                    Callback callback)
 {
-  BLI_assert(source_scope != BlenderScope::UNKNOWN);
-  BLI_assert(target_scope != BlenderScope::UNKNOWN);
+  BLI_assert(source_domain != ATTR_DOMAIN_NUM && source_domain != ATTR_DOMAIN_AUTO);
+  BLI_assert(target_domain != ATTR_DOMAIN_NUM && target_domain != ATTR_DOMAIN_AUTO);
 
-  const ScopeCustomDataPointers &custom_data_pointers = config.custom_data_pointers;
-  CustomData *custom_data = custom_data_for_scope(custom_data_pointers, target_scope);
+  CustomData *custom_data = config.domain_info[target_domain].customdata;
   if (!custom_data) {
     return;
   }
 
-  const int layer_size = size_for_scope(config.scope_sizes, target_scope);
+  const int layer_size = config.domain_info[target_domain].length;
 
-  const AttributeDomain domain = attribute_domain_from_blender_scope(target_scope);
   CustomDataLayer *layer = BKE_id_attribute_ensure(
-      config.id, name.c_str(), cd_type, domain, nullptr);
+      config.id, name.c_str(), cd_type, target_domain, nullptr);
 
   BlenderType *layer_data = static_cast<BlenderType *>(layer->data);
 
-  if (target_scope == BlenderScope::LOOPS) {
-    iterate_attribute_loop_scope(config, layer_data, source_scope, callback);
+  if (target_domain == ATTR_DOMAIN_CORNER) {
+    iterate_attribute_loop_domain(config, layer_data, source_domain, callback);
     return;
   }
 
-  /* POINT and POLYGON scopes can be simply iterated. */
+  /* Other domains can be simply iterated. */
   for (size_t i = 0; i < static_cast<size_t>(layer_size); i++) {
     *layer_data++ = callback(i);
   }
 }
 
-/* Wrapper around create_layer_for_scope with similar source and target scopes. */
+/* Wrapper around create_layer_for_domain with similar source and target domains. */
 template<typename BlenderType, typename Callback>
-static void create_layer_for_scope(const CDStreamConfig &config,
-                                   BlenderScope bl_scope,
-                                   CustomDataType cd_type,
-                                   const std::string &name,
-                                   Callback callback)
+static void create_layer_for_domain(const CDStreamConfig &config,
+                                    AttributeDomain bl_domain,
+                                    CustomDataType cd_type,
+                                    const std::string &name,
+                                    Callback callback)
 {
-  return create_layer_for_scope<BlenderType>(config, bl_scope, bl_scope, cd_type, name, callback);
+  return create_layer_for_domain<BlenderType>(
+      config, bl_domain, bl_domain, cd_type, name, callback);
 }
 
-/* Wrapper around create_layer_for_scope with the loop scope being the target scope. */
+/* Wrapper around create_layer_for_domain with the loop domain being the target domain. */
 template<typename BlenderType, typename Callback>
-static void create_loop_layer_for_scope(const CDStreamConfig &config,
-                                        BlenderScope source_scope,
-                                        CustomDataType cd_type,
-                                        const std::string &name,
-                                        Callback callback)
+static void create_loop_layer_for_domain(const CDStreamConfig &config,
+                                         AttributeDomain source_domain,
+                                         CustomDataType cd_type,
+                                         const std::string &name,
+                                         Callback callback)
 {
-  return create_layer_for_scope<BlenderType>(
-      config, source_scope, BlenderScope::LOOPS, cd_type, name, callback);
+  return create_layer_for_domain<BlenderType>(
+      config, source_domain, ATTR_DOMAIN_CORNER, cd_type, name, callback);
 }
 
 enum class AbcAttributeReadError {
@@ -1010,11 +933,11 @@ enum class AbcAttributeReadError {
   UNSUPPORTED_TYPE,
   /* The attribute is invalid (e.g. corrupt file or data). */
   INVALID_ATTRIBUTE,
-  /* We cannot determine the scope for the attribute, either from mismatching element size, or
-   * ambiguous scope used in the Alembic archive. */
-  SCOPE_RESOLUTION_FAILED,
-  /* Scope resolution succeeded, but the scope is not valid for the data. */
-  INVALID_SCOPE,
+  /* We cannot determine the domain for the attribute, either from mismatching element size, or
+   * ambiguous domain used in the Alembic archive. */
+  DOMAIN_RESOLUTION_FAILED,
+  /* Scope resolution succeeded, but the domain is not valid for the data. */
+  INVALID_DOMAIN,
   /* The mapping selected by the user is not possible. */
   MAPPING_IMPOSSIBLE,
   /* The limit of a attribute for the CustomData layer is reached (this should only concern UVs and
@@ -1123,29 +1046,30 @@ static std::optional<AbcAttributeMapping> determine_attribute_mapping(
     size_t num_values,
     const CacheAttributeMapping *desired_mapping)
 {
-  const BlenderScope bl_scope = to_blender_scope(param.getScope(), num_values, config.scope_sizes);
+  const AttributeDomain bl_domain = to_blender_domain(
+      param.getScope(), num_values, config.domain_info);
   AbcAttributeMapping default_mapping;
-  default_mapping.scope = bl_scope;
+  default_mapping.domain = bl_domain;
   default_mapping.type = get_default_custom_data_type(config, param, default_mapping.is_rgba);
 
   if (desired_mapping) {
     auto opt_final_mapping = final_mapping_from_cache_mapping(*desired_mapping,
-                                                              config.scope_sizes,
+                                                              config.domain_info,
                                                               default_mapping,
                                                               num_values *
                                                                   param.getDataType().getExtent());
 
     if (opt_final_mapping.has_value()) {
-      /* Verify that the scope is valid, it may be that we cannot apply the desired mapping, or
+      /* Verify that the domain is valid, it may be that we cannot apply the desired mapping, or
        * that the data matches the default mapping, but that is also invalid. */
       AbcAttributeMapping final_mapping = *opt_final_mapping;
-      if (final_mapping.scope != BlenderScope::UNKNOWN) {
+      if (final_mapping.domain != ATTR_DOMAIN_NUM) {
         return opt_final_mapping;
       }
     }
   }
 
-  if (!is_valid_scope_for_layer(default_mapping.scope, default_mapping.type)) {
+  if (!is_valid_domain_for_layer(default_mapping.domain, default_mapping.type)) {
     return {};
   }
 
@@ -1180,7 +1104,7 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
   }
 
   AbcAttributeMapping abc_mapping = *opt_abc_mapping;
-  BlenderScope bl_scope = abc_mapping.scope;
+  AttributeDomain domain = abc_mapping.domain;
 
   if (!attr_sel.select_attribute(param.getName())) {
     return AbcAttributeReadError::READ_SUCCESS;
@@ -1196,28 +1120,28 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
       return AbcAttributeReadError::MAPPING_IMPOSSIBLE;
     }
     case CD_PROP_BOOL: {
-      create_layer_for_scope<bool>(config, bl_scope, CD_PROP_BOOL, param.getName(), [&](size_t i) {
+      create_layer_for_domain<bool>(config, domain, CD_PROP_BOOL, param.getName(), [&](size_t i) {
         return value_type_converter<abc_scalar_type>::map_to_bool(&input_data[i]);
       });
       return AbcAttributeReadError::READ_SUCCESS;
     }
     case CD_PROP_INT32: {
-      create_layer_for_scope<int32_t>(
-          config, bl_scope, CD_PROP_INT32, param.getName(), [&](size_t i) {
+      create_layer_for_domain<int32_t>(
+          config, domain, CD_PROP_INT32, param.getName(), [&](size_t i) {
             return value_type_converter<abc_scalar_type>::map_to_int32(&input_data[i]);
           });
       return AbcAttributeReadError::READ_SUCCESS;
     }
     case CD_PROP_FLOAT: {
-      create_layer_for_scope<float>(
-          config, bl_scope, CD_PROP_FLOAT, param.getName(), [&](size_t i) {
+      create_layer_for_domain<float>(
+          config, domain, CD_PROP_FLOAT, param.getName(), [&](size_t i) {
             return value_type_converter<abc_scalar_type>::map_to_float(&input_data[i]);
           });
       return AbcAttributeReadError::READ_SUCCESS;
     }
     case CD_PROP_FLOAT2: {
-      create_layer_for_scope<float2>(
-          config, bl_scope, CD_PROP_FLOAT2, param.getName(), [&](size_t i) {
+      create_layer_for_domain<float2>(
+          config, domain, CD_PROP_FLOAT2, param.getName(), [&](size_t i) {
             return value_type_converter<abc_scalar_type>::map_to_float2(&input_data[i * 2]);
           });
       return AbcAttributeReadError::READ_SUCCESS;
@@ -1231,30 +1155,29 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
         is_velocity = true;
 
         /* Check that we indeed have an attribute on the points. */
-        if (bl_scope != BlenderScope::POINT) {
-          return AbcAttributeReadError::INVALID_SCOPE;
+        if (domain != ATTR_DOMAIN_POINT) {
+          return AbcAttributeReadError::INVALID_DOMAIN;
         }
       }
 
-      create_layer_for_scope<float3>(
-          config, bl_scope, abc_mapping.type, param_name, [&](size_t i) {
-            const float3 value = value_type_converter<abc_scalar_type>::map_to_float3(
-                &input_data[i * 3]);
-            return is_velocity ? value * velocity_scale : value;
-          });
+      create_layer_for_domain<float3>(config, domain, abc_mapping.type, param_name, [&](size_t i) {
+        const float3 value = value_type_converter<abc_scalar_type>::map_to_float3(
+            &input_data[i * 3]);
+        return is_velocity ? value * velocity_scale : value;
+      });
       return AbcAttributeReadError::READ_SUCCESS;
     }
     case CD_PROP_COLOR: {
       if (abc_mapping.is_rgba) {
-        create_layer_for_scope<ColorGeometry4f>(
-            config, bl_scope, CD_PROP_COLOR, param.getName(), [&](size_t i) {
+        create_layer_for_domain<ColorGeometry4f>(
+            config, domain, CD_PROP_COLOR, param.getName(), [&](size_t i) {
               return value_type_converter<abc_scalar_type>::map_to_color_from_rgba(
                   &input_data[i * 4]);
             });
       }
       else {
-        create_layer_for_scope<ColorGeometry4f>(
-            config, bl_scope, CD_PROP_COLOR, param.getName(), [&](size_t i) {
+        create_layer_for_domain<ColorGeometry4f>(
+            config, domain, CD_PROP_COLOR, param.getName(), [&](size_t i) {
               return value_type_converter<abc_scalar_type>::map_to_color_from_rgb(
                   &input_data[i * 3]);
             });
@@ -1266,8 +1189,8 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
         return AbcAttributeReadError::TOO_MANY_ATTRIBUTES;
       }
 
-      create_loop_layer_for_scope<float2>(
-          config, bl_scope, CD_MLOOPUV, param.getName(), [&](size_t i) {
+      create_loop_layer_for_domain<float2>(
+          config, domain, CD_MLOOPUV, param.getName(), [&](size_t i) {
             i = indices->size() ? (*indices)[i] : i;
             return value_type_converter<abc_scalar_type>::map_to_float2(&input_data[i * 2]);
           });
@@ -1279,7 +1202,7 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
         return AbcAttributeReadError::TOO_MANY_ATTRIBUTES;
       }
 
-      const bool is_facevarying = bl_scope == BlenderScope::LOOPS;
+      const bool is_facevarying = domain == ATTR_DOMAIN_CORNER;
 
       /* Read the vertex colors */
       bool bounds_warning_given = false;
@@ -1290,8 +1213,8 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
        * is why we have to check for indices->size() > 0 */
       bool use_dual_indexing = is_facevarying && indices->size() > 0;
 
-      create_loop_layer_for_scope<MCol>(
-          config, bl_scope, CD_MLOOPCOL, param.getName(), [&](size_t loop_index) {
+      create_loop_layer_for_domain<MCol>(
+          config, domain, CD_MLOOPCOL, param.getName(), [&](size_t loop_index) {
             size_t color_index = loop_index;
             if (use_dual_indexing) {
               color_index = (*indices)[color_index];
@@ -1346,11 +1269,11 @@ static AbcAttributeReadError read_mesh_uvs(const CDStreamConfig &config,
   const Alembic::AbcGeom::V2fArraySamplePtr &uvs = sample.getVals();
   const Alembic::AbcGeom::UInt32ArraySamplePtr &indices = sample.getIndices();
 
-  const BlenderScope bl_scope = to_blender_scope(
-      uv_param.getScope(), indices->size(), config.scope_sizes);
+  const AttributeDomain bl_domain = to_blender_domain(
+      uv_param.getScope(), indices->size(), config.domain_info);
 
-  if (!is_valid_uv_scope(bl_scope)) {
-    return AbcAttributeReadError::INVALID_SCOPE;
+  if (!is_valid_uv_domain(bl_domain)) {
+    return AbcAttributeReadError::INVALID_DOMAIN;
   }
 
   /* According to the convention, primary UVs should have had their name set using
@@ -1361,15 +1284,16 @@ static AbcAttributeReadError read_mesh_uvs(const CDStreamConfig &config,
     name = uv_param.getName();
   }
 
-  create_loop_layer_for_scope<MLoopUV>(config, bl_scope, CD_MLOOPUV, name, [&](size_t loop_index) {
-    size_t uv_index = (*indices)[loop_index];
-    const Imath::V2f &uv = (*uvs)[uv_index];
+  create_loop_layer_for_domain<MLoopUV>(
+      config, bl_domain, CD_MLOOPUV, name, [&](size_t loop_index) {
+        size_t uv_index = (*indices)[loop_index];
+        const Imath::V2f &uv = (*uvs)[uv_index];
 
-    MLoopUV result;
-    result.uv[0] = uv[0];
-    result.uv[1] = uv[1];
-    return result;
-  });
+        MLoopUV result;
+        result.uv[0] = uv[0];
+        result.uv[1] = uv[1];
+        return result;
+      });
 
   return AbcAttributeReadError::READ_SUCCESS;
 }
@@ -1532,14 +1456,14 @@ struct AttributeReadOperator {
                   << "\" as the mapping is impossible!\n";
         return;
       }
-      case AbcAttributeReadError::SCOPE_RESOLUTION_FAILED: {
+      case AbcAttributeReadError::DOMAIN_RESOLUTION_FAILED: {
         std::cerr << "Cannot read attribute \"" << attribute_name
-                  << "\" as the scope is undeterminable!\n";
+                  << "\" as the domain is undeterminable!\n";
         return;
       }
-      case AbcAttributeReadError::INVALID_SCOPE: {
+      case AbcAttributeReadError::INVALID_DOMAIN: {
         std::cerr << "Cannot read attribute \"" << attribute_name
-                  << "\" as the scope is invalid for the specific data type!\n";
+                  << "\" as the domain is invalid for the specific data type!\n";
         return;
       }
       case AbcAttributeReadError::UNSUPPORTED_TYPE: {

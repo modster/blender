@@ -200,12 +200,9 @@ void AbcPointsReader::read_geometry(GeometrySet &geometry_set,
     point_cloud = BKE_pointcloud_new_nomain(positions->size());
   }
 
-  ScopeCustomDataPointers custom_data_pointers = {&point_cloud->pdata, nullptr, nullptr};
-  ScopeSizeInfo scope_sizes = {point_cloud->totpoint, 0, 0};
   CDStreamConfig config;
-  config.custom_data_pointers = custom_data_pointers;
-  config.scope_sizes = scope_sizes;
   config.id = &point_cloud->id;
+  BKE_id_attribute_get_domains(config.id, config.domain_info);
   config.attr_selector = attribute_selector;
   config.time = sample_sel.getRequestedTime();
   config.use_vertex_interpolation = (read_flag & MOD_MESHSEQ_INTERPOLATE_VERTICES) != 0;

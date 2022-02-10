@@ -89,6 +89,13 @@ int *BKE_id_attributes_active_index_p(struct ID *id);
 
 CustomData *BKE_id_attributes_iterator_next_domain(struct ID *id, struct CustomDataLayer *layers);
 
+typedef struct DomainInfo {
+  CustomData *customdata;
+  int length;
+} DomainInfo;
+
+void BKE_id_attribute_get_domains(const struct ID *id, DomainInfo info[ATTR_DOMAIN_NUM]);
+
 #ifdef __cplusplus
 }
 #endif

@@ -391,8 +391,7 @@ CDStreamConfig get_config(Mesh *mesh,
   config.use_vertex_interpolation = use_vertex_interpolation;
   config.attr_selector = attr_selector;
   config.iobject_full_name = iobject_full_name;
-  config.scope_sizes = {mesh->totvert, mesh->totpoly, mesh->totloop};
-  config.custom_data_pointers = {&mesh->vdata, &mesh->pdata, &mesh->ldata};
+  BKE_id_attribute_get_domains(config.id, config.domain_info);
 
   return config;
 }

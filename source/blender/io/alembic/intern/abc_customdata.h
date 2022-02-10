@@ -27,6 +27,8 @@
 
 #include <map>
 
+#include "BKE_attribute.h"
+
 #include "BLI_listbase_wrapper.hh"
 
 struct CacheAttributeMapping;
@@ -43,23 +45,10 @@ using Alembic::Abc::OCompoundProperty;
 namespace blender::io::alembic {
 
 class AttributeSelector;
-enum class BlenderScope : uint32_t;
 
 struct UVSample {
   std::vector<Imath::V2f> uvs;
   std::vector<uint32_t> indices;
-};
-
-struct ScopeSizeInfo {
-  int point_scope_size;
-  int polygon_scope_size;
-  int loop_scope_size;
-};
-
-struct ScopeCustomDataPointers {
-  CustomData *point_custom_data;
-  CustomData *polygon_custom_data;
-  CustomData *loop_custom_data;
 };
 
 struct CDStreamConfig {
@@ -94,8 +83,7 @@ struct CDStreamConfig {
 
   const char **modifier_error_message;
 
-  ScopeCustomDataPointers custom_data_pointers;
-  ScopeSizeInfo scope_sizes;
+  DomainInfo domain_info[ATTR_DOMAIN_NUM];
 
   /* For error reporting when reading vertex colors. */
   std::string iobject_full_name;

@@ -254,15 +254,11 @@ static void read_curves_sample_ex(Curves *curves,
   geometry.offsets[geometry.curve_size] = offset;
 
   /* Attributes. */
-  ScopeCustomDataPointers custom_data_pointers = {
-      &geometry.point_data, &geometry.curve_data, nullptr};
-  ScopeSizeInfo scope_sizes = {geometry.point_size, geometry.curve_size, 0};
   CDStreamConfig config;
-  config.custom_data_pointers = custom_data_pointers;
-  config.scope_sizes = scope_sizes;
   config.id = &curves->id;
   config.attr_selector = attribute_selector;
   config.time = sample_sel.getRequestedTime();
+  BKE_id_attribute_get_domains(config.id, config.domain_info);
 
   read_arbitrary_attributes(config, schema, {}, sample_sel, velocity_scale);
 }

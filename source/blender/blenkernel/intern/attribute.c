@@ -45,12 +45,7 @@
 
 #include "RNA_access.h"
 
-typedef struct DomainInfo {
-  CustomData *customdata;
-  int length;
-} DomainInfo;
-
-static void get_domains(const ID *id, DomainInfo info[ATTR_DOMAIN_NUM])
+void BKE_id_attribute_get_domains(const ID *id, DomainInfo info[ATTR_DOMAIN_NUM])
 {
   memset(info, 0, sizeof(DomainInfo) * ATTR_DOMAIN_NUM);
 
@@ -103,7 +98,7 @@ static void get_domains(const ID *id, DomainInfo info[ATTR_DOMAIN_NUM])
 static CustomData *attribute_customdata_find(ID *id, CustomDataLayer *layer)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
 
   for (AttributeDomain domain = 0; domain < ATTR_DOMAIN_NUM; domain++) {
     CustomData *customdata = info[domain].customdata;
@@ -118,7 +113,7 @@ static CustomData *attribute_customdata_find(ID *id, CustomDataLayer *layer)
 bool BKE_id_attributes_supported(struct ID *id)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
   for (AttributeDomain domain = 0; domain < ATTR_DOMAIN_NUM; domain++) {
     if (info[domain].customdata) {
       return true;
@@ -152,7 +147,7 @@ CustomDataLayer *BKE_id_attribute_new(
     ID *id, const char *name, const int type, const AttributeDomain domain, ReportList *reports)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
 
   CustomData *customdata = info[domain].customdata;
   if (customdata == NULL) {
@@ -228,7 +223,7 @@ CustomDataLayer *BKE_id_attribute_find(const ID *id,
                                        const AttributeDomain domain)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
 
   CustomData *customdata = info[domain].customdata;
   if (customdata == NULL) {
@@ -260,7 +255,7 @@ CustomDataLayer *BKE_id_attribute_ensure(
 int BKE_id_attributes_length(ID *id, const CustomDataMask mask)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
 
   int length = 0;
 
@@ -277,7 +272,7 @@ int BKE_id_attributes_length(ID *id, const CustomDataMask mask)
 AttributeDomain BKE_id_attribute_domain(ID *id, CustomDataLayer *layer)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
 
   for (AttributeDomain domain = 0; domain < ATTR_DOMAIN_NUM; domain++) {
     CustomData *customdata = info[domain].customdata;
@@ -293,7 +288,7 @@ AttributeDomain BKE_id_attribute_domain(ID *id, CustomDataLayer *layer)
 int BKE_id_attribute_data_length(ID *id, CustomDataLayer *layer)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
 
   for (AttributeDomain domain = 0; domain < ATTR_DOMAIN_NUM; domain++) {
     CustomData *customdata = info[domain].customdata;
@@ -328,7 +323,7 @@ CustomDataLayer *BKE_id_attributes_active_get(ID *id)
   }
 
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
 
   int index = 0;
 
@@ -353,7 +348,7 @@ CustomDataLayer *BKE_id_attributes_active_get(ID *id)
 void BKE_id_attributes_active_set(ID *id, CustomDataLayer *active_layer)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
 
   int index = 0;
 
@@ -394,7 +389,7 @@ int *BKE_id_attributes_active_index_p(ID *id)
 CustomData *BKE_id_attributes_iterator_next_domain(ID *id, CustomDataLayer *layers)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
-  get_domains(id, info);
+  BKE_id_attribute_get_domains(id, info);
 
   bool use_next = (layers == NULL);
 
