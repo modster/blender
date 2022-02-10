@@ -343,7 +343,7 @@ using Alembic::AbcGeom::IV3fGeomParam;
 
 /* -------------------------------------------------------------------- */
 
-/* Check the bits and return an AttributeDomain it if only one of the bits is active. */
+/* Check the bits and return an AttributeDomain if only one of the bits is active. */
 static AttributeDomain valid_domain_or_unknown(uint32_t domain_bits)
 {
   if (count_bits_i(domain_bits) == 1) {
