@@ -1313,7 +1313,9 @@ static AbcAttributeReadError read_mesh_uvs(const CDStreamConfig &config,
   return AbcAttributeReadError::READ_SUCCESS;
 }
 
-/* This structure holds data for an attribute found on the Alembic object. */
+/* This structure holds data for a requested attribute on the Alembic object. Since attributes can
+ * be either in the `.arbGeomParams` or on the schema, we use this to centralize data about
+ * attributes and simplify data extraction with a common interface. */
 struct ParsedAttributeDesc {
   ICompoundProperty parent;
   const PropertyHeader &prop_header;
@@ -1321,7 +1323,8 @@ struct ParsedAttributeDesc {
 };
 
 /* Extract supported attributes from the ICompoundProperty, and associate them with any mapping
- * with a matching name. */
+ * with a matching name. This does not verify yet that the mapping is valid, it will be done during
+ * data processing. */
 static Vector<ParsedAttributeDesc> parse_attributes(const AttributeSelector *attr_sel,
                                                     const ICompoundProperty &arb_geom_params)
 {
