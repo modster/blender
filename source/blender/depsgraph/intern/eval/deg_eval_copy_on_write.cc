@@ -43,6 +43,7 @@
 #include "BKE_curve.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_update_cache.h"
 #include "BKE_idprop.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.h"
@@ -646,8 +647,8 @@ void set_particle_system_modifiers_loaded(Object *object_cow)
 
 void reset_particle_system_edit_eval(const Depsgraph *depsgraph, Object *object_cow)
 {
-  /* Inactive (and render) dependency graphs are living in own little bubble, should not care about
-   * edit mode at all. */
+  /* Inactive (and render) dependency graphs are living in their own little bubble, should not care
+   * about edit mode at all. */
   if (!DEG_is_active(reinterpret_cast<const ::Depsgraph *>(depsgraph))) {
     return;
   }
@@ -736,9 +737,6 @@ void update_id_after_copy(const Depsgraph *depsgraph,
           update_pose_orig_pointers(object_orig->pose, object_cow->pose);
         }
         BKE_pose_pchan_index_rebuild(object_cow->pose);
-      }
-      if (object_cow->type == OB_GPENCIL) {
-        BKE_gpencil_update_orig_pointers(object_orig, object_cow);
       }
       update_particles_after_copy(depsgraph, object_orig, object_cow);
       break;
@@ -890,6 +888,13 @@ ID *deg_update_copy_on_write_datablock(const Depsgraph *depsgraph, const IDNode 
        *  - Depsgraph of SceneB is evaluated.
        *  - User enters edit mode of ObjectA in SceneA. */
       update_edit_mode_pointers(depsgraph, id_orig, id_cow);
+      return id_cow;
+    }
+    /* In case we don't need to do a copy-on-write, we can use the update cache of the grease
+     * pencil data to do an update-on-write.*/
+    if (id_type == ID_GD && BKE_gpencil_can_avoid_full_copy_on_write(
+                                (const ::Depsgraph *)depsgraph, (bGPdata *)id_orig)) {
+      BKE_gpencil_update_on_write((bGPdata *)id_orig, (bGPdata *)id_cow);
       return id_cow;
     }
   }

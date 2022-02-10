@@ -273,6 +273,12 @@ static OutputFieldDependency find_group_output_dependencies(
   while (!sockets_to_check.is_empty()) {
     const InputSocketRef *input_socket = sockets_to_check.pop();
 
+    if (!input_socket->is_directly_linked() &&
+        !field_state_by_socket_id[input_socket->id()].is_single) {
+      /* This socket uses a field as input by default. */
+      return OutputFieldDependency::ForFieldSource();
+    }
+
     for (const OutputSocketRef *origin_socket : input_socket->directly_linked_sockets()) {
       const NodeRef &origin_node = origin_socket->node();
       const SocketFieldState &origin_state = field_state_by_socket_id[origin_socket->id()];
@@ -1606,6 +1612,11 @@ void BKE_ntree_update_tag_link_added(bNodeTree *ntree, bNodeLink *UNUSED(link))
 void BKE_ntree_update_tag_link_mute(bNodeTree *ntree, bNodeLink *UNUSED(link))
 {
   add_tree_tag(ntree, NTREE_CHANGED_LINK);
+}
+
+void BKE_ntree_update_tag_active_output_changed(bNodeTree *ntree)
+{
+  add_tree_tag(ntree, NTREE_CHANGED_ANY);
 }
 
 void BKE_ntree_update_tag_missing_runtime_data(bNodeTree *ntree)

@@ -129,7 +129,7 @@ constexpr bool is_type_string_related = (... && std::is_constructible_v<std::str
  * results in "obj_export_io.hh:205:18: warning: ‘%s’ directive output truncated writing 34 bytes
  * into a region of size 6" and similar warnings. Yes the output is truncated, and that is covered
  * as an edge case by tests on purpose. */
-#if defined __GNUC__
+#if defined(__GNUC__) && !defined(__clang__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wformat-truncation"
 #endif
@@ -177,7 +177,7 @@ constexpr FormattingSyntax syntax_elem_to_formatting(const eOBJSyntaxElement key
       return {"curv 0.0 1.0", 0, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::nurbs_parameter_begin: {
-      return {"parm 0.0", 0, is_type_string_related<T...>};
+      return {"parm u 0.0", 0, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::nurbs_parameters: {
       return {" %f", 1, is_type_float<T...>};
@@ -273,7 +273,7 @@ constexpr FormattingSyntax syntax_elem_to_formatting(const eMTLSyntaxElement key
     }
   }
 }
-#if defined __GNUC__
+#if defined(__GNUC__) && !defined(__clang__)
 #  pragma GCC diagnostic pop
 #endif
 
@@ -311,6 +311,14 @@ class FormatHandler : NonCopyable, NonMovable {
   size_t get_block_count() const
   {
     return blocks_.size();
+  }
+
+  void append_from(FormatHandler<filetype, buffer_chunk_size, write_local_buffer_size> &v)
+  {
+    blocks_.insert(blocks_.end(),
+                   std::make_move_iterator(v.blocks_.begin()),
+                   std::make_move_iterator(v.blocks_.end()));
+    v.blocks_.clear();
   }
 
   /**
