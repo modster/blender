@@ -105,6 +105,8 @@
  */
 #define BROKEN_PEEK_TOUCHPAD
 
+static bool isStartedFromCommandPrompt();
+
 static void initRawInput()
 {
 #ifdef WITH_INPUT_NDOF
@@ -166,7 +168,10 @@ GHOST_SystemWin32::~GHOST_SystemWin32()
 {
   // Shutdown COM
   OleUninitialize();
-  toggleConsole(1);
+
+  if (isStartedFromCommandPrompt()) {
+    setConsoleWindowState(GHOST_kConsoleWindowStateShow);
+  }
 }
 
 uint64_t GHOST_SystemWin32::performanceCounterToMillis(__int64 perf_ticks) const
@@ -1220,7 +1225,7 @@ GHOST_EventKey *GHOST_SystemWin32::processKeyEvent(GHOST_WindowWin32 *window, RA
     }
 
 #ifdef WITH_INPUT_IME
-    if (window->getImeInput()->IsImeKeyEvent(ascii)) {
+    if (window->getImeInput()->IsImeKeyEvent(ascii, key)) {
       return NULL;
     }
 #endif /* WITH_INPUT_IME */
@@ -2216,31 +2221,30 @@ static bool isStartedFromCommandPrompt()
   return false;
 }
 
-int GHOST_SystemWin32::toggleConsole(int action)
+int GHOST_SystemWin32::setConsoleWindowState(GHOST_TConsoleWindowState action)
 {
   HWND wnd = GetConsoleWindow();
 
   switch (action) {
-    case 3:  // startup: hide if not started from command prompt
-    {
+    case GHOST_kConsoleWindowStateHideForNonConsoleLaunch: {
       if (!isStartedFromCommandPrompt()) {
         ShowWindow(wnd, SW_HIDE);
         m_consoleStatus = 0;
       }
       break;
     }
-    case 0:  // hide
+    case GHOST_kConsoleWindowStateHide:
       ShowWindow(wnd, SW_HIDE);
       m_consoleStatus = 0;
       break;
-    case 1:  // show
+    case GHOST_kConsoleWindowStateShow:
       ShowWindow(wnd, SW_SHOW);
       if (!isStartedFromCommandPrompt()) {
         DeleteMenu(GetSystemMenu(wnd, FALSE), SC_CLOSE, MF_BYCOMMAND);
       }
       m_consoleStatus = 1;
       break;
-    case 2:  // toggle
+    case GHOST_kConsoleWindowStateToggle:
       ShowWindow(wnd, m_consoleStatus ? SW_HIDE : SW_SHOW);
       m_consoleStatus = !m_consoleStatus;
       if (m_consoleStatus && !isStartedFromCommandPrompt()) {

@@ -98,7 +98,7 @@ set(SRC
   intern/bmesh_marking.h
   intern/bmesh_mesh.c
   intern/bmesh_mesh.h
-  intern/bmesh_mesh_convert.c
+  intern/bmesh_mesh_convert.cc
   intern/bmesh_mesh_convert.h
   intern/bmesh_mesh_debug.c
   intern/bmesh_mesh_debug.h
@@ -205,10 +205,6 @@ if(WITH_BULLET)
     ${BULLET_LIBRARIES}
   )
   add_definitions(-DWITH_BULLET)
-endif()
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 if(WITH_FREESTYLE)

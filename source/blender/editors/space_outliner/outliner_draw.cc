@@ -81,6 +81,7 @@
 #include "outliner_intern.hh"
 #include "tree/tree_display.hh"
 #include "tree/tree_element.hh"
+#include "tree/tree_element_rna.hh"
 
 using namespace blender::ed::outliner;
 
@@ -1909,20 +1910,20 @@ static void outliner_draw_rnacols(ARegion *region, int sizex)
 static void outliner_draw_rnabuts(
     uiBlock *block, ARegion *region, SpaceOutliner *space_outliner, int sizex, ListBase *lb)
 {
-  PointerRNA *ptr;
+  PointerRNA ptr;
   PropertyRNA *prop;
 
   LISTBASE_FOREACH (TreeElement *, te, lb) {
     TreeStoreElem *tselem = TREESTORE(te);
     if (te->ys + 2 * UI_UNIT_Y >= region->v2d.cur.ymin && te->ys <= region->v2d.cur.ymax) {
-      if (tselem->type == TSE_RNA_PROPERTY) {
-        ptr = &te->rnaptr;
-        prop = reinterpret_cast<PropertyRNA *>(te->directdata);
+      if (TreeElementRNAProperty *te_rna_prop = tree_element_cast<TreeElementRNAProperty>(te)) {
+        ptr = te_rna_prop->getPointerRNA();
+        prop = te_rna_prop->getPropertyRNA();
 
         if (!TSELEM_OPEN(tselem, space_outliner)) {
           if (RNA_property_type(prop) == PROP_POINTER) {
             uiBut *but = uiDefAutoButR(block,
-                                       ptr,
+                                       &ptr,
                                        prop,
                                        -1,
                                        "",
@@ -1935,7 +1936,7 @@ static void outliner_draw_rnabuts(
           }
           else if (RNA_property_type(prop) == PROP_ENUM) {
             uiDefAutoButR(block,
-                          ptr,
+                          &ptr,
                           prop,
                           -1,
                           nullptr,
@@ -1947,7 +1948,7 @@ static void outliner_draw_rnabuts(
           }
           else {
             uiDefAutoButR(block,
-                          ptr,
+                          &ptr,
                           prop,
                           -1,
                           "",
@@ -1959,12 +1960,13 @@ static void outliner_draw_rnabuts(
           }
         }
       }
-      else if (tselem->type == TSE_RNA_ARRAY_ELEM) {
-        ptr = &te->rnaptr;
-        prop = reinterpret_cast<PropertyRNA *>(te->directdata);
+      else if (TreeElementRNAArrayElement *te_rna_array_elem =
+                   tree_element_cast<TreeElementRNAArrayElement>(te)) {
+        ptr = te_rna_array_elem->getPointerRNA();
+        prop = te_rna_array_elem->getPropertyRNA();
 
         uiDefAutoButR(block,
-                      ptr,
+                      &ptr,
                       prop,
                       te->index,
                       "",
@@ -2478,9 +2480,6 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
       case TSE_POSE_CHANNEL:
         data.icon = ICON_BONE_DATA;
         break;
-      case TSE_PROXY:
-        data.icon = ICON_GHOST_ENABLED;
-        break;
       case TSE_R_LAYER_BASE:
         data.icon = ICON_RENDERLAYERS;
         break;
@@ -2554,15 +2553,19 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
       case TSE_SEQUENCE_DUP:
         data.icon = ICON_SEQ_STRIP_DUPLICATE;
         break;
-      case TSE_RNA_STRUCT:
-        if (RNA_struct_is_ID(te->rnaptr.type)) {
-          data.drag_id = (ID *)te->rnaptr.data;
-          data.icon = RNA_struct_ui_icon(te->rnaptr.type);
+      case TSE_RNA_STRUCT: {
+        const TreeElementRNAStruct *te_rna_struct = tree_element_cast<TreeElementRNAStruct>(te);
+        const PointerRNA &ptr = te_rna_struct->getPointerRNA();
+
+        if (RNA_struct_is_ID(ptr.type)) {
+          data.drag_id = reinterpret_cast<ID *>(ptr.data);
+          data.icon = RNA_struct_ui_icon(ptr.type);
         }
         else {
-          data.icon = RNA_struct_ui_icon(te->rnaptr.type);
+          data.icon = RNA_struct_ui_icon(ptr.type);
         }
         break;
+      }
       case TSE_LAYER_COLLECTION:
       case TSE_SCENE_COLLECTION_BASE:
       case TSE_VIEW_COLLECTION_BASE: {
@@ -2629,8 +2632,8 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
         case OB_LIGHTPROBE:
           data.icon = ICON_OUTLINER_OB_LIGHTPROBE;
           break;
-        case OB_HAIR:
-          data.icon = ICON_OUTLINER_OB_HAIR;
+        case OB_CURVES:
+          data.icon = ICON_OUTLINER_OB_CURVES;
           break;
         case OB_POINTCLOUD:
           data.icon = ICON_OUTLINER_OB_POINTCLOUD;
@@ -2743,8 +2746,8 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
         case ID_GR:
           data.icon = ICON_OUTLINER_COLLECTION;
           break;
-        case ID_HA:
-          data.icon = ICON_OUTLINER_DATA_HAIR;
+        case ID_CV:
+          data.icon = ICON_OUTLINER_DATA_CURVES;
           break;
         case ID_PT:
           data.icon = ICON_OUTLINER_DATA_POINTCLOUD;
@@ -3319,8 +3322,9 @@ static void outliner_draw_tree_element(bContext *C,
       offsx += 2 * ufac;
     }
 
+    const TreeElementRNAStruct *te_rna_struct = tree_element_cast<TreeElementRNAStruct>(te);
     if (ELEM(tselem->type, TSE_SOME_ID, TSE_LAYER_COLLECTION) ||
-        ((tselem->type == TSE_RNA_STRUCT) && RNA_struct_is_ID(te->rnaptr.type))) {
+        (te_rna_struct && RNA_struct_is_ID(te_rna_struct->getPointerRNA().type))) {
       const BIFIconID lib_icon = (BIFIconID)UI_icon_from_library(tselem->id);
       if (lib_icon != ICON_NONE) {
         UI_icon_draw_alpha(

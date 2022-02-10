@@ -573,6 +573,9 @@ void draw_subdiv_cache_free(DRWSubdivCache *cache)
   GPU_VERTBUF_DISCARD_SAFE(cache->subdiv_vertex_face_adjacency);
   cache->resolution = 0;
   cache->num_subdiv_loops = 0;
+  cache->num_subdiv_edges = 0;
+  cache->num_subdiv_verts = 0;
+  cache->num_subdiv_triangles = 0;
   cache->num_coarse_poly = 0;
   cache->num_subdiv_quads = 0;
   draw_subdiv_free_edit_mode_cache(cache);
@@ -749,9 +752,10 @@ static bool draw_subdiv_topology_info_cb(const SubdivForeachContext *foreach_con
   cache->subdiv_loop_poly_index = static_cast<int *>(
       MEM_mallocN(cache->num_subdiv_loops * sizeof(int), "subdiv_loop_poly_index"));
 
+  const int num_coarse_vertices = ctx->coarse_mesh->totvert;
   cache->point_indices = static_cast<int *>(
-      MEM_mallocN(cache->num_subdiv_verts * sizeof(int), "point_indices"));
-  for (int i = 0; i < num_vertices; i++) {
+      MEM_mallocN(num_coarse_vertices * sizeof(int), "point_indices"));
+  for (int i = 0; i < num_coarse_vertices; i++) {
     cache->point_indices[i] = -1;
   }
 
@@ -976,6 +980,7 @@ static bool draw_subdiv_build_cache(DRWSubdivCache *cache,
   }
 
   DRWCacheBuildingContext cache_building_context;
+  memset(&cache_building_context, 0, sizeof(DRWCacheBuildingContext));
   cache_building_context.coarse_mesh = mesh_eval;
   cache_building_context.settings = &to_mesh_settings;
   cache_building_context.cache = cache;
@@ -994,7 +999,7 @@ static bool draw_subdiv_build_cache(DRWSubdivCache *cache,
 
   cache->face_ptex_offset = BKE_subdiv_face_ptex_offset_get(subdiv);
 
-  // Build patch coordinates for all the face dots
+  /* Build patch coordinates for all the face dots. */
   cache->fdots_patch_coords = gpu_vertbuf_create_from_format(get_blender_patch_coords_format(),
                                                              mesh_eval->totpoly);
   CompressedPatchCoord *blender_fdots_patch_coords = (CompressedPatchCoord *)GPU_vertbuf_get_data(
@@ -1755,7 +1760,7 @@ static void draw_subdiv_cache_ensure_mat_offsets(DRWSubdivCache *cache,
   int *mat_start = static_cast<int *>(MEM_callocN(sizeof(int) * mat_len, "subdiv mat_start"));
   int *subdiv_polygon_offset = cache->subdiv_polygon_offset;
 
-  // TODO: parallel_reduce?
+  /* TODO: parallel_reduce? */
   for (int i = 0; i < mesh_eval->totpoly; i++) {
     const MPoly *mpoly = &mesh_eval->mpoly[i];
     const int next_offset = (i == mesh_eval->totpoly - 1) ? number_of_quads :
@@ -1823,7 +1828,7 @@ static bool draw_subdiv_create_requested_buffers(const Scene *scene,
   Mesh *mesh_eval = mesh;
   BMesh *bm = nullptr;
   if (mesh->edit_mesh) {
-    mesh_eval = mesh->edit_mesh->mesh_eval_final;
+    mesh_eval = BKE_object_get_editmesh_eval_final(ob);
     bm = mesh->edit_mesh->bm;
   }
 

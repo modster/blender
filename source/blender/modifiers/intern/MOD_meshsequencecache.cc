@@ -508,6 +508,10 @@ static void render_procedural_panel_draw(const bContext *C, Panel *panel)
     return;
   }
 
+  if (RNA_pointer_is_null(&fileptr)) {
+    return;
+  }
+
   uiLayoutSetPropSep(layout, true);
   uiTemplateCacheFileProcedural(layout, C, &fileptr);
 }
@@ -568,7 +572,6 @@ ModifierTypeInfo modifierType_MeshSequenceCache = {
     /* deformVertsEM */ nullptr,
     /* deformMatricesEM */ nullptr,
     /* modifyMesh */ modifyMesh,
-    /* modifyHair */ nullptr,
     /* modifyGeometrySet */ modifyGeometrySet,
 
     /* initData */ initData,

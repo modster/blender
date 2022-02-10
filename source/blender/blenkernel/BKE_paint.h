@@ -499,7 +499,6 @@ typedef struct SculptSession {
 
   /* These are always assigned to base mesh data when using PBVH_FACES and PBVH_GRIDS. */
   struct MVert *mvert;
-  const float (*vert_normals)[3];
   struct MPoly *mpoly;
   struct MLoop *mloop;
 
@@ -616,10 +615,6 @@ typedef struct SculptSession {
   float init_pivot_pos[3];
   float init_pivot_rot[4];
   float init_pivot_scale[3];
-
-  float prev_pivot_pos[3];
-  float prev_pivot_rot[4];
-  float prev_pivot_scale[3];
 
   union {
     struct {

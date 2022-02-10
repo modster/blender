@@ -14,8 +14,6 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: some of this file.
  */
 
 /** \file
@@ -55,6 +53,8 @@
 #include "BKE_node.h"
 #include "BKE_paint.h"
 #include "BKE_undo_system.h"
+
+#include "NOD_texture.h"
 
 #include "DEG_depsgraph.h"
 

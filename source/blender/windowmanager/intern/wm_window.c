@@ -14,8 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * The Original Code is Copyright (C) 2007 Blender Foundation but based
- * on ghostwinlay.c (C) 2001-2002 by NaN Holding BV
- * All rights reserved.
+ * on ghostwinlay.c (C) 2001-2002 by NaN Holding BV. All rights reserved.
  */
 
 /** \file
@@ -1483,7 +1482,11 @@ static bool wm_window_timer(const bContext *C)
       wt->delta = time - wt->ltime;
       wt->duration += wt->delta;
       wt->ltime = time;
-      wt->ntime = wt->stime + wt->timestep * ceil(wt->duration / wt->timestep);
+
+      wt->ntime = wt->stime;
+      if (wt->timestep != 0.0f) {
+        wt->ntime += wt->timestep * ceil(wt->duration / wt->timestep);
+      }
 
       if (wt->event_type == TIMERJOBS) {
         wm_jobs_timer(wm, wt);
@@ -1596,6 +1599,7 @@ void WM_event_timer_sleep(wmWindowManager *wm,
 wmTimer *WM_event_add_timer(wmWindowManager *wm, wmWindow *win, int event_type, double timestep)
 {
   wmTimer *wt = MEM_callocN(sizeof(wmTimer), "window timer");
+  BLI_assert(timestep >= 0.0f);
 
   wt->event_type = event_type;
   wt->ltime = PIL_check_seconds_timer();
@@ -1615,6 +1619,7 @@ wmTimer *WM_event_add_timer_notifier(wmWindowManager *wm,
                                      double timestep)
 {
   wmTimer *wt = MEM_callocN(sizeof(wmTimer), "window timer");
+  BLI_assert(timestep >= 0.0f);
 
   wt->event_type = TIMERNOTIFIER;
   wt->ltime = PIL_check_seconds_timer();

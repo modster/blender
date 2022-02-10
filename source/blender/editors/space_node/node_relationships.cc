@@ -68,10 +68,6 @@
 #include "node_intern.hh" /* own include */
 
 using namespace blender::nodes::node_tree_ref_types;
-using blender::float2;
-using blender::StringRef;
-using blender::StringRefNull;
-using blender::Vector;
 
 /* -------------------------------------------------------------------- */
 /** \name Add Node
@@ -99,6 +95,8 @@ static void clear_picking_highlight(ListBase *links)
     link->flag &= ~NODE_LINK_TEMP_HIGHLIGHT;
   }
 }
+
+namespace blender::ed::space_node {
 
 static bNodeLink *create_drag_link(bNode &node, bNodeSocket &sock)
 {
@@ -367,10 +365,7 @@ void sort_multi_input_socket_links(SpaceNode &snode,
   }
 }
 
-static void snode_autoconnect(Main &bmain,
-                              SpaceNode &snode,
-                              const bool allow_multiple,
-                              const bool replace)
+static void snode_autoconnect(SpaceNode &snode, const bool allow_multiple, const bool replace)
 {
   bNodeTree *ntree = snode.edittree;
   Vector<bNode *> sorted_nodes;
@@ -443,10 +438,6 @@ static void snode_autoconnect(Main &bmain,
       }
     }
   }
-
-  if (numlinks > 0) {
-    BKE_ntree_update_main_tree(&bmain, ntree, nullptr);
-  }
 }
 
 /** \} */
@@ -455,7 +446,7 @@ static void snode_autoconnect(Main &bmain,
 /** \name Link Viewer Operator
  * \{ */
 
-namespace blender::ed::nodes::viewer_linking {
+namespace viewer_linking {
 
 /* Depending on the node tree type, different socket types are supported by viewer nodes. */
 static bool socket_can_be_viewed(const OutputSocketRef &socket)
@@ -722,7 +713,7 @@ static int node_link_viewer(const bContext &C, bNode &bnode_to_view)
   return link_socket_to_viewer(C, viewer_bnode, bnode_to_view, bsocket_to_view);
 }
 
-}  // namespace blender::ed::nodes::viewer_linking
+}  // namespace viewer_linking
 
 static int node_active_link_viewer_exec(bContext *C, wmOperator *UNUSED(op))
 {
@@ -735,7 +726,7 @@ static int node_active_link_viewer_exec(bContext *C, wmOperator *UNUSED(op))
 
   ED_preview_kill_jobs(CTX_wm_manager(C), CTX_data_main(C));
 
-  if (blender::ed::nodes::viewer_linking::node_link_viewer(*C, *node) == OPERATOR_CANCELLED) {
+  if (viewer_linking::node_link_viewer(*C, *node) == OPERATOR_CANCELLED) {
     return OPERATOR_CANCELLED;
   }
 
@@ -1076,12 +1067,10 @@ static int node_link_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (should_create_drag_link_search_menu(*snode.edittree, *nldrag)) {
           bNodeLink &link = *nldrag->links.first();
           if (nldrag->in_out == SOCK_OUT) {
-            blender::ed::space_node::invoke_node_link_drag_add_menu(
-                *C, *link.fromnode, *link.fromsock, cursor);
+            invoke_node_link_drag_add_menu(*C, *link.fromnode, *link.fromsock, cursor);
           }
           else {
-            blender::ed::space_node::invoke_node_link_drag_add_menu(
-                *C, *link.tonode, *link.tosock, cursor);
+            invoke_node_link_drag_add_menu(*C, *link.tonode, *link.tosock, cursor);
           }
         }
 
@@ -1308,13 +1297,13 @@ static int node_make_link_exec(bContext *C, wmOperator *op)
 
   ED_preview_kill_jobs(CTX_wm_manager(C), &bmain);
 
-  snode_autoconnect(bmain, snode, true, replace);
+  snode_autoconnect(snode, true, replace);
 
   /* deselect sockets after linking */
   node_deselect_all_input_sockets(snode, false);
   node_deselect_all_output_sockets(snode, false);
 
-  ED_node_tree_propagate_change(C, CTX_data_main(C), snode.edittree);
+  ED_node_tree_propagate_change(C, &bmain, snode.edittree);
 
   return OPERATOR_FINISHED;
 }
@@ -1949,8 +1938,12 @@ static bool ed_node_link_conditions(ScrArea *area,
   return true;
 }
 
+}  // namespace blender::ed::space_node
+
 void ED_node_link_intersect_test(ScrArea *area, int test)
 {
+  using namespace blender::ed::space_node;
+
   bNode *select;
   SpaceNode *snode;
   if (!ed_node_link_conditions(area, test, &snode, &select)) {
@@ -2010,6 +2003,8 @@ void ED_node_link_intersect_test(ScrArea *area, int test)
   }
 }
 
+namespace blender::ed::space_node {
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -2049,20 +2044,17 @@ static int get_main_socket_priority(const bNodeSocket *socket)
 /** Get the "main" socket based on the node declaration or an heuristic. */
 static bNodeSocket *get_main_socket(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out)
 {
-  using namespace blender;
-  using namespace blender::nodes;
-
   ListBase *sockets = (in_out == SOCK_IN) ? &node.inputs : &node.outputs;
 
   /* Try to get the main socket based on the socket declaration. */
   nodeDeclarationEnsure(&ntree, &node);
-  const NodeDeclaration *node_decl = node.declaration;
+  const nodes::NodeDeclaration *node_decl = node.declaration;
   if (node_decl != nullptr) {
-    Span<SocketDeclarationPtr> socket_decls = (in_out == SOCK_IN) ? node_decl->inputs() :
-                                                                    node_decl->outputs();
+    Span<nodes::SocketDeclarationPtr> socket_decls = (in_out == SOCK_IN) ? node_decl->inputs() :
+                                                                           node_decl->outputs();
     int index;
     LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, sockets, index) {
-      const SocketDeclaration &socket_decl = *socket_decls[index];
+      const nodes::SocketDeclaration &socket_decl = *socket_decls[index];
       if (nodeSocketIsHidden(socket)) {
         continue;
       }
@@ -2426,60 +2418,83 @@ void NODE_OT_insert_offset(wmOperatorType *ot)
 
 /** \} */
 
+}  // namespace blender::ed::space_node
+
 /* -------------------------------------------------------------------- */
 /** \name Note Link Insert
  * \{ */
 
 void ED_node_link_insert(Main *bmain, ScrArea *area)
 {
-  bNode *select;
+  using namespace blender::ed::space_node;
+
+  bNode *node_to_insert;
   SpaceNode *snode;
-  if (!ed_node_link_conditions(area, true, &snode, &select)) {
+  if (!ed_node_link_conditions(area, true, &snode, &node_to_insert)) {
     return;
   }
 
-  /* get the link */
-  bNodeLink *link;
-  for (link = (bNodeLink *)snode->edittree->links.first; link; link = link->next) {
+  /* Find link to insert on. */
+  bNodeTree &ntree = *snode->edittree;
+  bNodeLink *old_link = nullptr;
+  LISTBASE_FOREACH (bNodeLink *, link, &ntree.links) {
     if (link->flag & NODE_LINKFLAG_HILITE) {
+      old_link = link;
       break;
     }
   }
-
-  if (link) {
-    bNodeSocket *best_input = get_main_socket(*snode->edittree, *select, SOCK_IN);
-    bNodeSocket *best_output = get_main_socket(*snode->edittree, *select, SOCK_OUT);
-
-    if (best_input && best_output) {
-      bNode *node = link->tonode;
-      bNodeSocket *sockto = link->tosock;
-
-      link->tonode = select;
-      link->tosock = best_input;
-      node_remove_extra_links(*snode, *link);
-      link->flag &= ~NODE_LINKFLAG_HILITE;
-
-      bNodeLink *new_link = nodeAddLink(snode->edittree, select, best_output, node, sockto);
-
-      /* Copy the socket index for the new link, and reset it for the old link. This way the
-       * relative order of links is preserved, and the links get drawn in the right place. */
-      new_link->multi_input_socket_index = link->multi_input_socket_index;
-      link->multi_input_socket_index = 0;
-
-      /* set up insert offset data, it needs stuff from here */
-      if ((snode->flag & SNODE_SKIP_INSOFFSET) == 0) {
-        NodeInsertOfsData *iofsd = MEM_cnew<NodeInsertOfsData>(__func__);
-
-        iofsd->insert = select;
-        iofsd->prev = link->fromnode;
-        iofsd->next = node;
-
-        snode->runtime->iofsd = iofsd;
-      }
-
-      ED_node_tree_propagate_change(nullptr, bmain, snode->edittree);
-    }
+  if (old_link == nullptr) {
+    return;
   }
+
+  old_link->flag &= ~NODE_LINKFLAG_HILITE;
+
+  bNodeSocket *best_input = get_main_socket(ntree, *node_to_insert, SOCK_IN);
+  bNodeSocket *best_output = get_main_socket(ntree, *node_to_insert, SOCK_OUT);
+
+  /* Ignore main sockets when the types don't match. */
+  if (best_input != nullptr && ntree.typeinfo->validate_link != nullptr &&
+      !ntree.typeinfo->validate_link(static_cast<eNodeSocketDatatype>(old_link->fromsock->type),
+                                     static_cast<eNodeSocketDatatype>(best_input->type))) {
+    best_input = nullptr;
+  }
+  if (best_output != nullptr && ntree.typeinfo->validate_link != nullptr &&
+      !ntree.typeinfo->validate_link(static_cast<eNodeSocketDatatype>(best_output->type),
+                                     static_cast<eNodeSocketDatatype>(old_link->tosock->type))) {
+    best_output = nullptr;
+  }
+
+  bNode *from_node = old_link->fromnode;
+  bNodeSocket *from_socket = old_link->fromsock;
+  bNode *to_node = old_link->tonode;
+
+  if (best_output != nullptr) {
+    /* Relink the "start" of the existing link to the newly inserted node. */
+    old_link->fromnode = node_to_insert;
+    old_link->fromsock = best_output;
+    BKE_ntree_update_tag_link_changed(&ntree);
+  }
+  else {
+    nodeRemLink(&ntree, old_link);
+  }
+
+  if (best_input != nullptr) {
+    /* Add a new link that connects the node on the left to the newly inserted node. */
+    nodeAddLink(&ntree, from_node, from_socket, node_to_insert, best_input);
+  }
+
+  /* Set up insert offset data, it needs stuff from here. */
+  if ((snode->flag & SNODE_SKIP_INSOFFSET) == 0) {
+    NodeInsertOfsData *iofsd = MEM_cnew<NodeInsertOfsData>(__func__);
+
+    iofsd->insert = node_to_insert;
+    iofsd->prev = from_node;
+    iofsd->next = to_node;
+
+    snode->runtime->iofsd = iofsd;
+  }
+
+  ED_node_tree_propagate_change(nullptr, bmain, snode->edittree);
 }
 
 /** \} */

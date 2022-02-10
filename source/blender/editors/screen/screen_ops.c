@@ -2608,7 +2608,7 @@ typedef struct RegionMoveData {
   ARegion *region;
   ScrArea *area;
   int bigger, smaller, origval;
-  int origx, origy;
+  int orig_xy[2];
   int maxsize;
   AZEdge edge;
 
@@ -2716,8 +2716,7 @@ static int region_scale_invoke(bContext *C, wmOperator *op, const wmEvent *event
     }
     rmd->area = sad->sa1;
     rmd->edge = az->edge;
-    rmd->origx = event->xy[0];
-    rmd->origy = event->xy[1];
+    copy_v2_v2_int(rmd->orig_xy, event->xy);
     rmd->maxsize = area_max_regionsize(rmd->area, rmd->region, rmd->edge);
 
     /* if not set we do now, otherwise it uses type */
@@ -2804,7 +2803,7 @@ static int region_scale_modal(bContext *C, wmOperator *op, const wmEvent *event)
                            (BLI_rcti_size_x(&rmd->region->v2d.mask) + 1);
       const int snap_size_threshold = (U.widget_unit * 2) / aspect;
       if (ELEM(rmd->edge, AE_LEFT_TO_TOPRIGHT, AE_RIGHT_TO_TOPLEFT)) {
-        delta = event->xy[0] - rmd->origx;
+        delta = event->xy[0] - rmd->orig_xy[0];
         if (rmd->edge == AE_LEFT_TO_TOPRIGHT) {
           delta = -delta;
         }
@@ -2837,7 +2836,7 @@ static int region_scale_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
       else {
-        delta = event->xy[1] - rmd->origy;
+        delta = event->xy[1] - rmd->orig_xy[1];
         if (rmd->edge == AE_BOTTOM_TO_TOPLEFT) {
           delta = -delta;
         }
@@ -2879,7 +2878,7 @@ static int region_scale_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
     case LEFTMOUSE:
       if (event->val == KM_RELEASE) {
-        if (len_manhattan_v2v2_int(event->xy, &rmd->origx) <= WM_EVENT_CURSOR_MOTION_THRESHOLD) {
+        if (len_manhattan_v2v2_int(event->xy, rmd->orig_xy) <= WM_EVENT_CURSOR_MOTION_THRESHOLD) {
           if (rmd->region->flag & RGN_FLAG_HIDDEN) {
             region_scale_toggle_hidden(C, rmd);
           }
@@ -2986,7 +2985,7 @@ static int frame_offset_exec(bContext *C, wmOperator *op)
 
   areas_do_frame_follow(C, false);
 
-  DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
+  DEG_id_tag_update(&scene->id, ID_RECALC_FRAME_CHANGE);
 
   WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
 
@@ -3047,7 +3046,7 @@ static int frame_jump_exec(bContext *C, wmOperator *op)
 
     areas_do_frame_follow(C, true);
 
-    DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
+    DEG_id_tag_update(&scene->id, ID_RECALC_FRAME_CHANGE);
 
     WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
   }
@@ -3161,7 +3160,7 @@ static int keyframe_jump_exec(bContext *C, wmOperator *op)
 
   areas_do_frame_follow(C, true);
 
-  DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
+  DEG_id_tag_update(&scene->id, ID_RECALC_FRAME_CHANGE);
 
   WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
 
@@ -3225,7 +3224,7 @@ static int marker_jump_exec(bContext *C, wmOperator *op)
 
   areas_do_frame_follow(C, true);
 
-  DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
+  DEG_id_tag_update(&scene->id, ID_RECALC_FRAME_CHANGE);
 
   WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
 
@@ -4626,7 +4625,7 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
   if (scene_eval == NULL) {
     /* Happens when undo/redo system is used during playback, nothing meaningful we can do here. */
   }
-  else if (scene_eval->id.recalc & ID_RECALC_AUDIO_SEEK) {
+  else if (scene_eval->id.recalc & ID_RECALC_FRAME_CHANGE) {
     /* Ignore seek here, the audio will be updated to the scene frame after jump during next
      * dependency graph update. */
   }
@@ -4741,7 +4740,7 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
   }
 
   if (sad->flag & ANIMPLAY_FLAG_JUMPED) {
-    DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
+    DEG_id_tag_update(&scene->id, ID_RECALC_FRAME_CHANGE);
 #ifdef PROFILE_AUDIO_SYNCH
     old_frame = CFRA;
 #endif

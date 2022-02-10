@@ -22,14 +22,7 @@
  */
 
 #ifndef USE_GPU_SHADER_CREATE_INFO
-#  include "intern/gpu_shader_shared_utils.h"
-#endif
-
-#ifdef __cplusplus
-using blender::float2;
-using blender::float3;
-using blender::float4;
-using blender::float4x4;
+#  include "GPU_shader_shared_utils.h"
 #endif
 
 struct NodeLinkData {

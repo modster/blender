@@ -655,6 +655,8 @@ const EnumPropertyItem rna_enum_transform_orientation_items[] = {
 #  include "BKE_screen.h"
 #  include "BKE_unit.h"
 
+#  include "NOD_composite.h"
+
 #  include "ED_image.h"
 #  include "ED_info.h"
 #  include "ED_keyframing.h"
@@ -1026,7 +1028,7 @@ static void rna_Scene_frame_update(Main *UNUSED(bmain),
                                    PointerRNA *ptr)
 {
   Scene *scene = (Scene *)ptr->owner_id;
-  DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
+  DEG_id_tag_update(&scene->id, ID_RECALC_FRAME_CHANGE);
   WM_main_add_notifier(NC_SCENE | ND_FRAME, scene);
 }
 
@@ -1765,6 +1767,20 @@ void rna_ViewLayer_pass_update(Main *bmain, Scene *activescene, PointerRNA *ptr)
   }
 
   rna_Scene_glsl_update(bmain, activescene, ptr);
+}
+
+static char *rna_ViewLayerEEVEE_path(PointerRNA *ptr)
+{
+  ViewLayerEEVEE *view_layer_eevee = (ViewLayerEEVEE *)ptr->data;
+  ViewLayer *view_layer = (ViewLayer *)((uint8_t *)view_layer_eevee - offsetof(ViewLayer, eevee));
+  char rna_path[sizeof(view_layer->name) * 3];
+
+  const size_t view_layer_path_len = rna_ViewLayer_path_buffer_get(
+      view_layer, rna_path, sizeof(rna_path));
+
+  BLI_strncpy(rna_path + view_layer_path_len, ".eevee", sizeof(rna_path) - view_layer_path_len);
+
+  return BLI_strdup(rna_path);
 }
 
 static char *rna_SceneRenderView_path(PointerRNA *ptr)
@@ -4017,6 +4033,7 @@ static void rna_def_view_layer_eevee(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
   srna = RNA_def_struct(brna, "ViewLayerEEVEE", NULL);
+  RNA_def_struct_path_func(srna, "rna_ViewLayerEEVEE_path");
   RNA_def_struct_ui_text(srna, "Eevee Settings", "View layer settings for Eevee");
 
   prop = RNA_def_property(srna, "use_pass_volume_direct", PROP_BOOLEAN, PROP_NONE);
@@ -7911,8 +7928,10 @@ void RNA_def_scene(BlenderRNA *brna)
   RNA_def_property_pointer_sdna(prop, NULL, "clip");
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_struct_type(prop, "MovieClip");
-  RNA_def_property_ui_text(
-      prop, "Active Movie Clip", "Active movie clip used for constraints and viewport drawing");
+  RNA_def_property_ui_text(prop,
+                           "Active Movie Clip",
+                           "Active Movie Clip that can be used by motion tracking constraints "
+                           "or as a camera's background image");
   RNA_def_property_update(prop, NC_SCENE | ND_DRAW_RENDER_VIEWPORT, NULL);
 
   /* color management */

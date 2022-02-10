@@ -15,8 +15,6 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: some of this file.
  */
 
 #pragma once
@@ -404,6 +402,7 @@ void invert_m4_m4_safe_ortho(float Ainv[4][4], const float A[4][4]);
 
 void scale_m3_fl(float R[3][3], float scale);
 void scale_m4_fl(float R[4][4], float scale);
+void scale_m4_v2(float R[4][4], const float scale[2]);
 
 /**
  * This computes the overall volume scale factor of a transformation matrix.
@@ -428,6 +427,20 @@ void size_to_mat4(float R[4][4], const float size[3]);
 
 void mat3_to_size(float size[3], const float M[3][3]);
 void mat4_to_size(float size[3], const float M[4][4]);
+
+/**
+ * Return the largest scale on any axis, the equivalent of calling:
+ * \code{.c}
+ * mat3_to_size(size_v3, mat);
+ * size = size_v3[max_axis_v3(size_v3)];
+ * \endcode
+ * .. without 2x unnecessary `sqrtf` calls.
+ */
+float mat3_to_size_max_axis(const float M[3][3]);
+/**
+ * Only the first 3 axes are used.
+ */
+float mat4_to_size_max_axis(const float M[4][4]);
 
 /**
  * Extract scale factors from the matrix, with correction to ensure

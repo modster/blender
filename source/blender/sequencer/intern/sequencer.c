@@ -13,11 +13,9 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * - Blender Foundation, 2003-2009
- * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved.
+ *           2003-2009 Blender Foundation.
+ *           2005-2006 Peter Schlaile <peter [at] schlaile [dot] de>
  */
 
 /** \file
@@ -66,6 +64,15 @@
 /** \name Allocate / Free Functions
  * \{ */
 
+StripProxy *seq_strip_proxy_alloc(void)
+{
+  StripProxy *strip_proxy = MEM_callocN(sizeof(struct StripProxy), "StripProxy");
+  strip_proxy->quality = 50;
+  strip_proxy->build_tc_flags = SEQ_PROXY_TC_ALL;
+  strip_proxy->tc = SEQ_PROXY_TC_RECORD_RUN;
+  return strip_proxy;
+}
+
 static Strip *seq_strip_alloc(int type)
 {
   Strip *strip = MEM_callocN(sizeof(Strip), "strip");
@@ -76,6 +83,7 @@ static Strip *seq_strip_alloc(int type)
     strip->transform->scale_y = 1;
     strip->transform->origin[0] = 0.5f;
     strip->transform->origin[1] = 0.5f;
+    strip->transform->filter = SEQ_TRANSFORM_FILTER_BILINEAR;
     strip->crop = MEM_callocN(sizeof(struct StripCrop), "StripCrop");
   }
 

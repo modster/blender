@@ -339,7 +339,10 @@ typedef struct FileListEntryCache {
   /* Previews handling. */
   TaskPool *previews_pool;
   ThreadQueue *previews_done;
-  size_t previews_todo_count;
+  /** Counter for previews that are not fully loaded and ready to display yet. So includes all
+   * previews either in `previews_pool` or `previews_done`. #filelist_cache_previews_update() makes
+   * previews in `preview_done` ready for display, so the counter is decremented there. */
+  int previews_todo_count;
 } FileListEntryCache;
 
 /* FileListCache.flags */
@@ -521,7 +524,7 @@ static int compare_apply_inverted(int val, const struct FileSortData *sort_data)
  * 2) If not possible (file names match) and both represent local IDs, sort by ID-type.
  * 3) If not possible and only one is a local ID, place files representing local IDs first.
  *
- * TODO (not actually implemented, but should be):
+ * TODO: (not actually implemented, but should be):
  * 4) If no file represents a local ID, sort by file path, so that files higher up the file system
  *    hierarchy are placed first.
  */
@@ -1647,7 +1650,6 @@ static void filelist_cache_preview_runf(TaskPool *__restrict pool, void *taskdat
   preview_taskdata->preview = NULL;
 
   BLI_thread_queue_push(cache->previews_done, preview);
-  atomic_fetch_and_sub_z(&cache->previews_todo_count, 1);
 
   //  printf("%s: End (%d)...\n", __func__, threadid);
 }
@@ -1689,6 +1691,7 @@ static void filelist_cache_previews_clear(FileListEntryCache *cache)
       }
       MEM_freeN(preview);
     }
+    cache->previews_todo_count = 0;
   }
 }
 
@@ -1759,7 +1762,6 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
       preview->icon_id = BKE_icon_imbuf_create(imbuf);
     }
     BLI_thread_queue_push(cache->previews_done, preview);
-    atomic_fetch_and_sub_z(&cache->previews_todo_count, 1);
   }
   else {
     if (entry->redirection_path) {
@@ -1780,6 +1782,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
                        true,
                        filelist_cache_preview_freef);
   }
+  cache->previews_todo_count++;
 }
 
 static void filelist_cache_init(FileListEntryCache *cache, size_t cache_size)
@@ -2693,6 +2696,7 @@ bool filelist_cache_previews_update(FileList *filelist)
     }
 
     MEM_freeN(preview);
+    cache->previews_todo_count--;
   }
 
   return changed;
@@ -2714,7 +2718,7 @@ bool filelist_cache_previews_done(FileList *filelist)
   }
 
   return (cache->previews_pool == NULL) || (cache->previews_done == NULL) ||
-         (cache->previews_todo_count == (size_t)BLI_thread_queue_len(cache->previews_done));
+         (cache->previews_todo_count == 0);
 }
 
 /* would recognize .blend as well */
@@ -2779,7 +2783,8 @@ int ED_path_extension_type(const char *path)
                                  NULL)) {
     return FILE_TYPE_TEXT;
   }
-  if (BLI_path_extension_check_n(path, ".ttf", ".ttc", ".pfb", ".otf", ".otc", NULL)) {
+  if (BLI_path_extension_check_n(
+          path, ".ttf", ".ttc", ".pfb", ".otf", ".otc", ".woff", ".woff2", NULL)) {
     return FILE_TYPE_FTFONT;
   }
   if (BLI_path_extension_check(path, ".btx")) {

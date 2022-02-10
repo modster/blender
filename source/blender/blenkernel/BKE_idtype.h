@@ -31,11 +31,11 @@
 extern "C" {
 #endif
 
+struct BPathForeachPathData;
 struct BlendDataReader;
 struct BlendExpander;
 struct BlendLibReader;
 struct BlendWriter;
-struct BPathForeachPathData;
 struct ID;
 struct LibraryForeachIDData;
 struct Main;
@@ -278,7 +278,7 @@ extern IDTypeInfo IDType_ID_PC;
 extern IDTypeInfo IDType_ID_CF;
 extern IDTypeInfo IDType_ID_WS;
 extern IDTypeInfo IDType_ID_LP;
-extern IDTypeInfo IDType_ID_HA;
+extern IDTypeInfo IDType_ID_CV;
 extern IDTypeInfo IDType_ID_PT;
 extern IDTypeInfo IDType_ID_VO;
 extern IDTypeInfo IDType_ID_SIM;

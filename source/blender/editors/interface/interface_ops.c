@@ -597,6 +597,9 @@ static int override_type_set_button_exec(bContext *C, wmOperator *op)
     opop->operation = operation;
   }
 
+  /* Outliner e.g. has to be aware of this change. */
+  WM_main_add_notifier(NC_WM | ND_LIB_OVERRIDE_CHANGED, NULL);
+
   return operator_button_property_finish(C, &ptr, prop);
 }
 
@@ -713,6 +716,9 @@ static int override_remove_button_exec(bContext *C, wmOperator *op)
       RNA_property_copy(bmain, &ptr, &src, prop, -1);
     }
   }
+
+  /* Outliner e.g. has to be aware of this change. */
+  WM_main_add_notifier(NC_WM | ND_LIB_OVERRIDE_CHANGED, NULL);
 
   return operator_button_property_finish(C, &ptr, prop);
 }
@@ -2067,8 +2073,9 @@ static void UI_OT_tree_view_drop(wmOperatorType *ot)
 /** \name UI Tree-View Item Rename Operator
  *
  * General purpose renaming operator for tree-views. Thanks to this, to add a rename button to
- * context menus for example, tree-view API users don't have to implement own renaming operators
- * with the same logic as they already have for their #ui::AbstractTreeViewItem::rename() override.
+ * context menus for example, tree-view API users don't have to implement their own renaming
+ * operators with the same logic as they already have for their #ui::AbstractTreeViewItem::rename()
+ * override.
  *
  * \{ */
 

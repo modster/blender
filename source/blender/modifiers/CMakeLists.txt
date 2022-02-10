@@ -183,10 +183,6 @@ if(WITH_BULLET)
   add_definitions(-DWITH_BULLET)
 endif()
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
 # To disable adaptive subdivision test in subsurf UI without cycles
 if(WITH_CYCLES)
   add_definitions(-DWITH_CYCLES)
@@ -236,8 +232,7 @@ endif()
 
 if(WITH_EXPERIMENTAL_FEATURES)
   add_definitions(-DWITH_SIMULATION_DATABLOCK)
-  add_definitions(-DWITH_POINT_CLOUD)
-  add_definitions(-DWITH_HAIR_NODES)
+  add_definitions(-DWITH_NEW_CURVES_TYPE)
 endif()
 
 # So we can have special tricks in modifier system.

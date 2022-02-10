@@ -14,7 +14,7 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# The Original Code is Copyright (C) 2006, Blender Foundation
+# The Original Code is Copyright (C) 2006 Blender Foundation
 # All rights reserved.
 
 set(INC
@@ -30,10 +30,14 @@ set(INC
 )
 
 set(SRC
+  intern/mesh_merge_by_distance.cc
   intern/mesh_to_curve_convert.cc
+  intern/point_merge_by_distance.cc
   intern/realize_instances.cc
 
+  GEO_mesh_merge_by_distance.hh
   GEO_mesh_to_curve.hh
+  GEO_point_merge_by_distance.hh
   GEO_realize_instances.hh
 )
 

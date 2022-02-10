@@ -97,6 +97,9 @@ class BVHParams {
    */
   bool use_unaligned_nodes;
 
+  /* Use compact acceleration structure (Embree)*/
+  bool use_compact_structure;
+
   /* Split time range to this number of steps and create leaf node for each
    * of this time steps.
    *
@@ -139,6 +142,7 @@ class BVHParams {
 
     top_level = false;
     bvh_layout = BVH_LAYOUT_BVH2;
+    use_compact_structure = true;
     use_unaligned_nodes = false;
 
     num_motion_curve_steps = 0;

@@ -240,7 +240,7 @@ typedef enum PropertyFlag {
   PROP_ID_REFCOUNT = (1 << 6),
 
   /**
-   * Disallow assigning a variable to its self, eg an object tracking its self
+   * Disallow assigning a variable to itself, eg an object tracking itself
    * only apply this to types that are derived from an ID ().
    */
   PROP_ID_SELF_CHECK = (1 << 20),
@@ -322,7 +322,7 @@ typedef enum PropertyFlag {
  * FREE FLAGS: 2, 3, 4, 5, 6, 7, 8, 9, 12 and above.
  */
 typedef enum PropertyOverrideFlag {
-  /** Means the property can be overridden by a local 'proxy' of some linked datablock. */
+  /** Means that the property can be overridden by a local override of some linked datablock. */
   PROPOVERRIDE_OVERRIDABLE_LIBRARY = (1 << 0),
 
   /**
