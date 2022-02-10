@@ -92,6 +92,7 @@ enum {
   CACHEFILE_ATTR_MAP_DOMAIN_POINT,
   CACHEFILE_ATTR_MAP_DOMAIN_FACE_CORNER,
   CACHEFILE_ATTR_MAP_DOMAIN_FACE,
+  CACHEFILE_ATTR_MAP_DOMAIN_CURVE,
 };
 
 /* Custom data mapping for the attributes in the CacheFile. Since there might not be a standard way

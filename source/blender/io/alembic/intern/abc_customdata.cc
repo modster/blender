@@ -386,6 +386,14 @@ static AttributeDomain matching_domain(const DomainInfo info[ATTR_DOMAIN_NUM],
       return ATTR_DOMAIN_NUM;
     }
 
+    if (requested_domain == CACHEFILE_ATTR_MAP_DOMAIN_CURVE) {
+      if (static_cast<size_t>(info[ATTR_DOMAIN_CURVE].length * dimensions) == num_values) {
+        return ATTR_DOMAIN_CURVE;
+      }
+
+      return ATTR_DOMAIN_NUM;
+    }
+
     return ATTR_DOMAIN_NUM;
   }
 
@@ -404,6 +412,10 @@ static AttributeDomain matching_domain(const DomainInfo info[ATTR_DOMAIN_NUM],
 
   if (static_cast<size_t>(info[ATTR_DOMAIN_POINT].length * dimensions) == num_values) {
     domain_bits |= (1 << ATTR_DOMAIN_POINT);
+  }
+
+  if (static_cast<size_t>(info[ATTR_DOMAIN_CURVE].length * dimensions) == num_values) {
+    domain_bits |= (1 << ATTR_DOMAIN_CURVE);
   }
 
   return valid_domain_or_unknown(domain_bits);
@@ -492,8 +504,10 @@ static AttributeDomain to_blender_domain(Alembic::AbcGeom::GeometryScope abc_sco
       return matching_domain(info, 1, element_size, CACHEFILE_ATTR_MAP_DOMAIN_AUTO);
     }
     case kUniformScope: {
-      /* This would mean one value for the whole object, but we don't support that yet. */
-      return ATTR_DOMAIN_NUM;
+      /* This should mean one value for the whole object, but some software might use it to mean
+       * for example "uniform across the vertices" so we need to try and match this to some domain.
+       */
+      return matching_domain(info, 1, element_size, CACHEFILE_ATTR_MAP_DOMAIN_AUTO);
     }
     case kVertexScope: {
       /* This is pretty straightforward, just ensure that the sizes match. */
