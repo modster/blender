@@ -41,6 +41,7 @@
 #include "WM_api.h"
 
 /* XXX uses private header of file-space. */
+#include "../space_file/file_indexer.h"
 #include "../space_file/filelist.h"
 
 #include "ED_asset_handle.h"
@@ -48,10 +49,6 @@
 #include "ED_asset_list.h"
 #include "ED_asset_list.hh"
 #include "asset_library_reference.hh"
-
-/* Enable asset indexing. Currently disabled as ID properties aren't indexed yet and is needed for
- * object snapping. See {D12990}. */
-//#define SPACE_FILE_ENABLE_ASSET_INDEXING
 
 namespace blender::ed::asset {
 
@@ -174,9 +171,8 @@ void AssetList::setup()
       "",
       "");
 
-#ifdef SPACE_FILE_ENABLE_ASSET_INDEXING
-  filelist_setindexer(files, &file_indexer_asset);
-#endif
+  const bool use_asset_indexer = !USER_EXPERIMENTAL_TEST(&U, no_asset_indexing);
+  filelist_setindexer(files, use_asset_indexer ? &file_indexer_asset : &file_indexer_noop);
 
   char path[FILE_MAXDIR] = "";
   if (user_library) {

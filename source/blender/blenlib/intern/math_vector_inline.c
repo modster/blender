@@ -15,8 +15,6 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: some of this file.
  */
 
 /** \file
@@ -432,13 +430,6 @@ MINLINE void add_v3_v3v3(float r[3], const float a[3], const float b[3])
 }
 
 MINLINE void add_v3fl_v3fl_v3i(float r[3], const float a[3], const int b[3])
-{
-  r[0] = a[0] + (float)b[0];
-  r[1] = a[1] + (float)b[1];
-  r[2] = a[2] + (float)b[2];
-}
-
-MINLINE void add_v3fl_v3fl_v3s(float r[3], const float a[3], const short b[3])
 {
   r[0] = a[0] + (float)b[0];
   r[1] = a[1] + (float)b[1];

@@ -15,7 +15,6 @@
  *
  * The Original Code is Copyright (C) 2006 Blender Foundation.
  * All rights reserved.
- * Juho Vepsäläinen
  */
 
 /** \file
@@ -47,7 +46,6 @@ void register_node_type_cmp_group()
   BLI_assert(ntype.rna_ext.srna != nullptr);
   RNA_struct_blender_type_set(ntype.rna_ext.srna, &ntype);
 
-  node_type_socket_templates(&ntype, nullptr, nullptr);
   node_type_size(&ntype, 140, 60, 400);
   ntype.labelfunc = node_group_label;
   node_type_group_update(&ntype, node_group_update);

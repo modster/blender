@@ -15,11 +15,11 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- * .blend file reading entry point
  */
 
 /** \file
  * \ingroup blenloader
+ * `.blend` file reading entry point.
  */
 
 #include <stddef.h>
@@ -418,9 +418,6 @@ BlendFileData *BLO_read_from_memfile(Main *oldmain,
   if (fd) {
     fd->skip_flags = params->skip_flags;
     BLI_strncpy(fd->relabase, filename, sizeof(fd->relabase));
-
-    /* clear ob->proxy_from pointers in old main */
-    blo_clear_proxy_pointers_from_lib(oldmain);
 
     /* separate libraries from old main */
     blo_split_main(&old_mainlist, oldmain);

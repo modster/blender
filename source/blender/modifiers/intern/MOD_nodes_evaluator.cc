@@ -381,6 +381,11 @@ static bool get_implicit_socket_input(const SocketRef &socket, void *r_value)
         new (r_value) ValueOrField<float3>(bke::AttributeFieldInput::Create<float3>(side));
         return true;
       }
+      if (bnode.type == GEO_NODE_EXTRUDE_MESH) {
+        new (r_value)
+            ValueOrField<float3>(Field<float3>(std::make_shared<bke::NormalFieldInput>()));
+        return true;
+      }
       new (r_value) ValueOrField<float3>(bke::AttributeFieldInput::Create<float3>("position"));
       return true;
     }
@@ -891,7 +896,7 @@ class GeometryNodesEvaluator {
   void foreach_non_lazy_input(LockedNode &locked_node, FunctionRef<void(DInputSocket socket)> fn)
   {
     if (node_supports_laziness(locked_node.node)) {
-      /* In the future only some of the inputs may support lazyness. */
+      /* In the future only some of the inputs may support laziness. */
       return;
     }
     /* Nodes that don't support laziness require all inputs. */
@@ -1342,7 +1347,7 @@ class GeometryNodesEvaluator {
     }
     input_state.usage = ValueUsage::Unused;
 
-    /* If the input is unused, it's value can be destructed now. */
+    /* If the input is unused, its value can be destructed now. */
     this->destruct_input_value_if_exists(locked_node, socket);
 
     if (input_state.was_ready_for_execution) {

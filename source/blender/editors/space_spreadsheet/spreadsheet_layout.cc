@@ -17,8 +17,7 @@
 #include <iomanip>
 #include <sstream>
 
-#include "BLI_float2.hh"
-#include "BLI_float3.hh"
+#include "BLI_math_vec_types.hh"
 
 #include "BKE_geometry_set.hh"
 
@@ -108,6 +107,28 @@ class SpreadsheetLayoutDrawer : public SpreadsheetDrawer {
 
     if (data.type().is<int>()) {
       const int value = data.get<int>(real_index);
+      const std::string value_str = std::to_string(value);
+      uiBut *but = uiDefIconTextBut(params.block,
+                                    UI_BTYPE_LABEL,
+                                    0,
+                                    ICON_NONE,
+                                    value_str.c_str(),
+                                    params.xmin,
+                                    params.ymin,
+                                    params.width,
+                                    params.height,
+                                    nullptr,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    nullptr);
+      /* Right-align Integers. */
+      UI_but_drawflag_disable(but, UI_BUT_TEXT_LEFT);
+      UI_but_drawflag_enable(but, UI_BUT_TEXT_RIGHT);
+    }
+    if (data.type().is<int8_t>()) {
+      const int8_t value = data.get<int8_t>(real_index);
       const std::string value_str = std::to_string(value);
       uiBut *but = uiDefIconTextBut(params.block,
                                     UI_BTYPE_LABEL,

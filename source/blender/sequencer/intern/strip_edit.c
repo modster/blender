@@ -13,11 +13,9 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * - Blender Foundation, 2003-2009
- * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved.
+ *           2003-2009 Blender Foundation.
+ *           2005-2006 Peter Schlaile <peter [at] schlaile [dot] de>
  */
 
 /** \file
@@ -43,6 +41,7 @@
 #include "utils.h"
 
 #include "SEQ_add.h"
+#include "SEQ_animation.h"
 #include "SEQ_edit.h"
 #include "SEQ_effects.h"
 #include "SEQ_iterator.h"
@@ -199,8 +198,9 @@ void SEQ_edit_remove_flagged_sequences(Scene *scene, ListBase *seqbase)
       if (seq->type == SEQ_TYPE_META) {
         SEQ_edit_remove_flagged_sequences(scene, &seq->seqbase);
       }
+      SEQ_free_animdata(scene, seq);
       BLI_remlink(seqbase, seq);
-      SEQ_sequence_free(scene, seq, true);
+      SEQ_sequence_free(scene, seq);
       SEQ_sequence_lookup_tag(scene, SEQ_LOOKUP_TAG_INVALID);
     }
   }

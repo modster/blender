@@ -2148,8 +2148,8 @@ class VIEW3D_MT_add(Menu):
         layout.menu("VIEW3D_MT_surface_add", icon='OUTLINER_OB_SURFACE')
         layout.menu("VIEW3D_MT_metaball_add", text="Metaball", icon='OUTLINER_OB_META')
         layout.operator("object.text_add", text="Text", icon='OUTLINER_OB_FONT')
-        if context.preferences.experimental.use_new_hair_type:
-            layout.operator("object.hair_add", text="Hair", icon='OUTLINER_OB_HAIR')
+        if context.preferences.experimental.use_new_curves_type:
+            layout.operator("object.hair_curves_add", text="Hair Curves", icon='OUTLINER_OB_CURVES')
         if context.preferences.experimental.use_new_point_cloud_type:
             layout.operator("object.pointcloud_add", text="Point Cloud", icon='OUTLINER_OB_POINTCLOUD')
         layout.menu("VIEW3D_MT_volume_add", text="Volume", icon='OUTLINER_OB_VOLUME')
@@ -2227,8 +2227,6 @@ class VIEW3D_MT_object_relations(Menu):
         layout = self.layout
 
         layout.operator("object.make_override_library", text="Make Library Override...")
-
-        layout.operator("object.convert_proxy_to_override")
 
         layout.operator("object.make_dupli_face")
 
@@ -4023,6 +4021,10 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
         layout.operator("mesh.vertices_smooth", text="Smooth Vertices").factor = 0.5
         layout.operator("mesh.vertices_smooth_laplacian", text="Smooth Vertices (Laplacian)")
         layout.operator_context = 'INVOKE_REGION_WIN'
+
+        layout.separator()
+
+        layout.operator("transform.vert_crease")
 
         layout.separator()
 
@@ -6504,18 +6506,38 @@ class VIEW3D_PT_overlay_sculpt(Panel):
         row.prop(overlay, "sculpt_mode_face_sets_opacity", text="Face Sets")
 
 
-class VIEW3D_PT_overlay_pose(Panel):
+class VIEW3D_PT_overlay_bones(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
     bl_parent_id = 'VIEW3D_PT_overlay'
-    bl_label = "Pose Mode"
+    bl_label = "Bones"
+
+    @staticmethod
+    def is_using_wireframe(context):
+        shading = VIEW3D_PT_shading.get_shading(context)
+
+        if shading.type == 'WIREFRAME' or shading.show_xray:
+            return True
+
+        mode = context.mode
+
+        if mode in {'POSE', 'PAINT_WEIGHT'}:
+            armature = context.pose_object
+        elif mode == 'EDIT_ARMATURE':
+            armature = context.edit_object
+        else:
+            return False
+
+        return armature and armature.display_type == 'WIRE'
 
     @classmethod
     def poll(cls, context):
         mode = context.mode
         return (
             (mode == 'POSE') or
-            (mode == 'PAINT_WEIGHT' and context.pose_object)
+            (mode == 'PAINT_WEIGHT' and context.pose_object) or
+            (mode in {'EDIT_ARMATURE', 'OBJECT'} and
+             VIEW3D_PT_overlay_bones.is_using_wireframe(context))
         )
 
     def draw(self, context):
@@ -6534,9 +6556,12 @@ class VIEW3D_PT_overlay_pose(Panel):
             sub = row.row()
             sub.active = display_all and overlay.show_xray_bone
             sub.prop(overlay, "xray_alpha_bone", text="Fade Geometry")
-        else:
+        elif mode == 'PAINT_WEIGHT':
             row = col.row()
             row.prop(overlay, "show_xray_bone")
+
+        if VIEW3D_PT_overlay_bones.is_using_wireframe(context):
+            col.prop(overlay, "bone_wire_alpha")
 
 
 class VIEW3D_PT_overlay_texture_paint(Panel):
@@ -7705,7 +7730,7 @@ classes = (
     VIEW3D_PT_overlay_texture_paint,
     VIEW3D_PT_overlay_vertex_paint,
     VIEW3D_PT_overlay_weight_paint,
-    VIEW3D_PT_overlay_pose,
+    VIEW3D_PT_overlay_bones,
     VIEW3D_PT_overlay_sculpt,
     VIEW3D_PT_snapping,
     VIEW3D_PT_proportional_edit,

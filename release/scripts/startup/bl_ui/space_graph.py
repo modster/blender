@@ -335,6 +335,7 @@ class GRAPH_MT_key_snap(Menu):
         layout.operator("graph.snap", text="Selection to Nearest Second").type = 'NEAREST_SECOND'
         layout.operator("graph.snap", text="Selection to Nearest Marker").type = 'NEAREST_MARKER'
         layout.operator("graph.snap", text="Flatten Handles").type = 'HORIZONTAL'
+        layout.operator("graph.equalize_handles", text="Equalize Handles").side = 'BOTH'
         layout.separator()
         layout.operator("graph.frame_jump", text="Cursor to Selection")
         layout.operator("graph.snap_cursor_value", text="Cursor Value to Selection")
@@ -344,7 +345,7 @@ class GRAPH_MT_slider(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        
+
         layout.operator("graph.breakdown", text="Breakdown")
         layout.operator("graph.blend_to_neighbor", text="Blend To Neighbor")
 
@@ -352,7 +353,7 @@ class GRAPH_MT_slider(Menu):
 class GRAPH_MT_view_pie(Menu):
     bl_label = "View"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         pie = layout.menu_pie()

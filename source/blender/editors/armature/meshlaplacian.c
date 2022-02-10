@@ -12,11 +12,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- * meshlaplacian.c: Algorithms using the mesh laplacian.
  */
 
 /** \file
  * \ingroup edarmature
+ * Algorithms using the mesh laplacian.
  */
 
 #include "MEM_guardedalloc.h"
@@ -1618,8 +1618,7 @@ static void harmonic_coordinates_bind(MeshDeformModifierData *mmd, MeshDeformBin
     mdb->cagemesh_cache.mpoly = me->mpoly;
     mdb->cagemesh_cache.mloop = me->mloop;
     mdb->cagemesh_cache.looptri = BKE_mesh_runtime_looptri_ensure(me);
-    /* can be NULL */
-    mdb->cagemesh_cache.poly_nors = CustomData_get_layer(&me->pdata, CD_NORMAL);
+    mdb->cagemesh_cache.poly_nors = BKE_mesh_poly_normals_ensure(me);
   }
 
   /* make bounding box equal size in all directions, add padding, and compute
@@ -1743,14 +1742,15 @@ static void harmonic_coordinates_bind(MeshDeformModifierData *mmd, MeshDeformBin
   free_bvhtree_from_mesh(&mdb->bvhdata);
 }
 
-void ED_mesh_deform_bind_callback(MeshDeformModifierData *mmd,
+void ED_mesh_deform_bind_callback(Object *object,
+                                  MeshDeformModifierData *mmd,
                                   Mesh *cagemesh,
                                   float *vertexcos,
                                   int totvert,
                                   float cagemat[4][4])
 {
   MeshDeformModifierData *mmd_orig = (MeshDeformModifierData *)BKE_modifier_get_original(
-      &mmd->modifier);
+      object, &mmd->modifier);
   MeshDeformBind mdb;
   MVert *mvert;
   int a;

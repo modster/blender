@@ -15,11 +15,11 @@
  *
  * The Original Code is Copyright (C) 2006 by Nicholas Bishop
  * All rights reserved.
- * Implements the Sculpt Mode tools
  */
 
 /** \file
  * \ingroup edsculpt
+ * Implements the Sculpt Mode tools.
  */
 
 #include <stddef.h>
@@ -1107,10 +1107,10 @@ static void sculpt_undo_store_coords(Object *ob, SculptUndoNode *unode)
   BKE_pbvh_vertex_iter_begin (ss->pbvh, unode->node, vd, PBVH_ITER_ALL) {
     copy_v3_v3(unode->co[vd.i], vd.co);
     if (vd.no) {
-      copy_v3_v3_short(unode->no[vd.i], vd.no);
+      copy_v3_v3(unode->no[vd.i], vd.no);
     }
     else {
-      normal_float_to_short_v3(unode->no[vd.i], vd.fno);
+      copy_v3_v3(unode->no[vd.i], vd.fno);
     }
 
     if (ss->deform_modifiers_active) {

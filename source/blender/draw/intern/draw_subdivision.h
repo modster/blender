@@ -106,7 +106,7 @@ typedef struct DRWSubdivCache {
   struct GPUVertBuf *edges_orig_index;
 
   /* Owned by #Subdiv. Indexed by coarse polygon index, difference between value (i + 1) and (i)
-   * gives the number of ptex faces for coarse polygon (i).  */
+   * gives the number of ptex faces for coarse polygon (i). */
   int *face_ptex_offset;
   /* Vertex buffer for face_ptex_offset. */
   struct GPUVertBuf *face_ptex_offset_buffer;
@@ -178,7 +178,7 @@ void draw_subdiv_finalize_normals(const DRWSubdivCache *cache,
 
 void draw_subdiv_extract_pos_nor(const DRWSubdivCache *cache,
                                  struct GPUVertBuf *pos_nor,
-                                 const bool do_limit_normals);
+                                 bool do_limit_normals);
 
 void draw_subdiv_interp_custom_data(const DRWSubdivCache *cache,
                                     struct GPUVertBuf *src_data,
@@ -188,8 +188,8 @@ void draw_subdiv_interp_custom_data(const DRWSubdivCache *cache,
 
 void draw_subdiv_extract_uvs(const DRWSubdivCache *cache,
                              struct GPUVertBuf *uvs,
-                             const int face_varying_channel,
-                             const int dst_offset);
+                             int face_varying_channel,
+                             int dst_offset);
 
 void draw_subdiv_build_edge_fac_buffer(const DRWSubdivCache *cache,
                                        struct GPUVertBuf *pos_nor,
@@ -198,7 +198,7 @@ void draw_subdiv_build_edge_fac_buffer(const DRWSubdivCache *cache,
 
 void draw_subdiv_build_tris_buffer(const DRWSubdivCache *cache,
                                    struct GPUIndexBuf *subdiv_tris,
-                                   const int material_count);
+                                   int material_count);
 
 void draw_subdiv_build_lines_buffer(const DRWSubdivCache *cache,
                                     struct GPUIndexBuf *lines_indices);

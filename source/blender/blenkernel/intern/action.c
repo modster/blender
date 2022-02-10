@@ -307,7 +307,7 @@ static void action_asset_pre_save(void *asset_ptr, struct AssetMetaData *asset_d
   BKE_asset_metadata_idprop_ensure(asset_data, action_type);
 }
 
-AssetTypeInfo AssetType_AC = {
+static AssetTypeInfo AssetType_AC = {
     /* pre_save_fn */ action_asset_pre_save,
 };
 
@@ -1956,27 +1956,12 @@ void BKE_pose_blend_read_lib(BlendLibReader *reader, Object *ob, bPose *pose)
     return;
   }
 
-  /* always rebuild to match proxy or lib changes, but on Undo */
+  /* Always rebuild to match library changes, except on Undo. */
   bool rebuild = false;
 
   if (!BLO_read_lib_is_undo(reader)) {
-    if (ob->proxy || ob->id.lib != arm->id.lib) {
+    if (ob->id.lib != arm->id.lib) {
       rebuild = true;
-    }
-  }
-
-  if (ob->proxy) {
-    /* sync proxy layer */
-    if (pose->proxy_layer) {
-      arm->layer = pose->proxy_layer;
-    }
-
-    /* sync proxy active bone */
-    if (pose->proxy_act_bone[0]) {
-      Bone *bone = BKE_armature_find_bone_name(arm, pose->proxy_act_bone);
-      if (bone) {
-        arm->act_bone = bone;
-      }
     }
   }
 

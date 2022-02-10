@@ -349,7 +349,7 @@ static void do_version_scene_collection_convert(
   LISTBASE_FOREACH (LinkData *, link, &sc->objects) {
     Object *ob = link->data;
     if (ob) {
-      BKE_collection_object_add(bmain, collection, ob);
+      BKE_collection_object_add_notest(bmain, collection, ob);
       id_us_min(&ob->id);
     }
   }
@@ -401,6 +401,8 @@ static void do_version_scene_collection_to_collection(Main *bmain, Scene *scene)
 
     do_version_layer_collection_pre(
         view_layer, &view_layer->layer_collections, enabled_set, selectable_set);
+
+    BKE_layer_collection_doversion_2_80(scene, view_layer);
 
     BKE_layer_collection_sync(scene, view_layer);
 
@@ -457,7 +459,7 @@ static void do_version_layers_to_collections(Main *bmain, Scene *scene)
 
         /* Note usually this would do slow collection syncing for view layers,
          * but since no view layers exists yet at this point it's fast. */
-        BKE_collection_object_add(bmain, collections[layer], base->object);
+        BKE_collection_object_add_notest(bmain, collections[layer], base->object);
       }
 
       if (base->flag & SELECT) {
@@ -1233,7 +1235,7 @@ void do_versions_after_linking_280(Main *bmain, ReportList *UNUSED(reports))
             (*collection_hidden)->flag |= COLLECTION_HIDE_VIEWPORT | COLLECTION_HIDE_RENDER;
           }
 
-          BKE_collection_object_add(bmain, *collection_hidden, ob);
+          BKE_collection_object_add_notest(bmain, *collection_hidden, ob);
           BKE_collection_object_remove(bmain, collection, ob, true);
         }
       }

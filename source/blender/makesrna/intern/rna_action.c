@@ -625,11 +625,11 @@ static void rna_def_dopesheet(BlenderRNA *brna)
   RNA_def_property_ui_icon(prop, ICON_FILE, 0);
   RNA_def_property_update(prop, NC_ANIMATION | ND_ANIMCHAN | NA_EDITED, NULL);
 
-  prop = RNA_def_property(srna, "show_hairs", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "show_hair_curves", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_negative_sdna(prop, NULL, "filterflag2", ADS_FILTER_NOHAIR);
   RNA_def_property_ui_text(
       prop, "Display Hair", "Include visualization of hair related animation data");
-  RNA_def_property_ui_icon(prop, ICON_OUTLINER_OB_HAIR, 0);
+  RNA_def_property_ui_icon(prop, ICON_OUTLINER_OB_CURVES, 0);
   RNA_def_property_update(prop, NC_ANIMATION | ND_ANIMCHAN | NA_EDITED, NULL);
 
   prop = RNA_def_property(srna, "show_pointclouds", PROP_BOOLEAN, PROP_NONE);
@@ -907,7 +907,7 @@ static void rna_def_action(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_float_sdna(prop, NULL, "frame_start");
   RNA_def_property_float_funcs(prop, NULL, "rna_Action_start_frame_set", NULL);
-  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 100, 0);
+  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 100, 2);
   RNA_def_property_ui_text(
       prop, "Start Frame", "The start frame of the manually set intended playback range");
   RNA_def_property_update(prop, NC_ANIMATION | ND_ANIMCHAN | NA_EDITED, NULL);
@@ -916,7 +916,7 @@ static void rna_def_action(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_float_sdna(prop, NULL, "frame_end");
   RNA_def_property_float_funcs(prop, NULL, "rna_Action_end_frame_set", NULL);
-  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 100, 0);
+  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 100, 2);
   RNA_def_property_ui_text(
       prop, "End Frame", "The end frame of the manually set intended playback range");
   RNA_def_property_update(prop, NC_ANIMATION | ND_ANIMCHAN | NA_EDITED, NULL);

@@ -142,7 +142,7 @@ set(SRC
   ../DNA_defaults.h
   ../DNA_fluid_defaults.h
   ../DNA_gpencil_modifier_defaults.h
-  ../DNA_hair_defaults.h
+  ../DNA_curves_defaults.h
   ../DNA_image_defaults.h
   ../DNA_lattice_defaults.h
   ../DNA_light_defaults.h
@@ -159,6 +159,7 @@ set(SRC
   ../DNA_pointcloud_defaults.h
   ../DNA_scene_defaults.h
   ../DNA_simulation_defaults.h
+  ../DNA_space_defaults.h
   ../DNA_speaker_defaults.h
   ../DNA_texture_defaults.h
   ../DNA_vec_defaults.h

@@ -21,8 +21,8 @@
 #include "BKE_image.h"
 #include "BKE_node.h"
 
-#include "BLI_float3.hh"
 #include "BLI_map.hh"
+#include "BLI_math_vec_types.hh"
 #include "BLI_path_util.h"
 
 #include "DNA_material_types.h"
@@ -192,9 +192,9 @@ static void store_bsdf_properties(const nodes::NodeRef *bsdf_node,
   if (bnode) {
     copy_property_from_node(SOCK_FLOAT, bnode, "Roughness", {&roughness, 1});
   }
-  /* Emperical approximation. Importer should use the inverse of this method. */
-  float spec_exponent = (1.0f - roughness) * 30;
-  spec_exponent *= spec_exponent;
+  /* Empirical approximation. Importer should use the inverse of this method. */
+  float spec_exponent = (1.0f - roughness);
+  spec_exponent *= spec_exponent * 1000.0f;
 
   float specular = material->spec;
   if (bnode) {
@@ -230,7 +230,7 @@ static void store_bsdf_properties(const nodes::NodeRef *bsdf_node,
   }
   mul_v3_fl(emission_col, emission_strength);
 
-  /* See https://wikipedia.org/wiki/Wavefront_.obj_file for all possible values of illum. */
+  /* See https://wikipedia.org/wiki/Wavefront_.obj_file for all possible values of `illum`. */
   /* Highlight on. */
   int illum = 2;
   if (specular == 0.0f) {
@@ -268,7 +268,7 @@ static void store_bsdf_properties(const nodes::NodeRef *bsdf_node,
 }
 
 /**
- * Store image texture options and filepaths in r_mtl_mat.
+ * Store image texture options and file-paths in `r_mtl_mat`.
  */
 static void store_image_textures(const nodes::NodeRef *bsdf_node,
                                  const nodes::NodeTreeRef *node_tree,
@@ -292,7 +292,7 @@ static void store_image_textures(const nodes::NodeRef *bsdf_node,
     const bNode *normal_map_node{nullptr};
 
     if (texture_map.key == eMTLSyntaxElement::map_Bump) {
-      /* Find sockets linked to destination "Normal" socket in p-bsdf node. */
+      /* Find sockets linked to destination "Normal" socket in P-BSDF node. */
       linked_sockets_to_dest_id(bnode, *node_tree, "Normal", linked_sockets);
       /* Among the linked sockets, find Normal Map shader node. */
       normal_map_node = get_node_of_type(linked_sockets, SH_NODE_NORMAL_MAP);
@@ -308,7 +308,7 @@ static void store_image_textures(const nodes::NodeRef *bsdf_node,
       }
     }
     else {
-      /* Find sockets linked to the destination socket of interest, in p-bsdf node. */
+      /* Find sockets linked to the destination socket of interest, in P-BSDF node. */
       linked_sockets_to_dest_id(
           bnode, *node_tree, texture_map.value.dest_socket_id, linked_sockets);
     }
@@ -353,9 +353,7 @@ MTLMaterial mtlmaterial_for_material(const Material *material)
   const nodes::NodeRef *bsdf_node = find_bsdf_node(nodetree);
   store_bsdf_properties(bsdf_node, material, mtlmat);
   store_image_textures(bsdf_node, nodetree, material, mtlmat);
-  if (nodetree) {
-    delete nodetree;
-  }
+  delete nodetree;
   return mtlmat;
 }
 

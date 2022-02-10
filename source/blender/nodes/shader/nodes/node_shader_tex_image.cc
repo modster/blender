@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 namespace blender::nodes::node_shader_tex_image_cc {
 
@@ -27,7 +27,7 @@ static void sh_node_tex_image_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Vector>(N_("Vector")).implicit_field();
   b.add_output<decl::Color>(N_("Color")).no_muted_links();
   b.add_output<decl::Float>(N_("Alpha")).no_muted_links();
-};
+}
 
 static void node_shader_init_tex_image(bNodeTree *UNUSED(ntree), bNode *node)
 {

@@ -642,6 +642,10 @@ static int actkeys_paste_exec(bContext *C, wmOperator *op)
     }
   }
 
+  /* Grease Pencil needs extra update to refresh the added keyframes. */
+  if (ac.datatype == ANIMCONT_GPENCIL) {
+    WM_event_add_notifier(C, NC_GPENCIL | ND_DATA, NULL);
+  }
   /* set notifier that keyframes have changed */
   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
 
@@ -654,7 +658,7 @@ static char *actkeys_paste_description(bContext *UNUSED(C),
 {
   /* Custom description if the 'flipped' option is used. */
   if (RNA_boolean_get(ptr, "flipped")) {
-    return BLI_strdup("Paste keyframes from mirrored bones if they exist");
+    return BLI_strdup(TIP_("Paste keyframes from mirrored bones if they exist"));
   }
 
   /* Use the default description in the other cases. */

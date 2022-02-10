@@ -20,12 +20,12 @@
  * \ingroup bke
  */
 
+struct ID;
+struct Main;
 struct bNode;
+struct bNodeLink;
 struct bNodeSocket;
 struct bNodeTree;
-struct bNodeLink;
-struct Main;
-struct ID;
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,7 +35,7 @@ extern "C" {
  * Tag tree as changed without providing any more information about what has changed exactly.
  * The update process has to assume that everything may have changed.
  *
- * Using one of the methods below to tag the tree after changes is preffered when possible.
+ * Using one of the methods below to tag the tree after changes is preferred when possible.
  */
 void BKE_ntree_update_tag_all(struct bNodeTree *ntree);
 
@@ -60,6 +60,8 @@ void BKE_ntree_update_tag_link_removed(struct bNodeTree *ntree);
 void BKE_ntree_update_tag_link_added(struct bNodeTree *ntree, struct bNodeLink *link);
 void BKE_ntree_update_tag_link_mute(struct bNodeTree *ntree, struct bNodeLink *link);
 
+/** Used when the a new output node becomes active and therefore changes the output. */
+void BKE_ntree_update_tag_active_output_changed(struct bNodeTree *ntree);
 /** Used after file loading when run-time data on the tree has not been initialized yet. */
 void BKE_ntree_update_tag_missing_runtime_data(struct bNodeTree *ntree);
 /** Used when the interface sockets/values have changed. */

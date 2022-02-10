@@ -99,8 +99,10 @@ typedef struct tBeztCopyData {
 /** \name Utility Functions
  * \{ */
 
-/* Construct a list with the original bezt arrays so we can restore them during modal operation.
- * The data is stored on the struct that is passed.*/
+/**
+ * Construct a list with the original bezt arrays so we can restore them during modal operation.
+ * The data is stored on the struct that is passed.
+ */
 static void store_original_bezt_arrays(tGraphSliderOp *gso)
 {
   ListBase anim_data = {NULL, NULL};
@@ -481,7 +483,7 @@ static char *decimate_desc(bContext *UNUSED(C), wmOperatorType *UNUSED(op), Poin
 
   if (RNA_enum_get(ptr, "mode") == DECIM_ERROR) {
     return BLI_strdup(
-        "Decimate F-Curves by specifying how much it can deviate from the original curve");
+        TIP_("Decimate F-Curves by specifying how much they can deviate from the original curve"));
   }
 
   /* Use default description. */

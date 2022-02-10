@@ -20,7 +20,7 @@
 
 set(INC
   .
-  ../
+  ..
   ../intern
   ../../blenkernel
   ../../blenlib
@@ -53,7 +53,7 @@ set(SRC
   nodes/node_fn_slice_string.cc
   nodes/node_fn_string_length.cc
   nodes/node_fn_value_to_string.cc
-  
+
   node_function_util.cc
 
   node_function_util.hh
@@ -62,10 +62,6 @@ set(SRC
 set(LIB
   bf_functions
 )
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
 
 blender_add_lib(bf_nodes_function "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 

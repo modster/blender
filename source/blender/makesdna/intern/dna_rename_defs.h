@@ -15,7 +15,6 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- * DNA handling
  */
 
 /** \file
@@ -107,6 +106,7 @@ DNA_STRUCT_RENAME_ELEM(ParticleSettings, dup_group, instance_collection)
 DNA_STRUCT_RENAME_ELEM(ParticleSettings, dup_ob, instance_object)
 DNA_STRUCT_RENAME_ELEM(ParticleSettings, dupliweights, instance_weights)
 DNA_STRUCT_RENAME_ELEM(RigidBodyWorld, steps_per_second, substeps_per_frame)
+DNA_STRUCT_RENAME_ELEM(RenderData, bake_filter, bake_margin)
 DNA_STRUCT_RENAME_ELEM(SpaceSeq, overlay_type, overlay_frame_type)
 DNA_STRUCT_RENAME_ELEM(SurfaceDeformModifierData, numverts, num_bind_verts)
 DNA_STRUCT_RENAME_ELEM(Text, name, filepath)

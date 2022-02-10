@@ -300,13 +300,17 @@ typedef struct LineartRenderBuffer {
   bool use_loose_edge_chain;
   bool use_geometry_space_chain;
   bool use_image_boundary_trimming;
+  bool use_back_face_culling;
 
   bool filter_face_mark;
   bool filter_face_mark_invert;
   bool filter_face_mark_boundaries;
+  bool filter_face_mark_keep_contour;
 
   bool force_crease;
   bool sharp_as_crease;
+
+  bool chain_preserve_details;
 
   /* Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;
@@ -655,7 +659,7 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb);
  * implemented yet.
  */
 void MOD_lineart_chain_connect(LineartRenderBuffer *rb);
-void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
+void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, float threshold);
 void MOD_lineart_chain_clip_at_border(LineartRenderBuffer *rb);
 /**
  * This should always be the last stage!, see the end of

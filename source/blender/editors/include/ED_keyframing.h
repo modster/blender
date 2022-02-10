@@ -14,7 +14,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * The Original Code is Copyright (C) 2008, Blender Foundation
- * This is a new part of Blender (with some old code)
  */
 
 /** \file
@@ -62,7 +61,7 @@ struct NlaKeyframingContext;
  * \param use_autokey_mode: include settings from key-framing mode in the result
  * (i.e. replace only).
  */
-eInsertKeyFlags ANIM_get_keyframing_flags(struct Scene *scene, const bool use_autokey_mode);
+eInsertKeyFlags ANIM_get_keyframing_flags(struct Scene *scene, bool use_autokey_mode);
 
 /* -------- */
 
@@ -81,15 +80,13 @@ struct FCurve *ED_action_fcurve_ensure(struct Main *bmain,
                                        const char group[],
                                        struct PointerRNA *ptr,
                                        const char rna_path[],
-                                       const int array_index);
+                                       int array_index);
 
 /**
  * Find the F-Curve from the Active Action,
  * for the given Animation Data block. This assumes that all the destinations are valid.
  */
-struct FCurve *ED_action_fcurve_find(struct bAction *act,
-                                     const char rna_path[],
-                                     const int array_index);
+struct FCurve *ED_action_fcurve_find(struct bAction *act, const char rna_path[], int array_index);
 
 /* -------- */
 
@@ -449,11 +446,11 @@ typedef enum eDriverFCurveCreationMode {
  */
 struct FCurve *verify_driver_fcurve(struct ID *id,
                                     const char rna_path[],
-                                    const int array_index,
+                                    int array_index,
                                     eDriverFCurveCreationMode creation_mode);
 
 struct FCurve *alloc_driver_fcurve(const char rna_path[],
-                                   const int array_index,
+                                   int array_index,
                                    eDriverFCurveCreationMode creation_mode);
 
 /* -------- */

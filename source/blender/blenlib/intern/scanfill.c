@@ -15,7 +15,6 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- * (uit traces) maart 95
  */
 
 /** \file
@@ -357,8 +356,10 @@ static ScanFillVertLink *addedgetoscanlist(ScanFillVertLink *scdata,
   return NULL;
 }
 
+/**
+ * Return true if `eve` inside the bound-box of `eed`.
+ */
 static bool boundinsideEV(ScanFillEdge *eed, ScanFillVert *eve)
-/* is eve inside boundbox eed */
 {
   float minx, maxx, miny, maxy;
 

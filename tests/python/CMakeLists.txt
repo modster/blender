@@ -293,6 +293,13 @@ add_blender_test(
   --testdir "${TEST_SRC_DIR}/animation"
 )
 
+add_blender_test(
+  bl_rigging_symmetrize
+  --python ${CMAKE_CURRENT_LIST_DIR}/bl_rigging_symmetrize.py
+  --
+  --testdir "${TEST_SRC_DIR}/animation"
+)
+
 # ------------------------------------------------------------------------------
 # IO TESTS
 
@@ -324,7 +331,10 @@ add_blender_test(
 )
 endif()
 
+if(FALSE)
 # OBJ Export tests
+# Disabled because new C++ Obj exporter has C++ tests.
+
 add_blender_test(
   export_obj_cube
   ${TEST_SRC_DIR}/io_tests/blend_geometry/all_quads.blend
@@ -345,8 +355,6 @@ add_blender_test(
   --md5=a733ae4fa4a591ea9b0912da3af042de --md5_method=FILE
 )
 
-# disabled until updated & working
-if(FALSE)
 add_blender_test(
   export_obj_all_objects
   ${TEST_SRC_DIR}/io_tests/blend_scene/all_objects.blend
@@ -691,16 +699,19 @@ if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
         set(_cycles_render_tests bake;${render_tests};osl)
 
         foreach(render_test ${_cycles_render_tests})
-          add_python_test(
-            cycles_${render_test}_${_cycles_device_lower}
-            ${CMAKE_CURRENT_LIST_DIR}/cycles_render_tests.py
-            -blender "${TEST_BLENDER_EXE}"
-            -testdir "${TEST_SRC_DIR}/render/${render_test}"
-            -idiff "${OPENIMAGEIO_IDIFF}"
-            -outdir "${TEST_OUT_DIR}/cycles"
-            -device ${_cycles_device}
-            -blacklist ${_cycles_blacklist}
-          )
+          # Enable just one simple test for Metal until more tests are passing.
+          if((NOT (_cycles_device MATCHES "METAL")) OR (render_test MATCHES "camera"))
+            add_python_test(
+              cycles_${render_test}_${_cycles_device_lower}
+              ${CMAKE_CURRENT_LIST_DIR}/cycles_render_tests.py
+              -blender "${TEST_BLENDER_EXE}"
+              -testdir "${TEST_SRC_DIR}/render/${render_test}"
+              -idiff "${OPENIMAGEIO_IDIFF}"
+              -outdir "${TEST_OUT_DIR}/cycles"
+              -device ${_cycles_device}
+              -blacklist ${_cycles_blacklist}
+            )
+          endif()
         endforeach()
       endforeach()
     endif()
@@ -737,15 +748,17 @@ if(WITH_COMPOSITOR)
   set(compositor_tests
     color
     converter
-    distort
     filter
     input
-    matte
     output
     vector
 
     multiple_node_setups
   )
+
+  if(WITH_LIBMV)
+    list(APPEND compositor_tests distort matte)
+  endif()
 
   foreach(comp_test ${compositor_tests})
     add_python_test(
@@ -767,6 +780,7 @@ set(geo_node_tests
   geometry
   mesh_primitives
   mesh
+  mesh/extrude
   points
   utilities
   vector

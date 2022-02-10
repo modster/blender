@@ -15,11 +15,11 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- * blenloader readfile private function prototypes
  */
 
 /** \file
  * \ingroup blenloader
+ * blenloader readfile private function prototypes.
  */
 
 #pragma once
@@ -144,14 +144,6 @@ FileData *blo_filedata_from_memfile(struct MemFile *memfile,
                                     const struct BlendFileReadParams *params,
                                     struct BlendFileReadReport *reports);
 
-/**
- * Lib linked proxy objects point to our local data, we need
- * to clear that pointer before reading the undo memfile since
- * the object might be removed, it is set again in reading
- * if the local object still exists.
- * This is only valid for local proxy objects though, linked ones should not be affected here.
- */
-void blo_clear_proxy_pointers_from_lib(struct Main *oldmain);
 void blo_make_packed_pointer_map(FileData *fd, struct Main *oldmain);
 /**
  * Set old main packed data to zero if it has been restored
@@ -200,7 +192,7 @@ struct AssetMetaData *blo_bhead_id_asset_data_address(const FileData *fd, const 
  *
  * \attention ONLY USE THIS KIND OF VERSIONING WHEN `dna_rename_defs.h` ISN'T SUFFICIENT.
  */
-void blo_do_versions_dna(struct SDNA *sdna, const int versionfile, const int subversionfile);
+void blo_do_versions_dna(struct SDNA *sdna, int versionfile, int subversionfile);
 
 void blo_do_versions_oldnewmap_insert(struct OldNewMap *onm,
                                       const void *oldaddr,

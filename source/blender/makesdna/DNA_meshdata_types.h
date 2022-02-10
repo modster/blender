@@ -41,18 +41,13 @@ extern "C" {
  */
 typedef struct MVert {
   float co[3];
-  /**
-   * Cache the normal, can always be recalculated from surrounding faces.
-   * See #CD_CUSTOMLOOPNORMAL for custom normals.
-   */
-  short no[3];
   char flag, bweight;
+  char _pad[2];
 } MVert;
 
 /** #MVert.flag */
 enum {
   /*  SELECT = (1 << 0), */
-  ME_VERT_TMP_TAG = (1 << 2),
   ME_HIDE = (1 << 4),
   ME_VERT_FACEDOT = (1 << 5),
   /*  ME_VERT_MERGED = (1 << 6), */
@@ -270,6 +265,9 @@ typedef struct MStringProperty {
 typedef struct MBoolProperty {
   uint8_t b;
 } MBoolProperty;
+typedef struct MInt8Property {
+  int8_t i;
+} MInt8Property;
 
 /** \} */
 

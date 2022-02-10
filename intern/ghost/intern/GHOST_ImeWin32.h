@@ -14,9 +14,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * The Original Code is Copyright (c) 2010 The Chromium Authors. All rights reserved.
- * All rights reserved.
- *
- * The Original Code is: some of this file.
  */
 
 /** \file
@@ -161,7 +158,7 @@ class GHOST_ImeWin32 {
   bool IsEnglishMode();
 
   /* Checks a key whether IME has to do handling. */
-  bool IsImeKeyEvent(char ascii);
+  bool IsImeKeyEvent(char ascii, GHOST_TKey key);
 
   /**
    * Create the IME windows, and allocate required resources for them.

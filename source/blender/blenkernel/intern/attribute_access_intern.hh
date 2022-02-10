@@ -140,7 +140,8 @@ class CustomDataAttributeProvider final : public DynamicAttributesProvider {
  private:
   static constexpr uint64_t supported_types_mask = CD_MASK_PROP_FLOAT | CD_MASK_PROP_FLOAT2 |
                                                    CD_MASK_PROP_FLOAT3 | CD_MASK_PROP_INT32 |
-                                                   CD_MASK_PROP_COLOR | CD_MASK_PROP_BOOL;
+                                                   CD_MASK_PROP_COLOR | CD_MASK_PROP_BOOL |
+                                                   CD_MASK_PROP_INT8;
   const AttributeDomain domain_;
   const CustomDataAccessInfo custom_data_access_;
 
@@ -161,7 +162,7 @@ class CustomDataAttributeProvider final : public DynamicAttributesProvider {
 
   bool try_create(GeometryComponent &component,
                   const AttributeIDRef &attribute_id,
-                  const AttributeDomain domain,
+                  AttributeDomain domain,
                   const CustomDataType data_type,
                   const AttributeInit &initializer) const final;
 
@@ -185,8 +186,8 @@ class CustomDataAttributeProvider final : public DynamicAttributesProvider {
  */
 class NamedLegacyCustomDataProvider final : public DynamicAttributesProvider {
  private:
-  using AsReadAttribute = GVArray (*)(const void *data, const int domain_size);
-  using AsWriteAttribute = GVMutableArray (*)(void *data, const int domain_size);
+  using AsReadAttribute = GVArray (*)(const void *data, int domain_size);
+  using AsWriteAttribute = GVMutableArray (*)(void *data, int domain_size);
   const AttributeDomain domain_;
   const CustomDataType attribute_type_;
   const CustomDataType stored_type_;
@@ -229,8 +230,8 @@ class NamedLegacyCustomDataProvider final : public DynamicAttributesProvider {
  * if the stored type is the same as the attribute type.
  */
 class BuiltinCustomDataLayerProvider final : public BuiltinAttributeProvider {
-  using AsReadAttribute = GVArray (*)(const void *data, const int domain_size);
-  using AsWriteAttribute = GVMutableArray (*)(void *data, const int domain_size);
+  using AsReadAttribute = GVArray (*)(const void *data, int domain_size);
+  using AsWriteAttribute = GVMutableArray (*)(void *data, int domain_size);
   using UpdateOnRead = void (*)(const GeometryComponent &component);
   using UpdateOnWrite = void (*)(GeometryComponent &component);
   const CustomDataType stored_type_;

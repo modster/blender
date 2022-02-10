@@ -88,13 +88,6 @@
 
 #include "node_intern.hh" /* own include */
 
-using blender::Array;
-using blender::float2;
-using blender::Map;
-using blender::Set;
-using blender::Span;
-using blender::Vector;
-using blender::VectorSet;
 using blender::fn::CPPType;
 using blender::fn::FieldCPPType;
 using blender::fn::FieldInput;
@@ -115,6 +108,8 @@ float ED_node_grid_size()
 
 void ED_node_tree_update(const bContext *C)
 {
+  using namespace blender::ed::space_node;
+
   SpaceNode *snode = CTX_wm_space_node(C);
   if (snode) {
     snode_set_context(*C);
@@ -176,6 +171,8 @@ void ED_node_tag_update_id(ID *id)
   }
 }
 
+namespace blender::ed::space_node {
+
 static bool compare_nodes(const bNode *a, const bNode *b)
 {
   /* These tell if either the node or any of the parent nodes is selected.
@@ -232,14 +229,14 @@ static bool compare_nodes(const bNode *a, const bNode *b)
   return false;
 }
 
-void ED_node_sort(bNodeTree *ntree)
+void node_sort(bNodeTree &ntree)
 {
   /* Merge sort is the algorithm of choice here. */
-  int totnodes = BLI_listbase_count(&ntree->nodes);
+  int totnodes = BLI_listbase_count(&ntree.nodes);
 
   int k = 1;
   while (k < totnodes) {
-    bNode *first_a = (bNode *)ntree->nodes.first;
+    bNode *first_a = (bNode *)ntree.nodes.first;
     bNode *first_b = first_a;
 
     do {
@@ -266,8 +263,8 @@ void ED_node_sort(bNodeTree *ntree)
           bNode *tmp = node_b;
           node_b = node_b->next;
           b++;
-          BLI_remlink(&ntree->nodes, tmp);
-          BLI_insertlinkbefore(&ntree->nodes, node_a, tmp);
+          BLI_remlink(&ntree.nodes, tmp);
+          BLI_insertlinkbefore(&ntree.nodes, node_a, tmp);
         }
       }
 
@@ -400,7 +397,7 @@ static void node_update_basis(const bContext &C, bNodeTree &ntree, bNode &node, 
 
     /* Round the socket location to stop it from jiggling. */
     nsock->locx = round(loc.x + NODE_WIDTH(node));
-    nsock->locy = round(0.5f * (dy + buty));
+    nsock->locy = round(dy - NODE_DYS);
 
     dy = buty;
     if (nsock->next) {
@@ -530,7 +527,7 @@ static void node_update_basis(const bContext &C, bNodeTree &ntree, bNode &node, 
 
     nsock->locx = loc.x;
     /* Round the socket vertical position to stop it from jiggling. */
-    nsock->locy = round(0.5f * (dy + buty));
+    nsock->locy = round(dy - NODE_DYS);
 
     dy = buty - multi_input_socket_offset * 0.5;
     if (nsock->next) {
@@ -629,7 +626,9 @@ static void node_update_hidden(bNode &node, uiBlock &block)
 
 static int node_get_colorid(const bNode &node)
 {
-  switch (node.typeinfo->nclass) {
+  const int nclass = (node.typeinfo->ui_class == nullptr) ? node.typeinfo->nclass :
+                                                            node.typeinfo->ui_class(&node);
+  switch (nclass) {
     case NODE_CLASS_INPUT:
       return TH_NODE_INPUT;
     case NODE_CLASS_OUTPUT:
@@ -1071,8 +1070,12 @@ static void node_socket_draw_nested(const bContext &C,
   UI_block_emboss_set(&block, old_emboss);
 }
 
+}  // namespace blender::ed::space_node
+
 void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[4], float scale)
 {
+  using namespace blender::ed::space_node;
+
   const float size = 2.25f * NODE_SOCKSIZE * scale;
   rcti draw_rect = *rect;
   float outline_color[4] = {0};
@@ -1118,6 +1121,8 @@ void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[
   /* Restore. */
   GPU_blend(state);
 }
+
+namespace blender::ed::space_node {
 
 /* **************  Socket callbacks *********** */
 
@@ -1169,17 +1174,17 @@ static void node_draw_preview(bNodePreview *preview, rctf *prv)
   GPU_blend(GPU_BLEND_ALPHA);
 
   IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-  immDrawPixelsTex(&state,
-                   draw_rect.xmin,
-                   draw_rect.ymin,
-                   preview->xsize,
-                   preview->ysize,
-                   GPU_RGBA8,
-                   true,
-                   preview->rect,
-                   scale,
-                   scale,
-                   nullptr);
+  immDrawPixelsTexTiled(&state,
+                        draw_rect.xmin,
+                        draw_rect.ymin,
+                        preview->xsize,
+                        preview->ysize,
+                        GPU_RGBA8,
+                        true,
+                        preview->rect,
+                        scale,
+                        scale,
+                        nullptr);
 
   GPU_blend(GPU_BLEND_NONE);
 
@@ -2025,7 +2030,7 @@ static void node_draw_basis(const bContext &C,
     }
 
     UI_draw_roundbox_corner_set(UI_CNR_ALL);
-    UI_draw_roundbox_4fv(&rect, false, BASIS_RAD, color_outline);
+    UI_draw_roundbox_4fv(&rect, false, BASIS_RAD + outline_width, color_outline);
   }
 
   float scale;
@@ -2267,6 +2272,13 @@ void node_set_cursor(wmWindow &win, SpaceNode &snode, const float2 &cursor)
   if (node) {
     NodeResizeDirection dir = node_get_resize_direction(node, cursor[0], cursor[1]);
     wmcursor = node_get_resize_cursor(dir);
+    /* We want to indicate that Frame nodes can be moved/selected on their borders. */
+    if (node->type == NODE_FRAME && dir == NODE_RESIZE_NONE) {
+      const rctf frame_inside = node_frame_rect_inside(*node);
+      if (!BLI_rctf_isect_pt(&frame_inside, cursor[0], cursor[1])) {
+        wmcursor = WM_CURSOR_NSEW_SCROLL;
+      }
+    }
   }
 
   WM_cursor_set(&win, wmcursor);
@@ -2452,7 +2464,7 @@ static void frame_node_draw_label(const bNodeTree &ntree,
   const bool has_label = node.label[0] != '\0';
   if (has_label) {
     BLF_position(fontid, x, y, 0);
-    BLF_draw(fontid, label, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw(fontid, label, sizeof(label));
   }
 
   /* draw text body */
@@ -2879,3 +2891,5 @@ void node_draw_space(const bContext &C, ARegion &region)
   /* Scrollers. */
   UI_view2d_scrollers_draw(&v2d, nullptr);
 }
+
+}  // namespace blender::ed::space_node

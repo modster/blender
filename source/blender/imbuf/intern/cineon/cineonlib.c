@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 1999,2000,2001 David Hodson <hodsond@acm.org>
+ * Copyright 1999-2001 David Hodson <hodsond@acm.org>
  */
 
 /** \file
@@ -239,13 +239,13 @@ LogImageFile *cineonOpen(const unsigned char *byteStuff, int fromMemory, size_t 
   }
 
   if (cineon->depth == 1) {
-    /* Grayscale image */
+    /* Gray-scale image. */
     cineon->element[0].descriptor = descriptor_Luminance;
     cineon->element[0].transfer = transfer_Linear;
     cineon->element[0].depth = 1;
   }
   else if (cineon->depth == 3) {
-    /* RGB image */
+    /* RGB image. */
     if (cineon->numElements == 1) {
       cineon->element[0].descriptor = descriptor_RGB;
       cineon->element[0].transfer = transfer_PrintingDensity;
