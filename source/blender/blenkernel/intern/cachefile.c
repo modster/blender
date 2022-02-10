@@ -459,11 +459,6 @@ bool BKE_cache_file_uses_render_procedural(const CacheFile *cache_file,
   return cache_file->use_render_procedural && !is_final_render;
 }
 
-bool BKE_cache_file_supports_layers(const CacheFile *cache_file)
-{
-  return cache_file->type == CACHEFILE_TYPE_ALEMBIC;
-}
-
 CacheFileLayer *BKE_cachefile_add_layer(CacheFile *cache_file, const char filename[1024])
 {
   for (CacheFileLayer *layer = cache_file->layers.first; layer; layer = layer->next) {
@@ -496,8 +491,37 @@ void BKE_cachefile_remove_layer(CacheFile *cache_file, CacheFileLayer *layer)
   MEM_freeN(layer);
 }
 
+CacheAttributeMapping *BKE_cachefile_add_attribute_mapping(CacheFile *cache_file,
+                                                           const char *name,
+                                                           const int mapping_type,
+                                                           const int domain)
+{
+  const int current_mapping_count = BLI_listbase_count(&cache_file->attribute_mappings);
+
+  CacheAttributeMapping *mapping = MEM_callocN(sizeof(CacheAttributeMapping),
+                                               "CacheAttributeMapping");
+
+  if (name) {
+    BLI_strncpy(mapping->name, name, sizeof(mapping->name));
+  }
+  mapping->mapping = (char)mapping_type;
+  mapping->domain = (char)domain;
+
+  BLI_addtail(&cache_file->attribute_mappings, mapping);
+
+  cache_file->active_attribute_mapping = current_mapping_count + 1;
+  return mapping;
+}
+
 CacheAttributeMapping *BKE_cachefile_get_active_attribute_mapping(CacheFile *cache_file)
 {
   /* BLI_findlink handles the out of bounds checks. */
   return BLI_findlink(&cache_file->attribute_mappings, cache_file->active_attribute_mapping - 1);
+}
+
+void BKE_cachefile_remove_attribute_mapping(CacheFile *cache_file, CacheAttributeMapping *mapping)
+{
+  cache_file->active_attribute_mapping = 0;
+  BLI_remlink(&cache_file->attribute_mappings, mapping);
+  MEM_freeN(mapping);
 }

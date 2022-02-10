@@ -344,14 +344,8 @@ static int cachefile_attribute_mapping_add_exec(bContext *C, wmOperator *UNUSED(
     return OPERATOR_CANCELLED;
   }
 
-  const int current_mapping_count = BLI_listbase_count(&cache_file->attribute_mappings);
-
-  CacheAttributeMapping *mapping = MEM_callocN(sizeof(CacheAttributeMapping),
-                                               "CacheAttributeMapping");
-
-  BLI_addtail(&cache_file->attribute_mappings, mapping);
-
-  cache_file->active_attribute_mapping = current_mapping_count + 1;
+  BKE_cachefile_add_attribute_mapping(
+      cache_file, NULL, CACHEFILE_ATTRIBUTE_MAP_NONE, CACHEFILE_ATTR_MAP_DOMAIN_AUTO);
 
   /* Since the mapping is not initialized, adding a mapping does not trigger a CacheFile update. */
 
@@ -384,14 +378,11 @@ static int cachefile_attribute_mapping_remove_exec(bContext *C, wmOperator *UNUS
 
   CacheAttributeMapping *mapping = BKE_cachefile_get_active_attribute_mapping(cache_file);
 
-  /* Reset this now as it will have to be done whether we have a mapping or not. */
-  cache_file->active_attribute_mapping = 0;
-
   if (!mapping) {
     return OPERATOR_CANCELLED;
   }
 
-  BLI_remlink(&cache_file->attribute_mappings, mapping);
+  BKE_cachefile_remove_attribute_mapping(cache_file, mapping);
 
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   BKE_cachefile_reload(depsgraph, cache_file);

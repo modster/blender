@@ -170,6 +170,40 @@ static void rna_CacheFile_layer_remove(CacheFile *cache_file, bContext *C, Point
   WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
 }
 
+static CacheAttributeMapping *rna_CacheFile_attribute_mapping_new(CacheFile *cache_file,
+                                                                  bContext *C,
+                                                                  ReportList *reports,
+                                                                  const char *name,
+                                                                  const int mapping_type,
+                                                                  const int domain)
+{
+  CacheAttributeMapping *mapping = BKE_cachefile_add_attribute_mapping(
+      cache_file, name, mapping_type, domain);
+  if (mapping == NULL) {
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Cannot add an attribute mapping to CacheFile '%s'",
+                cache_file->id.name + 2);
+    return NULL;
+  }
+
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  BKE_cachefile_reload(depsgraph, cache_file);
+  WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
+  return mapping;
+}
+
+static void rna_CacheFile_attribute_mapping_remove(CacheFile *cache_file,
+                                                   bContext *C,
+                                                   PointerRNA *mapping_ptr)
+{
+  CacheAttributeMapping *mapping = mapping_ptr->data;
+  BKE_cachefile_remove_attribute_mapping(cache_file, mapping);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  BKE_cachefile_reload(depsgraph, cache_file);
+  WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
+}
+
 static PointerRNA rna_CacheFile_active_attribute_mapping_get(PointerRNA *ptr)
 {
   CacheFile *cache_file = (CacheFile *)ptr->owner_id;
@@ -236,6 +270,61 @@ static void rna_def_alembic_object_path(BlenderRNA *brna)
   RNA_define_lib_overridable(false);
 }
 
+static const EnumPropertyItem rna_enum_cache_attribute_mapping_items[] = {
+    {CACHEFILE_ATTRIBUTE_MAP_NONE, "MAP_NONE", 0, "None", ""},
+    {CACHEFILE_ATTRIBUTE_MAP_TO_UVS,
+     "MAP_TO_UVS",
+     0,
+     "UVs",
+     "Read the attribute as a UV map of the same name"},
+    {CACHEFILE_ATTRIBUTE_MAP_TO_VERTEX_COLORS,
+     "MAP_TO_VERTEX_COLORS",
+     0,
+     "Vertex Colors",
+     "Read the attribute as a vertex color layer of the same name"},
+    {CACHEFILE_ATTRIBUTE_MAP_TO_WEIGHT_GROUPS,
+     "MAP_TO_WEIGHT_GROUPS",
+     0,
+     "Weight Group",
+     "Read the attribute as a weight group channel of the same name"},
+    {CACHEFILE_ATTRIBUTE_MAP_TO_FLOAT2,
+     "MAP_TO_FLOAT2",
+     0,
+     "2D Vector",
+     "Interpret the attribute's data as generic 2D vectors"},
+    {CACHEFILE_ATTRIBUTE_MAP_TO_FLOAT3,
+     "MAP_TO_FLOAT3",
+     0,
+     "3D Vector",
+     "Interpret the attribute's data as generic 3D vectors"},
+    {CACHEFILE_ATTRIBUTE_MAP_TO_COLOR,
+     "MAP_TO_COLOR",
+     0,
+     "Color",
+     "Interpret the attribute's data as colors (RGBA)"},
+    {0, NULL, 0, NULL, NULL},
+};
+
+static const EnumPropertyItem rna_enum_cache_attribute_domain_items[] = {
+    {CACHEFILE_ATTR_MAP_DOMAIN_AUTO,
+     "AUTO",
+     0,
+     "Automatic",
+     "Try to automatically determine the domain of the attribute"},
+    {CACHEFILE_ATTR_MAP_DOMAIN_POINT,
+     "POINT",
+     0,
+     "Point",
+     "The attribute is defined on the points"},
+    {CACHEFILE_ATTR_MAP_DOMAIN_FACE_CORNER,
+     "FACE_CORNER",
+     0,
+     "Face Corner",
+     "The attribute is defined on the face corners"},
+    {CACHEFILE_ATTR_MAP_DOMAIN_FACE, "FACE", 0, "Face", "The attribute is defined on the faces"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 static void rna_def_cachefile_attribute_mapping(BlenderRNA *brna)
 {
   StructRNA *srna = RNA_def_struct(brna, "CacheAttributeMapping", NULL);
@@ -249,65 +338,10 @@ static void rna_def_cachefile_attribute_mapping(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Name", "Name of the attribute to map");
   RNA_def_property_update(prop, 0, "rna_CacheFile_attribute_mapping_update");
 
-  static const EnumPropertyItem rna_enum_cache_attribute_mapping_items[] = {
-      {CACHEFILE_ATTRIBUTE_MAP_NONE, "MAP_NONE", 0, "None", ""},
-      {CACHEFILE_ATTRIBUTE_MAP_TO_UVS,
-       "MAP_TO_UVS",
-       0,
-       "UVs",
-       "Read the attribute as a UV map of the same name"},
-      {CACHEFILE_ATTRIBUTE_MAP_TO_VERTEX_COLORS,
-       "MAP_TO_VERTEX_COLORS",
-       0,
-       "Vertex Colors",
-       "Read the attribute as a vertex color layer of the same name"},
-      {CACHEFILE_ATTRIBUTE_MAP_TO_WEIGHT_GROUPS,
-       "MAP_TO_WEIGHT_GROUPS",
-       0,
-       "Weight Group",
-       "Read the attribute as a weight group channel of the same name"},
-      {CACHEFILE_ATTRIBUTE_MAP_TO_FLOAT2,
-       "MAP_TO_FLOAT2",
-       0,
-       "2D Vector",
-       "Interpret the attribute's data as generic 2D vectors"},
-      {CACHEFILE_ATTRIBUTE_MAP_TO_FLOAT3,
-       "MAP_TO_FLOAT3",
-       0,
-       "3D Vector",
-       "Interpret the attribute's data as generic 3D vectors"},
-      {CACHEFILE_ATTRIBUTE_MAP_TO_COLOR,
-       "MAP_TO_COLOR",
-       0,
-       "Color",
-       "Interpret the attribute's data as colors (RGBA)"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   prop = RNA_def_property(srna, "mapping", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_cache_attribute_mapping_items);
   RNA_def_property_update(prop, 0, "rna_CacheFile_attribute_mapping_update");
   RNA_def_property_ui_text(prop, "Data Type", "Define the data type of the attribute");
-
-  static const EnumPropertyItem rna_enum_cache_attribute_domain_items[] = {
-      {CACHEFILE_ATTR_MAP_DOMAIN_AUTO,
-       "AUTO",
-       0,
-       "Automatic",
-       "Try to automatically determine the domain of the attribute"},
-      {CACHEFILE_ATTR_MAP_DOMAIN_POINT,
-       "POINT",
-       0,
-       "Point",
-       "The attribute is defined on the points"},
-      {CACHEFILE_ATTR_MAP_DOMAIN_FACE_CORNER,
-       "FACE_CORNER",
-       0,
-       "Face Corner",
-       "The attribute is defined on the face corners"},
-      {CACHEFILE_ATTR_MAP_DOMAIN_FACE, "FACE", 0, "Face", "The attribute is defined on the faces"},
-      {0, NULL, 0, NULL, NULL},
-  };
 
   prop = RNA_def_property(srna, "domain", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_cache_attribute_domain_items);
@@ -335,6 +369,42 @@ static void rna_def_cachefile_attribute_mappings(BlenderRNA *brna, PropertyRNA *
       prop, "Active Attribute Mapping", "Active attribute mapping of the CacheFile");
   RNA_def_property_ui_text(
       prop, "Active Attribute Mapping Index", "Active index in attribute mappings array");
+
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  /* Add a mapping. */
+  func = RNA_def_function(srna, "new", "rna_CacheFile_attribute_mapping_new");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS | FUNC_USE_CONTEXT);
+  RNA_def_function_ui_description(func, "Add a new attribute mapping");
+  /* Optional parameters. */
+  parm = RNA_def_string(func, "name", "Name", 64, "Name", "Name of the attribute to remap");
+  parm = RNA_def_enum(func,
+                      "mapping_type",
+                      rna_enum_cache_attribute_mapping_items,
+                      CACHEFILE_ATTRIBUTE_MAP_NONE,
+                      "Mapping Type",
+                      "Type of the mapping");
+  parm = RNA_def_enum(func,
+                      "domain",
+                      rna_enum_cache_attribute_domain_items,
+                      CACHEFILE_ATTR_MAP_DOMAIN_AUTO,
+                      "Domain",
+                      "Original domain of the attribute to remap");
+  /* Return type. */
+  parm = RNA_def_pointer(
+      func, "mapping", "CacheAttributeMapping", "", "Newly created attribute mapping");
+  RNA_def_function_return(func, parm);
+
+  /* Remove a mapping. */
+  func = RNA_def_function(srna, "remove", "rna_CacheFile_attribute_mapping_remove");
+  RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+  RNA_def_function_ui_description(func,
+                                  "Remove an existing attribute mapping from the cache file");
+  parm = RNA_def_pointer(
+      func, "mapping", "CacheAttributeMapping", "", "Attribute mapping to remove");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
 }
 
 /* cachefile.object_paths */
