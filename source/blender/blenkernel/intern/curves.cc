@@ -450,7 +450,13 @@ static Curves *curves_evaluate_modifiers(struct Depsgraph *depsgraph,
           curves = BKE_curves_copy_for_eval(curves, true);
         }
 
-        Curves *new_curves = ABC_read_curves(reader, object, curves, &params, nullptr);
+        const char *err_str = nullptr;
+
+        Curves *new_curves = ABC_read_curves(reader, object, curves, &params, &err_str);
+
+        if (err_str) {
+          BKE_modifier_set_error(object, md, "%s", err_str);
+        }
 
         if (curves != new_curves) {
           BKE_id_free(nullptr, &curves->id);

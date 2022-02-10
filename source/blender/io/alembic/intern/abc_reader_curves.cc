@@ -206,7 +206,8 @@ static void read_curves_sample_ex(Curves *curves,
                                   const ICurvesSchema::Sample &sample,
                                   const ISampleSelector sample_sel,
                                   const AttributeSelector *attribute_selector,
-                                  const float velocity_scale)
+                                  const float velocity_scale,
+                                  const char **err_str)
 {
   CurvesGeometry &geometry = curves->geometry;
   const Int32ArraySamplePtr num_vertices = sample.getCurvesNumVertices();
@@ -258,6 +259,7 @@ static void read_curves_sample_ex(Curves *curves,
   config.id = &curves->id;
   config.attr_selector = attribute_selector;
   config.time = sample_sel.getRequestedTime();
+  config.modifier_error_message = err_str;
   BKE_id_attribute_get_domains(config.id, config.domain_info);
 
   read_arbitrary_attributes(config, schema, {}, sample_sel, velocity_scale);
@@ -293,7 +295,7 @@ void AbcCurveReader::read_curves_sample(Curves *curves,
   CustomData_realloc(&geometry.curve_data, geometry.curve_size);
   BKE_curves_update_customdata_pointers(curves);
 
-  read_curves_sample_ex(curves, m_curves_schema, smp, sample_sel, nullptr, 0.0f);
+  read_curves_sample_ex(curves, m_curves_schema, smp, sample_sel, nullptr, 0.0f, nullptr);
 #else
   const FloatArraySamplePtr weights = smp.getPositionWeights();
   const FloatArraySamplePtr knots = smp.getKnots();
@@ -419,13 +421,23 @@ Curves *AbcCurveReader::read_curves(Curves *curves_input,
   if (point_size != curves_input->geometry.point_size ||
       curve_size != curves_input->geometry.curve_size) {
     Curves *new_curves = BKE_curves_new_for_eval(curves_input, point_size, curve_size);
-    read_curves_sample_ex(
-        new_curves, m_curves_schema, sample, sample_sel, attribute_selector, velocity_scale);
+    read_curves_sample_ex(new_curves,
+                          m_curves_schema,
+                          sample,
+                          sample_sel,
+                          attribute_selector,
+                          velocity_scale,
+                          err_str);
     return new_curves;
   }
 
-  read_curves_sample_ex(
-      curves_input, m_curves_schema, sample, sample_sel, attribute_selector, velocity_scale);
+  read_curves_sample_ex(curves_input,
+                        m_curves_schema,
+                        sample,
+                        sample_sel,
+                        attribute_selector,
+                        velocity_scale,
+                        err_str);
   return curves_input;
 }
 

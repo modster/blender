@@ -206,6 +206,7 @@ void AbcPointsReader::read_geometry(GeometrySet &geometry_set,
   config.attr_selector = attribute_selector;
   config.time = sample_sel.getRequestedTime();
   config.use_vertex_interpolation = (read_flag & MOD_MESHSEQ_INTERPOLATE_VERTICES) != 0;
+  config.modifier_error_message = err_str;
 
   read_points_sample(m_schema, sample_sel, config, reinterpret_cast<float3 *>(point_cloud->co));
 
