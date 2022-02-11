@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2016 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -332,8 +316,15 @@ ID *BKE_lib_override_library_create_from_id(Main *bmain,
 bool BKE_lib_override_library_create_from_tag(Main *bmain,
                                               Library *owner_library,
                                               const ID *id_root_reference,
+                                              ID *id_hierarchy_root,
                                               const bool do_no_main)
 {
+  BLI_assert(id_root_reference != NULL);
+  BLI_assert(id_hierarchy_root != NULL || (id_root_reference->tag & LIB_TAG_DOIT) != 0);
+  BLI_assert(id_hierarchy_root == NULL ||
+             (ID_IS_OVERRIDE_LIBRARY_REAL(id_hierarchy_root) &&
+              id_hierarchy_root->override_library->reference == id_root_reference));
+
   const Library *reference_library = id_root_reference->lib;
 
   ID *reference_id;
@@ -388,7 +379,10 @@ bool BKE_lib_override_library_create_from_tag(Main *bmain,
   /* Only remap new local ID's pointers, we don't want to force our new overrides onto our whole
    * existing linked IDs usages. */
   if (success) {
-    ID *hierarchy_root_id = id_root_reference->newid;
+    if (id_root_reference->newid != NULL) {
+      id_hierarchy_root = id_root_reference->newid;
+    }
+    BLI_assert(id_hierarchy_root != NULL);
 
     for (todo_id_iter = todo_ids.first; todo_id_iter != NULL; todo_id_iter = todo_id_iter->next) {
       reference_id = todo_id_iter->data;
@@ -398,7 +392,7 @@ bool BKE_lib_override_library_create_from_tag(Main *bmain,
         continue;
       }
 
-      local_id->override_library->hierarchy_root = hierarchy_root_id;
+      local_id->override_library->hierarchy_root = id_hierarchy_root;
 
       Key *reference_key, *local_key = NULL;
       if ((reference_key = BKE_key_from_id(reference_id)) != NULL) {
@@ -889,7 +883,7 @@ static bool lib_override_library_create_do(Main *bmain,
   lib_override_group_tag_data_clear(&data);
 
   const bool success = BKE_lib_override_library_create_from_tag(
-      bmain, owner_library, id_root, false);
+      bmain, owner_library, id_root, NULL, false);
 
   return success;
 }
@@ -1424,7 +1418,7 @@ static bool lib_override_library_resync(Main *bmain,
    * override IDs (including within the old overrides themselves, since those are tagged too
    * above). */
   const bool success = BKE_lib_override_library_create_from_tag(
-      bmain, NULL, id_root_reference, true);
+      bmain, NULL, id_root_reference, id_root->override_library->hierarchy_root, true);
 
   if (!success) {
     return success;
@@ -1945,7 +1939,8 @@ static int lib_override_sort_libraries_func(LibraryIDLinkCallbackData *cb_data)
   ID *id_owner = cb_data->id_owner;
   ID *id = *cb_data->id_pointer;
   if (id != NULL && ID_IS_LINKED(id) && id->lib != id_owner->lib) {
-    const int owner_library_indirect_level = id_owner->lib != NULL ? id_owner->lib->temp_index : 0;
+    const int owner_library_indirect_level = ID_IS_LINKED(id_owner) ? id_owner->lib->temp_index :
+                                                                      0;
     if (owner_library_indirect_level > 10000) {
       CLOG_ERROR(
           &LOG,
@@ -2987,6 +2982,8 @@ void BKE_lib_override_library_update(Main *bmain, ID *local)
     return;
   }
 
+  tmp_id->lib = local->lib;
+
   /* This ID name is problematic, since it is an 'rna name property' it should not be editable or
    * different from reference linked ID. But local ID names need to be unique in a given type
    * list of Main, so we cannot always keep it identical, which is why we need this special
@@ -2999,6 +2996,7 @@ void BKE_lib_override_library_update(Main *bmain, ID *local)
   Key *tmp_key = BKE_key_from_id(tmp_id);
   if (local_key != NULL && tmp_key != NULL) {
     tmp_key->id.flag |= (local_key->id.flag & LIB_EMBEDDED_DATA_LIB_OVERRIDE);
+    tmp_key->id.lib = local_key->id.lib;
   }
 
   PointerRNA rnaptr_src, rnaptr_dst, rnaptr_storage_stack, *rnaptr_storage = NULL;
