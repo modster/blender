@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup nodes
@@ -230,6 +216,8 @@ DefNode(CompositorNode, CMP_NODE_ANTIALIASING,   def_cmp_antialiasing,   "ANTIAL
 DefNode(CompositorNode, CMP_NODE_POSTERIZE,      0,                      "POSTERIZE",      Posterize,        "Posterize",         ""              )
 DefNode(CompositorNode, CMP_NODE_CONVERT_COLOR_SPACE,def_cmp_convert_color_space, "CONVERT_COLORSPACE", ConvertColorSpace, "Color Space",""       )
 DefNode(CompositorNode, CMP_NODE_SCENE_TIME,     0,                      "SCENE_TIME",      SceneTime,        "Scene Time",        ""              )
+DefNode(CompositorNode, CMP_NODE_COMBINE_XYZ,    0,                      "COMBINE_XYZ",    CombineXYZ,       "Combine XYZ",       ""              )
+DefNode(CompositorNode, CMP_NODE_SEPARATE_XYZ,   0,                      "SEPARATE_XYZ",   SeparateXYZ,      "Separate XYZ",      ""              )
 
 DefNode(TextureNode,    TEX_NODE_OUTPUT,         def_tex_output,         "OUTPUT",         Output,           "Output",            ""              )
 DefNode(TextureNode,    TEX_NODE_CHECKER,        0,                      "CHECKER",        Checker,          "Checker",           ""              )

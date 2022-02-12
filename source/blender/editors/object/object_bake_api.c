@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2004 by Blender Foundation
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2004 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup edobj
@@ -188,7 +172,7 @@ static bool write_internal_bake_pixels(Image *image,
                                        const char margin_type,
                                        const bool is_clear,
                                        const bool is_noncolor,
-                                       Mesh const *mesh,
+                                       Mesh const *mesh_eval,
                                        char const *uv_layer)
 {
   ImBuf *ibuf;
@@ -285,7 +269,7 @@ static bool write_internal_bake_pixels(Image *image,
 
   /* margins */
   if (margin > 0) {
-    RE_bake_margin(ibuf, mask_buffer, margin, margin_type, mesh, uv_layer);
+    RE_bake_margin(ibuf, mask_buffer, margin, margin_type, mesh_eval, uv_layer);
   }
 
   ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
@@ -334,7 +318,7 @@ static bool write_external_bake_pixels(const char *filepath,
                                        const int margin_type,
                                        ImageFormatData *im_format,
                                        const bool is_noncolor,
-                                       Mesh const *mesh,
+                                       Mesh const *mesh_eval,
                                        char const *uv_layer)
 {
   ImBuf *ibuf = NULL;
@@ -392,7 +376,7 @@ static bool write_external_bake_pixels(const char *filepath,
 
     mask_buffer = MEM_callocN(sizeof(char) * num_pixels, "Bake Mask");
     RE_bake_mask_fill(pixel_array, num_pixels, mask_buffer);
-    RE_bake_margin(ibuf, mask_buffer, margin, margin_type, mesh, uv_layer);
+    RE_bake_margin(ibuf, mask_buffer, margin, margin_type, mesh_eval, uv_layer);
 
     if (mask_buffer) {
       MEM_freeN(mask_buffer);
@@ -774,10 +758,10 @@ static bool bake_targets_output_internal(const BakeAPIRender *bkr,
                                          BakeTargets *targets,
                                          Object *ob,
                                          BakePixel *pixel_array,
-                                         ReportList *reports)
+                                         ReportList *reports,
+                                         Mesh *mesh_eval)
 {
   bool all_ok = true;
-  const Mesh *me = (Mesh *)ob->data;
 
   for (int i = 0; i < targets->num_images; i++) {
     BakeImage *bk_image = &targets->images[i];
@@ -791,7 +775,7 @@ static bool bake_targets_output_internal(const BakeAPIRender *bkr,
                                                bkr->margin_type,
                                                bkr->is_clear,
                                                targets->is_noncolor,
-                                               me,
+                                               mesh_eval,
                                                bkr->uv_layer);
 
     /* might be read by UI to set active image for display */
@@ -852,7 +836,7 @@ static bool bake_targets_output_external(const BakeAPIRender *bkr,
                                          BakeTargets *targets,
                                          Object *ob,
                                          Object *ob_eval,
-                                         Mesh *me,
+                                         Mesh *mesh_eval,
                                          BakePixel *pixel_array,
                                          ReportList *reports)
 {
@@ -886,8 +870,8 @@ static bool bake_targets_output_external(const BakeAPIRender *bkr,
         if (ob_eval->mat[i]) {
           BLI_path_suffix(name, FILE_MAX, ob_eval->mat[i]->id.name + 2, "_");
         }
-        else if (me->mat[i]) {
-          BLI_path_suffix(name, FILE_MAX, me->mat[i]->id.name + 2, "_");
+        else if (mesh_eval->mat[i]) {
+          BLI_path_suffix(name, FILE_MAX, mesh_eval->mat[i]->id.name + 2, "_");
         }
         else {
           /* if everything else fails, use the material index */
@@ -909,7 +893,7 @@ static bool bake_targets_output_external(const BakeAPIRender *bkr,
                                                bkr->margin_type,
                                                &bake->im_format,
                                                targets->is_noncolor,
-                                               me,
+                                               mesh_eval,
                                                bkr->uv_layer);
 
     if (!ok) {
@@ -1211,7 +1195,7 @@ static bool bake_targets_output(const BakeAPIRender *bkr,
 {
   if (bkr->target == R_BAKE_TARGET_IMAGE_TEXTURES) {
     if (bkr->save_mode == R_BAKE_SAVE_INTERNAL) {
-      return bake_targets_output_internal(bkr, targets, ob, pixel_array, reports);
+      return bake_targets_output_internal(bkr, targets, ob, pixel_array, reports, me_eval);
     }
     if (bkr->save_mode == R_BAKE_SAVE_EXTERNAL) {
       return bake_targets_output_external(

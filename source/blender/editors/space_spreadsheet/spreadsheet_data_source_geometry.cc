@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_virtual_array.hh"
 
@@ -473,6 +459,11 @@ static void find_fields_to_evaluate(const SpaceSpreadsheet *sspreadsheet,
       if (field) {
         r_fields.add("Viewer", std::move(field));
       }
+    }
+    if (const geo_log::GenericValueLog *generic_value_log =
+            dynamic_cast<const geo_log::GenericValueLog *>(value_log)) {
+      fn::GPointer value = generic_value_log->value();
+      r_fields.add("Viewer", fn::make_constant_field(*value.type(), value.get()));
     }
   }
 }

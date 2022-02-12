@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2021, Blender Foundation.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2021 Blender Foundation. */
 
 /** \file
  * \ingroup draw_engine
@@ -57,29 +42,14 @@ struct IMAGE_InstanceData {
 
   struct {
     DRWPass *image_pass;
+    DRWPass *depth_pass;
   } passes;
 
   /** \brief Transform matrix to convert a normalized screen space coordinates to texture space. */
   float ss_to_texture[4][4];
   TextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
 
-  /**
-   * \brief Maximum uv's that are on the border of the image.
-   *
-   * Larger UV coordinates would be drawn as a border. */
-  float max_uv[2];
-
  public:
-  void max_uv_update()
-  {
-    copy_v2_fl2(max_uv, 1.0f, 1.0);
-    LISTBASE_FOREACH (ImageTile *, image_tile_ptr, &image->tiles) {
-      ImageTileWrapper image_tile(image_tile_ptr);
-      max_uv[0] = max_ii(max_uv[0], image_tile.get_tile_x_offset() + 1);
-      max_uv[1] = max_ii(max_uv[1], image_tile.get_tile_y_offset() + 1);
-    }
-  }
-
   void clear_dirty_flag()
   {
     reset_dirty_flag(false);

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "gpu_shader_create_info.hh"
 
@@ -30,7 +31,7 @@ GPU_SHADER_CREATE_INFO(draw_resource_id_uniform)
 
 /**
  * Declare a resource handle that identify a unique object.
- * Requires draw_resource_id[_constant].
+ * Requires draw_resource_id[_uniform].
  */
 GPU_SHADER_CREATE_INFO(draw_resource_handle)
     .define("resource_handle (drw_resourceChunk * DRW_RESOURCE_CHUNK_LEN + resource_id)")
@@ -83,7 +84,7 @@ GPU_SHADER_CREATE_INFO(draw_hair)
     .sampler(15, ImageType::FLOAT_BUFFER, "hairPointBuffer")
     .sampler(14, ImageType::UINT_BUFFER, "hairStrandBuffer")
     .sampler(13, ImageType::UINT_BUFFER, "hairStrandSegBuffer")
-    /* TODO(fclem) Pack thoses into one UBO. */
+    /* TODO(@fclem): Pack these into one UBO. */
     .push_constant(Type::INT, "hairStrandsRes")
     .push_constant(Type::INT, "hairThicknessRes")
     .push_constant(Type::FLOAT, "hairRadRoot")

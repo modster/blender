@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2005 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -194,13 +178,10 @@ void BKE_crazyspace_set_quats_mesh(Mesh *me,
                                    float (*mappedcos)[3],
                                    float (*quats)[4])
 {
-  MVert *mvert = me->mvert;
-  for (int i = 0; i < me->totvert; i++, mvert++) {
-    mvert->flag &= ~ME_VERT_TMP_TAG;
-  }
+  BLI_bitmap *vert_tag = BLI_BITMAP_NEW(me->totvert, __func__);
 
   /* first store two sets of tangent vectors in vertices, we derive it just from the face-edges */
-  mvert = me->mvert;
+  MVert *mvert = me->mvert;
   MPoly *mp = me->mpoly;
   MLoop *mloop = me->mloop;
 
@@ -210,7 +191,7 @@ void BKE_crazyspace_set_quats_mesh(Mesh *me,
     MLoop *ml_prev = &ml_next[mp->totloop - 2];
 
     for (int j = 0; j < mp->totloop; j++) {
-      if ((mvert[ml_curr->v].flag & ME_VERT_TMP_TAG) == 0) {
+      if (!BLI_BITMAP_TEST(vert_tag, ml_curr->v)) {
         const float *co_prev, *co_curr, *co_next; /* orig */
         const float *vd_prev, *vd_curr, *vd_next; /* deform */
 
@@ -233,7 +214,7 @@ void BKE_crazyspace_set_quats_mesh(Mesh *me,
         set_crazy_vertex_quat(
             quats[ml_curr->v], co_curr, co_next, co_prev, vd_curr, vd_next, vd_prev);
 
-        mvert[ml_curr->v].flag |= ME_VERT_TMP_TAG;
+        BLI_BITMAP_ENABLE(vert_tag, ml_curr->v);
       }
 
       ml_prev = ml_curr;
@@ -241,6 +222,8 @@ void BKE_crazyspace_set_quats_mesh(Mesh *me,
       ml_next++;
     }
   }
+
+  MEM_freeN(vert_tag);
 }
 
 int BKE_crazyspace_get_first_deform_matrices_editbmesh(struct Depsgraph *depsgraph,

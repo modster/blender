@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2021, Blender Foundation.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2021 Blender Foundation. */
 
 #include "draw_subdivision.h"
 
@@ -820,6 +805,7 @@ static void draw_subdiv_edge_cb(const SubdivForeachContext *foreach_context,
                                 void *UNUSED(tls),
                                 const int coarse_edge_index,
                                 const int subdiv_edge_index,
+                                const bool UNUSED(is_loose),
                                 const int UNUSED(subdiv_v1),
                                 const int UNUSED(subdiv_v2))
 {
@@ -999,7 +985,7 @@ static bool draw_subdiv_build_cache(DRWSubdivCache *cache,
 
   cache->face_ptex_offset = BKE_subdiv_face_ptex_offset_get(subdiv);
 
-  // Build patch coordinates for all the face dots
+  /* Build patch coordinates for all the face dots. */
   cache->fdots_patch_coords = gpu_vertbuf_create_from_format(get_blender_patch_coords_format(),
                                                              mesh_eval->totpoly);
   CompressedPatchCoord *blender_fdots_patch_coords = (CompressedPatchCoord *)GPU_vertbuf_get_data(
@@ -1760,7 +1746,7 @@ static void draw_subdiv_cache_ensure_mat_offsets(DRWSubdivCache *cache,
   int *mat_start = static_cast<int *>(MEM_callocN(sizeof(int) * mat_len, "subdiv mat_start"));
   int *subdiv_polygon_offset = cache->subdiv_polygon_offset;
 
-  // TODO: parallel_reduce?
+  /* TODO: parallel_reduce? */
   for (int i = 0; i < mesh_eval->totpoly; i++) {
     const MPoly *mpoly = &mesh_eval->mpoly[i];
     const int next_offset = (i == mesh_eval->totpoly - 1) ? number_of_quads :

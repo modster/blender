@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Peter Schlaile <peter [at] schlaile [dot] de> 2011
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2011 Peter Schlaile <peter [at] schlaile [dot] de>. */
 
 /** \file
  * \ingroup imbuf
@@ -247,8 +232,10 @@ struct anim_index *IMB_indexer_open(const char *name)
 
 uint64_t IMB_indexer_get_seek_pos(struct anim_index *idx, int frame_index)
 {
-  if (frame_index < 0) {
-    frame_index = 0;
+  /* This is hard coded, because our current timecode files return non zero seek position for index
+   * 0. Only when seeking to 0 it is guaranteed, that first packet will be read. */
+  if (frame_index <= 0) {
+    return 0;
   }
   if (frame_index >= idx->num_entries) {
     frame_index = idx->num_entries - 1;

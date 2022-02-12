@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup RNA
@@ -465,7 +451,8 @@ static const EnumPropertyItem rna_enum_node_tex_dimensions_items[] = {
 
 const EnumPropertyItem rna_enum_node_filter_items[] = {
     {0, "SOFTEN", 0, "Soften", ""},
-    {1, "SHARPEN", 0, "Sharpen", ""},
+    {1, "SHARPEN", 0, "Box Sharpen", "An aggressive sharpening filter"},
+    {7, "SHARPEN_DIAMOND", 0, "Diamond Sharpen", "A moderate sharpening filter"},
     {2, "LAPLACE", 0, "Laplace", ""},
     {3, "SOBEL", 0, "Sobel", ""},
     {4, "PREWITT", 0, "Prewitt", ""},
@@ -10524,7 +10511,7 @@ static void def_geo_object_info(StructRNA *srna)
   RNA_def_property_enum_items(prop, rna_node_geometry_object_info_transform_space_items);
   RNA_def_property_ui_text(
       prop, "Transform Space", "The transformation of the vector and geometry outputs");
-  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update_relations");
 }
 
 static void def_geo_legacy_points_to_volume(StructRNA *srna)
@@ -10608,7 +10595,7 @@ static void def_geo_collection_info(StructRNA *srna)
   prop = RNA_def_property(srna, "transform_space", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_node_geometry_collection_info_transform_space_items);
   RNA_def_property_ui_text(prop, "Transform Space", "The transformation of the geometry output");
-  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update_relations");
 }
 
 static void def_geo_legacy_attribute_proximity(StructRNA *srna)

@@ -1,21 +1,5 @@
 #!/usr/bin/env bash
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # A shell script installing/building all needed dependencies to build Blender, for some Linux distributions.
 
@@ -579,7 +563,7 @@ FFMPEG_FORCE_REBUILD=false
 FFMPEG_SKIP=false
 _ffmpeg_list_sep=";"
 
-XR_OPENXR_VERSION="1.0.17"
+XR_OPENXR_VERSION="1.0.22"
 XR_OPENXR_VERSION_SHORT="1.0"
 XR_OPENXR_VERSION_MIN="1.0.8"
 XR_OPENXR_VERSION_MEX="2.0"
@@ -1116,7 +1100,7 @@ FFMPEG_SOURCE=( "http://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2" )
 XR_OPENXR_USE_REPO=false
 XR_OPENXR_SOURCE=("https://github.com/KhronosGroup/OpenXR-SDK/archive/release-${XR_OPENXR_VERSION}.tar.gz")
 XR_OPENXR_SOURCE_REPO=("https://github.com/KhronosGroup/OpenXR-SDK.git")
-XR_OPENXR_REPO_UID="bf21ccb1007bb531b45d9978919a56ea5059c245"
+XR_OPENXR_REPO_UID="458984d7f59d1ae6dc1b597d94b02e4f7132eaba"
 XR_OPENXR_REPO_BRANCH="master"
 
 # C++11 is required now
@@ -4036,13 +4020,13 @@ install_DEB() {
     INFO "Forced Python building, as requested..."
     _do_compile_python=true
   else
-    check_package_version_ge_lt_DEB python3-dev $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
+    check_package_version_ge_lt_DEB python${PYTHON_VERSION_SHORT}-dev $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
     if [ $? -eq 0 ]; then
-      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_DEB python3-dev` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
-
-      install_packages_DEB python3-dev
+      install_packages_DEB python${PYTHON_VERSION_SHORT}-dev
       clean_Python
       PRINT ""
+
+      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_DEB python${PYTHON_VERSION_SHORT}-dev` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
 
       for module in "${PYTHON_MODULES_PACKAGES[@]}"
       do
@@ -4681,10 +4665,10 @@ install_RPM() {
   else
     check_package_version_ge_lt_RPM python3-devel $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
     if [ $? -eq 0 ]; then
-      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_RPM python3-devel` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
-
       install_packages_RPM python3-devel
       clean_Python
+
+      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_RPM python3-devel` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
 
       for module in "${PYTHON_MODULES_PACKAGES[@]}"
       do
@@ -5224,11 +5208,11 @@ install_ARCH() {
   else
     check_package_version_ge_lt_ARCH python $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
     if [ $? -eq 0 ]; then
-      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_ARCH python` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
-
       install_packages_ARCH python
       clean_Python
       PRINT ""
+
+      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_ARCH python` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
 
       for module in "${PYTHON_MODULES_PACKAGES[@]}"
       do

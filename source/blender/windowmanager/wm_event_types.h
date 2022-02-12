@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup wm
@@ -60,7 +46,7 @@ enum {
 
   /* ********** Start of Input devices. ********** */
 
-  /* MOUSE : 0x000x, 0x001x */
+  /* MOUSE: 0x000x, 0x001x */
   LEFTMOUSE = 0x0001,
   MIDDLEMOUSE = 0x0002,
   RIGHTMOUSE = 0x0003,
@@ -71,7 +57,7 @@ enum {
   /* More mouse buttons - can't use 9 and 10 here (wheel) */
   BUTTON6MOUSE = 0x0012,
   BUTTON7MOUSE = 0x0013,
-  /* Extra trackpad gestures */
+  /* Extra track-pad gestures. */
   MOUSEPAN = 0x000e,
   MOUSEZOOM = 0x000f,
   MOUSEROTATE = 0x0010,

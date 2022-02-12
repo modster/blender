@@ -1,22 +1,5 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2016, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2016 Blender Foundation. All rights reserved.
 
 set(INC
   .
@@ -45,6 +28,7 @@ set(INC
   ../../../intern/glew-mx
   ../../../intern/guardedalloc
   ../../../intern/opensubdiv
+  ../../../intern/clog
 
   # dna_type_offsets.h
   ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
@@ -85,9 +69,9 @@ set(SRC
   intern/mesh_extractors/extract_mesh_vbo_vcol.cc
   intern/mesh_extractors/extract_mesh_vbo_weights.cc
   intern/draw_cache_impl_curve.cc
+  intern/draw_cache_impl_curves.cc
   intern/draw_cache_impl_displist.c
   intern/draw_cache_impl_gpencil.c
-  intern/draw_cache_impl_hair.cc
   intern/draw_cache_impl_lattice.c
   intern/draw_cache_impl_mesh.c
   intern/draw_cache_impl_metaball.c
@@ -518,8 +502,10 @@ set(GLSL_SRC
   engines/overlay/shaders/wireframe_frag.glsl
   engines/overlay/shaders/xray_fade_frag.glsl
 
-  engines/image/shaders/image_engine_frag.glsl
-  engines/image/shaders/image_engine_vert.glsl
+  engines/image/shaders/image_engine_color_frag.glsl
+  engines/image/shaders/image_engine_color_vert.glsl
+  engines/image/shaders/image_engine_depth_frag.glsl
+  engines/image/shaders/image_engine_depth_vert.glsl
 )
 
 set(GLSL_C)

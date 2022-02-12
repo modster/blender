@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2022 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2022 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup draw
@@ -25,7 +9,7 @@
 
 GPU_SHADER_CREATE_INFO(draw_hair_refine_compute)
     .local_group_size(1, 1)
-    .storage_buf(0, Qualifier::WRITE_ONLY, "vec4", "posTime[]")
+    .storage_buf(0, Qualifier::WRITE, "vec4", "posTime[]")
     .sampler(0, ImageType::FLOAT_BUFFER, "hairPointBuffer")
     .sampler(1, ImageType::UINT_BUFFER, "hairStrandBuffer")
     .sampler(2, ImageType::UINT_BUFFER, "hairStrandSegBuffer")

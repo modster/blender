@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
 /** \file
@@ -245,10 +231,6 @@ typedef struct ModifierTypeInfo {
                              const struct ModifierEvalContext *ctx,
                              struct Mesh *mesh);
 
-  struct Hair *(*modifyHair)(struct ModifierData *md,
-                             const struct ModifierEvalContext *ctx,
-                             struct Hair *hair);
-
   /**
    * The modifier has to change the geometry set in-place. The geometry set can contain zero or
    * more geometry components. This callback can be used by modifiers that don't work on any
@@ -470,6 +452,8 @@ void BKE_modifiers_foreach_tex_link(struct Object *ob, TexWalkFunc walk, void *u
 
 struct ModifierData *BKE_modifiers_findby_type(const struct Object *ob, ModifierType type);
 struct ModifierData *BKE_modifiers_findby_name(const struct Object *ob, const char *name);
+struct ModifierData *BKE_modifiers_findby_session_uuid(const struct Object *ob,
+                                                       const SessionUUID *session_uuid);
 void BKE_modifiers_clear_errors(struct Object *ob);
 /**
  * used for buttons, to find out if the 'draw deformed in edit-mode option is there.
@@ -568,7 +552,8 @@ const char *BKE_modifier_path_relbase_from_global(struct Object *ob);
  * For a given modifier data, get corresponding original one.
  * If the modifier data is already original, return it as-is.
  */
-struct ModifierData *BKE_modifier_get_original(struct ModifierData *md);
+struct ModifierData *BKE_modifier_get_original(const struct Object *object,
+                                               struct ModifierData *md);
 struct ModifierData *BKE_modifier_get_evaluated(struct Depsgraph *depsgraph,
                                                 struct Object *object,
                                                 struct ModifierData *md);
