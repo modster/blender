@@ -33,7 +33,7 @@ static blender::Vector<VColRef> get_vcol_refs(const CustomData *cd_vdata,
   uint layeri = 0;
 
   auto buildList = [&](const CustomData *cdata, AttributeDomain domain) {
-    for (int i=0; i<cdata->totlayer; i++) {
+    for (int i = 0; i < cdata->totlayer; i++) {
       const CustomDataLayer *layer = cdata->layers + i;
 
       if (!(CD_TYPE_AS_MASK(layer->type) & CD_MASK_COLOR_ALL)) {

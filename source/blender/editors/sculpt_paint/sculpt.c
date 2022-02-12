@@ -4697,7 +4697,7 @@ static bool sculpt_needs_connectivity_info(const Sculpt *sd,
           (brush->sculpt_tool == SCULPT_TOOL_POSE) ||
           (brush->sculpt_tool == SCULPT_TOOL_BOUNDARY) ||
           (brush->sculpt_tool == SCULPT_TOOL_SLIDE_RELAX) ||
-          SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool) || 
+          SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool) ||
           (brush->sculpt_tool == SCULPT_TOOL_CLOTH) || (brush->sculpt_tool == SCULPT_TOOL_SMEAR) ||
           (brush->sculpt_tool == SCULPT_TOOL_DRAW_FACE_SETS) ||
           (brush->sculpt_tool == SCULPT_TOOL_DISPLACEMENT_SMEAR));

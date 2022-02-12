@@ -56,11 +56,8 @@ bool BKE_id_attributes_supported(struct ID *id);
  *   \param list_mask restricts unique name check to certain customdata types,
  *          if in doubt just pass CD_MASK_PROP_ALL
  */
-struct CustomDataLayer *BKE_id_attribute_new(struct ID *id,
-                                             const char *name,
-                                             int type,
-                                             AttributeDomain domain,
-                                             struct ReportList *reports);
+struct CustomDataLayer *BKE_id_attribute_new(
+    struct ID *id, const char *name, int type, AttributeDomain domain, struct ReportList *reports);
 bool BKE_id_attribute_remove(struct ID *id,
                              struct CustomDataLayer *layer,
                              struct ReportList *reports);
@@ -125,9 +122,7 @@ void BKE_id_attributes_active_color_set(struct ID *id, struct CustomDataLayer *a
 struct CustomDataLayer *BKE_id_attributes_render_color_get(struct ID *id);
 void BKE_id_attributes_render_color_set(struct ID *id, struct CustomDataLayer *active_layer);
 
-bool BKE_id_attribute_find_unique_name(struct ID *id,
-                                       const char *name,
-                                       char *outname);
+bool BKE_id_attribute_find_unique_name(struct ID *id, const char *name, char *outname);
 
 #ifdef __cplusplus
 }

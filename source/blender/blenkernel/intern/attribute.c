@@ -162,9 +162,7 @@ static bool unique_name_cb(void *arg, const char *name)
   return false;
 }
 
-bool BKE_id_attribute_find_unique_name(ID *id,
-                                       const char *name,
-                                       char *outname)
+bool BKE_id_attribute_find_unique_name(ID *id, const char *name, char *outname)
 {
   AttrUniqueData data = {.id = id};
 
@@ -173,11 +171,8 @@ bool BKE_id_attribute_find_unique_name(ID *id,
   return BLI_uniquename_cb(unique_name_cb, &data, NULL, '.', outname, MAX_CUSTOMDATA_LAYER_NAME);
 }
 
-CustomDataLayer *BKE_id_attribute_new(ID *id,
-                                      const char *name,
-                                      const int type,
-                                      const AttributeDomain domain,
-                                      ReportList *reports)
+CustomDataLayer *BKE_id_attribute_new(
+    ID *id, const char *name, const int type, const AttributeDomain domain, ReportList *reports)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
   get_domains(id, info);
