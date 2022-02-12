@@ -154,8 +154,6 @@ static void mesh_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int 
     mesh_dst->key->from = &mesh_dst->id;
   }
 
-  mesh_dst->attr_color_active = mesh_src->attr_color_active;
-  mesh_dst->attr_color_render = mesh_src->attr_color_render;
   BKE_mesh_assert_normals_dirty_or_calculated(mesh_dst);
 }
 
@@ -1050,9 +1048,6 @@ void BKE_mesh_copy_parameters(Mesh *me_dst, const Mesh *me_src)
   copy_v3_v3(me_dst->size, me_src->size);
 
   me_dst->vertex_group_active_index = me_src->vertex_group_active_index;
-
-  me_dst->attr_color_active = me_src->attr_color_active;
-  me_dst->attr_color_render = me_src->attr_color_render;
 }
 
 void BKE_mesh_copy_parameters_for_eval(Mesh *me_dst, const Mesh *me_src)

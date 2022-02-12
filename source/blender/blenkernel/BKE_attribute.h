@@ -43,6 +43,10 @@ typedef enum AttributeDomainMask {
   ATTR_DOMAIN_MASK_ALL = (1 << 5) - 1
 } AttributeDomainMask;
 
+/* All domains that support color attributes */
+#define ATTR_DOMAIN_MASK_COLOR \
+  ((AttributeDomainMask)((ATTR_DOMAIN_MASK_POINT | ATTR_DOMAIN_MASK_CORNER)))
+
 /* Attributes */
 
 bool BKE_id_attributes_supported(struct ID *id);
@@ -67,7 +71,7 @@ struct CustomDataLayer *BKE_id_attribute_find(const struct ID *id,
                                               int type,
                                               AttributeDomain domain);
 
-AttributeDomain BKE_id_attribute_domain(struct ID *id, struct CustomDataLayer *layer);
+AttributeDomain BKE_id_attribute_domain(struct ID *id, const struct CustomDataLayer *layer);
 int BKE_id_attribute_data_length(struct ID *id, struct CustomDataLayer *layer);
 bool BKE_id_attribute_required(struct ID *id, struct CustomDataLayer *layer);
 bool BKE_id_attribute_rename(struct ID *id,
@@ -84,38 +88,48 @@ void BKE_id_attributes_active_set(struct ID *id, struct CustomDataLayer *layer);
 int *BKE_id_attributes_active_index_p(struct ID *id);
 
 CustomData *BKE_id_attributes_iterator_next_domain(struct ID *id, struct CustomDataLayer *layers);
-const CustomDataLayer *BKE_id_attribute_from_index(const struct ID *id,
-                                                   int lookup_index,
-                                                   const AttributeDomainMask domain_mask);
+CustomDataLayer *BKE_id_attribute_from_index(const struct ID *id,
+                                             int lookup_index,
+                                             AttributeDomainMask domain_mask,
+                                             CustomDataMask layer_mask);
 
-struct AttributeRef *BKE_id_attributes_active_color_ref_p(struct ID *id);
-void BKE_id_attributes_active_color_set(struct ID *id, struct CustomDataLayer *active_layer);
+/** Layer is allowed to be nullptr; if so -1 (layer not found) will be returned. */
+int BKE_id_attribute_to_index(const struct ID *id,
+                              const CustomDataLayer *layer,
+                              AttributeDomainMask domain_mask,
+                              CustomDataMask layer_mask);
+
+struct CustomDataLayer *BKE_id_attribute_subset_active_get(struct ID *id,
+                                                           int active_flag,
+                                                           AttributeDomainMask domain_mask,
+                                                           CustomDataMask mask);
+void BKE_id_attribute_subset_active_set(struct ID *id,
+                                        struct CustomDataLayer *layer,
+                                        int active_flag,
+                                        AttributeDomainMask domain_mask,
+                                        CustomDataMask mask);
+
+/** Copies CustomData instances into a (usually stack-allocated) ID.  This is a shallow copy, the
+    purpose is to create a bride for using the C attribute API on arbitrary sets of CustomData
+    domains.
+*/
+
+void BKE_id_attribute_copy_domains_temp(struct ID *temp_id,
+                                        const struct CustomData *vdata,
+                                        const struct CustomData *edata,
+                                        const struct CustomData *ldata,
+                                        const struct CustomData *pdata,
+                                        const struct CustomData *cdata);
+
 struct CustomDataLayer *BKE_id_attributes_active_color_get(struct ID *id);
-
-struct AttributeRef *BKE_id_attributes_render_color_ref_p(struct ID *id);
+void BKE_id_attributes_active_color_set(struct ID *id, struct CustomDataLayer *active_layer);
+struct CustomDataLayer *BKE_id_attributes_render_color_get(struct ID *id);
 void BKE_id_attributes_render_color_set(struct ID *id, struct CustomDataLayer *active_layer);
-CustomDataLayer *BKE_id_attributes_render_color_get(struct ID *id);
 
 bool BKE_id_attribute_find_unique_name(struct ID *id,
                                        const char *name,
                                        char *outname,
                                        CustomDataMask mask);
-
-int BKE_id_attribute_index_from_ref(struct ID *id,
-                                    struct AttributeRef *ref,
-                                    AttributeDomainMask domain_mask,
-                                    CustomDataMask type_filter);
-
-bool BKE_id_attribute_ref_from_index(struct ID *id,
-                                     int attr_index,
-                                     AttributeDomainMask domain_mask,
-                                     CustomDataMask type_filter,
-                                     struct AttributeRef *r_ref);
-
-bool BKE_id_attribute_ref_layer_equals(const struct AttributeRef *ref,
-                                       const struct CustomDataLayer *layer,
-                                       const AttributeDomain domain);
-bool BKE_id_attribute_ref_equals(const struct AttributeRef *ref1, const struct AttributeRef *ref2);
 
 #ifdef __cplusplus
 }

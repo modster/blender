@@ -253,7 +253,6 @@ static eV3DShadingColorType workbench_color_type_get(WORKBENCH_PrivateData *wpd,
   eV3DShadingColorType color_type = wpd->shading.color_type;
   const Mesh *me = (ob->type == OB_MESH) ? ob->data : NULL;
   const CustomData *ldata = (me == NULL) ? NULL : workbench_mesh_get_loop_custom_data(me);
-  const CustomData *vdata = (me == NULL) ? NULL : workbench_mesh_get_vert_custom_data(me);
 
   const DRWContextState *draw_ctx = DRW_context_state_get();
   const bool is_active = (ob == draw_ctx->obact);
@@ -273,13 +272,21 @@ static eV3DShadingColorType workbench_color_type_get(WORKBENCH_PrivateData *wpd,
     }
   }
   else if (color_type == V3D_SHADING_VERTEX_COLOR) {
-    bool has_color = me && (CustomData_has_layer(&me->vdata, CD_PROP_COLOR) ||
-                            CustomData_has_layer(&me->vdata, CD_MLOOPCOL) ||
-                            CustomData_has_layer(&me->ldata, CD_PROP_COLOR) ||
-                            CustomData_has_layer(&me->ldata, CD_MLOOPCOL));
-
-    if (!has_color) {
+    if (!me) {
       color_type = V3D_SHADING_OBJECT_COLOR;
+    }
+    else {
+      const CustomData *cd_vdata = workbench_mesh_get_vert_custom_data(me);
+      const CustomData *cd_ldata = workbench_mesh_get_loop_custom_data(me);
+
+      bool has_color = (CustomData_has_layer(cd_vdata, CD_PROP_COLOR) ||
+                        CustomData_has_layer(cd_vdata, CD_MLOOPCOL) ||
+                        CustomData_has_layer(cd_ldata, CD_PROP_COLOR) ||
+                        CustomData_has_layer(cd_ldata, CD_MLOOPCOL));
+
+      if (!has_color) {
+        color_type = V3D_SHADING_OBJECT_COLOR;
+      }
     }
   }
 

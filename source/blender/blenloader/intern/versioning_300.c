@@ -2371,7 +2371,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
   }
 
   /* rebuild active/render color attribute references*/
-  if (!MAIN_VERSION_ATLEAST(bmain, 302, 0)) {
+  if (!MAIN_VERSION_ATLEAST(bmain, 302, 3)) {
     LISTBASE_FOREACH (Mesh *, me, &bmain->meshes) {
       for (int step = 0; step < 2; step++) {
         CustomDataLayer *actlayer = NULL;

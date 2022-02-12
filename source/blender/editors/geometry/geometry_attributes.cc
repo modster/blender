@@ -112,24 +112,25 @@ static int geometry_attribute_add_exec(bContext *C, wmOperator *op)
 
 static void next_color_attribute(struct ID *id, CustomDataLayer *layer, bool is_render)
 {
-  AttributeRef *ref = is_render ? BKE_id_attributes_render_color_ref_p(id) :
-                                  BKE_id_attributes_active_color_ref_p(id);
+  int index = BKE_id_attribute_to_index(id, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
 
-  if (!ref || layer != (is_render ? BKE_id_attributes_render_color_get(id) :
-                                    BKE_id_attributes_active_color_get(id))) {
-    return;
+  index++;
+
+  layer = BKE_id_attribute_from_index(id, index, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
+
+  if (!layer) {
+    index = 0;
+    layer = BKE_id_attribute_from_index(id, index, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
   }
 
-  AttributeDomainMask domain_mask = (AttributeDomainMask)(ATTR_DOMAIN_MASK_POINT |
-                                                          ATTR_DOMAIN_MASK_CORNER);
-  CustomDataMask type_mask = CD_MASK_PROP_COLOR | CD_MASK_MLOOPCOL;
-
-  int length = BKE_id_attributes_length(id, domain_mask, type_mask);
-  int index = BKE_id_attribute_index_from_ref(id, ref, domain_mask, type_mask);
-
-  index = mod_i(index + 1, length);
-
-  BKE_id_attribute_ref_from_index(id, index, domain_mask, type_mask, ref);
+  if (layer) {
+    if (is_render) {
+      BKE_id_attributes_active_color_set(id, layer);
+    }
+    else {
+      BKE_id_attributes_render_color_set(id, layer);
+    }
+  }
 }
 
 static void next_color_attributes(struct ID *id, CustomDataLayer *layer)

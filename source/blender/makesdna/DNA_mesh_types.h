@@ -254,13 +254,6 @@ typedef struct Mesh {
   int act_face;
 
   /**
-   * Active vertex color reference.  Can refer for a layer of types CD_PROP_COLOR
-   * or CD_MLOOPCOL, in ATTR_DOMAIN_POINT or ATTR_DOMAIN_CORNER domains
-   */
-  AttributeRef attr_color_active;
-  AttributeRef attr_color_render;
-
-  /**
    * An optional mesh owned elsewhere (by #Main) that can be used to override
    * the texture space #loc and #size.
    * \note Vertex indices should be aligned for this to work usefully.

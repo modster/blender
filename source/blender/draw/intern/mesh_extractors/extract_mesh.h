@@ -360,16 +360,6 @@ extern const MeshExtract extract_vert_idx;
 extern const MeshExtract extract_fdot_idx;
 extern const MeshExtract extract_attr[GPU_MAX_ATTR];
 
-int mesh_cd_get_active_color_i(const Mesh *me,
-                               const CustomData *cd_vdata,
-                               const CustomData *cd_ldata);
-int mesh_cd_get_render_color_i(const Mesh *me,
-                               const CustomData *cd_vdata,
-                               const CustomData *cd_ldata);
-int mesh_cd_get_vcol_i(const CustomData *cd_vdata,
-                       const CustomData *cd_ldata,
-                       const struct AttributeRef *ref);
-
 #ifdef __cplusplus
 }
 #endif

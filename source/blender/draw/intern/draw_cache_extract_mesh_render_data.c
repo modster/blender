@@ -448,10 +448,6 @@ MeshRenderData *mesh_render_data_create(Object *object,
 
     mr->me = (do_final) ? editmesh_eval_final : editmesh_eval_cage;
 
-    /* needed so correct vcol layer is shown in edit mode */
-    mr->me->attr_color_active = me->attr_color_active;
-    mr->me->attr_color_render = me->attr_color_render;
-
     mr->edit_data = is_mode_active ? mr->me->runtime.edit_data : NULL;
 
     if (mr->edit_data) {
