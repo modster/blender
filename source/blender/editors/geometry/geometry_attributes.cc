@@ -96,7 +96,7 @@ static int geometry_attribute_add_exec(bContext *C, wmOperator *op)
   CustomDataType type = (CustomDataType)RNA_enum_get(op->ptr, "data_type");
   AttributeDomain domain = (AttributeDomain)RNA_enum_get(op->ptr, "domain");
   CustomDataLayer *layer = BKE_id_attribute_new(
-      id, name, type, domain, CD_MASK_PROP_ALL, op->reports);
+      id, name, type, domain, op->reports);
 
   if (layer == nullptr) {
     return OPERATOR_CANCELLED;
@@ -226,7 +226,7 @@ static int geometry_color_attribute_add_exec(bContext *C, wmOperator *op)
   CustomDataType type = (CustomDataType)RNA_enum_get(op->ptr, "data_type");
   AttributeDomain domain = (AttributeDomain)RNA_enum_get(op->ptr, "domain");
   CustomDataLayer *layer = BKE_id_attribute_new(
-      id, name, type, domain, CD_MASK_PROP_ALL, op->reports);
+      id, name, type, domain, op->reports);
 
   if (layer == NULL) {
     return OPERATOR_CANCELLED;

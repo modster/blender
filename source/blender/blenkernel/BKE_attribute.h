@@ -60,7 +60,6 @@ struct CustomDataLayer *BKE_id_attribute_new(struct ID *id,
                                              const char *name,
                                              int type,
                                              AttributeDomain domain,
-                                             const CustomDataMask list_mask,
                                              struct ReportList *reports);
 bool BKE_id_attribute_remove(struct ID *id,
                              struct CustomDataLayer *layer,
@@ -128,8 +127,7 @@ void BKE_id_attributes_render_color_set(struct ID *id, struct CustomDataLayer *a
 
 bool BKE_id_attribute_find_unique_name(struct ID *id,
                                        const char *name,
-                                       char *outname,
-                                       CustomDataMask mask);
+                                       char *outname);
 
 #ifdef __cplusplus
 }

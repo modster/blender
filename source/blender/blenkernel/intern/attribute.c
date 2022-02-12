@@ -135,7 +135,6 @@ bool BKE_id_attribute_rename(ID *id,
 
 typedef struct AttrUniqueData {
   ID *id;
-  CustomDataMask mask;
 } AttrUniqueData;
 
 static bool unique_name_cb(void *arg, const char *name)
@@ -154,7 +153,7 @@ static bool unique_name_cb(void *arg, const char *name)
     for (int i = 0; i < cdata->totlayer; i++) {
       CustomDataLayer *layer = cdata->layers + i;
 
-      if ((CD_TYPE_AS_MASK(layer->type) & data->mask) && STREQ(layer->name, name)) {
+      if (STREQ(layer->name, name)) {
         return true;
       }
     }
@@ -165,10 +164,9 @@ static bool unique_name_cb(void *arg, const char *name)
 
 bool BKE_id_attribute_find_unique_name(ID *id,
                                        const char *name,
-                                       char *outname,
-                                       CustomDataMask mask)
+                                       char *outname)
 {
-  AttrUniqueData data = {.id = id, .mask = mask};
+  AttrUniqueData data = {.id = id};
 
   BLI_strncpy_utf8(outname, name, MAX_CUSTOMDATA_LAYER_NAME);
 
@@ -179,7 +177,6 @@ CustomDataLayer *BKE_id_attribute_new(ID *id,
                                       const char *name,
                                       const int type,
                                       const AttributeDomain domain,
-                                      const CustomDataMask list_mask,
                                       ReportList *reports)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
@@ -192,7 +189,7 @@ CustomDataLayer *BKE_id_attribute_new(ID *id,
   }
 
   char uniquename[MAX_CUSTOMDATA_LAYER_NAME];
-  BKE_id_attribute_find_unique_name(id, name, uniquename, list_mask);
+  BKE_id_attribute_find_unique_name(id, name, uniquename);
 
   switch (GS(id->name)) {
     case ID_ME: {

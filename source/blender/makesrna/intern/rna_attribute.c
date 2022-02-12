@@ -314,7 +314,7 @@ static void rna_ByteIntAttributeValue_set(PointerRNA *ptr, const int new_value)
 static PointerRNA rna_AttributeGroup_new(
     ID *id, ReportList *reports, const char *name, const int type, const int domain)
 {
-  CustomDataLayer *layer = BKE_id_attribute_new(id, name, type, domain, CD_MASK_PROP_ALL, reports);
+  CustomDataLayer *layer = BKE_id_attribute_new(id, name, type, domain, reports);
   DEG_id_tag_update(id, ID_RECALC_GEOMETRY);
   WM_main_add_notifier(NC_GEOM | ND_DATA, id);
 
