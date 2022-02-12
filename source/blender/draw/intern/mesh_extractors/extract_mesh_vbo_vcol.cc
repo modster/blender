@@ -32,17 +32,20 @@ static blender::Vector<VColRef> get_vcol_refs(const CustomData *cd_vdata,
   blender::Vector<VColRef> refs;
   uint layeri = 0;
 
-  auto buildList = [&](const CustomData *cdata, CustomDataType type, AttributeDomain domain) {
-    int i = cdata->typemap[(int)type];
-
-    if (i == -1) {
-      return;
-    }
-
-    for (; i < cdata->totlayer && (CustomDataType)cdata->layers[i].type == type; i++, layeri++) {
+  auto buildList = [&](const CustomData *cdata, AttributeDomain domain) {
+    for (int i=0; i<cdata->totlayer; i++) {
       const CustomDataLayer *layer = cdata->layers + i;
 
-      if (!(vcol_layers & (1UL << layeri)) || (layer->flag & CD_FLAG_TEMPORARY)) {
+      if (!(CD_TYPE_AS_MASK(layer->type) & CD_MASK_COLOR_ALL)) {
+        continue;
+      }
+
+      if (!(vcol_layers & (1UL << layeri))) {
+        layeri++;
+        continue;
+      }
+
+      if (layer->flag & CD_FLAG_TEMPORARY) {
         continue;
       }
 
@@ -51,13 +54,12 @@ static blender::Vector<VColRef> get_vcol_refs(const CustomData *cd_vdata,
       ref.layer = layer;
 
       refs.append(ref);
+      layeri++;
     }
   };
 
-  buildList(cd_vdata, CD_PROP_COLOR, ATTR_DOMAIN_POINT);
-  buildList(cd_vdata, CD_MLOOPCOL, ATTR_DOMAIN_POINT);
-  buildList(cd_ldata, CD_PROP_COLOR, ATTR_DOMAIN_CORNER);
-  buildList(cd_ldata, CD_MLOOPCOL, ATTR_DOMAIN_CORNER);
+  buildList(cd_vdata, ATTR_DOMAIN_POINT);
+  buildList(cd_ldata, ATTR_DOMAIN_CORNER);
 
   return refs;
 }

@@ -575,23 +575,23 @@ void BKE_id_attribute_subset_active_set(ID *id,
   get_domains(id, info);
 
   for (int i = 0; i < ATTR_DOMAIN_NUM; i++) {
-    if (!((1 << domains[i]) & domain_mask) || !info[domains[i]].customdata) {
+    AttributeDomainMask domain_mask2 = (AttributeDomainMask)(1 << domains[i]);
+
+    if (!(domain_mask2 & domain_mask) || !info[domains[i]].customdata) {
       continue;
     }
 
     CustomData *cdata = info[domains[i]].customdata;
 
     for (int j = 0; j < cdata->totlayer; j++) {
-      CustomDataLayer *layer = cdata->layers + j;
+      CustomDataLayer *layer2 = cdata->layers + j;
 
-      if (!(CD_TYPE_AS_MASK(layer->type) & mask) ||
-          (CD_TYPE_AS_MASK(layer->type) & CD_FLAG_TEMPORARY)) {
+      if (!(CD_TYPE_AS_MASK(layer2->type) & mask) ||
+          (CD_TYPE_AS_MASK(layer2->type) & CD_FLAG_TEMPORARY)) {
         continue;
       }
 
-      if (layer->flag & active_flag) {
-        layer->flag &= ~active_flag;
-      }
+      layer2->flag &= ~active_flag;
     }
   }
 
