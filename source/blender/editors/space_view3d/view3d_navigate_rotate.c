@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spview3d
@@ -370,7 +356,8 @@ static int viewrotate_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   if (ret & OPERATOR_FINISHED) {
-    viewops_data_free(C, op);
+    viewops_data_free(C, op->customdata);
+    op->customdata = NULL;
   }
 
   return ret;
@@ -383,16 +370,13 @@ static int viewrotate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   const bool use_cursor_init = RNA_boolean_get(op->ptr, "use_cursor_init");
 
   /* makes op->customdata */
-  viewops_data_alloc(C, op);
-  vod = op->customdata;
+  vod = op->customdata = viewops_data_create(
+      C,
+      event,
+      viewops_flag_from_prefs() | VIEWOPS_FLAG_PERSP_ENSURE |
+          (use_cursor_init ? VIEWOPS_FLAG_USE_MOUSE_INIT : 0));
 
   ED_view3d_smooth_view_force_finish(C, vod->v3d, vod->region);
-
-  viewops_data_create(C,
-                      op,
-                      event,
-                      viewops_flag_from_prefs() | VIEWOPS_FLAG_PERSP_ENSURE |
-                          (use_cursor_init ? VIEWOPS_FLAG_USE_MOUSE_INIT : 0));
 
   if (ELEM(event->type, MOUSEPAN, MOUSEROTATE)) {
     /* Rotate direction we keep always same */
@@ -414,7 +398,8 @@ static int viewrotate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
     viewrotate_apply(vod, event_xy);
 
-    viewops_data_free(C, op);
+    viewops_data_free(C, op->customdata);
+    op->customdata = NULL;
 
     return OPERATOR_FINISHED;
   }
@@ -427,7 +412,8 @@ static int viewrotate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
 static void viewrotate_cancel(bContext *C, wmOperator *op)
 {
-  viewops_data_free(C, op);
+  viewops_data_free(C, op->customdata);
+  op->customdata = NULL;
 }
 
 void VIEW3D_OT_rotate(wmOperatorType *ot)

@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spview3d
@@ -378,9 +364,8 @@ static int ndof_orbit_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   const wmNDOFMotionData *ndof = event->customdata;
 
-  viewops_data_alloc(C, op);
-  viewops_data_create(C, op, event, (viewops_flag_from_prefs() & ~VIEWOPS_FLAG_DEPTH_NAVIGATE));
-  vod = op->customdata;
+  vod = op->customdata = viewops_data_create(
+      C, event, (viewops_flag_from_prefs() & ~VIEWOPS_FLAG_DEPTH_NAVIGATE));
 
   ED_view3d_smooth_view_force_finish(C, vod->v3d, vod->region);
 
@@ -418,7 +403,8 @@ static int ndof_orbit_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   ED_region_tag_redraw(vod->region);
 
-  viewops_data_free(C, op);
+  viewops_data_free(C, op->customdata);
+  op->customdata = NULL;
 
   return OPERATOR_FINISHED;
 }
@@ -458,10 +444,8 @@ static int ndof_orbit_zoom_invoke(bContext *C, wmOperator *op, const wmEvent *ev
 
   const wmNDOFMotionData *ndof = event->customdata;
 
-  viewops_data_alloc(C, op);
-  viewops_data_create(C, op, event, (viewops_flag_from_prefs() & ~VIEWOPS_FLAG_DEPTH_NAVIGATE));
-
-  vod = op->customdata;
+  vod = op->customdata = viewops_data_create(
+      C, event, (viewops_flag_from_prefs() & ~VIEWOPS_FLAG_DEPTH_NAVIGATE));
 
   ED_view3d_smooth_view_force_finish(C, vod->v3d, vod->region);
 
@@ -533,7 +517,8 @@ static int ndof_orbit_zoom_invoke(bContext *C, wmOperator *op, const wmEvent *ev
 
   ED_region_tag_redraw(vod->region);
 
-  viewops_data_free(C, op);
+  viewops_data_free(C, op->customdata);
+  op->customdata = NULL;
 
   return OPERATOR_FINISHED;
 }

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spview3d
@@ -82,7 +66,7 @@ enum eViewOpsFlag {
 
 /** Generic View Operator Custom-Data */
 typedef struct ViewOpsData {
-  /** Context pointers (assigned by #viewops_data_alloc). */
+  /** Context pointers (assigned by #viewops_data_create). */
   struct Main *bmain;
   struct Scene *scene;
   struct ScrArea *area;
@@ -169,16 +153,14 @@ void view3d_operator_properties_common(struct wmOperatorType *ot, const enum eV3
 /**
  * Allocate and fill in context pointers for #ViewOpsData
  */
-void viewops_data_alloc(struct bContext *C, struct wmOperator *op);
-void viewops_data_free(struct bContext *C, struct wmOperator *op);
+void viewops_data_free(struct bContext *C, ViewOpsData *vod);
 
 /**
- * Calculate the values for #ViewOpsData
+ * Allocate, fill in context pointers and calculate the values for #ViewOpsData
  */
-void viewops_data_create(struct bContext *C,
-                         struct wmOperator *op,
-                         const struct wmEvent *event,
-                         enum eViewOpsFlag viewops_flag);
+ViewOpsData *viewops_data_create(struct bContext *C,
+                                 const struct wmEvent *event,
+                                 enum eViewOpsFlag viewops_flag);
 
 void VIEW3D_OT_view_all(struct wmOperatorType *ot);
 void VIEW3D_OT_view_selected(struct wmOperatorType *ot);

@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spview3d
@@ -141,21 +127,6 @@ void calctrackballvec(const rcti *rect, const int event_xy[2], float r_dir[3])
     /* On hyperbola. */
     r_dir[2] = square_f(t) / d;
   }
-}
-
-void viewops_data_alloc(bContext *C, wmOperator *op)
-{
-  ViewOpsData *vod = MEM_callocN(sizeof(ViewOpsData), "viewops data");
-
-  /* store data */
-  op->customdata = vod;
-  vod->bmain = CTX_data_main(C);
-  vod->depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
-  vod->scene = CTX_data_scene(C);
-  vod->area = CTX_wm_area(C);
-  vod->region = CTX_wm_region(C);
-  vod->v3d = vod->area->spacedata.first;
-  vod->rv3d = vod->region->regiondata;
 }
 
 void view3d_orbit_apply_dyn_ofs(float r_ofs[3],
@@ -289,13 +260,20 @@ enum eViewOpsFlag viewops_flag_from_prefs(void)
                                 (U.uiflag & USER_DEPTH_NAVIGATE) != 0);
 }
 
-void viewops_data_create(bContext *C,
-                         wmOperator *op,
-                         const wmEvent *event,
-                         enum eViewOpsFlag viewops_flag)
+ViewOpsData *viewops_data_create(bContext *C, const wmEvent *event, enum eViewOpsFlag viewops_flag)
 {
-  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
-  ViewOpsData *vod = op->customdata;
+  ViewOpsData *vod = MEM_callocN(sizeof(ViewOpsData), __func__);
+
+  /* Store data. */
+  vod->bmain = CTX_data_main(C);
+  vod->depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  vod->scene = CTX_data_scene(C);
+  vod->area = CTX_wm_area(C);
+  vod->region = CTX_wm_region(C);
+  vod->v3d = vod->area->spacedata.first;
+  vod->rv3d = vod->region->regiondata;
+
+  Depsgraph *depsgraph = vod->depsgraph;
   RegionView3D *rv3d = vod->rv3d;
 
   /* Could do this more nicely. */
@@ -427,13 +405,14 @@ void viewops_data_create(bContext *C,
   }
 
   rv3d->rflag |= RV3D_NAVIGATING;
+
+  return vod;
 }
 
-void viewops_data_free(bContext *C, wmOperator *op)
+void viewops_data_free(bContext *C, ViewOpsData *vod)
 {
   ARegion *region;
-  if (op->customdata) {
-    ViewOpsData *vod = op->customdata;
+  if (vod) {
     region = vod->region;
     vod->rv3d->rflag &= ~RV3D_NAVIGATING;
 
@@ -446,7 +425,6 @@ void viewops_data_free(bContext *C, wmOperator *op)
     }
 
     MEM_freeN(vod);
-    op->customdata = NULL;
   }
   else {
     region = CTX_wm_region(C);
@@ -1569,13 +1547,12 @@ static int viewpan_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     y = 25;
   }
 
-  viewops_data_alloc(C, op);
-  viewops_data_create(C, op, event, (viewops_flag_from_prefs() & ~VIEWOPS_FLAG_ORBIT_SELECT));
-  ViewOpsData *vod = op->customdata;
+  ViewOpsData *vod = viewops_data_create(
+      C, event, (viewops_flag_from_prefs() & ~VIEWOPS_FLAG_ORBIT_SELECT));
 
   viewmove_apply(vod, vod->prev.event_xy[0] + x, vod->prev.event_xy[1] + y);
 
-  viewops_data_free(C, op);
+  viewops_data_free(C, vod);
 
   return OPERATOR_FINISHED;
 }
