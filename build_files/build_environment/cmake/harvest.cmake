@@ -30,8 +30,8 @@ if(WIN32)
 if(BUILD_MODE STREQUAL Release)
   add_custom_target(Harvest_Release_Results
     COMMAND # jpeg rename libfile + copy include
-        ${CMAKE_COMMAND} -E copy ${LIBDIR}/jpg/lib/jpeg-static.lib ${HARVEST_TARGET}/jpeg/lib/libjpeg.lib &&
-        ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/jpg/include/ ${HARVEST_TARGET}/jpeg/include/ &&
+        ${CMAKE_COMMAND} -E copy ${LIBDIR}/jpeg/lib/jpeg-static.lib ${HARVEST_TARGET}/jpeg/lib/libjpeg.lib &&
+        ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/jpeg/include/ ${HARVEST_TARGET}/jpeg/include/ &&
         # png
         ${CMAKE_COMMAND} -E copy ${LIBDIR}/png/lib/libpng16_static.lib ${HARVEST_TARGET}/png/lib/libpng.lib &&
         ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/png/include/ ${HARVEST_TARGET}/png/include/ &&
@@ -96,8 +96,8 @@ harvest(gmp/include gmp/include "*.h")
 harvest(gmp/lib gmp/lib "*.a")
 harvest(jemalloc/include jemalloc/include "*.h")
 harvest(jemalloc/lib jemalloc/lib "*.a")
-harvest(jpg/include jpeg/include "*.h")
-harvest(jpg/lib jpeg/lib "libjpeg.a")
+harvest(jpeg/include jpeg/include "*.h")
+harvest(jpeg/lib jpeg/lib "libjpeg.a")
 harvest(lame/lib ffmpeg/lib "*.a")
 harvest(llvm/bin llvm/bin "clang-format")
 if(BUILD_CLANG_TOOLS)

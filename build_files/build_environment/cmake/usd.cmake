@@ -15,21 +15,28 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # ***** END GPL LICENSE BLOCK *****
+if(WIN32)
+  set(USD_PLATFORM_ARGS
+    -DBUILD_SHARED_LIBS=On
+    -DTBB_ROOT_DIR=${LIBDIR}/tbb/
+  )
+else()
+  set(USD_PLATFORM_ARGS
+    -DBUILD_SHARED_LIBS=Off
+    # USD is hellbound on making a shared lib, unless you point this variable to a valid cmake file
+    # doesn't have to make sense, but as long as it points somewhere valid it will skip the shared lib.
+    -DPXR_MONOLITHIC_IMPORT=${BUILD_DIR}/usd/src/external_usd/cmake/defaults/Version.cmake
+    -DTBB_LIBRARIES=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
+    -DTbb_TBB_LIBRARY=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
+    # USD wants the tbb debug lib set even when you are doing a release build
+    # Otherwise it will error out during the cmake configure phase.
+    -DTBB_LIBRARIES_DEBUG=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
+  )
+endif()
 
 set(USD_EXTRA_ARGS
-  -DBoost_COMPILER:STRING=${BOOST_COMPILER_STRING}
-  -DBoost_USE_MULTITHREADED=ON
-  -DBoost_USE_STATIC_LIBS=ON
-  -DBoost_USE_STATIC_RUNTIME=OFF
-  -DBOOST_ROOT=${LIBDIR}/boost
-  -DBoost_NO_SYSTEM_PATHS=ON
-  -DBoost_NO_BOOST_CMAKE=ON
+  ${DEFAULT_BOOST_FLAGS}
   -DTBB_INCLUDE_DIRS=${LIBDIR}/tbb/include
-  -DTBB_LIBRARIES=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
-  -DTbb_TBB_LIBRARY=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
-  # USD wants the tbb debug lib set even when you are doing a release build
-  # Otherwise it will error out during the cmake configure phase.
-  -DTBB_LIBRARIES_DEBUG=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
 
   # This is a preventative measure that avoids possible conflicts when add-ons
   # try to load another USD library into the same process space.
@@ -38,7 +45,6 @@ set(USD_EXTRA_ARGS
   -DPXR_ENABLE_PYTHON_SUPPORT=OFF
   -DPXR_BUILD_IMAGING=OFF
   -DPXR_BUILD_TESTS=OFF
-  -DBUILD_SHARED_LIBS=OFF
   -DPYTHON_EXECUTABLE=${PYTHON_BINARY}
   -DPXR_BUILD_MONOLITHIC=ON
 
@@ -47,9 +53,7 @@ set(USD_EXTRA_ARGS
   -DPXR_BUILD_USD_TOOLS=OFF
 
   -DCMAKE_DEBUG_POSTFIX=_d
-  # USD is hellbound on making a shared lib, unless you point this variable to a valid cmake file
-  # doesn't have to make sense, but as long as it points somewhere valid it will skip the shared lib.
-  -DPXR_MONOLITHIC_IMPORT=${BUILD_DIR}/usd/src/external_usd/cmake/defaults/Version.cmake
+  ${USD_PLATFORM_ARGS}
 )
 
 ExternalProject_Add(external_usd
@@ -80,15 +84,18 @@ if(WIN32)
   )
   if(BUILD_MODE STREQUAL Release)
     ExternalProject_Add_Step(external_usd after_install
-      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/usd/ ${HARVEST_TARGET}/usd
-      COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/usd/src/external_usd-build/pxr/Release/usd_m.lib ${HARVEST_TARGET}/usd/lib/libusd_m.lib
+      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/usd/include ${HARVEST_TARGET}/usd/include
+      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/usd/plugin ${HARVEST_TARGET}/usd/plugin
+      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/usd/lib/usd ${HARVEST_TARGET}/usd/lib/usd
+      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/usd/lib/usd_usd_ms.lib ${HARVEST_TARGET}/usd/lib/usd_usd_ms.lib
+      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/usd/lib/usd_usd_ms.dll ${HARVEST_TARGET}/usd/lib/usd_usd_ms.dll
       DEPENDEES install
     )
   endif()
   if(BUILD_MODE STREQUAL Debug)
     ExternalProject_Add_Step(external_usd after_install
-      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/usd/lib ${HARVEST_TARGET}/usd/lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/usd/src/external_usd-build/pxr/Debug/usd_m_d.lib ${HARVEST_TARGET}/usd/lib/libusd_m_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/usd/lib/usd_usd_ms_d.lib ${HARVEST_TARGET}/usd/lib/usd_usd_ms_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/usd/lib/usd_usd_ms_d.dll ${HARVEST_TARGET}/usd/lib/usd_usd_ms_d.dll
       DEPENDEES install
     )
   endif()

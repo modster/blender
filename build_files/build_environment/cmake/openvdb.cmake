@@ -29,6 +29,7 @@ else()
 endif()
 
 set(OPENVDB_EXTRA_ARGS
+  ${DEFAULT_BOOST_FLAGS}
   -DBoost_COMPILER:STRING=${BOOST_COMPILER_STRING}
   -DBoost_USE_MULTITHREADED=ON
   -DBoost_USE_STATIC_LIBS=ON
@@ -40,22 +41,18 @@ set(OPENVDB_EXTRA_ARGS
   -DZLIB_INCLUDE_DIR=${LIBDIR}/zlib/include/
   -DBlosc_INCLUDE_DIR=${LIBDIR}/blosc/include/
   -DBlosc_LIBRARY=${LIBDIR}/blosc/lib/libblosc${BLOSC_POST}${LIBEXT}
-  -DOPENVDB_ENABLE_3_ABI_COMPATIBLE=OFF
-  -DOPENVDB_BUILD_UNITTESTS=Off
-  -DOPENVDB_BUILD_PYTHON_MODULE=Off
+  -DBlosc_LIBRARY_RELEASE=${LIBDIR}/blosc/lib/libblosc${BLOSC_POST}${LIBEXT}
+  -DBlosc_LIBRARY_DEBUG=${LIBDIR}/blosc/lib/libblosc${BLOSC_POST}${LIBEXT}
+  -DOPENVDB_BUILD_UNITTESTS=OFF
+  -DOPENVDB_BUILD_PYTHON_MODULE=OFF
+  -DOPENVDB_BUILD_NANOVDB=ON
   -DBlosc_ROOT=${LIBDIR}/blosc/
   -DTBB_ROOT=${LIBDIR}/tbb/
-  -DOpenEXR_ROOT=${LIBDIR}/openexr
-  -DIlmBase_ROOT=${LIBDIR}/openexr
-  -DOPENEXR_LIBRARYDIR=${LIBDIR}/openexr/lib
-   # All libs live in openexr, even the ilmbase ones
-  -DILMBASE_LIBRARYDIR=${LIBDIR}/openexr/lib
   -DOPENVDB_CORE_SHARED=${OPENVDB_SHARED}
   -DOPENVDB_CORE_STATIC=${OPENVDB_STATIC}
-  -DOPENVDB_BUILD_BINARIES=Off
+  -DOPENVDB_BUILD_BINARIES=OFF
   -DCMAKE_DEBUG_POSTFIX=_d
-  -DILMBASE_USE_STATIC_LIBS=On
-  -DOPENEXR_USE_STATIC_LIBS=On
+  -DBLOSC_USE_STATIC_LIBS=ON
 )
 
 if(WIN32)
@@ -64,7 +61,6 @@ if(WIN32)
   # needs to link pthreads due to it being a blosc dependency
   set(OPENVDB_EXTRA_ARGS ${OPENVDB_EXTRA_ARGS}
     -DCMAKE_CXX_STANDARD_LIBRARIES="${LIBDIR}/pthreads/lib/pthreadVC3.lib"
-    -DUSE_EXR=On
   )
 else()
   # OpenVDB can't find the _static libraries automatically.
@@ -90,7 +86,6 @@ add_dependencies(
   openvdb
   external_tbb
   external_boost
-  external_openexr
   external_zlib
   external_blosc
 )

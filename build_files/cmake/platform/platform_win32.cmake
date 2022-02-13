@@ -419,27 +419,43 @@ if(WITH_CODEC_FFMPEG)
   endif()
 endif()
 
+if(WITH_IMATH)
+  set(IMATH_ROOT_DIR ${LIBDIR}/imath)
+  set(IMATH_VERSION "3.14")
+  windows_find_package(IMATH REQUIRED)
+  if(NOT IMATH_FOUND)
+    set(IMATH ${LIBDIR}/imath)
+    set(IMATH_INCLUDE_DIR ${IMATH}/include)
+    set(IMATH_INCLUDE_DIRS ${IMATH_INCLUDE_DIR} ${IMATH}/include/Imath)
+    set(IMATH_LIBPATH ${IMATH}/lib)
+    set(IMATH_LIBRARIES
+      optimized ${IMATH_LIBPATH}/Imath-3_1.lib
+      debug ${IMATH_LIBPATH}/Imath-3_1_d.lib
+    )
+  endif()
+endif()
 if(WITH_IMAGE_OPENEXR)
   set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
-  set(OPENEXR_VERSION "2.1")
+  set(OPENEXR_VERSION "3.14")
   windows_find_package(OPENEXR REQUIRED)
   if(NOT OPENEXR_FOUND)
     warn_hardcoded_paths(OpenEXR)
     set(OPENEXR ${LIBDIR}/openexr)
     set(OPENEXR_INCLUDE_DIR ${OPENEXR}/include)
-    set(OPENEXR_INCLUDE_DIRS ${OPENEXR_INCLUDE_DIR} ${OPENEXR}/include/OpenEXR)
+    set(OPENEXR_INCLUDE_DIRS ${OPENEXR_INCLUDE_DIR} ${IMATH_INCLUDE_DIRS} ${OPENEXR}/include/OpenEXR)
     set(OPENEXR_LIBPATH ${OPENEXR}/lib)
     set(OPENEXR_LIBRARIES
       optimized ${OPENEXR_LIBPATH}/Iex_s.lib
-      optimized ${OPENEXR_LIBPATH}/Half_s.lib
-      optimized ${OPENEXR_LIBPATH}/IlmImf_s.lib
-      optimized ${OPENEXR_LIBPATH}/Imath_s.lib
       optimized ${OPENEXR_LIBPATH}/IlmThread_s.lib
+      optimized ${OPENEXR_LIBPATH}/OpenEXR_s.lib
+      optimized ${OPENEXR_LIBPATH}/OpenEXRCore_s.lib
+      optimized ${OPENEXR_LIBPATH}/OpenEXRUtil_s.lib
       debug ${OPENEXR_LIBPATH}/Iex_s_d.lib
-      debug ${OPENEXR_LIBPATH}/Half_s_d.lib
-      debug ${OPENEXR_LIBPATH}/IlmImf_s_d.lib
-      debug ${OPENEXR_LIBPATH}/Imath_s_d.lib
       debug ${OPENEXR_LIBPATH}/IlmThread_s_d.lib
+      debug ${OPENEXR_LIBPATH}/OpenEXR_s_d.lib
+      debug ${OPENEXR_LIBPATH}/OpenEXRCore_s_d.lib
+      debug ${OPENEXR_LIBPATH}/OpenEXRUtil_s_d.lib
+      ${IMATH_LIBRARIES}
     )
   endif()
 endif()
@@ -506,8 +522,8 @@ if(WITH_BOOST)
     if(NOT BOOST_VERSION)
       message(FATAL_ERROR "Unable to determine Boost version")
     endif()
-    set(BOOST_POSTFIX "vc141-mt-x64-${BOOST_VERSION}.lib")
-    set(BOOST_DEBUG_POSTFIX "vc141-mt-gd-x64-${BOOST_VERSION}.lib")
+    set(BOOST_POSTFIX "vc142-mt-x64-${BOOST_VERSION}.lib")
+    set(BOOST_DEBUG_POSTFIX "vc142-mt-gd-x64-${BOOST_VERSION}.lib")
     set(BOOST_LIBRARIES
       optimized ${BOOST_LIBPATH}/libboost_date_time-${BOOST_POSTFIX}
       optimized ${BOOST_LIBPATH}/libboost_filesystem-${BOOST_POSTFIX}
@@ -775,8 +791,8 @@ if(WITH_USD)
   if(NOT USD_FOUND)
     set(USD_FOUND ON)
     set(USD_INCLUDE_DIRS ${LIBDIR}/usd/include)
-    set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/libusd_m.lib)
-    set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/libusd_m_d.lib)
+    set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/usd_usd_ms.lib)
+    set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/usd_usd_ms_d.lib)
     set(USD_LIBRARY_DIR ${LIBDIR}/usd/lib)
     set(USD_LIBRARIES
       debug ${USD_DEBUG_LIB}

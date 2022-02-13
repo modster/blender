@@ -34,7 +34,7 @@
 #include <pxr/usd/usdGeom/nurbsCurves.h>
 #include <pxr/usd/usdGeom/scope.h>
 #include <pxr/usd/usdGeom/xform.h>
-#include <pxr/usd/usdLux/light.h>
+#include <pxr/usd/usdLux/boundableLightBase.h>
 
 #include <iostream>
 
@@ -71,7 +71,7 @@ USDPrimReader *USDStageReader::create_reader_if_allowed(const pxr::UsdPrim &prim
   if (params_.import_meshes && prim.IsA<pxr::UsdGeomMesh>()) {
     return new USDMeshReader(prim, params_, settings_);
   }
-  if (params_.import_lights && prim.IsA<pxr::UsdLuxLight>()) {
+  if (params_.import_lights && prim.IsA<pxr::UsdLuxBoundableLightBase>()) {
     return new USDLightReader(prim, params_, settings_);
   }
   if (params_.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
@@ -98,7 +98,7 @@ USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim)
   if (prim.IsA<pxr::UsdGeomMesh>()) {
     return new USDMeshReader(prim, params_, settings_);
   }
-  if (prim.IsA<pxr::UsdLuxLight>()) {
+  if (prim.IsA<pxr::UsdGeomBoundable>()) {
     return new USDLightReader(prim, params_, settings_);
   }
   if (prim.IsA<pxr::UsdVolVolume>()) {

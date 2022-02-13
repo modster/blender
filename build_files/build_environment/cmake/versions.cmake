@@ -34,17 +34,18 @@ set(PNG_HASH 505e70834d35383537b6491e7ae8641f1a4bed1876dbfe361201fc80868d88ca)
 set(PNG_HASH_TYPE SHA256)
 set(PNG_FILE libpng-${PNG_VERSION}.tar.xz)
 
-set(JPEG_VERSION 2.0.4)
+set(JPEG_VERSION 2.1.2)
 set(JPEG_URI https://github.com/libjpeg-turbo/libjpeg-turbo/archive/${JPEG_VERSION}.tar.gz)
-set(JPEG_HASH 44c43e4a9fb352f47090804529317c88)
+set(JPEG_HASH f02d78311298468c5c1d278507ad42f2)
 set(JPEG_HASH_TYPE MD5)
 set(JPEG_FILE libjpeg-turbo-${JPEG_VERSION}.tar.gz)
 
-set(BOOST_VERSION 1.73.0)
-set(BOOST_VERSION_NODOTS 1_73_0)
-set(BOOST_VERSION_NODOTS_SHORT 1_73)
+set(BOOST_VERSION 1.78.0)
+set(BOOST_VERSION_SHORT 1.78)
+set(BOOST_VERSION_NODOTS 1_78_0)
+set(BOOST_VERSION_NODOTS_SHORT 1_78)
 set(BOOST_URI https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source/boost_${BOOST_VERSION_NODOTS}.tar.gz)
-set(BOOST_HASH 4036cd27ef7548b8d29c30ea10956196)
+set(BOOST_HASH c2f6428ac52b0e5a3c9b2e1d8cc832b5)
 set(BOOST_HASH_TYPE MD5)
 set(BOOST_FILE boost_${BOOST_VERSION_NODOTS}.tar.gz)
 
@@ -61,11 +62,18 @@ set(PTHREADS_HASH f3bf81bb395840b3446197bcf4ecd653)
 set(PTHREADS_HASH_TYPE MD5)
 set(PTHREADS_FILE pthreads4w-code-${PTHREADS_VERSION}.zip)
 
-set(OPENEXR_VERSION 2.5.5)
+set(OPENEXR_VERSION 3.1.4)
 set(OPENEXR_URI https://github.com/AcademySoftwareFoundation/openexr/archive/v${OPENEXR_VERSION}.tar.gz)
-set(OPENEXR_HASH 85e8a979092c9055d10ed103062d31a0)
+set(OPENEXR_HASH e990be1ff765797bc2d93a8060e1c1f2)
 set(OPENEXR_HASH_TYPE MD5)
 set(OPENEXR_FILE openexr-${OPENEXR_VERSION}.tar.gz)
+
+set(IMATH_VERSION 3.1.4)
+set(IMATH_URI https://github.com/AcademySoftwareFoundation/Imath/archive/v${OPENEXR_VERSION}.tar.gz)
+set(IMATH_HASH fddf14ec73e12c34e74c3c175e311a3f)
+set(IMATH_HASH_TYPE MD5)
+set(IMATH_FILE imath-${IMATH_VERSION}.tar.gz)
+
 
 if(WIN32)
   # Openexr started appending _d on its own so now
@@ -101,9 +109,9 @@ set(FREEGLUT_HASH 90c3ca4dd9d51cf32276bc5344ec9754)
 set(FREEGLUT_HASH_TYPE MD5)
 set(FREEGLUT_FILE freeglut-${FREEGLUT_VERSION}.tar.gz)
 
-set(ALEMBIC_VERSION 1.7.16)
+set(ALEMBIC_VERSION 1.8.3)
 set(ALEMBIC_URI https://github.com/alembic/alembic/archive/${ALEMBIC_VERSION}.tar.gz)
-set(ALEMBIC_HASH effcc86e42fe6605588e3de57bde6677)
+set(ALEMBIC_HASH 2cd8d6e5a3ac4a014e24a4b04f4fadf9)
 set(ALEMBIC_HASH_TYPE MD5)
 set(ALEMBIC_FILE alembic-${ALEMBIC_VERSION}.tar.gz)
 
@@ -128,15 +136,15 @@ set(CUEW_HASH 86760d62978ebfd96cd93f5aa1abaf4a)
 set(CUEW_HASH_TYPE MD5)
 set(CUEW_FILE cuew-${CUEW_GIT_UID}.zip)
 
-set(OPENSUBDIV_VERSION v3_4_3)
+set(OPENSUBDIV_VERSION v3_4_4)
 set(OPENSUBDIV_URI https://github.com/PixarAnimationStudios/OpenSubdiv/archive/${OPENSUBDIV_VERSION}.tar.gz)
-set(OPENSUBDIV_HASH 7bbfa275d021fb829e521df749160edb)
+set(OPENSUBDIV_HASH 39ecc5caf0abebc943d1ce131855e76e)
 set(OPENSUBDIV_HASH_TYPE MD5)
 set(OPENSUBDIV_FILE opensubdiv-${OPENSUBDIV_VERSION}.tar.gz)
 
-set(SDL_VERSION 2.0.12)
+set(SDL_VERSION 2.0.20)
 set(SDL_URI https://www.libsdl.org/release/SDL2-${SDL_VERSION}.tar.gz)
-set(SDL_HASH 783b6f2df8ff02b19bb5ce492b99c8ff)
+set(SDL_HASH a53acc02e1cca98c4123229069b67c9e)
 set(SDL_HASH_TYPE MD5)
 set(SDL_FILE SDL2-${SDL_VERSION}.tar.gz)
 
@@ -146,9 +154,9 @@ set(OPENCOLLADA_HASH ee7dae874019fea7be11613d07567493)
 set(OPENCOLLADA_HASH_TYPE MD5)
 set(OPENCOLLADA_FILE opencollada-${OPENCOLLADA_VERSION}.tar.gz)
 
-set(OPENCOLORIO_VERSION 2.0.0)
+set(OPENCOLORIO_VERSION 2.1.1)
 set(OPENCOLORIO_URI https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/v${OPENCOLORIO_VERSION}.tar.gz)
-set(OPENCOLORIO_HASH 1a2e3478b6cd9a1549f24e1b2205e3f0)
+set(OPENCOLORIO_HASH 604f562e073f23d88ce89ed4f7f709ba)
 set(OPENCOLORIO_HASH_TYPE MD5)
 set(OPENCOLORIO_FILE OpenColorIO-${OPENCOLORIO_VERSION}.tar.gz)
 
@@ -171,21 +179,21 @@ set(OPENMP_URI https://github.com/llvm/llvm-project/releases/download/llvmorg-${
 set(OPENMP_HASH_TYPE MD5)
 set(OPENMP_FILE openmp-${OPENMP_VERSION}.src.tar.xz)
 
-set(OPENIMAGEIO_VERSION v2.3.11.0)
+set(OPENIMAGEIO_VERSION v2.3.12.0)
 set(OPENIMAGEIO_URI https://github.com/OpenImageIO/oiio/archive/refs/tags/${OPENIMAGEIO_VERSION}.tar.gz)
-set(OPENIMAGEIO_HASH 04dfc101095929e5da6ffc1aeeb06ab8)
+set(OPENIMAGEIO_HASH e109c5a4e6844f1f58c91ec7a991dbd7)
 set(OPENIMAGEIO_HASH_TYPE MD5)
 set(OPENIMAGEIO_FILE OpenImageIO-${OPENIMAGEIO_VERSION}.tar.gz)
 
-# 7.1.3 is currently oiio's preferred vesion although never versions are available.
+# 8.0.0 is currently oiio's preferred vesion although never versions may be available.
 # the preferred version can be found in oiio's externalpackages.cmake
-set(FMT_VERSION 7.1.3)
+set(FMT_VERSION 8.0.0)
 set(FMT_URI https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.tar.gz)
-set(FMT_HASH 5cae7072042b3043e12d53d50ef404bbb76949dad1de368d7f993a15c8c05ecc)
+set(FMT_HASH 7bce0e9e022e586b178b150002e7c2339994e3c2bbe44027e9abb0d60f9cce83)
 set(FMT_HASH_TYPE SHA256)
 set(FMT_FILE fmt-${FMT_VERSION}.tar.gz)
 
-# 0.6.2 is currently oiio's preferred vesion although never versions are available.
+# 0.6.2 is currently oiio's preferred vesion although never versions may be available.
 # the preferred version can be found in oiio's externalpackages.cmake
 set(ROBINMAP_VERSION v0.6.2)
 set(ROBINMAP_URI https://github.com/Tessil/robin-map/archive/refs/tags/${ROBINMAP_VERSION}.tar.gz)
@@ -193,15 +201,15 @@ set(ROBINMAP_HASH c08ec4b1bf1c85eb0d6432244a6a89862229da1cb834f3f90fba8dc35d8c8e
 set(ROBINMAP_HASH_TYPE SHA256)
 set(ROBINMAP_FILE robinmap-${ROBINMAP_VERSION}.tar.gz)
 
-set(TIFF_VERSION 4.1.0)
+set(TIFF_VERSION 4.3.0)
 set(TIFF_URI http://download.osgeo.org/libtiff/tiff-${TIFF_VERSION}.tar.gz)
-set(TIFF_HASH 2165e7aba557463acc0664e71a3ed424)
+set(TIFF_HASH 0a2e4744d1426a8fc8211c0cdbc3a1b3)
 set(TIFF_HASH_TYPE MD5)
 set(TIFF_FILE tiff-${TIFF_VERSION}.tar.gz)
 
-set(OSL_VERSION 1.11.14.1)
+set(OSL_VERSION 1.11.17.0)
 set(OSL_URI https://github.com/imageworks/OpenShadingLanguage/archive/Release-${OSL_VERSION}.tar.gz)
-set(OSL_HASH 1abd7ce40481771a9fa937f19595d2f2)
+set(OSL_HASH 63265472ce14548839ace2e21e401544)
 set(OSL_HASH_TYPE MD5)
 set(OSL_FILE OpenShadingLanguage-${OSL_VERSION}.tar.gz)
 
@@ -219,17 +227,11 @@ set(TBB_HASH 1b711ae956524855088df3bbf5ec65dc)
 set(TBB_HASH_TYPE MD5)
 set(TBB_FILE oneTBB-${TBB_VERSION}.tar.gz)
 
-set(OPENVDB_VERSION 8.0.1)
+set(OPENVDB_VERSION 9.0.0)
 set(OPENVDB_URI https://github.com/AcademySoftwareFoundation/openvdb/archive/v${OPENVDB_VERSION}.tar.gz)
-set(OPENVDB_HASH 01b490be16cc0e15c690f9a153c21461)
+set(OPENVDB_HASH 684ce40c2f74f3a0c9cac530e1c7b07e)
 set(OPENVDB_HASH_TYPE MD5)
 set(OPENVDB_FILE openvdb-${OPENVDB_VERSION}.tar.gz)
-
-set(NANOVDB_GIT_UID dc37d8a631922e7bef46712947dc19b755f3e841)
-set(NANOVDB_URI https://github.com/AcademySoftwareFoundation/openvdb/archive/${NANOVDB_GIT_UID}.tar.gz)
-set(NANOVDB_HASH e7b9e863ec2f3b04ead171dec2322807)
-set(NANOVDB_HASH_TYPE MD5)
-set(NANOVDB_FILE nano-vdb-${NANOVDB_GIT_UID}.tar.gz)
 
 set(IDNA_VERSION 3.3)
 set(CHARSET_NORMALIZER_VERSION 2.0.10)
@@ -302,10 +304,10 @@ set(XVIDCORE_HASH abbdcbd39555691dd1c9b4d08f0a031376a3b211652c0d8b3b8aa9be1303ce
 set(XVIDCORE_HASH_TYPE SHA256)
 set(XVIDCORE_FILE xvidcore-${XVIDCORE_VERSION}.tar.gz)
 
-set(OPENJPEG_VERSION 2.3.1)
-set(OPENJPEG_SHORT_VERSION 2.3)
+set(OPENJPEG_VERSION 2.4.0)
+set(OPENJPEG_SHORT_VERSION 2.4)
 set(OPENJPEG_URI https://github.com/uclouvain/openjpeg/archive/v${OPENJPEG_VERSION}.tar.gz)
-set(OPENJPEG_HASH 63f5a4713ecafc86de51bfad89cc07bb788e9bba24ebbf0c4ca637621aadb6a9)
+set(OPENJPEG_HASH 8702ba68b442657f11aaeb2b338443ca8d5fb95b0d845757968a7be31ef7f16d)
 set(OPENJPEG_HASH_TYPE SHA256)
 set(OPENJPEG_FILE openjpeg-v${OPENJPEG_VERSION}.tar.gz)
 
@@ -370,9 +372,16 @@ set(YAMLCPP_HASH b45bf1089a382e81f6b661062c10d0c2)
 set(YAMLCPP_HASH_TYPE MD5)
 set(YAMLCPP_FILE yaml-cpp-${YAMLCPP_VERSION}.tar.gz)
 
-set(EXPAT_VERSION 2_2_10)
+set(PYSTRING_VERSION v1.1.3)
+set(PYSTRING_URI https://codeload.github.com/imageworks/pystring/tar.gz/refs/tags/${PYSTRING_VERSION})
+set(PYSTRING_HASH f2c68786b359f5e4e62bed53bc4fb86d)
+set(PYSTRING_HASH_TYPE MD5)
+set(PYSTRING_FILE pystring-${YAMLCPP_VERSION}.tar.gz)
+
+
+set(EXPAT_VERSION 2_4_4)
 set(EXPAT_URI https://github.com/libexpat/libexpat/archive/R_${EXPAT_VERSION}.tar.gz)
-set(EXPAT_HASH 7ca5f09959fcb9a57618368deb627b9f)
+set(EXPAT_HASH 2d3e81dee94b452369dc6394ff0f8f98)
 set(EXPAT_HASH_TYPE MD5)
 set(EXPAT_FILE libexpat-${EXPAT_VERSION}.tar.gz)
 
@@ -437,22 +446,22 @@ set(SQLITE_HASH fb558c49ee21a837713c4f1e7e413309aabdd9c7)
 set(SQLITE_HASH_TYPE SHA1)
 set(SQLITE_FILE sqlite-src-3240000.zip)
 
-set(EMBREE_VERSION 3.10.0)
+set(EMBREE_VERSION 3.13.3)
 set(EMBREE_URI https://github.com/embree/embree/archive/v${EMBREE_VERSION}.zip)
-set(EMBREE_HASH 4bbe29e7eaa46417efc75fc5f1e8eb87)
+set(EMBREE_HASH f62766ba54e48a2f327c3a22596e7133)
 set(EMBREE_HASH_TYPE MD5)
 set(EMBREE_FILE embree-v${EMBREE_VERSION}.zip)
 set(EMBREE_ARM_GIT https://github.com/brechtvl/embree.git)
 
-set(USD_VERSION 21.02)
+set(USD_VERSION 21.11)
 set(USD_URI https://github.com/PixarAnimationStudios/USD/archive/v${USD_VERSION}.tar.gz)
-set(USD_HASH 1dd1e2092d085ed393c1f7c450a4155a)
+set(USD_HASH 7fe232df5c732fedf466d33ff431ce33)
 set(USD_HASH_TYPE MD5)
 set(USD_FILE usd-v${USD_VERSION}.tar.gz)
 
-set(OIDN_VERSION 1.4.1)
+set(OIDN_VERSION 1.4.2)
 set(OIDN_URI https://github.com/OpenImageDenoise/oidn/releases/download/v${OIDN_VERSION}/oidn-${OIDN_VERSION}.src.tar.gz)
-set(OIDN_HASH df4007b0ab93b1c41cdf223b075d01c0)
+set(OIDN_HASH 9ee4dd818fd8a828fc145c8df92e145c)
 set(OIDN_HASH_TYPE MD5)
 set(OIDN_FILE oidn-${OIDN_VERSION}.src.tar.gz)
 
@@ -486,9 +495,9 @@ set(WL_PROTOCOLS_URI https://gitlab.freedesktop.org/wayland/wayland-protocols/-/
 set(WL_PROTOCOLS_HASH af5ca07e13517cdbab33504492cef54a)
 set(WL_PROTOCOLS_HASH_TYPE MD5)
 
-set(ISPC_VERSION v1.16.0)
+set(ISPC_VERSION v1.17.0)
 set(ISPC_URI https://github.com/ispc/ispc/archive/${ISPC_VERSION}.tar.gz)
-set(ISPC_HASH 2e3abedbc0ea9aaec17d6562c632454d)
+set(ISPC_HASH 4f476a3109332a77fe839a9014c60ca9)
 set(ISPC_HASH_TYPE MD5)
 set(ISPC_FILE ispc-${ISPC_VERSION}.tar.gz)
 

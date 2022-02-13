@@ -25,8 +25,6 @@
 #include "DNA_light_types.h"
 #include "DNA_object_types.h"
 
-#include <pxr/usd/usdLux/light.h>
-
 #include <pxr/usd/usdLux/diskLight.h>
 #include <pxr/usd/usdLux/distantLight.h>
 #include <pxr/usd/usdLux/rectLight.h>
@@ -57,7 +55,7 @@ void USDLightReader::read_object_data(Main *bmain, const double motionSampleTime
     return;
   }
 
-  pxr::UsdLuxLight light_prim(prim_);
+  pxr::UsdLuxBoundableLightBase light_prim(prim_);
 
   if (!light_prim) {
     return;

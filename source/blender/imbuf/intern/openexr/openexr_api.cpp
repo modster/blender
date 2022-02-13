@@ -38,6 +38,7 @@
 #include <ImfChannelList.h>
 #include <ImfCompression.h>
 #include <ImfCompressionAttribute.h>
+#include <ImfFrameBuffer.h>
 #include <ImfIO.h>
 #include <ImfInputFile.h>
 #include <ImfOutputFile.h>
@@ -131,12 +132,12 @@ class IMemStream : public Imf::IStream {
     return false;
   }
 
-  Int64 tellg() override
+  uint64_t tellg() override
   {
     return _exrpos;
   }
 
-  void seekg(Int64 pos) override
+  void seekg(uint64_t pos) override
   {
     _exrpos = pos;
   }
@@ -146,8 +147,8 @@ class IMemStream : public Imf::IStream {
   }
 
  private:
-  Int64 _exrpos;
-  Int64 _exrsize;
+  uint64_t _exrpos;
+  uint64_t _exrsize;
   unsigned char *_exrbuf;
 };
 
@@ -182,12 +183,12 @@ class IFileStream : public Imf::IStream {
     return check_error();
   }
 
-  Int64 tellg() override
+  uint64_t tellg() override
   {
     return std::streamoff(ifs.tellg());
   }
 
-  void seekg(Int64 pos) override
+  void seekg(uint64_t pos) override
   {
     ifs.seekg(pos);
     check_error();
@@ -231,19 +232,19 @@ class OMemStream : public OStream {
     ibuf->encodedsize += n;
   }
 
-  Int64 tellp() override
+  uint64_t tellp() override
   {
     return offset;
   }
 
-  void seekp(Int64 pos) override
+  void seekp(uint64_t pos) override
   {
     offset = pos;
     ensure_size(offset);
   }
 
  private:
-  void ensure_size(Int64 size)
+  void ensure_size(uint64_t size)
   {
     /* if buffer is too small increase it. */
     while (size > ibuf->encodedbuffersize) {
@@ -254,7 +255,7 @@ class OMemStream : public OStream {
   }
 
   ImBuf *ibuf;
-  Int64 offset;
+  uint64_t offset;
 };
 
 /* File Output Stream */
@@ -284,12 +285,12 @@ class OFileStream : public OStream {
     check_error();
   }
 
-  Int64 tellp() override
+  uint64_t tellp() override
   {
     return std::streamoff(ofs.tellp());
   }
 
-  void seekp(Int64 pos) override
+  void seekp(uint64_t pos) override
   {
     ofs.seekp(pos);
     check_error();

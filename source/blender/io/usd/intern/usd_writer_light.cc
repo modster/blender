@@ -49,7 +49,7 @@ void USDLightWriter::do_write(HierarchyContext &context)
   pxr::UsdTimeCode timecode = get_export_time_code();
 
   Light *light = static_cast<Light *>(context.object->data);
-  pxr::UsdLuxLight usd_light;
+  pxr::UsdLuxBoundableLightBase usd_light;
 
   switch (light->type) {
     case LA_AREA:
@@ -84,7 +84,8 @@ void USDLightWriter::do_write(HierarchyContext &context)
       break;
     }
     case LA_SUN:
-      usd_light = pxr::UsdLuxDistantLight::Define(stage, usd_path);
+      // TODO: RAY TOTALLY BROKE THIS SINCE SEARCH AND REPLACE DIDNT WORK HERE
+      //usd_light = pxr::UsdLuxDistantLight::Define(stage, usd_path);
       break;
     default:
       BLI_assert_msg(0, "is_supported() returned true for unsupported light type");

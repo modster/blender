@@ -27,8 +27,9 @@ if(UNIX AND NOT APPLE)
 endif()
 if(WIN32)
   add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
+else()
+  add_definitions(-DPXR_STATIC)
 endif()
-add_definitions(-DPXR_STATIC)
 
 # USD headers use deprecated TBB headers, silence warning.
 add_definitions(-DTBB_SUPPRESS_DEPRECATED_MESSAGES=1)

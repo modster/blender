@@ -49,25 +49,18 @@ endif()
 
 if(MSVC)
   set(OPENJPEG_FLAGS
-    -DOpenJpeg_ROOT=${LIBDIR}/openjpeg_msvc
+    -DOpenJPEG_ROOT=${LIBDIR}/openjpeg_msvc
   )
 else()
   set(OPENJPEG_FLAGS
-    -DOpenJpeg_ROOT=${LIBDIR}/openjpeg
+    -DOpenJPEG_ROOT=${LIBDIR}/openjpeg
   )
 endif()
 
 set(OPENIMAGEIO_EXTRA_ARGS
   -DBUILD_SHARED_LIBS=OFF
   ${OPENIMAGEIO_LINKSTATIC}
-  -DBoost_COMPILER:STRING=${BOOST_COMPILER_STRING}
-  -DBoost_USE_MULTITHREADED=ON
-  -DBoost_USE_STATIC_LIBS=ON
-  -DBoost_USE_STATIC_RUNTIME=OFF
-  -DBOOST_ROOT=${LIBDIR}/boost
-  -DBOOST_LIBRARYDIR=${LIBDIR}/boost/lib/
-  -DBoost_NO_SYSTEM_PATHS=ON
-  -DBoost_NO_BOOST_CMAKE=ON
+  ${DEFAULT_BOOST_FLAGS}
   -DUSE_LIBSQUISH=OFF
   -DUSE_QT5=OFF
   -DUSE_NUKE=OFF
@@ -78,7 +71,6 @@ set(OPENIMAGEIO_EXTRA_ARGS
   -DUSE_LIBHEIF=OFF
   -DUSE_OPENGL=OFF
   -DUSE_TBB=OFF
-  -DUSE_FIELD3D=OFF
   -DUSE_QT=OFF
   -DUSE_PYTHON=OFF
   -DUSE_GIF=OFF
@@ -99,14 +91,9 @@ set(OPENIMAGEIO_EXTRA_ARGS
   -DPNG_PNG_INCLUDE_DIR=${LIBDIR}/png/include
   -DTIFF_LIBRARY=${LIBDIR}/tiff/lib/${LIBPREFIX}tiff${LIBEXT}
   -DTIFF_INCLUDE_DIR=${LIBDIR}/tiff/include
-  -DJPEG_LIBRARY=${LIBDIR}/jpg/lib/${JPEG_LIBRARY}
-  -DJPEG_INCLUDE_DIR=${LIBDIR}/jpg/include
+  -DJPEG_LIBRARY=${LIBDIR}/jpeg/lib/${JPEG_LIBRARY}
+  -DJPEG_INCLUDE_DIR=${LIBDIR}/jpeg/include
   ${OPENJPEG_FLAGS}
-  -DOpenEXR_USE_STATIC_LIBS=On
-  -DILMBASE_INCLUDE_DIR=${LIBDIR}/openexr/include/
-  -DOPENEXR_INCLUDE_DIR=${LIBDIR}/openexr/include/
-  -DOPENEXR_HALF_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}Half${OPENEXR_VERSION_POSTFIX}${LIBEXT}
-  -DOPENEXR_IMATH_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}Imath${OPENEXR_VERSION_POSTFIX}${LIBEXT}
   -DOPENEXR_ILMTHREAD_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}IlmThread${OPENEXR_VERSION_POSTFIX}${LIBEXT}
   -DOPENEXR_IEX_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}Iex${OPENEXR_VERSION_POSTFIX}${LIBEXT}
   -DOPENEXR_ILMIMF_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}IlmImf${OPENEXR_VERSION_POSTFIX}${LIBEXT}
@@ -120,6 +107,8 @@ set(OPENIMAGEIO_EXTRA_ARGS
   -DRobinmap_ROOT=${LIBDIR}/robinmap
   ${WEBP_FLAGS}
   ${OIIO_SIMD_FLAGS}
+  -DOpenEXR_ROOT=${LIBDIR}/openexr
+  -DImath_ROOT=${LIBDIR}/imath
 )
 
 ExternalProject_Add(external_openimageio
@@ -137,6 +126,7 @@ add_dependencies(
   external_png
   external_zlib
   external_openexr
+  external_imath
   external_jpeg
   external_boost
   external_tiff
