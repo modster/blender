@@ -1750,7 +1750,7 @@ void CURVE_OT_pen(wmOperatorType *ot)
                       prop_extra_key_types,
                       NONE,
                       "Move Entire",
-                      "Move the whole point using handles");
+                      "Move the entire point using handles");
   prop = RNA_def_enum(ot->srna,
                       "link_handles",
                       prop_extra_key_types,
@@ -1778,7 +1778,7 @@ void CURVE_OT_pen(wmOperatorType *ot)
                       prop_handle_types,
                       HD_VECT,
                       "Extrude Handle Type",
-                      "Mirror the movement of one handle onto the other");
+                      "Type of the extruded handle");
   prop = RNA_def_boolean(
       ot->srna, "delete_point", false, "Delete Point", "Delete an existing point");
   prop = RNA_def_boolean(
