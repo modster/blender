@@ -423,7 +423,7 @@ static void move_all_selected_points(ListBase *nurbs,
       }
       BKE_nurb_handles_calc(nu);
     }
-    else {
+    else if (!bezt_only) {
       for (int i = 0; i < nu->pntsu; i++) {
         BPoint *bp = nu->bp + i;
         if (bp->f1 & SELECT) {
