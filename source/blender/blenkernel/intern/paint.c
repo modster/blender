@@ -1489,7 +1489,7 @@ void BKE_sculptsession_free(Object *ob)
   }
 }
 
-MultiresModifierData *BKE_sculpt_multires_active(Scene *scene, Object *ob)
+MultiresModifierData *BKE_sculpt_multires_active(const Scene *scene, Object *ob)
 {
   Mesh *me = (Mesh *)ob->data;
   ModifierData *md;
