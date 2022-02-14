@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -1051,7 +1037,12 @@ static Mesh *mesh_new_from_mesh(Object *object, Mesh *mesh)
 {
   /* While we could copy this into the new mesh,
    * add the data to 'mesh' so future calls to this function don't need to re-convert the data. */
-  BKE_mesh_wrapper_ensure_mdata(mesh);
+  if (mesh->runtime.wrapper_type == ME_WRAPPER_TYPE_BMESH) {
+    BKE_mesh_wrapper_ensure_mdata(mesh);
+  }
+  else {
+    BKE_mesh_wrapper_ensure_subdivision(object, mesh);
+  }
 
   Mesh *mesh_result = (Mesh *)BKE_id_copy_ex(
       nullptr, &mesh->id, nullptr, LIB_ID_CREATE_NO_MAIN | LIB_ID_CREATE_NO_USER_REFCOUNT);
@@ -1088,6 +1079,7 @@ static Mesh *mesh_new_from_mesh_object_with_layers(Depsgraph *depsgraph,
     mask.pmask |= CD_MASK_ORIGINDEX;
   }
   Mesh *result = mesh_create_eval_final(depsgraph, scene, &object_for_eval, &mask);
+  BKE_mesh_wrapper_ensure_subdivision(object, result);
   return result;
 }
 

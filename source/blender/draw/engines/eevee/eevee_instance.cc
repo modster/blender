@@ -1,19 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2021, Blender Foundation.
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2021 Blender Foundation.
  */
 
 /** \file
@@ -143,8 +129,16 @@ void Instance::begin_sync()
 
 void Instance::object_sync(Object *ob)
 {
-  const bool is_renderable_type = ELEM(
-      ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL, OB_LAMP, OB_VOLUME, OB_GPENCIL);
+  const bool is_renderable_type = ELEM(ob->type,
+                                       OB_MESH,
+                                       OB_CURVE,
+                                       OB_SURF,
+                                       OB_FONT,
+                                       OB_MBALL,
+                                       OB_LAMP,
+                                       OB_VOLUME,
+                                       OB_CURVES,
+                                       OB_GPENCIL);
   const int ob_visibility = DRW_object_visibility_in_active_context(ob);
   const bool partsys_is_visible = (ob_visibility & OB_VISIBLE_PARTICLES) != 0 &&
                                   (ob->type == OB_MESH);
@@ -181,7 +175,7 @@ void Instance::object_sync(Object *ob)
       case OB_VOLUME:
         shading_passes.deferred.volume_add(ob);
         break;
-      case OB_HAIR:
+      case OB_CURVES:
         hair_sync(ob, ob_handle);
         break;
       case OB_GPENCIL:

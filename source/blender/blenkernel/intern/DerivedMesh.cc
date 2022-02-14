@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2005 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -738,7 +722,7 @@ static Mesh *modifier_modify_mesh_and_geometry_set(ModifierData *md,
 }
 
 static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
-                                Scene *scene,
+                                const Scene *scene,
                                 Object *ob,
                                 const bool use_deform,
                                 const bool need_mapping,
@@ -1256,7 +1240,7 @@ float (*editbmesh_vert_coords_alloc(BMEditMesh *em, int *r_vert_len))[3]
   return cos;
 }
 
-bool editbmesh_modifier_is_enabled(Scene *scene,
+bool editbmesh_modifier_is_enabled(const Scene *scene,
                                    const Object *ob,
                                    ModifierData *md,
                                    bool has_prev_mesh)
@@ -1317,7 +1301,7 @@ static void editbmesh_calc_modifier_final_normals(Mesh *mesh_final,
 }
 
 static void editbmesh_calc_modifiers(struct Depsgraph *depsgraph,
-                                     Scene *scene,
+                                     const Scene *scene,
                                      Object *ob,
                                      BMEditMesh *em_input,
                                      const CustomData_MeshMasks *dataMask,
@@ -1611,7 +1595,7 @@ static void mesh_build_extra_data(struct Depsgraph *depsgraph, Object *ob, Mesh 
 }
 
 static void mesh_build_data(struct Depsgraph *depsgraph,
-                            Scene *scene,
+                            const Scene *scene,
                             Object *ob,
                             const CustomData_MeshMasks *dataMask,
                             const bool need_mapping)
@@ -1677,7 +1661,7 @@ static void mesh_build_data(struct Depsgraph *depsgraph,
 }
 
 static void editbmesh_build_data(struct Depsgraph *depsgraph,
-                                 Scene *scene,
+                                 const Scene *scene,
                                  Object *obedit,
                                  BMEditMesh *em,
                                  CustomData_MeshMasks *dataMask)
@@ -1770,7 +1754,7 @@ static void object_get_datamask(const Depsgraph *depsgraph,
 }
 
 void makeDerivedMesh(struct Depsgraph *depsgraph,
-                     Scene *scene,
+                     const Scene *scene,
                      Object *ob,
                      const CustomData_MeshMasks *dataMask)
 {
@@ -1806,7 +1790,7 @@ void makeDerivedMesh(struct Depsgraph *depsgraph,
 /***/
 
 Mesh *mesh_get_eval_final(struct Depsgraph *depsgraph,
-                          Scene *scene,
+                          const Scene *scene,
                           Object *ob,
                           const CustomData_MeshMasks *dataMask)
 {
@@ -1842,7 +1826,7 @@ Mesh *mesh_get_eval_final(struct Depsgraph *depsgraph,
 }
 
 Mesh *mesh_get_eval_deform(struct Depsgraph *depsgraph,
-                           Scene *scene,
+                           const Scene *scene,
                            Object *ob,
                            const CustomData_MeshMasks *dataMask)
 {
@@ -1882,7 +1866,7 @@ Mesh *mesh_get_eval_deform(struct Depsgraph *depsgraph,
 }
 
 Mesh *mesh_create_eval_final(Depsgraph *depsgraph,
-                             Scene *scene,
+                             const Scene *scene,
                              Object *ob,
                              const CustomData_MeshMasks *dataMask)
 {
@@ -1893,7 +1877,7 @@ Mesh *mesh_create_eval_final(Depsgraph *depsgraph,
 }
 
 Mesh *mesh_create_eval_no_deform(Depsgraph *depsgraph,
-                                 Scene *scene,
+                                 const Scene *scene,
                                  Object *ob,
                                  const CustomData_MeshMasks *dataMask)
 {
@@ -1904,7 +1888,7 @@ Mesh *mesh_create_eval_no_deform(Depsgraph *depsgraph,
 }
 
 Mesh *mesh_create_eval_no_deform_render(Depsgraph *depsgraph,
-                                        Scene *scene,
+                                        const Scene *scene,
                                         Object *ob,
                                         const CustomData_MeshMasks *dataMask)
 {
@@ -1917,7 +1901,7 @@ Mesh *mesh_create_eval_no_deform_render(Depsgraph *depsgraph,
 /***/
 
 Mesh *editbmesh_get_eval_cage(struct Depsgraph *depsgraph,
-                              Scene *scene,
+                              const Scene *scene,
                               Object *obedit,
                               BMEditMesh *em,
                               const CustomData_MeshMasks *dataMask)
@@ -1938,12 +1922,12 @@ Mesh *editbmesh_get_eval_cage(struct Depsgraph *depsgraph,
 }
 
 Mesh *editbmesh_get_eval_cage_from_orig(struct Depsgraph *depsgraph,
-                                        Scene *scene,
+                                        const Scene *scene,
                                         Object *obedit,
                                         const CustomData_MeshMasks *dataMask)
 {
   BLI_assert((obedit->id.tag & LIB_TAG_COPIED_ON_WRITE) == 0);
-  Scene *scene_eval = (Scene *)DEG_get_evaluated_id(depsgraph, &scene->id);
+  const Scene *scene_eval = (const Scene *)DEG_get_evaluated_id(depsgraph, (ID *)&scene->id);
   Object *obedit_eval = (Object *)DEG_get_evaluated_id(depsgraph, &obedit->id);
   BMEditMesh *em_eval = BKE_editmesh_from_object(obedit_eval);
   return editbmesh_get_eval_cage(depsgraph, scene_eval, obedit_eval, em_eval, dataMask);
