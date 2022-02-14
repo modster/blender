@@ -1,0 +1,277 @@
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ */
+
+#include "BLI_hash.hh"
+#include "BLI_map.hh"
+#include "BLI_set.hh"
+#include "BLI_string_ref.hh"
+#include "BLI_utildefines.h"
+#include "BLI_vector.hh"
+#include "BLI_vector_set.hh"
+
+#include "DNA_node_types.h"
+#include "DNA_scene_types.h"
+
+#include "GPU_texture.h"
+
+#include "IMB_colormanagement.h"
+
+#include "NOD_compositor_execute.hh"
+#include "NOD_derived_node_tree.hh"
+
+namespace blender::compositor {
+
+using namespace nodes::derived_node_tree_types;
+
+/* A key structure used to identify a texture in a texture pool. Defines a hash and an equality
+ * operator for use in a hash map. */
+class TexturePoolKey {
+ public:
+  int width;
+  int height;
+  eGPUTextureFormat format;
+
+  TexturePoolKey(int width, int height, eGPUTextureFormat format)
+      : width(width), height(height), format(format)
+  {
+  }
+
+  TexturePoolKey(const GPUTexture *texture)
+  {
+    width = GPU_texture_width(texture);
+    height = GPU_texture_height(texture);
+    format = GPU_texture_format(texture);
+  }
+
+  uint64_t hash() const
+  {
+    return get_default_hash_3(width, height, format);
+  }
+};
+
+inline bool operator==(const TexturePoolKey &a, const TexturePoolKey &b)
+{
+  return a.width == b.width && a.height == b.height && a.format == b.format;
+}
+
+/* A pool of textures that can be allocated and reused transparently throughout the evaluation of
+ * the node tree. The compositor engine should implement the allocate_texture method, which would
+ * ideally use a global DRW texture pool for allocations. The acquired textures are uncleared and
+ * are expected to contain garbage data. */
+class TexturePool {
+ private:
+  /* The set of textures in the pool that are currently in use. */
+  Set<GPUTexture *> in_use_textures_;
+  /* The set of textures in the pool that are available to acquire. */
+  Map<TexturePoolKey, GPUTexture *> available_textures_;
+
+ public:
+  /* Check if there is an available texture with the given specification in the pool, if such
+   * texture exists, return it, otherwise, get a new texture from the DRW texture pool. */
+  GPUTexture *acquire(int width, int height, eGPUTextureFormat format)
+  {
+    const TexturePoolKey key = TexturePoolKey(width, height, format);
+    std::optional<GPUTexture *> available_texture = available_textures_.pop_try(key);
+    if (available_texture) {
+      return *available_texture;
+    }
+    GPUTexture *new_texture = allocate_texture(width, height, format);
+    in_use_textures_.add_new(new_texture);
+    return new_texture;
+  }
+
+  /* Move the texture from the in-use textures set to the available textures set, potentially to be
+   * acquired later by another user. */
+  void release(GPUTexture *texture)
+  {
+    in_use_textures_.remove_contained(texture);
+    available_textures_.add_new(TexturePoolKey(texture), texture);
+  }
+
+  virtual GPUTexture *allocate_texture(int with, int height, eGPUTextureFormat format) = 0;
+};
+
+class Compiler {
+ public:
+ private:
+  /* The derived and reference node trees repressing the compositor setup. */
+  NodeTreeRefMap tree_ref_map_;
+  DerivedNodeTree tree_;
+  /* The output node whose result should be computed and drawn. */
+  DNode output_node_;
+  /* Stores a heuristic estimation of the number of needed intermediate buffers
+   * to compute every node and all of its dependencies. */
+  Map<DNode, int> needed_buffers_;
+  /* An ordered set of nodes defining the schedule of node execution. */
+  VectorSet<DNode> node_schedule_;
+
+ public:
+  Compiler(bNodeTree *scene_node_tree) : tree_(*scene_node_tree, tree_ref_map_){};
+
+  void compile()
+  {
+    compute_output_node();
+    compute_needed_buffers(output_node_);
+    compute_schedule(output_node_);
+  }
+
+  void dump_schedule()
+  {
+    for (const DNode &node : node_schedule_) {
+      std::cout << node->name() << std::endl;
+    }
+  }
+
+ private:
+  /* Computes the output node whose result should be computed and drawn. The output node is the
+   * node marked as NODE_DO_OUTPUT. If multiple types of output nodes are marked, then the
+   * preference will be CMP_NODE_COMPOSITE > CMP_NODE_VIEWER > CMP_NODE_SPLITVIEWER. */
+  void compute_output_node()
+  {
+    const NodeTreeRef &root_tree = tree_.root_context().tree();
+    for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeComposite")) {
+      if (node->bnode()->flag & NODE_DO_OUTPUT) {
+        output_node_ = DNode(&tree_.root_context(), node);
+        return;
+      }
+    }
+    for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeViewer")) {
+      if (node->bnode()->flag & NODE_DO_OUTPUT) {
+        output_node_ = DNode(&tree_.root_context(), node);
+        return;
+      }
+    }
+    for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeSplitViewer")) {
+      if (node->bnode()->flag & NODE_DO_OUTPUT) {
+        output_node_ = DNode(&tree_.root_context(), node);
+        return;
+      }
+    }
+  }
+
+  /* Computes a heuristic estimation of the number of needed intermediate buffers to compute this
+   * node and all of its dependencies. The method recursively computes the needed buffers for all
+   * node dependencies and stores them in the needed_buffers_ map. So the root/output node can be
+   * provided to compute the needed buffers for all nodes.
+   *
+   * Consider a node that takes n number of buffers as an input from a number of node dependencies,
+   * which we shall call the input nodes. The node also computes and outputs m number of buffers.
+   * In order for the node to compute its output, a number of intermediate buffers will be needed.
+   * Since the node takes n buffers and outputs m buffers, then the number of buffers directly
+   * needed by the node is (n + m). But each of the input buffers are computed by a node that, in
+   * turn, needs a number of buffers to compute its output. So the total number of buffers needed
+   * to compute the output of the node is max(n + m, d) where d is the number of buffers needed by
+   * the input node that needs the largest number of buffers. We only consider the input node that
+   * needs the largest number of buffers, because those buffers can be reused by any input node
+   * that needs a lesser number of buffers.
+   *
+   * If the node tree was, in fact, a tree, then this would be an accurate computation. However,
+   * the node tree is in fact a graph that allows output sharing, so the computation in this case
+   * is merely a heuristic estimation that works well in most cases. */
+  int compute_needed_buffers(DNode node)
+  {
+    /* Compute the number of buffers that the node takes as an input as well as the number of
+     * buffers needed to compute the most demanding dependency node. */
+    int input_buffers = 0;
+    int buffers_needed_by_dependencies = 0;
+    for (const InputSocketRef *input_ref : node->inputs()) {
+      const DInputSocket input{node.context(), input_ref};
+      /* Only consider inputs that are linked, that is, those that take a buffer. */
+      input.foreach_origin_socket([&](const DSocket origin) {
+        input_buffers++;
+        /* The origin node was already computed before, so skip it. */
+        if (needed_buffers_.contains(origin.node())) {
+          return;
+        }
+        /* Recursively compute the number of buffers needed to compute this dependency node. */
+        const int buffers_needed_by_origin = compute_needed_buffers(origin.node());
+        if (buffers_needed_by_origin > buffers_needed_by_dependencies) {
+          buffers_needed_by_dependencies = buffers_needed_by_origin;
+        }
+      });
+    }
+
+    /* Compute the number of buffers that will be computed/output by this node. */
+    int output_buffers = 0;
+    for (const OutputSocketRef *output : node->outputs()) {
+      if (output->logically_linked_sockets().size() != 0) {
+        output_buffers++;
+      }
+    }
+
+    /* Compute the heuristic estimation of the number of needed intermediate buffers to compute
+     * this node and all of its dependencies. */
+    const int total_buffers = MAX2(input_buffers + output_buffers, buffers_needed_by_dependencies);
+    needed_buffers_.add_new(node, total_buffers);
+    return total_buffers;
+  }
+
+  /* Computes the most optimal execution schedule of the nodes and stores the schedule in
+   * node_schedule_. This is essentially a post-order depth first traversal of the node tree from
+   * the output node to the leaf input nodes, with informed order of traversal of children.
+   *
+   * There are multiple different possible orders of evaluating a node graph, each of which needs
+   * to allocate a number of intermediate buffers to store its intermediate results. It follows
+   * that we need to find the evaluation order which uses the least amount of intermediate buffers.
+   * For instance, consider a node that takes two input buffers A and B. Each of those buffers is
+   * computed through a number of nodes constituting a sub-graph whose root is the node that
+   * outputs that buffer. Suppose the number of intermediate buffers needed to compute A and B are
+   * N(A) and N(B) respectively and N(A) > N(B). Then evaluating the sub-graph computing A would be
+   * a better option than that of B, because had B was computed first, its outputs will need to be
+   * stored in extra buffers in addition to the buffers needed by A.
+   *
+   * This is a heuristic generalization of the Sethi–Ullman algorithm, a generalization that
+   * doesn't always guarantee an optimal evaluation order, as the optimal evaluation order is very
+   * difficult to compute, however, this method works well in most cases. */
+  void compute_schedule(DNode node)
+  {
+    /* Compute the nodes directly connected to the node inputs sorted by their needed buffers such
+     * that the node with the highest number of needed buffers comes first. */
+    Vector<DNode> sorted_origin_nodes;
+    for (const InputSocketRef *input_ref : node->inputs()) {
+      const DInputSocket input{node.context(), input_ref};
+      input.foreach_origin_socket([&](const DSocket origin) {
+        /* The origin node was added before or was already schedule, so skip it. The number of
+         * origin nodes is very small, so linear search is okay.
+         */
+        if (sorted_origin_nodes.contains(origin.node()) ||
+            node_schedule_.contains(origin.node())) {
+          return;
+        }
+        /* Sort on insertion, the number of origin nodes is very small, so this is okay. */
+        int insertion_position = 0;
+        for (int i = 0; i < sorted_origin_nodes.size(); i++) {
+          if (needed_buffers_.lookup(origin.node()) >
+              needed_buffers_.lookup(sorted_origin_nodes[i])) {
+            break;
+          }
+          insertion_position++;
+        }
+        sorted_origin_nodes.insert(insertion_position, origin.node());
+      });
+    }
+
+    /* Recursively schedule origin nodes. Nodes with higher number of needed intermediate buffers
+     * are scheduled first. */
+    for (const DNode &origin_node : sorted_origin_nodes) {
+      compute_schedule(origin_node);
+    }
+
+    node_schedule_.add_new(node);
+  }
+};
+
+}  // namespace blender::compositor
