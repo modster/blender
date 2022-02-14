@@ -19,10 +19,14 @@
 #include "BLI_hash.hh"
 #include "BLI_map.hh"
 #include "BLI_vector.hh"
+#include "BLI_vector_set.hh"
 
+#include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 
 #include "GPU_texture.h"
+
+#include "NOD_derived_node_tree.hh"
 
 namespace blender::compositor {
 
@@ -110,6 +114,48 @@ class CompositorContext {
   /* Get the texture where the given render pass is stored. This should be called by the Render
    * Layer node to populate its outputs. */
   virtual GPUTexture *get_pass_texture(int view_layer, eScenePassType pass_type) = 0;
+};
+
+using namespace nodes::derived_node_tree_types;
+
+class Compiler {
+ private:
+  /* The derived and reference node trees representing the compositor setup. */
+  NodeTreeRefMap tree_ref_map_;
+  DerivedNodeTree tree_;
+  /* The output node whose result should be computed and drawn. */
+  DNode output_node_;
+  /* Stores a heuristic estimation of the number of needed intermediate buffers
+   * to compute every node and all of its dependencies. */
+  Map<DNode, int> needed_buffers_;
+  /* An ordered set of nodes defining the schedule of node execution. */
+  VectorSet<DNode> node_schedule_;
+
+ public:
+  Compiler(bNodeTree *scene_node_tree);
+
+  void compile();
+
+  void dump_schedule();
+
+ private:
+  /* Computes the output node whose result should be computed and drawn, then store the result in
+   * output_node_. The output node is the node marked as NODE_DO_OUTPUT. If multiple types of
+   * output nodes are marked, then the preference will be CMP_NODE_COMPOSITE > CMP_NODE_VIEWER >
+   * CMP_NODE_SPLITVIEWER. */
+  void compute_output_node();
+
+  /* Computes a heuristic estimation of the number of needed intermediate buffers to compute this
+   * node and all of its dependencies. The method recursively computes the needed buffers for all
+   * node dependencies and stores them in the needed_buffers_ map. So the root/output node can be
+   * provided to compute the needed buffers for all nodes. */
+  int compute_needed_buffers(DNode node);
+
+  /* Computes the execution schedule of the nodes and stores the schedule in node_schedule_. This
+   * is essentially a post-order depth first traversal of the node tree from the output node to the
+   * leaf input nodes, with informed order of traversal of children based on a heuristic estimation
+   * of the number of needed_buffers. */
+  void compute_schedule(DNode node);
 };
 
 }  // namespace blender::compositor
