@@ -36,6 +36,14 @@
 
 namespace blender::compositor {
 
+class DRWTexturePool : public TexturePool {
+  GPUTexture *allocate_texture(int width, int height, eGPUTextureFormat format) override
+  {
+    DrawEngineType *owner = (DrawEngineType *)this;
+    return DRW_texture_pool_query_2d(width, height, format, owner);
+  }
+};
+
 class DRWCompositorContext : public CompositorContext {
   GPUTexture *get_viewport_texture() override
   {

@@ -14,7 +14,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BLI_hash.hh"
 #include "BLI_map.hh"
 #include "BLI_set.hh"
 #include "BLI_string_ref.hh"
@@ -36,73 +35,34 @@ namespace blender::compositor {
 
 using namespace nodes::derived_node_tree_types;
 
-/* A key structure used to identify a texture in a texture pool. Defines a hash and an equality
- * operator for use in a hash map. */
-class TexturePoolKey {
- public:
-  int width;
-  int height;
-  eGPUTextureFormat format;
+/* --------------------------------------------------------------------
+ * Texture Pool.
+ */
 
-  TexturePoolKey(int width, int height, eGPUTextureFormat format)
-      : width(width), height(height), format(format)
-  {
-  }
-
-  TexturePoolKey(const GPUTexture *texture)
-  {
-    width = GPU_texture_width(texture);
-    height = GPU_texture_height(texture);
-    format = GPU_texture_format(texture);
-  }
-
-  uint64_t hash() const
-  {
-    return get_default_hash_3(width, height, format);
-  }
-};
-
-inline bool operator==(const TexturePoolKey &a, const TexturePoolKey &b)
+GPUTexture *TexturePool::acquire(int width, int height, eGPUTextureFormat format, int users_count)
 {
-  return a.width == b.width && a.height == b.height && a.format == b.format;
+  const TexturePoolKey key = TexturePoolKey(width, height, format);
+  Vector<GPUTexture *> &available_textures = textures_.lookup_or_add_default(key);
+  GPUTexture *texture = available_textures.is_empty() ? allocate_texture(width, height, format) :
+                                                        available_textures.pop_last();
+  /* Add 1 to the users count because the texture pool itself is considered a user. */
+  GPU_texture_set_reference_count(texture, users_count + 1);
+  return texture;
 }
 
-/* A pool of textures that can be allocated and reused transparently throughout the evaluation of
- * the node tree. The compositor engine should implement the allocate_texture method, which would
- * ideally use a global DRW texture pool for allocations. The acquired textures are uncleared and
- * are expected to contain garbage data. */
-class TexturePool {
- private:
-  /* The set of textures in the pool that are currently in use. */
-  Set<GPUTexture *> in_use_textures_;
-  /* The set of textures in the pool that are available to acquire. */
-  Map<TexturePoolKey, GPUTexture *> available_textures_;
-
- public:
-  /* Check if there is an available texture with the given specification in the pool, if such
-   * texture exists, return it, otherwise, get a new texture from the DRW texture pool. */
-  GPUTexture *acquire(int width, int height, eGPUTextureFormat format)
-  {
-    const TexturePoolKey key = TexturePoolKey(width, height, format);
-    std::optional<GPUTexture *> available_texture = available_textures_.pop_try(key);
-    if (available_texture) {
-      return *available_texture;
-    }
-    GPUTexture *new_texture = allocate_texture(width, height, format);
-    in_use_textures_.add_new(new_texture);
-    return new_texture;
+void TexturePool::release(GPUTexture *texture)
+{
+  /* Don't release if the texture still has more than 1 user. We check if the reference count is
+   * more than 1, not zero, because the texture pool itself is considered a user of the texture. */
+  if (GPU_texture_get_reference_count(texture) > 1) {
+    return;
   }
+  textures_.lookup(TexturePoolKey(texture)).append(texture);
+}
 
-  /* Move the texture from the in-use textures set to the available textures set, potentially to be
-   * acquired later by another user. */
-  void release(GPUTexture *texture)
-  {
-    in_use_textures_.remove_contained(texture);
-    available_textures_.add_new(TexturePoolKey(texture), texture);
-  }
-
-  virtual GPUTexture *allocate_texture(int with, int height, eGPUTextureFormat format) = 0;
-};
+/* --------------------------------------------------------------------
+ * Compiler.
+ */
 
 class Compiler {
  public:
