@@ -579,4 +579,15 @@ using double2 = vec_base<double, 2>;
 using double3 = vec_base<double, 3>;
 using double4 = vec_base<double, 4>;
 
+template<typename T> constexpr bool is_math_vec_type = false;
+template<typename BaseType, int Size>
+constexpr bool is_math_vec_type<vec_base<BaseType, Size>> = true;
+
+static_assert(is_math_vec_type<int2>);
+static_assert(is_math_vec_type<uint4>);
+static_assert(is_math_vec_type<float2>);
+static_assert(is_math_vec_type<vec_base<float, 20>>);
+static_assert(!is_math_vec_type<int>);
+static_assert(!is_math_vec_type<float>);
+
 }  // namespace blender

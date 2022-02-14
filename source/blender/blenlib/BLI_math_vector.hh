@@ -35,17 +35,25 @@ namespace blender::math {
 
 #define bT typename T::base_type
 
+template<typename T>
+inline constexpr bool is_float_vector = (std::is_floating_point_v<typename T::base_type>
 #ifdef WITH_GMP
-#  define BLI_ENABLE_IF_FLT_VEC(T) \
-    BLI_ENABLE_IF((std::is_floating_point_v<typename T::base_type> || \
-                   std::is_same_v<typename T::base_type, mpq_class>))
-#else
-#  define BLI_ENABLE_IF_FLT_VEC(T) BLI_ENABLE_IF((std::is_floating_point_v<typename T::base_type>))
+                                         || std::is_same_v<typename T::base_type, mpq_class>
 #endif
+);
 
-#define BLI_ENABLE_IF_INT_VEC(T) BLI_ENABLE_IF((std::is_integral_v<typename T::base_type>))
+template<typename T>
+inline constexpr bool is_integral_vector = std::is_integral_v<typename T::base_type>;
 
-template<typename T> inline bool is_zero(const T &a)
+/* In this file, only implement math functions for the vector types. This allows other
+ * files to use overloading to implement the same functions with different types. */
+#define BLI_ENABLE_IF_VEC(T) BLI_ENABLE_IF((is_math_vec_type<T>))
+
+#define BLI_ENABLE_IF_FLT_VEC(T) BLI_ENABLE_IF_VEC(T), BLI_ENABLE_IF((is_float_vector<T>))
+
+#define BLI_ENABLE_IF_INT_VEC(T) BLI_ENABLE_IF_VEC(T), BLI_ENABLE_IF((is_integral_vector<T>))
+
+template<typename T, BLI_ENABLE_IF_VEC(T)> inline bool is_zero(const T &a)
 {
   for (int i = 0; i < T::type_length; i++) {
     if (a[i] != bT(0)) {
@@ -55,7 +63,7 @@ template<typename T> inline bool is_zero(const T &a)
   return true;
 }
 
-template<typename T> inline bool is_any_zero(const T &a)
+template<typename T, BLI_ENABLE_IF_VEC(T)> inline bool is_any_zero(const T &a)
 {
   for (int i = 0; i < T::type_length; i++) {
     if (a[i] == bT(0)) {
@@ -65,7 +73,7 @@ template<typename T> inline bool is_any_zero(const T &a)
   return false;
 }
 
-template<typename T> inline T abs(const T &a)
+template<typename T, BLI_ENABLE_IF_VEC(T)> inline T abs(const T &a)
 {
   T result;
   for (int i = 0; i < T::type_length; i++) {
@@ -74,7 +82,7 @@ template<typename T> inline T abs(const T &a)
   return result;
 }
 
-template<typename T> inline T min(const T &a, const T &b)
+template<typename T, BLI_ENABLE_IF_VEC(T)> inline T min(const T &a, const T &b)
 {
   T result;
   for (int i = 0; i < T::type_length; i++) {
@@ -83,7 +91,7 @@ template<typename T> inline T min(const T &a, const T &b)
   return result;
 }
 
-template<typename T> inline T max(const T &a, const T &b)
+template<typename T, BLI_ENABLE_IF_VEC(T)> inline T max(const T &a, const T &b)
 {
   T result;
   for (int i = 0; i < T::type_length; i++) {
@@ -92,7 +100,8 @@ template<typename T> inline T max(const T &a, const T &b)
   return result;
 }
 
-template<typename T> inline T clamp(const T &a, const T &min_v, const T &max_v)
+template<typename T, BLI_ENABLE_IF_VEC(T)>
+inline T clamp(const T &a, const T &min_v, const T &max_v)
 {
   T result = a;
   for (int i = 0; i < T::type_length; i++) {
@@ -101,7 +110,8 @@ template<typename T> inline T clamp(const T &a, const T &min_v, const T &max_v)
   return result;
 }
 
-template<typename T> inline T clamp(const T &a, const bT &min_v, const bT &max_v)
+template<typename T, BLI_ENABLE_IF_VEC(T)>
+inline T clamp(const T &a, const bT &min_v, const bT &max_v)
 {
   T result = a;
   for (int i = 0; i < T::type_length; i++) {
@@ -151,7 +161,8 @@ template<typename T, BLI_ENABLE_IF_FLT_VEC(T)> inline T safe_mod(const T &a, bT 
   return result;
 }
 
-template<typename T> inline void min_max(const T &vector, T &min_vec, T &max_vec)
+template<typename T, BLI_ENABLE_IF_VEC(T)>
+inline void min_max(const T &vector, T &min_vec, T &max_vec)
 {
   min_vec = min(vector, min_vec);
   max_vec = max(vector, max_vec);
@@ -207,7 +218,7 @@ template<typename T, BLI_ENABLE_IF_FLT_VEC(T)> inline bT dot(const T &a, const T
   return result;
 }
 
-template<typename T> inline bT length_manhattan(const T &a)
+template<typename T, BLI_ENABLE_IF_VEC(T)> inline bT length_manhattan(const T &a)
 {
   bT result = std::abs(a[0]);
   for (int i = 1; i < T::type_length; i++) {
@@ -364,6 +375,7 @@ template<typename T> struct isect_result {
 template<typename T, BLI_ENABLE_IF_FLT_VEC(T)>
 isect_result<T> isect_seg_seg(const T &v1, const T &v2, const T &v3, const T &v4);
 
+#undef BLI_ENABLE_IF_VEC
 #undef BLI_ENABLE_IF_FLT_VEC
 #undef BLI_ENABLE_IF_INT_VEC
 #undef bT
