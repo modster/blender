@@ -32,7 +32,7 @@ void main()
     if (pdf > 0.0) {
       /* Microfacet normal. */
       vec3 H = normalize(V + L);
-      float NL = dot(N, L);
+      float NL = saturate(dot(N, L));
       float NH = max(1e-8, dot(N, H));
 
       /* Coarse Approximation of the mapping distortion.
