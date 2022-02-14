@@ -12,7 +12,6 @@
 #include <iostream>
 #include <type_traits>
 
-#include "BLI_math_vector.hh"
 #include "BLI_utildefines.h"
 
 namespace blender {
@@ -40,6 +39,28 @@ template<typename T> struct vec_struct_base<T, 3> {
 template<typename T> struct vec_struct_base<T, 4> {
   T x, y, z, w;
 };
+
+namespace math {
+
+template<typename T> uint64_t vector_hash(const T &vec)
+{
+  BLI_STATIC_ASSERT(T::type_length <= 4, "Longer types need to implement vector_hash themself.");
+  const typename T::uint_type &uvec = *reinterpret_cast<const typename T::uint_type *>(&vec);
+  uint64_t result;
+  result = uvec[0] * uint64_t(435109);
+  if constexpr (T::type_length > 1) {
+    result ^= uvec[1] * uint64_t(380867);
+  }
+  if constexpr (T::type_length > 2) {
+    result ^= uvec[2] * uint64_t(1059217);
+  }
+  if constexpr (T::type_length > 3) {
+    result ^= uvec[3] * uint64_t(2002613);
+  }
+  return result;
+}
+
+}  // namespace math
 
 template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size> {
 
@@ -234,6 +255,16 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
   } \
   return *this;
 
+  bool is_any_zero() const
+  {
+    for (int i = 0; i < Size; i++) {
+      if ((*this)[i] == T(0)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Arithmetic operators. */
 
   friend vec_base operator+(const vec_base &a, const vec_base &b)
@@ -318,7 +349,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   friend vec_base operator/(const vec_base &a, const vec_base &b)
   {
-    BLI_assert(!math::is_any_zero(b));
+    BLI_assert(!b.is_any_zero());
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] / b[i]);
   }
 
@@ -330,19 +361,19 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   friend vec_base operator/(T a, const vec_base &b)
   {
-    BLI_assert(!math::is_any_zero(b));
+    BLI_assert(!b.is_any_zero());
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a / b[i]);
   }
 
   vec_base &operator/=(T b)
   {
-    BLI_assert(b != T(0));
+    BLI_assert(!b.is_any_zero());
     BLI_VEC_OP_IMPL_SELF(i, (*this)[i] /= b);
   }
 
   vec_base &operator/=(const vec_base &b)
   {
-    BLI_assert(!math::is_any_zero(b));
+    BLI_assert(!b != T(0));
     BLI_VEC_OP_IMPL_SELF(i, (*this)[i] /= b[i]);
   }
 
@@ -474,7 +505,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   BLI_INT_OP(T) friend vec_base operator%(const vec_base &a, const vec_base &b)
   {
-    BLI_assert(!math::is_any_zero(b));
+    BLI_assert(!b.is_any_zero());
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] % b[i]);
   }
 
@@ -486,7 +517,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   BLI_INT_OP(T) friend vec_base operator%(T a, const vec_base &b)
   {
-    BLI_assert(!math::is_any_zero(b));
+    BLI_assert(b != T(0));
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a % b[i]);
   }
 
