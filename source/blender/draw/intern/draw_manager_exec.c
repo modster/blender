@@ -599,11 +599,15 @@ static void draw_update_uniforms(DRWShadingGroup *shgroup,
                                  DRWCommandsState *state,
                                  bool *use_tfeedback)
 {
-#define CHECK(a) \
-  if (a == NULL) { \
-    printf("Resource %s is null\n", uni->name); \
-    break; \
-  }
+#ifdef DEBUG
+#  define CHECK(a) \
+    if (a == NULL) { \
+      printf("Resource %s is null\n", uni->name); \
+      break; \
+    }
+#else
+#  define CHECK(a)
+#endif
 
   for (DRWUniformChunk *unichunk = shgroup->uniforms; unichunk; unichunk = unichunk->next) {
     DRWUniform *uni = unichunk->uniforms;
