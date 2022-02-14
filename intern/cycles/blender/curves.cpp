@@ -46,12 +46,12 @@ static float shaperadius(float shape, float root, float tip, float time)
 /* curve functions */
 
 static bool ObtainCacheParticleData(
-    Hair *hair, BL::Mesh *b_curves, BL::Object *b_ob, ParticleCurveData *CData, bool background)
+    Hair *hair, BL::Mesh *b_mesh, BL::Object *b_ob, ParticleCurveData *CData, bool background)
 {
   int curvenum = 0;
   int keyno = 0;
 
-  if (!(hair && b_curves && b_ob && CData))
+  if (!(hair && b_mesh && b_ob && CData))
     return false;
 
   Transform tfm = get_transform(b_ob->matrix_world());
@@ -141,13 +141,13 @@ static bool ObtainCacheParticleData(
 }
 
 static bool ObtainCacheParticleUV(Hair *hair,
-                                  BL::Mesh *b_curves,
+                                  BL::Mesh *b_mesh,
                                   BL::Object *b_ob,
                                   ParticleCurveData *CData,
                                   bool background,
                                   int uv_num)
 {
-  if (!(hair && b_curves && b_ob && CData))
+  if (!(hair && b_mesh && b_ob && CData))
     return false;
 
   CData->curve_uv.clear();
@@ -185,10 +185,10 @@ static bool ObtainCacheParticleUV(Hair *hair,
         for (; pa_no < totparts + totchild; pa_no++) {
           /* Add UVs */
           BL::Mesh::uv_layers_iterator l;
-          b_curves->uv_layers.begin(l);
+          b_mesh->uv_layers.begin(l);
 
           float2 uv = zero_float2();
-          if (!b_curves->uv_layers.empty())
+          if (!b_mesh->uv_layers.empty())
             b_psys.uv_on_emitter(psmd, *b_pa, pa_no, uv_num, &uv.x);
           CData->curve_uv.push_back_slow(uv);
 
@@ -203,13 +203,13 @@ static bool ObtainCacheParticleUV(Hair *hair,
 }
 
 static bool ObtainCacheParticleVcol(Hair *hair,
-                                    BL::Mesh *b_curves,
+                                    BL::Mesh *b_mesh,
                                     BL::Object *b_ob,
                                     ParticleCurveData *CData,
                                     bool background,
                                     int vcol_num)
 {
-  if (!(hair && b_curves && b_ob && CData))
+  if (!(hair && b_mesh && b_ob && CData))
     return false;
 
   CData->curve_vcol.clear();
@@ -247,10 +247,10 @@ static bool ObtainCacheParticleVcol(Hair *hair,
         for (; pa_no < totparts + totchild; pa_no++) {
           /* Add vertex colors */
           BL::Mesh::vertex_colors_iterator l;
-          b_curves->vertex_colors.begin(l);
+          b_mesh->vertex_colors.begin(l);
 
           float4 vcol = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
-          if (!b_curves->vertex_colors.empty())
+          if (!b_mesh->vertex_colors.empty())
             b_psys.mcol_on_emitter(psmd, *b_pa, pa_no, vcol_num, &vcol.x);
           CData->curve_vcol.push_back_slow(vcol);
 
@@ -399,7 +399,6 @@ static void export_hair_motion_validate_attribute(Hair *hair,
     if (num_motion_keys != num_keys) {
       VLOG(1) << "Hair topology changed, removing motion attribute.";
     }
-    std::cerr << "remove motion attribute...\n";
     hair->attributes.remove(ATTR_STD_MOTION_VERTEX_POSITION);
   }
   else if (motion_step > 0) {
@@ -511,7 +510,7 @@ bool BlenderSync::object_has_particle_hair(BL::Object b_ob)
 
 /* Old particle hair. */
 void BlenderSync::sync_particle_hair(
-    Hair *hair, BL::Mesh &b_curves, BObjectInfo &b_ob_info, bool motion, int motion_step)
+    Hair *hair, BL::Mesh &b_mesh, BObjectInfo &b_ob_info, bool motion, int motion_step)
 {
   if (!b_ob_info.is_real_object_data()) {
     return;
@@ -527,7 +526,7 @@ void BlenderSync::sync_particle_hair(
 
   ParticleCurveData CData;
 
-  ObtainCacheParticleData(hair, &b_curves, &b_ob, &CData, !preview);
+  ObtainCacheParticleData(hair, &b_mesh, &b_ob, &CData, !preview);
 
   /* add hair geometry */
   if (motion)
@@ -540,7 +539,7 @@ void BlenderSync::sync_particle_hair(
   if (!motion) {
     if (hair->need_attribute(scene, ATTR_STD_GENERATED)) {
       float3 loc, size;
-      mesh_texture_space(b_curves, loc, size);
+      mesh_texture_space(b_mesh, loc, size);
 
       Attribute *attr_generated = hair->attributes.add(ATTR_STD_GENERATED);
       float3 *generated = attr_generated->data_float3();
@@ -557,11 +556,11 @@ void BlenderSync::sync_particle_hair(
     BL::Mesh::vertex_colors_iterator l;
     int vcol_num = 0;
 
-    for (b_curves.vertex_colors.begin(l); l != b_curves.vertex_colors.end(); ++l, vcol_num++) {
+    for (b_mesh.vertex_colors.begin(l); l != b_mesh.vertex_colors.end(); ++l, vcol_num++) {
       if (!hair->need_attribute(scene, ustring(l->name().c_str())))
         continue;
 
-      ObtainCacheParticleVcol(hair, &b_curves, &b_ob, &CData, !preview, vcol_num);
+      ObtainCacheParticleVcol(hair, &b_mesh, &b_ob, &CData, !preview, vcol_num);
 
       Attribute *attr_vcol = hair->attributes.add(
           ustring(l->name().c_str()), TypeRGBA, ATTR_ELEMENT_CURVE);
@@ -584,7 +583,7 @@ void BlenderSync::sync_particle_hair(
     BL::Mesh::uv_layers_iterator l;
     int uv_num = 0;
 
-    for (b_curves.uv_layers.begin(l); l != b_curves.uv_layers.end(); ++l, uv_num++) {
+    for (b_mesh.uv_layers.begin(l); l != b_mesh.uv_layers.end(); ++l, uv_num++) {
       bool active_render = l->active_render();
       AttributeStandard std = (active_render) ? ATTR_STD_UV : ATTR_STD_NONE;
       ustring name = ustring(l->name().c_str());
@@ -593,7 +592,7 @@ void BlenderSync::sync_particle_hair(
       if (hair->need_attribute(scene, name) || hair->need_attribute(scene, std)) {
         Attribute *attr_uv;
 
-        ObtainCacheParticleUV(hair, &b_curves, &b_ob, &CData, !preview, uv_num);
+        ObtainCacheParticleUV(hair, &b_mesh, &b_ob, &CData, !preview, uv_num);
 
         if (active_render)
           attr_uv = hair->attributes.add(std, name);
@@ -1021,12 +1020,12 @@ void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph, BObjectInfo &b_ob_info, H
     {
       /* Particle hair. */
       bool need_undeformed = new_hair.need_attribute(scene, ATTR_STD_GENERATED);
-      BL::Mesh b_curves = object_to_mesh(
+      BL::Mesh b_mesh = object_to_mesh(
           b_data, b_ob_info, b_depsgraph, need_undeformed, Mesh::SUBDIVISION_NONE);
 
-      if (b_curves) {
-        sync_particle_hair(&new_hair, b_curves, b_ob_info, false);
-        free_object_to_mesh(b_data, b_ob_info, b_curves);
+      if (b_mesh) {
+        sync_particle_hair(&new_hair, b_mesh, b_ob_info, false);
+        free_object_to_mesh(b_data, b_ob_info, b_mesh);
       }
     }
   }
@@ -1075,11 +1074,11 @@ void BlenderSync::sync_hair_motion(BL::Depsgraph b_depsgraph,
 #endif
     {
       /* Particle hair. */
-      BL::Mesh b_curves = object_to_mesh(
+      BL::Mesh b_mesh = object_to_mesh(
           b_data, b_ob_info, b_depsgraph, false, Mesh::SUBDIVISION_NONE);
-      if (b_curves) {
-        sync_particle_hair(hair, b_curves, b_ob_info, true, motion_step);
-        free_object_to_mesh(b_data, b_ob_info, b_curves);
+      if (b_mesh) {
+        sync_particle_hair(hair, b_mesh, b_ob_info, true, motion_step);
+        free_object_to_mesh(b_data, b_ob_info, b_mesh);
         return;
       }
     }
