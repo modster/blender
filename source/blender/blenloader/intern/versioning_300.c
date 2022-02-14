@@ -1959,20 +1959,6 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  if (!MAIN_VERSION_ATLEAST(bmain, 302, 0)) {
-    LISTBASE_FOREACH (Brush *, br, &bmain->brushes) {
-      /* buggy code in wm_toolsystem broke smear in old files,
-         reset to defaults*/
-      if (br->sculpt_tool == SCULPT_TOOL_SMEAR) {
-        br->alpha = 1.0f;
-        br->spacing = 5;
-        br->flag &= ~BRUSH_ALPHA_PRESSURE;
-        br->flag &= ~BRUSH_SPACE_ATTEN;
-        br->curve_preset = BRUSH_CURVE_SPHERE;
-      }
-    }
-  }
-
   if (!MAIN_VERSION_ATLEAST(bmain, 300, 23)) {
     for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
       LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
@@ -2370,42 +2356,6 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  /* rebuild active/render color attribute references*/
-  if (!MAIN_VERSION_ATLEAST(bmain, 302, 3)) {
-    LISTBASE_FOREACH (Mesh *, me, &bmain->meshes) {
-      for (int step = 0; step < 2; step++) {
-        CustomDataLayer *actlayer = NULL;
-
-        int vact1, vact2;
-
-        if (step) {
-          vact1 = CustomData_get_render_layer_index(&me->vdata, CD_PROP_COLOR);
-          vact2 = CustomData_get_render_layer_index(&me->ldata, CD_MLOOPCOL);
-        }
-        else {
-          vact1 = CustomData_get_active_layer_index(&me->vdata, CD_PROP_COLOR);
-          vact2 = CustomData_get_active_layer_index(&me->ldata, CD_MLOOPCOL);
-        }
-
-        if (vact1 != -1) {
-          actlayer = me->vdata.layers + vact1;
-        }
-        else if (vact2 != -1) {
-          actlayer = me->ldata.layers + vact2;
-        }
-
-        if (actlayer) {
-          if (step) {
-            BKE_id_attributes_render_color_set(&me->id, actlayer);
-          }
-          else {
-            BKE_id_attributes_active_color_set(&me->id, actlayer);
-          }
-        }
-      }
-    }
-  }
-
   if (!MAIN_VERSION_ATLEAST(bmain, 300, 42)) {
     /* Use consistent socket identifiers for the math node.
      * The code to make unique identifiers from the names was inconsistent. */
@@ -2600,6 +2550,54 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
       if (scene->ed != NULL) {
         SEQ_for_each_callback(&scene->ed->seqbase, seq_transform_filter_set, NULL);
+      }
+    }
+  }
+
+  /* rebuild active/render color attribute references*/
+  if (!MAIN_VERSION_ATLEAST(bmain, 302, 3)) {
+    LISTBASE_FOREACH (Brush *, br, &bmain->brushes) {
+      /* buggy code in wm_toolsystem broke smear in old files,
+         reset to defaults */
+      if (br->sculpt_tool == SCULPT_TOOL_SMEAR) {
+        br->alpha = 1.0f;
+        br->spacing = 5;
+        br->flag &= ~BRUSH_ALPHA_PRESSURE;
+        br->flag &= ~BRUSH_SPACE_ATTEN;
+        br->curve_preset = BRUSH_CURVE_SPHERE;
+      }
+    }
+
+    LISTBASE_FOREACH (Mesh *, me, &bmain->meshes) {
+      for (int step = 0; step < 2; step++) {
+        CustomDataLayer *actlayer = NULL;
+
+        int vact1, vact2;
+
+        if (step) {
+          vact1 = CustomData_get_render_layer_index(&me->vdata, CD_PROP_COLOR);
+          vact2 = CustomData_get_render_layer_index(&me->ldata, CD_MLOOPCOL);
+        }
+        else {
+          vact1 = CustomData_get_active_layer_index(&me->vdata, CD_PROP_COLOR);
+          vact2 = CustomData_get_active_layer_index(&me->ldata, CD_MLOOPCOL);
+        }
+
+        if (vact1 != -1) {
+          actlayer = me->vdata.layers + vact1;
+        }
+        else if (vact2 != -1) {
+          actlayer = me->ldata.layers + vact2;
+        }
+
+        if (actlayer) {
+          if (step) {
+            BKE_id_attributes_render_color_set(&me->id, actlayer);
+          }
+          else {
+            BKE_id_attributes_active_color_set(&me->id, actlayer);
+          }
+        }
       }
     }
   }

@@ -81,7 +81,7 @@ void BKE_id_attributes_active_set(struct ID *id, struct CustomDataLayer *layer);
 int *BKE_id_attributes_active_index_p(struct ID *id);
 
 CustomData *BKE_id_attributes_iterator_next_domain(struct ID *id, struct CustomDataLayer *layers);
-CustomDataLayer *BKE_id_attribute_from_index(const struct ID *id,
+CustomDataLayer *BKE_id_attribute_from_index(struct ID *id,
                                              int lookup_index,
                                              AttributeDomainMask domain_mask,
                                              CustomDataMask layer_mask);

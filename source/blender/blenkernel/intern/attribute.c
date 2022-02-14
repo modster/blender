@@ -432,7 +432,7 @@ CustomData *BKE_id_attributes_iterator_next_domain(ID *id, CustomDataLayer *laye
   return NULL;
 }
 
-CustomDataLayer *BKE_id_attribute_from_index(const ID *id,
+CustomDataLayer *BKE_id_attribute_from_index(ID *id,
                                              int lookup_index,
                                              AttributeDomainMask domain_mask,
                                              CustomDataMask layer_mask)
