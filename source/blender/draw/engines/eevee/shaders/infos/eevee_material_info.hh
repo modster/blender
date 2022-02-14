@@ -93,10 +93,11 @@ GPU_SHADER_CREATE_INFO(eevee_surface_forward)
     .fragment_out(0, Type::VEC4, "out_radiance", DualBlend::SRC_0)
     .fragment_out(0, Type::VEC4, "out_transmittance", DualBlend::SRC_1)
     .fragment_source("eevee_surface_forward_frag.glsl")
-    .additional_info("eevee_transmittance_data",
-                     "eevee_sampling_data",
+    .additional_info("eevee_sampling_data",
                      "eevee_lightprobe_data",
-                     "eevee_raytrace_data",
+                     /* Optionnally added depending on the material. */
+                     // "eevee_raytrace_data",
+                     // "eevee_transmittance_data",
                      "eevee_utility_texture",
                      "eevee_light_data",
                      "eevee_shadow_data");

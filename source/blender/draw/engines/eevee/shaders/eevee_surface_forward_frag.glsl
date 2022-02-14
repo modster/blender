@@ -19,9 +19,6 @@
 #pragma BLENDER_REQUIRE(eevee_lightprobe_eval_cubemap_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_lightprobe_eval_grid_lib.glsl)
 
-/* TODO(fclem) Option. */
-// #define USE_RAYTRACING
-
 void main(void)
 {
   g_data = init_globals();
@@ -69,16 +66,17 @@ void main(void)
     bool hit = false;
     Ray ray = raytrace_create_diffuse_ray(sampling_buf, noise_rt.xy, g_diffuse_data, P, pdf);
     ray = raytrace_world_ray_to_view(ray);
-#ifdef USE_RAYTRACING
+#ifdef SCREEN_RAYTRACE
     /* Extend the ray to cover the whole view. */
     ray.direction *= 1e16;
     hit = raytrace_screen(raytrace_diffuse, hiz_buf, hiz_tx, noise_rt.w, 1.0, false, true, ray);
-#endif
     if (hit) {
       vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);
       radiance_diffuse += textureLod(radiance_tx, hit_uv, 0.0).rgb;
     }
-    else {
+    else
+#endif
+    {
       ray = raytrace_view_ray_to_world(ray);
       radiance_diffuse += lightprobe_cubemap_eval(P, ray.direction, 1.0, random_probe);
     }
@@ -91,19 +89,20 @@ void main(void)
     Ray ray = raytrace_create_reflection_ray(
         sampling_buf, noise_rt.xy, g_reflection_data, V, P, pdf);
     ray = raytrace_world_ray_to_view(ray);
-#ifdef USE_RAYTRACING
+#ifdef SCREEN_RAYTRACE
     if (roughness - noise_rt.z * 0.2 < raytrace_reflection.max_roughness) {
       /* Extend the ray to cover the whole view. */
       ray.direction *= 1e16;
       hit = raytrace_screen(
           raytrace_reflection, hiz_buf, hiz_tx, noise_rt.w, roughness, false, true, ray);
     }
-#endif
     if (hit) {
       vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);
       radiance_reflection += textureLod(radiance_tx, hit_uv, 0.0).rgb;
     }
-    else {
+    else
+#endif
+    {
       ray = raytrace_view_ray_to_world(ray);
       radiance_reflection += lightprobe_cubemap_eval(
           P, ray.direction, sqr(roughness), random_probe);
@@ -117,7 +116,7 @@ void main(void)
     Ray ray = raytrace_create_refraction_ray(
         sampling_buf, noise_rt.xy, g_refraction_data, V, P, pdf);
     ray = raytrace_world_ray_to_view(ray);
-#ifdef USE_RAYTRACING
+#ifdef SCREEN_RAYTRACE
     if (roughness - noise_rt.z * 0.2 < raytrace_refraction.max_roughness) {
       /* Extend the ray to cover the whole view. */
       ray.direction *= 1e16;
@@ -125,12 +124,13 @@ void main(void)
       hit = raytrace_screen(
           raytrace_refraction, hiz_buf, hiz_tx, noise_rt.w, roughness, false, true, ray);
     }
-#endif
     if (hit) {
       vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);
       radiance_refraction += textureLod(radiance_tx, hit_uv, 0.0).rgb;
     }
-    else {
+    else
+#endif
+    {
       ray = raytrace_view_ray_to_world(ray);
       radiance_refraction += lightprobe_cubemap_eval(
           P, ray.direction, sqr(roughness), random_probe);

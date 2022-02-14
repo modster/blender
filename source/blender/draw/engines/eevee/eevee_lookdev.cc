@@ -307,6 +307,7 @@ void LookDev::sync_overlay(void)
     DRW_shgroup_uniform_block(grp, "probes_buf", lightprobes.info_ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
+    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
 
     offset.x -= sphere_size_ + sphere_margin;
 

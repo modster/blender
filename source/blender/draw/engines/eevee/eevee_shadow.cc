@@ -1068,6 +1068,13 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
 
   DRW_stats_group_start("ShadowUpdate");
   {
+    if (G.debug & G_DEBUG_GPU) {
+      /* Bind another framebuffer in order to avoid triggering the feedback loop check.
+       * This is safe because we only use compute shaders in the portion of the code.
+       * Ideally the check should be smarter. */
+      GPU_framebuffer_bind(render_fb_);
+    }
+
     if (do_tilemap_setup_) {
       if (do_page_init_) {
 #ifndef SHADOW_DEBUG_NO_CACHING

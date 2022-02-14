@@ -2,6 +2,7 @@
 #include "gpu_shader_create_info.hh"
 
 GPU_SHADER_CREATE_INFO(eevee_transmittance_data)
+    .define("SSS_TRANSMITTANCE")
     .sampler(0, ImageType::FLOAT_1D, "sss_transmittance_tx");
 
 GPU_SHADER_CREATE_INFO(eevee_subsurface_eval)

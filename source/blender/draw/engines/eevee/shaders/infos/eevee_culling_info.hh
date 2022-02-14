@@ -27,7 +27,6 @@ GPU_SHADER_CREATE_INFO(eevee_culling_sort)
     .storage_buf(2, Qualifier::READ, "uint", "keys_buf[]")
     .storage_buf(3, Qualifier::WRITE, "CullingZBin", "lights_zbin_buf[]")
     .storage_buf(4, Qualifier::WRITE, "LightData", "out_lights_buf[]")
-    .sampler(0, ImageType::DEPTH_2D, "depth_tx")
     .fragment_out(0, Type::VEC4, "out_velocity_camera")
     .fragment_out(1, Type::VEC4, "out_velocity_view")
     .compute_source("eevee_culling_sort_comp.glsl");

@@ -95,6 +95,7 @@ EEVEE_RAYTRACE_BSDF_VARIATIONS(eevee_raytrace_resolve, "eevee_raytrace_resolve")
  * \{ */
 
 GPU_SHADER_CREATE_INFO(eevee_raytrace_data)
+    .define("SCREEN_RAYTRACE")
     .uniform_buf(4, "RaytraceData", "raytrace_diffuse")
     .uniform_buf(1, "RaytraceData", "raytrace_reflection")
     .uniform_buf(2, "RaytraceData", "raytrace_refraction")

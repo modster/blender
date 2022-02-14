@@ -39,6 +39,7 @@ void light_eval_ex(ClosureDiffuse diffuse,
     float shadow_delta = shadow_delta_get(
         shadow_atlas_tx, shadow_tilemaps_tx, light, light.shadow_data, lL, dist, P);
 
+#ifdef SSS_TRANSMITTANCE
     /* Transmittance evaluation first to use initial visibility. */
     if (diffuse.sss_id != 0u && light.diffuse_power > 0.0) {
       float delta = max(thickness, shadow_delta);
@@ -54,6 +55,7 @@ void light_eval_ex(ClosureDiffuse diffuse,
                                          delta);
       out_diffuse += light.color * intensity;
     }
+#endif
 
     visibility *= float(shadow_delta - light.shadow_data.bias <= 0.0);
   }

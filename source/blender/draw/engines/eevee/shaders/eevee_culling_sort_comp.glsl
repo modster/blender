@@ -8,7 +8,7 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 
 /* Fits the limit of 32KB. */
 shared int zbin_max[CULLING_ZBIN_COUNT];
