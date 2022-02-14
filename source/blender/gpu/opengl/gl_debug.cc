@@ -350,7 +350,7 @@ void object_label(GLenum type, GLuint object, const char *name)
     if (ELEM(type, GL_FRAGMENT_SHADER, GL_GEOMETRY_SHADER, GL_VERTEX_SHADER, GL_COMPUTE_SHADER)) {
       type = GL_SHADER;
     }
-    if (ELEM(type, GL_UNIFORM_BUFFER)) {
+    if (ELEM(type, GL_UNIFORM_BUFFER, GL_SHADER_STORAGE_BUFFER)) {
       type = GL_BUFFER;
     }
     glObjectLabel(type, object, -1, label);
