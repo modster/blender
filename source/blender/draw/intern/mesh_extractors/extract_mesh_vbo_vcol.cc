@@ -146,7 +146,7 @@ static void extract_vcol_init(const MeshRenderData *mr,
 
   Mesh query_mesh = *mr->me;
   BKE_id_attribute_copy_domains_temp(
-      reinterpret_cast<ID *>(&query_mesh), cd_vdata, nullptr, cd_ldata, nullptr, nullptr);
+      &query_mesh.id, cd_vdata, nullptr, cd_ldata, nullptr, nullptr);
 
   CustomDataLayer *active_color = BKE_id_attributes_active_color_get(&query_mesh.id);
   CustomDataLayer *render_color = BKE_id_attributes_render_color_get(&query_mesh.id);

@@ -139,11 +139,6 @@ typedef struct Mesh_Runtime {
 
 } Mesh_Runtime;
 
-typedef struct AttributeRef {
-  int domain, type;
-  char name[64];
-} AttributeRef;
-
 typedef struct Mesh {
   ID id;
   /** Animation data (must be immediately after id for utilities to use it). */
