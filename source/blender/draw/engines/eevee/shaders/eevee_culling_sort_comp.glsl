@@ -46,8 +46,10 @@ void main()
   float radius = light.influence_radius_max;
   float z_dist = dot(cameraForward, lP) - dot(cameraForward, cameraPos);
 
-  int z_min = culling_z_to_zbin(lights_cull_buf, z_dist + radius);
-  int z_max = culling_z_to_zbin(lights_cull_buf, z_dist - radius);
+  int z_min = culling_z_to_zbin(
+      lights_cull_buf.zbin_scale, lights_cull_buf.zbin_bias, z_dist + radius);
+  int z_max = culling_z_to_zbin(
+      lights_cull_buf.zbin_scale, lights_cull_buf.zbin_bias, z_dist - radius);
   z_min = clamp(z_min, 0, CULLING_ZBIN_COUNT - 1);
   z_max = clamp(z_max, 0, CULLING_ZBIN_COUNT - 1);
 

@@ -23,7 +23,7 @@ void main(void)
   }
 
   /* TODO(fclem): We could stop the tile at the HiZ depth. */
-  CullingTile tile = culling_tile_get(lights_cull_buf, tile_co);
+  CullingTile tile = culling_tile_get(lights_cull_buf.tile_to_uv_fac, tile_co);
 
   uint l_idx = max(word_idx * 32u, lights_cull_buf.items_no_cull_count);
   uint l_end = min(l_idx + 32u,

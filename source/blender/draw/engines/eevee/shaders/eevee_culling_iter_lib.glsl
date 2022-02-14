@@ -10,6 +10,11 @@ uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
   return bit_field_mask(mask_width, local_min);
 }
 
+int culling_z_to_zbin(float scale, float bias, float z)
+{
+  return int(z * scale + bias);
+}
+
 /* Waiting to implement extensions support. We need:
  * - GL_KHR_shader_subgroup_ballot
  * - GL_KHR_shader_subgroup_arithmetic
@@ -36,7 +41,7 @@ uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
     uint tile_word_offset = (tile_co.x + tile_co.y * _culling.tile_x_len) * \
                             _culling.tile_word_len; \
     for (uint batch = 0; batch < batch_count; batch++) { \
-      int zbin_index = culling_z_to_zbin(_culling, _linearz); \
+      int zbin_index = culling_z_to_zbin(_culling.zbin_scale, _culling.zbin_bias, _linearz); \
       zbin_index = clamp(zbin_index, 0, CULLING_ZBIN_COUNT - 1); \
       uint zbin_data = _zbins[zbin_index + batch * CULLING_ZBIN_COUNT]; \
       uint min_index = zbin_data & 0xFFFFu; \

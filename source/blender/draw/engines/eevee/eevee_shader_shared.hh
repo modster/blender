@@ -379,11 +379,6 @@ BLI_STATIC_ASSERT_ALIGN(CullingData, 16)
 #define CullingZBin uint
 #define CullingWord uint
 
-static inline int culling_z_to_zbin(CullingData data, float z)
-{
-  return int(z * data.zbin_scale + data.zbin_bias);
-}
-
 /** \} */
 
 /* -------------------------------------------------------------------- */
