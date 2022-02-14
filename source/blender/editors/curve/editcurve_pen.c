@@ -1547,13 +1547,12 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (ELEM(event->val, KM_PRESS, KM_DBL_CLICK)) {
       /* Get the details of points selected at the start of the operation.
-       * Used for closing the spline when endpoints are clicked consecutively. */
-      if (close_spline) {
-        get_selected_points(cu, vc.v3d, &nu, &bezt, &bp);
-        cpd->nu = nu;
-        cpd->bezt = bezt;
-        cpd->bp = bp;
-      }
+       * Used for closing the spline when endpoints are clicked consecutively and for selecting a
+       * single point. */
+      get_selected_points(cu, vc.v3d, &nu, &bezt, &bp);
+      cpd->nu = nu;
+      cpd->bezt = bezt;
+      cpd->bp = bp;
 
       /* Get the details of the vertex closest to the mouse at the start of the operation. */
       Nurb *nu1;
