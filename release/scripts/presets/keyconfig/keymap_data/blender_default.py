@@ -7001,7 +7001,7 @@ def km_3d_view_tool_edit_curve_pen(params):
                  ("move_segment", True),
                  ("select_point", True),
                  ("move_point", True),
-                 ("close_spline_opts", "ON_PRESS"),
+                 ("close_spline_opts", "ON_CLICK"),
                  ("free_toggle", "SHIFT"),
                  ("lock_angle", "CTRL"),
                  ("move_entire", "ALT"),
