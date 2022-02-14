@@ -15,10 +15,10 @@ static void node_declare(NodeDeclarationBuilder &b)
 }
 
 static int node_shader_gpu_output_material(GPUMaterial *mat,
-                                           bNode *node,
+                                           bNode *UNUSED(node),
                                            bNodeExecData *UNUSED(execdata),
                                            GPUNodeStack *in,
-                                           GPUNodeStack *out)
+                                           GPUNodeStack *UNUSED(out))
 {
   GPUNodeLink *outlink_surface, *outlink_volume, *outlink_displacement, *outlink_thickness;
   /* Passthrough node in order to do the right socket conversions (important for displacement). */
