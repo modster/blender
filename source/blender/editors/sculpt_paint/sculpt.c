@@ -3955,9 +3955,6 @@ bool SCULPT_mode_poll(bContext *C)
 
 bool SCULPT_vertex_colors_poll(bContext *C)
 {
-  if (!U.experimental.use_sculpt_vertex_colors) {
-    return false;
-  }
   return SCULPT_mode_poll(C);
 }
 

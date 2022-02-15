@@ -342,7 +342,7 @@ static int rna_Attributes_layer_skip(CollectionPropertyIterator *UNUSED(iter), v
 static int rna_Attributes_noncolor_layer_skip(CollectionPropertyIterator *UNUSED(iter), void *data)
 {
   CustomDataLayer *layer = (CustomDataLayer *)data;
-  return !(CD_TYPE_AS_MASK(layer->type) & (CD_MASK_PROP_COLOR | CD_MASK_MLOOPCOL));
+  return !(CD_TYPE_AS_MASK(layer->type) & CD_MASK_COLOR_ALL);
 }
 
 /* Attributes are spread over multiple domains in separate CustomData, we use repeated

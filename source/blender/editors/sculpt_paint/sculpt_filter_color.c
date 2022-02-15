@@ -190,10 +190,7 @@ static void color_filter_task_cb(void *__restrict userdata,
       }
     }
 
-    float col[4];
-    SCULPT_vertex_color_get(ss, vd.index, col);
-
-    copy_v3_v3(col, final_color);
+    SCULPT_vertex_color_set(ss, vd.index, final_color);
 
     if (vd.mvert) {
       BKE_pbvh_vert_mark_update(ss->pbvh, vd.index);
