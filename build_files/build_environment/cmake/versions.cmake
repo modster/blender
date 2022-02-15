@@ -205,9 +205,9 @@ set(PYTHON_HASH 14e8c22458ed7779a1957b26cde01db9)
 set(PYTHON_HASH_TYPE MD5)
 set(PYTHON_FILE Python-${PYTHON_VERSION}.tar.xz)
 
-set(TBB_VERSION 2020_U2)
+set(TBB_VERSION 2020_U3)
 set(TBB_URI https://github.com/oneapi-src/oneTBB/archive/${TBB_VERSION}.tar.gz)
-set(TBB_HASH 1b711ae956524855088df3bbf5ec65dc)
+set(TBB_HASH 55ec8df6eae5ed6364a47f0e671e460c)
 set(TBB_HASH_TYPE MD5)
 set(TBB_FILE oneTBB-${TBB_VERSION}.tar.gz)
 
