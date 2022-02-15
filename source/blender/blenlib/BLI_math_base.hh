@@ -102,8 +102,4 @@ template<typename T, BLI_ENABLE_IF((math_is_float<T>))> inline T midpoint(const 
   return (a + b) * T(0.5);
 }
 
-#undef BLI_ENABLE_IF_BASE
-#undef BLI_ENABLE_IF_FLT
-#undef BLI_ENABLE_IF_INT
-
 }  // namespace blender::math
