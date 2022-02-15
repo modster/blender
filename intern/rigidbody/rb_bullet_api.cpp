@@ -220,13 +220,16 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
   int num_norm_forces = 0;
   int num_fric_forces = 0;
 
-  /*Loop thrhough all persisent contact manifolds. */
+  /* Loop through all persisent contact manifolds. The persistant manifold contains all contact points between
+   * 2 overlapping objects in the world. It can contain between 0 and 4 points. This is the contact point cache
+   * after reduction of the contact manifold. */
   for (int i = 0; i < numManifolds; i++) {
     btPersistentManifold *contactManifold = world->dispatcher->getManifoldByIndexInternal(i);
+    /* The 2 overlapping obejcts. */
     const void *obA = contactManifold->getBody0();
     const void *obB = contactManifold->getBody1();
 
-    /* Break if we cannot store any more forces. */
+    /* Break if we cannot store any more forces. upperlimit is 3 */
     /* Friction cannot exist without a normal force, so counting number of normal forces stored is enough. */
     if (num_norm_forces > 2) {
       break;
@@ -250,7 +253,8 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
         }
       }
 
-      /* Loop throught contact points and add impulses applied at each point. */
+      /* Loop throught contact points and add impulses applied at each point.
+       * Devide by time to get the equivilant force. */
       for (int j = 0; j < numContacts; j++) {
         btManifoldPoint &pt = contactManifold->getContactPoint(j);
         if (pt.getAppliedImpulse() > 0.f || -pt.getAppliedImpulse() > 0.f) {
@@ -277,7 +281,7 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
         }
       }
       /* If impulse was applied at more than one point, the location of the force is taken as average of points
-       * weighted by magnitude of impulse applied at each point. */
+       * weighted by the magnitude of impulse applied at each point. */
       if(fabsf(tot_impulse_magnitude)==0.0f){
           continue;
       }
