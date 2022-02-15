@@ -115,9 +115,11 @@ typedef struct SculptUndoStep {
   /* NOTE: will split out into list for multi-object-sculpt-mode. */
   UndoSculpt data;
 
-  // active vcol layer
-  SculptAttrRef active_attr_start;
-  SculptAttrRef active_attr_end;
+  /* Active color attribute at the start of this undo step. */
+  SculptAttrRef active_color_start;
+
+  /* Active color attribute at the end of this undo step. */
+  SculptAttrRef active_color_end;
 
   bContext *C;
 } SculptUndoStep;
@@ -1441,8 +1443,16 @@ void SCULPT_undo_push_begin(Object *ob, const char *name)
   SculptUndoStep *us = (SculptUndoStep *)BKE_undosys_step_push_init_with_type(
       ustack, C, name, BKE_UNDOSYS_TYPE_SCULPT);
 
-  if (!us->active_attr_start.was_set) {
-    sculpt_save_active_attribute(ob, &us->active_attr_start);
+  if (!us->active_color_start.was_set) {
+    sculpt_save_active_attribute(ob, &us->active_color_start);
+  }
+
+  /* Set end attribute in case SCULPT_undo_push_end is not called,
+   * so we don't end up with corrupted state. 
+   */
+  if (!us->active_color_end.was_set) {
+    sculpt_save_active_attribute(ob, &us->active_color_end);
+    us->active_color_end.was_set = false;
   }
 }
 
@@ -1480,7 +1490,7 @@ void SCULPT_undo_push_end_ex(struct Object *ob, const bool use_nested_undo)
   SculptUndoStep *us = (SculptUndoStep *)BKE_undosys_stack_init_or_active_with_type(
       ustack, BKE_UNDOSYS_TYPE_SCULPT);
 
-  sculpt_save_active_attribute(ob, &us->active_attr_end);
+  sculpt_save_active_attribute(ob, &us->active_color_end);
 }
 
 /* -------------------------------------------------------------------- */
@@ -1574,12 +1584,12 @@ static void sculpt_undosys_step_decode_undo(struct bContext *C,
   while ((us_iter != us) || (!is_final && us_iter == us)) {
     BLI_assert(us_iter->step.type == us->step.type); /* Previous loop ensures this. */
 
-    sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter)->active_attr_start);
+    sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter)->active_color_start);
     sculpt_undosys_step_decode_undo_impl(C, depsgraph, us_iter);
 
     if (us_iter == us) {
       if (us_iter->step.prev && us_iter->step.prev->type == BKE_UNDOSYS_TYPE_SCULPT) {
-        sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter->step.prev)->active_attr_end);
+        sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter->step.prev)->active_color_end);
       }
       break;
     }
@@ -1600,11 +1610,11 @@ static void sculpt_undosys_step_decode_redo(struct bContext *C,
     us_iter = (SculptUndoStep *)us_iter->step.prev;
   }
   while (us_iter && (us_iter->step.is_applied == false)) {
-    sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter)->active_attr_start);
+    sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter)->active_color_start);
     sculpt_undosys_step_decode_redo_impl(C, depsgraph, us_iter);
 
     if (us_iter == us) {
-      sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter)->active_attr_end);
+      sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter)->active_color_end);
       break;
     }
     us_iter = (SculptUndoStep *)us_iter->step.next;

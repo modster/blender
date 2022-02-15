@@ -508,6 +508,7 @@ static int sculpt_mode_toggle_exec(bContext *C, wmOperator *op)
         wmWindowManager *wm = CTX_wm_manager(C);
         if (wm->op_undo_depth <= 1) {
           SCULPT_undo_push_begin(ob, op->type->name);
+          SCULPT_undo_push_end(ob);
         }
       }
     }
