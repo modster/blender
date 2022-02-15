@@ -16,7 +16,8 @@
 
 #pragma once
 
-#include "BLI_hash.hh"
+#include <cstdint>
+
 #include "BLI_map.hh"
 #include "BLI_vector.hh"
 #include "BLI_vector_set.hh"
@@ -47,28 +48,6 @@ class TexturePoolKey {
 
   uint64_t hash() const;
 };
-
-inline TexturePoolKey::TexturePoolKey(int width, int height, eGPUTextureFormat format)
-    : width(width), height(height), format(format)
-{
-}
-
-inline TexturePoolKey::TexturePoolKey(const GPUTexture *texture)
-{
-  width = GPU_texture_width(texture);
-  height = GPU_texture_height(texture);
-  format = GPU_texture_format(texture);
-}
-
-inline uint64_t TexturePoolKey::hash() const
-{
-  return get_default_hash_3(width, height, format);
-}
-
-inline bool operator==(const TexturePoolKey &a, const TexturePoolKey &b)
-{
-  return a.width == b.width && a.height == b.height && a.format == b.format;
-}
 
 /* A pool of textures that can be allocated and reused transparently throughout the evaluation of
  * the node tree. The textures can be reference counted and will only be effectively released back
@@ -102,10 +81,14 @@ class TexturePool {
   virtual GPUTexture *allocate_texture(int width, int height, eGPUTextureFormat format) = 0;
 };
 
+/* --------------------------------------------------------------------
+ * Context.
+ */
+
 /* This abstract class is used by node operations to access data intrinsic to the compositor
  * engine. The compositor engine should implement the class to provide the necessary
  * functionalities for node operations. */
-class CompositorContext {
+class Context {
  public:
   /* Get the texture representing the viewport where the result of the compositor should be
    * written. This should be called by output nodes to get their target texture. */
@@ -116,7 +99,120 @@ class CompositorContext {
   virtual GPUTexture *get_pass_texture(int view_layer, eScenePassType pass_type) = 0;
 };
 
+/* --------------------------------------------------------------------
+ * Result.
+ */
+
+/* Possible data types that operations can operate on. They either represent the base type of the
+ * result texture or a single value result. */
+enum class ResultType : uint8_t {
+  Float,
+  Vector,
+  Color,
+};
+
+/* A structure that describes the result of an operation. An operator can have multiple results
+ * corresponding to multiple outputs. A result either represents a single value or a texture. */
+struct Result {
+  /* The base type of the texture or the type of the single value. */
+  ResultType type;
+  /* If true, the result is a texture, otherwise, the result is a single value. */
+  bool is_texture;
+  /* A union of the possible data that could be stored in the result. One of those members is
+   * active depending on the value of the is_texture and type members. */
+  union {
+    GPUTexture *texture;
+    float value;
+    float vector[3];
+    float color[4];
+  } data;
+};
+
+/* --------------------------------------------------------------------
+ * Operation.
+ */
+
+class Operation {
+ protected:
+  /* A reference to the compositor context. This member references the same object in all
+   * operations but is included in the class for convenience. */
+  Context &context_;
+  /* A mapping between each output of the operation identified by its name and the computed result
+   * for that output. Unused outputs are not included. It is the responsibility of the evaluator to
+   * add default results for outputs that are needed and should be computed by the operation prior
+   * to invoking any methods, which is done by calling ensure_output. The results structures are
+   * uninitialized prior to the invocation of the allocate method, and allocate method is expected
+   * to initialize the results structures appropriately. The contents of the results data are
+   * uninitialized prior to the invocation of the execute method, and the execute method is
+   * expected to compute those data appropriately. */
+  Map<StringRef, Result> outputs_;
+  /* A mapping between each input of the operation identified by its name and a reference to the
+   * computed result for the output that it is connected to. It is the responsibility of the
+   * evaluator to populate the inputs prior to invoking any method, which is done by calling
+   * populate_input. Inputs that are not linked reference meta-output single value results. */
+  Map<StringRef, Result *> inputs_;
+
+ public:
+  Operation(Context &context);
+
+  /* This method should return true if this operation can only operate on buffers, otherwise,
+   * return false if the operation can be applied pixel-wise. */
+  virtual bool is_buffered() const = 0;
+
+  /* This method should allocate all the necessary buffers needed by the operation and initialize
+   * the output results. This includes the output textures as well as any temporary intermediate
+   * buffers used by the operation. The texture pool provided by the context should be used to any
+   * texture allocations. */
+  virtual void allocate() = 0;
+
+  /* This method should execute the operation, compute its outputs, and write them to the
+   * appropriate result. */
+  virtual void execute() = 0;
+
+  /* This method should release any temporary intermediate buffer that was allocated in the
+   * allocation method. */
+  virtual void release();
+
+  /* Declares that the output identified by the given name is needed and should be computed by the
+   * operation. See outputs_ member for more details. */
+  void ensure_output(StringRef name);
+
+  /* Get a reference to the output result identified by the given name. Expect the result to be
+   * uninitialized when calling from the allocate method and expect the result data to be
+   * uninitialized when calling from the execute method. */
+  Result &get_result(StringRef name);
+
+  /* Populate the inputs map by mapping an input identified by the given name to a reference to the
+   * output result it is connected to. See inputs_ member for more details. */
+  void populate_input(StringRef name, Result *result);
+
+  /* Get a reference to the result connected to the input identified by the given name. */
+  const Result &get_input(StringRef name) const;
+};
+
+/* --------------------------------------------------------------------
+ * Node Operation.
+ */
+
 using namespace nodes::derived_node_tree_types;
+
+class NodeOperation : public Operation {
+ private:
+  DNode &node_;
+
+ public:
+  NodeOperation(Context &context, DNode &node);
+
+  virtual bool is_buffered() const override;
+
+  /* Returns true if the output identified by the given name is needed and should be computed,
+   * otherwise returns false. */
+  bool is_output_needed(StringRef name) const;
+};
+
+/* --------------------------------------------------------------------
+ * Compiler.
+ */
 
 class Compiler {
  private:

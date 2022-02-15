@@ -14,6 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_hash.hh"
 #include "BLI_map.hh"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
@@ -31,11 +32,31 @@
 
 namespace blender::compositor {
 
-using namespace nodes::derived_node_tree_types;
-
 /* --------------------------------------------------------------------
  * Texture Pool.
  */
+
+TexturePoolKey::TexturePoolKey(int width, int height, eGPUTextureFormat format)
+    : width(width), height(height), format(format)
+{
+}
+
+TexturePoolKey::TexturePoolKey(const GPUTexture *texture)
+{
+  width = GPU_texture_width(texture);
+  height = GPU_texture_height(texture);
+  format = GPU_texture_format(texture);
+}
+
+uint64_t TexturePoolKey::hash() const
+{
+  return get_default_hash_3(width, height, format);
+}
+
+bool operator==(const TexturePoolKey &a, const TexturePoolKey &b)
+{
+  return a.width == b.width && a.height == b.height && a.format == b.format;
+}
 
 GPUTexture *TexturePool::acquire(int width, int height, eGPUTextureFormat format, int users_count)
 {
@@ -56,6 +77,54 @@ void TexturePool::release(GPUTexture *texture)
     return;
   }
   textures_.lookup(TexturePoolKey(texture)).append(texture);
+}
+
+/* --------------------------------------------------------------------
+ * Operation.
+ */
+
+Operation::Operation(Context &context) : context_(context)
+{
+}
+
+void Operation::ensure_output(StringRef name)
+{
+  outputs_.add_new(name, Result());
+}
+
+Result &Operation::get_result(StringRef name)
+{
+  return outputs_.lookup(name);
+}
+
+void Operation::populate_input(StringRef name, Result *result)
+{
+  inputs_.add_new(name, result);
+}
+
+const Result &Operation::get_input(StringRef name) const
+{
+  return *inputs_.lookup(name);
+}
+
+/* --------------------------------------------------------------------
+ * Node Operation.
+ */
+
+using namespace nodes::derived_node_tree_types;
+
+NodeOperation::NodeOperation(Context &context, DNode &node) : Operation(context), node_(node)
+{
+}
+
+bool NodeOperation::is_buffered() const
+{
+  return true;
+}
+
+bool NodeOperation::is_output_needed(StringRef name) const
+{
+  return outputs_.contains(name);
 }
 
 /* --------------------------------------------------------------------

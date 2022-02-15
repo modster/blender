@@ -44,7 +44,7 @@ class DRWTexturePool : public TexturePool {
   }
 };
 
-class DRWCompositorContext : public CompositorContext {
+class DRWContext : public Context {
   GPUTexture *get_viewport_texture() override
   {
     return DRW_viewport_texture_list_get()->color;

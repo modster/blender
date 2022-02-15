@@ -116,7 +116,7 @@ typedef struct bNodeSocketTemplate {
 #ifdef __cplusplus
 namespace blender {
 namespace nodes {
-class CompositorContext;
+class DNode;
 class NodeMultiFunctionBuilder;
 class GeoNodeExecParams;
 class NodeDeclarationBuilder;
@@ -126,10 +126,13 @@ namespace fn {
 class CPPType;
 class MFDataType;
 }  // namespace fn
+namespace compositor {
+class Context;
+class NodeOperation;
+}  // namespace compositor
 }  // namespace blender
 
 using CPPTypeHandle = blender::fn::CPPType;
-using NodeCompositorExecuteFunction = void (*)(blender::nodes::CompositorContext &context);
 using NodeMultiFunctionBuildFunction = void (*)(blender::nodes::NodeMultiFunctionBuilder &builder);
 using NodeGeometryExecFunction = void (*)(blender::nodes::GeoNodeExecParams params);
 using NodeDeclareFunction = void (*)(blender::nodes::NodeDeclarationBuilder &builder);
@@ -141,8 +144,11 @@ using SocketGetGeometryNodesCPPValueFunction = void (*)(const struct bNodeSocket
 using NodeGatherSocketLinkOperationsFunction =
     void (*)(blender::nodes::GatherLinkSearchOpParams &params);
 
+using NodeCompositorGetOperationFunction = blender::compositor::NodeOperation (*)(
+    blender::compositor::Context &context, blender::nodes::DNode &node);
+
 #else
-typedef void *NodeCompositorExecuteFunction;
+typedef void *NodeCompositorGetOperationFunction;
 typedef void *NodeMultiFunctionBuildFunction;
 typedef void *NodeGeometryExecFunction;
 typedef void *NodeDeclareFunction;
@@ -326,7 +332,7 @@ typedef struct bNodeType {
   NodeGPUExecFunction gpu_fn;
 
   /* Execute a compositor node. */
-  NodeCompositorExecuteFunction compositor_execute;
+  NodeCompositorGetOperationFunction compositor_get_operation;
 
   /* Build a multi-function for this node. */
   NodeMultiFunctionBuildFunction build_multi_function;
