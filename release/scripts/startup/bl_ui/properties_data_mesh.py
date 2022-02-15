@@ -469,7 +469,7 @@ class MESH_UL_color_attributes(UIList):
         sub.label(text="%s ▶ %s" % (domain_name, data_type.name))
 
 class DATA_PT_vertex_colors(MeshButtonsPanel, Panel):
-    bl_label = "Vertex Colors"
+    bl_label = "Color Attributes"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
@@ -548,7 +548,7 @@ class DATA_PT_remesh(MeshButtonsPanel, Panel):
             col.prop(mesh, "use_remesh_preserve_volume", text="Volume")
             col.prop(mesh, "use_remesh_preserve_paint_mask", text="Paint Mask")
             col.prop(mesh, "use_remesh_preserve_sculpt_face_sets", text="Face Sets")
-            col.prop(mesh, "use_remesh_preserve_vertex_colors", text="Vertex Colors")
+            col.prop(mesh, "use_remesh_preserve_vertex_colors", text="Color Attributes")
 
             col.operator("object.voxel_remesh", text="Voxel Remesh")
         else:
