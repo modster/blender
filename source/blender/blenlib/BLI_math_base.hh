@@ -61,10 +61,10 @@ template<typename T, BLI_ENABLE_IF((math_is_float<T>))> inline T safe_mod(const 
   return (b != 0) ? std::fmod(a, b) : 0;
 }
 
-template<typename T> inline void min_max(const T &vector, T &min_vec, T &max_vec)
+template<typename T> inline void min_max(const T &value, T &min, T &max)
 {
-  min_vec = min(vector, min_vec);
-  max_vec = max(vector, max_vec);
+  min = math::min(value, min);
+  max = math::max(value, max);
 }
 
 template<typename T, BLI_ENABLE_IF((math_is_float<T>))>
