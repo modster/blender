@@ -92,7 +92,7 @@ else()
   # case (only the shared library). As a result, we need to grab the `libusd_m.a`
   # file from the build directory instead of from the install directory.
   ExternalProject_Add_Step(external_usd after_install
-    COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/usd/src/external_usd-build/pxr/libusd_m.a ${HARVEST_TARGET}/usd/lib/libusd_m.a
+    COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/usd/src/external_usd-build/pxr/libusd_usd_m.a ${HARVEST_TARGET}/usd/lib/libusd_m.a
     DEPENDEES install
   )
 endif()

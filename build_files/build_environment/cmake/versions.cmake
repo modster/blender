@@ -435,7 +435,6 @@ set(EMBREE_URI https://github.com/embree/embree/archive/v${EMBREE_VERSION}.zip)
 set(EMBREE_HASH f62766ba54e48a2f327c3a22596e7133)
 set(EMBREE_HASH_TYPE MD5)
 set(EMBREE_FILE embree-v${EMBREE_VERSION}.zip)
-set(EMBREE_ARM_GIT https://github.com/brechtvl/embree.git)
 
 set(USD_VERSION 21.11)
 set(USD_URI https://github.com/PixarAnimationStudios/USD/archive/v${USD_VERSION}.tar.gz)

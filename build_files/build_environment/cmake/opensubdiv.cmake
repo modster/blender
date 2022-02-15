@@ -39,6 +39,8 @@ if(WIN32)
 else()
   set(OPENSUBDIV_EXTRA_ARGS
     ${OPENSUBDIV_EXTRA_ARGS}
+    -DTBB_INCLUDE_DIR=${LIBDIR}/tbb/include
+    -DTBB_tbb_LIBRARY=${LIBDIR}/tbb/lib/${LIBPREFIX}tbb_static${LIBEXT}
     -DCUEW_INCLUDE_DIR=${LIBDIR}/cuew/include
     -DCLEW_INCLUDE_DIR=${LIBDIR}/clew/include/CL
     -DCLEW_LIBRARY=${LIBDIR}/clew/lib/static/${LIBPREFIX}clew${LIBEXT}

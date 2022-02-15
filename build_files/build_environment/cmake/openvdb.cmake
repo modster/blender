@@ -30,6 +30,7 @@ set(OPENVDB_EXTRA_ARGS
   -DOPENVDB_BUILD_UNITTESTS=OFF
   -DOPENVDB_BUILD_PYTHON_MODULE=OFF
   -DOPENVDB_BUILD_NANOVDB=ON
+  -DNANOVDB_BUILD_TOOLS=OFF
   -DBlosc_ROOT=${LIBDIR}/blosc/
   -DTBB_ROOT=${LIBDIR}/tbb/
   -DOPENVDB_CORE_SHARED=${OPENVDB_SHARED}
@@ -50,10 +51,8 @@ if(WIN32)
 else()
   # OpenVDB can't find the _static libraries automatically.
   set(OPENVDB_EXTRA_ARGS ${OPENVDB_EXTRA_ARGS}
-    -DTbb_LIBRARIES=${LIBDIR}/tbb/lib/${LIBPREFIX}tbb_static${LIBEXT}
-    -DTbb_tbb_LIBRARY=${LIBDIR}/tbb/lib/${LIBPREFIX}tbb_static${LIBEXT}
-    -DTbb_tbbmalloc_LIBRARY=${LIBDIR}/tbb/lib/${LIBPREFIX}tbbmalloc_static${LIBEXT}
-    -DTbb_tbbmalloc_proxy_LIBRARY=${LIBDIR}/tbb/lib/${LIBPREFIX}tbbmalloc_proxy_static${LIBEXT}
+    -DTBB_INCLUDE_DIRS=${LIBDIR}/tbb/include
+    -DTbb_RELEASE_LIBRARIES=${LIBDIR}/tbb/lib/${LIBPREFIX}tbb_static${LIBEXT};${LIBDIR}/tbb/lib/${LIBPREFIX}tbbmalloc_static${LIBEXT};${LIBDIR}/tbb/lib/${LIBPREFIX}tbbmalloc_proxy_static${LIBEXT}
   )
 endif()
 
