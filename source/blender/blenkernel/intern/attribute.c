@@ -548,6 +548,8 @@ CustomDataLayer *BKE_id_attribute_subset_active_get(ID *id,
       if (layer->flag & active_flag) {
         return layer;
       }
+
+      candidate = layer;
     }
   }
 
