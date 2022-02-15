@@ -190,3 +190,17 @@ set_source_files_properties(
 )
 
 blender_add_lib(bf_imbuf "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+
+if(WITH_GTESTS)
+    set(TEST_SRC
+      intern/rasterizer_test.cc
+    )
+    set(TEST_INC
+    )
+    set(TEST_LIB
+    )
+    include(GTestTesting)
+    blender_add_test_lib(bf_imbuf_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
+endif()
+
