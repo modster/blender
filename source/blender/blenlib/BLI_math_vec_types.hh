@@ -60,6 +60,16 @@ template<typename T> uint64_t vector_hash(const T &vec)
   return result;
 }
 
+template<typename T> inline bool is_any_zero(const T &a)
+{
+  for (int i = 0; i < T::type_length; i++) {
+    if (a[i] == T::base_type(0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace math
 
 template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size> {
@@ -349,7 +359,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   friend vec_base operator/(const vec_base &a, const vec_base &b)
   {
-    BLI_assert(!b.is_any_zero());
+    BLI_assert(!math::is_any_zero());
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] / b[i]);
   }
 
@@ -361,7 +371,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   friend vec_base operator/(T a, const vec_base &b)
   {
-    BLI_assert(!b.is_any_zero());
+    BLI_assert(!math::is_any_zero());
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a / b[i]);
   }
 
@@ -505,7 +515,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   BLI_INT_OP(T) friend vec_base operator%(const vec_base &a, const vec_base &b)
   {
-    BLI_assert(!b.is_any_zero());
+    BLI_assert(!math::is_any_zero());
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] % b[i]);
   }
 

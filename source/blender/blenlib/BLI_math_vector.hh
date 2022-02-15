@@ -63,16 +63,6 @@ template<typename T, BLI_ENABLE_IF_VEC(T)> inline bool is_zero(const T &a)
   return true;
 }
 
-template<typename T, BLI_ENABLE_IF_VEC(T)> inline bool is_any_zero(const T &a)
-{
-  for (int i = 0; i < T::type_length; i++) {
-    if (a[i] == bT(0)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 template<typename T, BLI_ENABLE_IF_VEC(T)> inline T abs(const T &a)
 {
   T result;
