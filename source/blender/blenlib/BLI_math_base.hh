@@ -89,11 +89,8 @@ template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))> inline T fract(cons
   return a - std::floor(a);
 }
 
-template<typename T,
-         typename FactorT,
-         BLI_ENABLE_IF((is_math_float_type<T>)),
-         BLI_ENABLE_IF((is_math_float_type<T>))>
-inline T interpolate(const T &a, const T &b, const FactorT &t)
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))>
+inline T interpolate(const T &a, const T &b, const T &t)
 {
   return a * (1 - t) + b * t;
 }
