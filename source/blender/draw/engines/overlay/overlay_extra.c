@@ -2263,6 +2263,9 @@ static void OVERLAY_angular_limits_rods( OVERLAY_ExtraCallBuffers *cb,
                                      const float ob_offset_vec[3],
                                      const float coupled_ob_offset_vec[3],
                                      const float color[4]) {
+    /* The rods are drawn between 3 points:
+     * The object's origin(start), the point where the perpendicular from the object meets the axis(mid),
+     * and the corresponding point for the other constrained object(end). */
     float start[3];
     float end[3];
     float mid[3];
@@ -2311,9 +2314,6 @@ static void OVERLAY_angular_limits_disk(OVERLAY_Data *data,
 
     float final_transform_mat[3][3];
     mul_m3_m3m3(final_transform_mat, transform_mat, corr_rot);
-
-    /* Rotate the arc about constrained axis by required amount.
-     * The arc should lie along the object-pivot distance vector. */
     float constrained_axis_rot;
 
     if(ob == rbc->ob1) {
@@ -2393,13 +2393,14 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
         RB_constraint_get_transforms_slider(orig_constraint_ob->rigidbody_constraint->physics_constraint, ob1_basis, ob2_basis, ob1_origin, ob2_origin, NULL);
 
     }
+    /* The transforms obtained from bullet are equal to (inverse of the object transforms) * (constraint pivot transform)
+     * The Final transforms are equal to the (object rotations) * (bullet transforms). */
     mul_m3_m3m3(t1, ob1_rot, ob1_basis);
     mul_m3_m3m3(t2, ob2_rot, ob2_basis);
 
     float real_pivot[3] = {0.0f};
-    float ob1_initial_rot_inv[3][3] = {{0.0f}};
-    BKE_object_rot_to_mat3(ob1, ob1_initial_rot_inv, false);
-    invert_m3(ob1_initial_rot_inv);
+    /* If the constraint is set on one of the objects, get pivot position from that object
+     * Otherwise, get it from the bullet transforms. */
     if(constraint_ob == ob1) {
       copy_v3_v3(real_pivot, ob1_pos);
     }
@@ -2409,36 +2410,37 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
     else{
       mul_v3_m4v3(real_pivot, ob1->obmat, ob1_origin);
     }
-    /* Rotate disk to correct initial orientation */
+    /* Matrix to rotate disk to correct initial orientation */
     float corr_rot[3][3] = {{0}};
     float constrained_axis_w[3] = {0.0f};
 
+    /* A unit vector pointing in the direction of the constrained axis.
+     * Multiplying this by t1 or t2 doesn't matter because the difference is simply a rotation about the
+     * constrained axis itself. */
     constrained_axis_w[axis] = 1.0f;
-
     mul_m3_v3(t1, constrained_axis_w);
-    mul_m3_v3(ob1_rot, constrained_axis_w);
-
-    float ax[3] = {0.0f};
+    /* Axis perpendicular to the constrained axis. */
+    float perpendicular_axis[3] = {0.0f};
 
     switch(axis){
        case 0:
         angle = (rbc->limit_ang_x_upper - rbc->limit_ang_x_lower);
         angular_offset = rbc->limit_ang_x_lower;
-        ax[1] = 1.0f;
+        perpendicular_axis[1] = 1.0f;
         axis_angle_to_mat3(corr_rot, ax, M_PI_2);
         draw_disks = (rbc->flag & RBC_FLAG_USE_LIMIT_ANG_X);
         break;
        case 1:
         angle = (rbc->limit_ang_y_upper - rbc->limit_ang_y_lower);
         angular_offset = rbc->limit_ang_y_lower;
-        ax[0] = 1.0f;
+        perpendicular_axis[0] = 1.0f;
         axis_angle_to_mat3(corr_rot, ax, M_PI_2);
         draw_disks = (rbc->flag & RBC_FLAG_USE_LIMIT_ANG_Y);
         break;
        case 2:
         angle = (rbc->limit_ang_z_upper - rbc->limit_ang_z_lower);
         angular_offset = rbc->limit_ang_z_lower;
-        ax[0] = 1.0f;
+        perpendicular_axis[0] = 1.0f;
         unit_m3(corr_rot);
         draw_disks = (rbc->flag & RBC_FLAG_USE_LIMIT_ANG_Z);
         break;
@@ -2447,6 +2449,8 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
 
     float ob1_pivot_dist[3];
     float ob2_pivot_dist[3];
+    /* Object-pivot distance is zero for passive objects because the lines from these objects
+     * are not drawn. */
     if(ob1->rigidbody_object->type == RBO_TYPE_ACTIVE) {
       sub_v3_v3v3(ob1_pivot_dist, ob1_pos, real_pivot);
     }
@@ -2459,6 +2463,8 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
     else {
       zero_v3(ob2_pivot_dist);
     }
+    /* Distance from the pivot to the perpendicular line from the objects
+     * projected onto the axis. */
     float ob1_offset = dot_v3v3(ob1_pivot_dist, constrained_axis_w);
     float ob1_offset_vec[3];
     float ob2_offset = dot_v3v3(ob2_pivot_dist, constrained_axis_w);
@@ -2468,10 +2474,12 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
     mul_v3_fl(ob1_offset_vec, ob1_offset);
     mul_v3_fl(ob2_offset_vec, ob2_offset);
 
+    /*Find the change in the angle between the objects about the constrained axis
+     * by transforming a perpendicular axis according to the objects' transforms. */
     float axis_ob1[3];
     float axis_ob2[3];
-    copy_v3_v3(axis_ob1, ax);
-    copy_v3_v3(axis_ob2, ax);
+    copy_v3_v3(axis_ob1, perpendicular_axis);
+    copy_v3_v3(axis_ob2, perpendicular_axis);
     mul_m3_v3(t1, axis_ob1);
     mul_m3_v3(t2, axis_ob2);
     float delta_angle = angle_signed_on_axis_v3v3_v3(axis_ob1, axis_ob2, constrained_axis_w);
