@@ -14,6 +14,10 @@
 
 #include "BLI_utildefines.h"
 
+#ifdef WITH_GMP
+#  include "BLI_math_mpq.hh"
+#endif
+
 namespace blender {
 
 /* clang-format off */
@@ -60,10 +64,10 @@ template<typename T> uint64_t vector_hash(const T &vec)
   return result;
 }
 
-template<typename T> inline bool is_any_zero(const T &a)
+template<typename T, int Size> inline bool is_any_zero(const vec_struct_base<T, Size> &a)
 {
-  for (int i = 0; i < T::type_length; i++) {
-    if (a[i] == T::base_type(0)) {
+  for (int i = 0; i < Size; i++) {
+    if (a[i] == T(0)) {
       return true;
     }
   }
@@ -265,16 +269,6 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
   } \
   return *this;
 
-  bool is_any_zero() const
-  {
-    for (int i = 0; i < Size; i++) {
-      if ((*this)[i] == T(0)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   /** Arithmetic operators. */
 
   friend vec_base operator+(const vec_base &a, const vec_base &b)
@@ -377,7 +371,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   vec_base &operator/=(T b)
   {
-    BLI_assert(!b.is_any_zero());
+    BLI_assert(b != T(0));
     BLI_VEC_OP_IMPL_SELF(i, (*this)[i] /= b);
   }
 
@@ -589,15 +583,13 @@ using double2 = vec_base<double, 2>;
 using double3 = vec_base<double, 3>;
 using double4 = vec_base<double, 4>;
 
-template<typename T> constexpr bool is_math_vec_type = false;
-template<typename BaseType, int Size>
-constexpr bool is_math_vec_type<vec_base<BaseType, Size>> = true;
+template<typename T>
+inline constexpr bool math_is_float = (std::is_floating_point_v<T>
+#ifdef WITH_GMP
+                                       || std::is_same_v<T, mpq_class>
+#endif
+);
 
-static_assert(is_math_vec_type<int2>);
-static_assert(is_math_vec_type<uint4>);
-static_assert(is_math_vec_type<float2>);
-static_assert(is_math_vec_type<vec_base<float, 20>>);
-static_assert(!is_math_vec_type<int>);
-static_assert(!is_math_vec_type<float>);
+template<typename T> inline constexpr bool math_is_integral = std::is_integral_v<T>;
 
 }  // namespace blender
