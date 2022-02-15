@@ -90,7 +90,7 @@ inline vec_base<T, Size> clamp(const vec_base<T, Size> &a, const T &min, const T
   return result;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> mod(const vec_base<T, Size> &a, const vec_base<T, Size> &b)
 {
   vec_base<T, Size> result;
@@ -101,7 +101,7 @@ inline vec_base<T, Size> mod(const vec_base<T, Size> &a, const vec_base<T, Size>
   return result;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> mod(const vec_base<T, Size> &a, const T &b)
 {
   BLI_assert(b != 0);
@@ -112,7 +112,7 @@ inline vec_base<T, Size> mod(const vec_base<T, Size> &a, const T &b)
   return result;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T safe_mod(const vec_base<T, Size> &a, const vec_base<T, Size> &b)
 {
   vec_base<T, Size> result;
@@ -122,7 +122,7 @@ inline T safe_mod(const vec_base<T, Size> &a, const vec_base<T, Size> &b)
   return result;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T safe_mod(const vec_base<T, Size> &a, const T &b)
 {
   if (b == 0) {
@@ -144,7 +144,7 @@ inline void min_max(const vec_base<T, Size> &vector,
   max = math::max(vector, max);
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> safe_divide(const vec_base<T, Size> &a, const vec_base<T, Size> &b)
 {
   vec_base<T, Size> result;
@@ -154,13 +154,13 @@ inline vec_base<T, Size> safe_divide(const vec_base<T, Size> &a, const vec_base<
   return result;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> safe_divide(const vec_base<T, Size> &a, const T &b)
 {
   return (b != 0) ? a / b : vec_base<T, Size>(0.0f);
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> floor(const vec_base<T, Size> &a)
 {
   vec_base<T, Size> result;
@@ -170,7 +170,7 @@ inline vec_base<T, Size> floor(const vec_base<T, Size> &a)
   return result;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> ceil(const vec_base<T, Size> &a)
 {
   vec_base<T, Size> result;
@@ -180,7 +180,7 @@ inline vec_base<T, Size> ceil(const vec_base<T, Size> &a)
   return result;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> fract(const vec_base<T, Size> &a)
 {
   vec_base<T, Size> result;
@@ -190,7 +190,7 @@ inline vec_base<T, Size> fract(const vec_base<T, Size> &a)
   return result;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T dot(const vec_base<T, Size> &a, const vec_base<T, Size> &b)
 {
   T result = a[0] * b[0];
@@ -209,37 +209,37 @@ template<typename T, int Size> inline T length_manhattan(const vec_base<T, Size>
   return result;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T length_squared(const vec_base<T, Size> &a)
 {
   return dot(a, a);
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T length(const vec_base<T, Size> &a)
 {
   return std::sqrt(length_squared(a));
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T distance_manhattan(const vec_base<T, Size> &a, const vec_base<T, Size> &b)
 {
   return length_manhattan(a - b);
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T distance_squared(const vec_base<T, Size> &a, const vec_base<T, Size> &b)
 {
   return length_squared(a - b);
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T distance(const vec_base<T, Size> &a, const vec_base<T, Size> &b)
 {
   return length(a - b);
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> reflect(const vec_base<T, Size> &incident,
                                  const vec_base<T, Size> &normal)
 {
@@ -247,7 +247,7 @@ inline vec_base<T, Size> reflect(const vec_base<T, Size> &incident,
   return incident - 2.0 * dot(normal, incident) * normal;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> refract(const vec_base<T, Size> &incident,
                                  const vec_base<T, Size> &normal,
                                  const T &eta)
@@ -260,7 +260,7 @@ inline vec_base<T, Size> refract(const vec_base<T, Size> &incident,
   return eta * incident - (eta * dot_ni + sqrt(k)) * normal;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> project(const vec_base<T, Size> &p, const vec_base<T, Size> &v_proj)
 {
   if (UNLIKELY(is_zero(v_proj))) {
@@ -269,7 +269,7 @@ inline vec_base<T, Size> project(const vec_base<T, Size> &p, const vec_base<T, S
   return v_proj * (dot(p, v_proj) / dot(v_proj, v_proj));
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> normalize_and_get_length(const vec_base<T, Size> &v, T &out_length)
 {
   out_length = length_squared(v);
@@ -284,14 +284,14 @@ inline vec_base<T, Size> normalize_and_get_length(const vec_base<T, Size> &v, T 
   return vec_base<T, Size>(0.0);
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> normalize(const vec_base<T, Size> &v)
 {
   T len;
   return normalize_and_get_length(v, len);
 }
 
-template<typename T, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, 3> cross(const vec_base<T, 3> &a, const vec_base<T, 3> &b)
 {
   return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
@@ -305,7 +305,7 @@ inline vec_base<float, 3> cross_high_precision(const vec_base<float, 3> &a,
           (float)((double)a.x * b.y - (double)a.y * b.x)};
 }
 
-template<typename T, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, 3> cross_poly(Span<vec_base<T, 3>> poly)
 {
   /* Newell's Method. */
@@ -329,7 +329,7 @@ inline vec_base<T, 3> cross_poly(Span<vec_base<T, 3>> poly)
   return n;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> interpolate(const vec_base<T, Size> &a,
                                      const vec_base<T, Size> &b,
                                      const T &t)
@@ -337,13 +337,13 @@ inline vec_base<T, Size> interpolate(const vec_base<T, Size> &a,
   return a * (1 - t) + b * t;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> midpoint(const vec_base<T, Size> &a, const vec_base<T, Size> &b)
 {
   return (a + b) * 0.5;
 }
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline vec_base<T, Size> faceforward(const vec_base<T, Size> &vector,
                                      const vec_base<T, Size> &incident,
                                      const vec_base<T, Size> &reference)
@@ -369,7 +369,7 @@ template<typename T> struct isect_result {
   typename T::base_type lambda;
 };
 
-template<typename T, int Size, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, int Size, BLI_ENABLE_IF((is_math_float_type<T>))>
 isect_result<vec_base<T, Size>> isect_seg_seg(const vec_base<T, Size> &v1,
                                               const vec_base<T, Size> &v2,
                                               const vec_base<T, Size> &v3,

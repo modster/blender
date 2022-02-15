@@ -584,12 +584,12 @@ using double3 = vec_base<double, 3>;
 using double4 = vec_base<double, 4>;
 
 template<typename T>
-inline constexpr bool math_is_float = (std::is_floating_point_v<T>
+inline constexpr bool is_math_float_type = (std::is_floating_point_v<T>
 #ifdef WITH_GMP
-                                       || std::is_same_v<T, mpq_class>
+                                            || std::is_same_v<T, mpq_class>
 #endif
 );
 
-template<typename T> inline constexpr bool math_is_integral = std::is_integral_v<T>;
+template<typename T> inline constexpr bool is_math_integral_type = std::is_integral_v<T>;
 
 }  // namespace blender

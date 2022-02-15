@@ -51,12 +51,13 @@ template<typename T> inline T clamp(const T &a, const T &min, const T &max)
   return std::clamp(a, min, max);
 }
 
-template<typename T, BLI_ENABLE_IF((math_is_float<T>))> inline T mod(const T &a, const T &b)
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))> inline T mod(const T &a, const T &b)
 {
   return std::fmod(a, b);
 }
 
-template<typename T, BLI_ENABLE_IF((math_is_float<T>))> inline T safe_mod(const T &a, const T &b)
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))>
+inline T safe_mod(const T &a, const T &b)
 {
   return (b != 0) ? std::fmod(a, b) : 0;
 }
@@ -67,37 +68,38 @@ template<typename T> inline void min_max(const T &value, T &min, T &max)
   max = math::max(value, max);
 }
 
-template<typename T, BLI_ENABLE_IF((math_is_float<T>))>
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T safe_divide(const T &a, const T &b)
 {
   return (b != 0) ? a / b : T(0.0f);
 }
 
-template<typename T, BLI_ENABLE_IF((math_is_float<T>))> inline T floor(const T &a)
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))> inline T floor(const T &a)
 {
   return std::floor(a);
 }
 
-template<typename T, BLI_ENABLE_IF((math_is_float<T>))> inline T ceil(const T &a)
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))> inline T ceil(const T &a)
 {
   return std::ceil(a);
 }
 
-template<typename T, BLI_ENABLE_IF((math_is_float<T>))> inline T fract(const T &a)
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))> inline T fract(const T &a)
 {
   return a - std::floor(a);
 }
 
 template<typename T,
          typename FactorT,
-         BLI_ENABLE_IF((math_is_float<T>)),
-         BLI_ENABLE_IF((math_is_float<T>))>
+         BLI_ENABLE_IF((is_math_float_type<T>)),
+         BLI_ENABLE_IF((is_math_float_type<T>))>
 inline T interpolate(const T &a, const T &b, const FactorT &t)
 {
   return a * (1 - t) + b * t;
 }
 
-template<typename T, BLI_ENABLE_IF((math_is_float<T>))> inline T midpoint(const T &a, const T &b)
+template<typename T, BLI_ENABLE_IF((is_math_float_type<T>))>
+inline T midpoint(const T &a, const T &b)
 {
   return (a + b) * T(0.5);
 }
