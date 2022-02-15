@@ -3,10 +3,8 @@
 #include "testing/testing.h"
 
 #include "BLI_math.h"
-
-#include "BLI_math_vector.hh"
-
 #include "BLI_math_base.hh"
+#include "BLI_math_vector.hh"
 
 namespace blender::tests {
 
