@@ -2427,14 +2427,14 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
         angle = (rbc->limit_ang_x_upper - rbc->limit_ang_x_lower);
         angular_offset = rbc->limit_ang_x_lower;
         perpendicular_axis[1] = 1.0f;
-        axis_angle_to_mat3(corr_rot, ax, M_PI_2);
+        axis_angle_to_mat3(corr_rot, perpendicular_axis, M_PI_2);
         draw_disks = (rbc->flag & RBC_FLAG_USE_LIMIT_ANG_X);
         break;
        case 1:
         angle = (rbc->limit_ang_y_upper - rbc->limit_ang_y_lower);
         angular_offset = rbc->limit_ang_y_lower;
         perpendicular_axis[0] = 1.0f;
-        axis_angle_to_mat3(corr_rot, ax, M_PI_2);
+        axis_angle_to_mat3(corr_rot, perpendicular_axis, M_PI_2);
         draw_disks = (rbc->flag & RBC_FLAG_USE_LIMIT_ANG_Y);
         break;
        case 2:
