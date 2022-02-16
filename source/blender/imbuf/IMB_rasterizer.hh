@@ -83,7 +83,7 @@ template<typename VertexInput, typename VertexOutput> class AbstractVertexShader
 
 /**
  * Fragment shader will render a single fragment onto the ImageBuffer.
- * FragmentInput
+ * FragmentInput - The input data from the vertex stage.
  * FragmentOutput points to the memory location to write to in the image buffer.
  */
 template<typename FragmentInput, typename FragmentOutput> class AbstractFragmentShader {
@@ -110,10 +110,7 @@ template<typename FragmentInput> class Rasterline {
   /** Delta to add to the start_input to create the data for the next fragment. */
   FragmentInput delta_step;
 
-  Rasterline()
-  {
-  }
-
+  Rasterline() = default;
   Rasterline(uint32_t y,
              uint32_t start_x,
              uint32_t end_x,
@@ -338,13 +335,13 @@ class Rasterizer {
     /* Find max v-coordinate and store at index 2. */
     sorted[2] = &vertex_out[0];
     for (int i = 1; i < 3; i++) {
-      if (vertex_out[i].uv[1] > sorted[0]->uv[1]) {
+      if (vertex_out[i].uv[1] > sorted[2]->uv[1]) {
         sorted[2] = &vertex_out[i];
       }
     }
 
     /* Exit when all 3 have the same v coordinate. Use the original input order. */
-    if (sorted[0] == sorted[2]) {
+    if (sorted[0]->uv[1] == sorted[2]->uv[1]) {
       for (int i = 0; i < 3; i++) {
         sorted[i] = &vertex_out[i];
       }
@@ -357,12 +354,14 @@ class Rasterizer {
     for (int i = 0; i < 3; i++) {
       if (sorted[0] != &vertex_out[i] && sorted[2] != &vertex_out[i]) {
         sorted[1] = &vertex_out[i];
-        BLI_assert(sorted[0] != sorted[1] && sorted[0] != sorted[2] && sorted[1] != sorted[2]);
-        return sorted;
+        break;
       }
     }
 
-    BLI_assert_unreachable();
+    BLI_assert(sorted[0] != sorted[1] && sorted[0] != sorted[2] && sorted[1] != sorted[2]);
+    BLI_assert(sorted[0]->uv[1] <= sorted[1]->uv[1]);
+    BLI_assert(sorted[0]->uv[1] < sorted[2]->uv[1]);
+    BLI_assert(sorted[1]->uv[1] <= sorted[2]->uv[1]);
     return sorted;
   }
 
