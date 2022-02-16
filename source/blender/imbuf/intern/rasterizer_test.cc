@@ -52,7 +52,7 @@ TEST(imbuf_rasterizer, draw_triangle)
   EXPECT_EQ(rasterizer.stats.drawn_fragments, 0);
 
   rasterizer.draw_triangle(
-      VertexInput(float2(0.1, 0.1)), VertexInput(float2(0.5, 0.2)), VertexInput(float2(0.4, 0.9)));
+      VertexInput(float2(0.1, 0.1)), VertexInput(float2(0.5, 0.9)), VertexInput(float2(0.8, 0.5)));
   rasterizer.flush();
 
   /*

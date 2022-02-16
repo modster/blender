@@ -281,6 +281,11 @@ class Rasterizer {
     VertexOutputType left_add = calc_vertex_output_data(left, *left_target);
     VertexOutputType right_add = calc_vertex_output_data(right, *right_target);
 
+    /* Change winding order to match the steepness of the edges. */
+    if (right_add.uv[0] < left_add.uv[1]) {
+      std::swap(left_add, right_add);
+    }
+
     int v;
     for (v = min_v; v < mid_v; v++) {
       if (v >= 0 && v < image_buffer_->y) {
