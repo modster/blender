@@ -199,14 +199,18 @@ void ForwardPass::render(const DRWView *view,
     hiz.update(gbuffer.depth_tx);
 
     input_hiz_tx_ = hiz.texture_get();
-
-    GPU_framebuffer_bind(view_fb);
   }
 
   DRW_stats_group_start("ForwardOpaque");
+
+  GPU_framebuffer_bind(view_fb);
   DRW_draw_pass(prepass_ps_);
+
   inst_.shadows.set_view(view, gbuffer.depth_tx);
+
+  GPU_framebuffer_bind(view_fb);
   DRW_draw_pass(opaque_ps_);
+
   DRW_stats_group_end();
 
   DRW_stats_group_start("ForwardTransparent");
