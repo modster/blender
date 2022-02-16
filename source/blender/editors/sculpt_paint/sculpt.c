@@ -3955,7 +3955,12 @@ bool SCULPT_mode_poll(bContext *C)
 
 bool SCULPT_vertex_colors_poll(bContext *C)
 {
-  return SCULPT_mode_poll(C);
+  if (!SCULPT_mode_poll(C)) {
+    return false;
+  }
+
+  Object *ob = CTX_data_active_object(C);
+  return ob->sculpt && SCULPT_has_colors(ob->sculpt);
 }
 
 bool SCULPT_mode_poll_view3d(bContext *C)

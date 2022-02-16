@@ -251,7 +251,6 @@ static int sculpt_color_filter_invoke(bContext *C, wmOperator *op, const wmEvent
   Object *ob = CTX_data_active_object(C);
   Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
   SculptSession *ss = ob->sculpt;
-  int mode = RNA_enum_get(op->ptr, "type");
   PBVH *pbvh = ob->sculpt->pbvh;
 
   const bool use_automasking = SCULPT_is_automasking_enabled(sd, ss, NULL);
@@ -284,10 +283,9 @@ static int sculpt_color_filter_invoke(bContext *C, wmOperator *op, const wmEvent
   /* CTX_data_ensure_evaluated_depsgraph should be used at the end to include the updates of
    * earlier steps modifying the data. */
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
-  const bool needs_topology_info = mode == COLOR_FILTER_SMOOTH || use_automasking;
-  BKE_sculpt_update_object_for_edit(depsgraph, ob, needs_topology_info, false, true);
+  BKE_sculpt_update_object_for_edit(depsgraph, ob, true, false, true);
 
-  if (BKE_pbvh_type(pbvh) == PBVH_FACES && needs_topology_info && !ob->sculpt->pmap) {
+  if (BKE_pbvh_type(pbvh) == PBVH_FACES && !ob->sculpt->pmap) {
     return OPERATOR_CANCELLED;
   }
 
