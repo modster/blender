@@ -29,7 +29,7 @@
 
 #include "NOD_derived_node_tree.hh"
 
-namespace blender::compositor {
+namespace blender::viewport_compositor {
 
 /* --------------------------------------------------------------------
  * Texture Pool.
@@ -90,6 +90,10 @@ class TexturePool {
  * functionalities for node operations. */
 class Context {
  public:
+  TexturePool &texture_pool;
+
+ public:
+  Context(TexturePool &texture_pool);
   /* Get the texture representing the viewport where the result of the compositor should be
    * written. This should be called by output nodes to get their target texture. */
   virtual GPUTexture *get_viewport_texture() = 0;
@@ -132,29 +136,23 @@ struct Result {
  * Operation.
  */
 
+/* The most basic unit of the compositor. The class can be implemented to perform a certain action
+ * in the compositor. */
 class Operation {
- protected:
-  /* A reference to the compositor context. This member references the same object in all
-   * operations but is included in the class for convenience. */
-  Context &context_;
-  /* A mapping between each output of the operation identified by its name and the computed result
-   * for that output. Unused outputs are not included. It is the responsibility of the evaluator to
-   * add default results for outputs that are needed and should be computed by the operation prior
-   * to invoking any methods, which is done by calling ensure_output. The results structures are
-   * uninitialized prior to the invocation of the allocate method, and allocate method is expected
-   * to initialize the results structures appropriately. The contents of the results data are
-   * uninitialized prior to the invocation of the execute method, and the execute method is
-   * expected to compute those data appropriately. */
-  Map<StringRef, Result> outputs_;
-  /* A mapping between each input of the operation identified by its name and a reference to the
-   * computed result for the output that it is connected to. It is the responsibility of the
-   * evaluator to populate the inputs prior to invoking any method, which is done by calling
-   * populate_input. Inputs that are not linked reference meta-output single value results. */
-  Map<StringRef, Result *> inputs_;
+ private:
+  /* A mapping between each output of the operation identified by its identifier and the computed
+   * result for that output. The initialize method is expected to add the needed results. The
+   * contents of the results data are uninitialized prior to the invocation of the execute method,
+   * and the execute method is expected to compute those data appropriately. */
+  Map<StringRef, Result> results_;
+  /* A mapping between each input of the operation identified by its identifier and a reference to
+   * the computed result for the output that it is connected to. It is the responsibility of the
+   * evaluator to map the inputs to their results prior to invoking any method, which is done by
+   * calling map_input_to_result. Inputs that are not linked are mapped to the result of a meta
+   * operation emitted by the evaluator, such as SingleValueInputOperation. */
+  Map<StringRef, Result *> inputs_to_results_map_;
 
  public:
-  Operation(Context &context);
-
   /* This method should return true if this operation can only operate on buffers, otherwise,
    * return false if the operation can be applied pixel-wise. */
   virtual bool is_buffered() const = 0;
@@ -163,31 +161,29 @@ class Operation {
    * the output results. This includes the output textures as well as any temporary intermediate
    * buffers used by the operation. The texture pool provided by the context should be used to any
    * texture allocations. */
-  virtual void allocate() = 0;
+  virtual void initialize() = 0;
 
   /* This method should execute the operation, compute its outputs, and write them to the
    * appropriate result. */
   virtual void execute() = 0;
 
-  /* This method should release any temporary intermediate buffer that was allocated in the
+  /* This method should release any temporary intermediate buffers that were allocated in the
    * allocation method. */
   virtual void release();
 
-  /* Declares that the output identified by the given name is needed and should be computed by the
-   * operation. See outputs_ member for more details. */
-  void ensure_output(StringRef name);
+  /* Add the given result to the results_ map identified by the given output identifier. */
+  void add_result(StringRef identifier, Result result);
 
-  /* Get a reference to the output result identified by the given name. Expect the result to be
-   * uninitialized when calling from the allocate method and expect the result data to be
-   * uninitialized when calling from the execute method. */
-  Result &get_result(StringRef name);
+  /* Get a reference to the output result identified by the given identifier. Expect the result
+   * data to be uninitialized when calling from the execute method. */
+  Result &get_result(StringRef identifier);
 
-  /* Populate the inputs map by mapping an input identified by the given name to a reference to the
-   * output result it is connected to. See inputs_ member for more details. */
-  void populate_input(StringRef name, Result *result);
+  /* Map the input identified by the given identifier to a reference to the result it is connected
+   * to. See inputs_to_results_map_ member for more details. */
+  void map_input_to_result(StringRef identifier, Result *result);
 
-  /* Get a reference to the result connected to the input identified by the given name. */
-  const Result &get_input(StringRef name) const;
+  /* Get a reference to the result connected to the input identified by the given identifier. */
+  const Result &get_input(StringRef identifier) const;
 };
 
 /* --------------------------------------------------------------------
@@ -196,62 +192,149 @@ class Operation {
 
 using namespace nodes::derived_node_tree_types;
 
+/* The operation class that nodes should implement and instantiate in the
+ * bNodeType.get_compositor_operation, passing the given inputs to the base constructor.  */
 class NodeOperation : public Operation {
  private:
-  DNode &node_;
+  /* A reference to the compositor context. This member references the same object in all
+   * operations but is included in the class for convenience. */
+  Context &context_;
+  /* The node that this operation represents. */
+  DNode node_;
 
  public:
-  NodeOperation(Context &context, DNode &node);
+  NodeOperation(Context &context, DNode node);
 
   virtual bool is_buffered() const override;
 
-  /* Returns true if the output identified by the given name is needed and should be computed,
-   * otherwise returns false. */
-  bool is_output_needed(StringRef name) const;
+  Context &context();
+
+  /* Returns true if the output identified by the given identifier is needed and should be
+   * computed, otherwise returns false. */
+  bool is_output_needed(StringRef identifier) const;
 };
 
 /* --------------------------------------------------------------------
- * Compiler.
+ * Meta Operation.
  */
 
-class Compiler {
+/* A meta operation is an operation that is emitted by the evaluator to make execution easier for
+ * node operations by hiding certain implementations details. See any of the derived classes as an
+ * example. */
+class MetaOperation : public Operation {
+};
+
+/* --------------------------------------------------------------------
+ * Single Value Input Operation.
+ */
+
+/* A meta operation that provide single value results to node inputs that are not linked. The
+ * operation merely pass the default value of the input socket to its output result, which can then
+ * be mapped to the input by the evaluator. */
+class SingleValueInputOperation : public MetaOperation {
+ public:
+  /* The identifier of the output for this operation. This is constant for all operations. */
+  static const StringRef output_identifier;
+
  private:
-  /* The derived and reference node trees representing the compositor setup. */
-  NodeTreeRefMap tree_ref_map_;
-  DerivedNodeTree tree_;
-  /* The output node whose result should be computed and drawn. */
-  DNode output_node_;
-  /* Stores a heuristic estimation of the number of needed intermediate buffers
-   * to compute every node and all of its dependencies. */
-  Map<DNode, int> needed_buffers_;
-  /* An ordered set of nodes defining the schedule of node execution. */
-  VectorSet<DNode> node_schedule_;
+  DInputSocket input_;
 
  public:
-  Compiler(bNodeTree *scene_node_tree);
+  SingleValueInputOperation(DInputSocket input);
 
-  void compile();
+  virtual bool is_buffered() const override;
 
-  void dump_schedule();
+  virtual void initialize() override;
+
+  virtual void execute() override;
 
  private:
-  /* Computes the output node whose result should be computed and drawn, then store the result in
-   * output_node_. The output node is the node marked as NODE_DO_OUTPUT. If multiple types of
-   * output nodes are marked, then the preference will be CMP_NODE_COMPOSITE > CMP_NODE_VIEWER >
-   * CMP_NODE_SPLITVIEWER. */
-  void compute_output_node();
+  /* Returns the result type corresponding to the type of the member input socket. */
+  ResultType get_input_result_type() const;
+};
+
+/* --------------------------------------------------------------------
+ * Evaluator.
+ */
+
+/* The main class of the viewport compositor. The evaluator compiles the compositor node tree into
+ * a stream of operations that are then executed to compute the output of the compositor. */
+class Evaluator {
+ public:
+  /* A reference to the compositor context provided by the compositor engine. */
+  Context &context;
+  /* The derived and reference node trees representing the compositor setup. */
+  NodeTreeRefMap tree_ref_map;
+  DerivedNodeTree tree;
+
+ private:
+  /* A mapping between nodes and instances of their operations. Initialized with default instances
+   * of operations by calling create_node_operations(). Typically initialized early on to be used
+   * by various methods to query information about node operations. */
+  Map<DNode, NodeOperation *> node_operations_;
+  /* The compiled operations stream. This contains ordered references to the operations that were
+   * compiled and needs to be evaluated. The operations can be node operations or meta-operations
+   * that were emitted by the evaluator. */
+  Vector<Operation *> operations_stream_;
+
+  /* A type representing a mapping between nodes and heuristic estimations of the number of needed
+   * intermediate buffers to compute the nodes and all of their dependencies. */
+  using NeededBuffers = Map<DNode, int>;
+  /* A type representing the ordered set of nodes defining the schedule of node execution. */
+  using NodeSchedule = VectorSet<DNode>;
+
+ public:
+  Evaluator(Context &context, bNodeTree *scene_node_tree);
+
+  void evaluate();
+
+ private:
+  /* Computes the output node whose result should be computed and drawn. The output node is the
+   * node marked as NODE_DO_OUTPUT. If multiple types of output nodes are marked, then the
+   * preference will be CMP_NODE_COMPOSITE > CMP_NODE_VIEWER > CMP_NODE_SPLITVIEWER. */
+  DNode compute_output_node() const;
+
+  /* Returns true if the compositor node tree is valid, false otherwise. */
+  bool is_valid(DNode output_node);
+
+  /* Default instantiate node operations for all nodes reachable from the given node. The result is
+   * stored in node_operations_. The instances are owned by the evaluator and should be deleted in
+   * the destructor. */
+  void create_node_operations(DNode node);
 
   /* Computes a heuristic estimation of the number of needed intermediate buffers to compute this
    * node and all of its dependencies. The method recursively computes the needed buffers for all
-   * node dependencies and stores them in the needed_buffers_ map. So the root/output node can be
-   * provided to compute the needed buffers for all nodes. */
-  int compute_needed_buffers(DNode node);
+   * node dependencies and stores them in the given needed_buffers map. So the root/output node can
+   * be provided to compute the needed buffers for all nodes. */
+  int compute_needed_buffers(DNode node, NeededBuffers &needed_buffers);
 
-  /* Computes the execution schedule of the nodes and stores the schedule in node_schedule_. This
-   * is essentially a post-order depth first traversal of the node tree from the output node to the
+  /* Computes the execution schedule of the nodes and stores it in the given node_schedule. This is
+   * essentially a post-order depth first traversal of the node tree from the output node to the
    * leaf input nodes, with informed order of traversal of children based on a heuristic estimation
    * of the number of needed_buffers. */
-  void compute_schedule(DNode node);
+  void compute_schedule(DNode node, NeededBuffers &needed_buffers, NodeSchedule &node_schedule);
+
+  /* Compile the node schedule into the stream of operations that will be executed in order by the
+   * evaluator, and store the result in operations_stream_. */
+  void compute_operations_stream(NodeSchedule &node_schedule);
+
+  /* Emit and initialize the node operation corresponding to the given node. This may also emit
+   * and initialize extra meta operations that are required by the node operation. */
+  void emit_node_operation(DNode node);
+
+  /* Maps each of the inputs of the node operation to their results. Essentially calls
+   * map_node_input_to_result for every input in the node. */
+  void map_node_inputs_to_results(DNode node);
+
+  /* Map the input to its result. If the input is not linked, it will be mapped to a newly emitted
+   * and initialized SingleValueInputOperation. */
+  void map_node_input_to_result(DInputSocket input);
+
+  /* Map the input to the result of the given node operation output. */
+  void map_node_linked_input_to_result(DInputSocket input, DOutputSocket output);
+
+  /* Map the input to the result of a newly emitted and initialized SingleValueInputOperation. */
+  void map_node_unlinked_input_to_result(DInputSocket input);
 };
 
-}  // namespace blender::compositor
+}  // namespace blender::viewport_compositor

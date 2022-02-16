@@ -126,10 +126,10 @@ namespace fn {
 class CPPType;
 class MFDataType;
 }  // namespace fn
-namespace compositor {
+namespace viewport_compositor {
 class Context;
 class NodeOperation;
-}  // namespace compositor
+}  // namespace viewport_compositor
 }  // namespace blender
 
 using CPPTypeHandle = blender::fn::CPPType;
@@ -144,11 +144,11 @@ using SocketGetGeometryNodesCPPValueFunction = void (*)(const struct bNodeSocket
 using NodeGatherSocketLinkOperationsFunction =
     void (*)(blender::nodes::GatherLinkSearchOpParams &params);
 
-using NodeCompositorGetOperationFunction = blender::compositor::NodeOperation (*)(
-    blender::compositor::Context &context, blender::nodes::DNode &node);
+using NodeGetCompositorOperationFunction = blender::viewport_compositor::NodeOperation
+    *(*)(blender::viewport_compositor::Context &context, blender::nodes::DNode node);
 
 #else
-typedef void *NodeCompositorGetOperationFunction;
+typedef void *NodeGetCompositorOperationFunction;
 typedef void *NodeMultiFunctionBuildFunction;
 typedef void *NodeGeometryExecFunction;
 typedef void *NodeDeclareFunction;
@@ -331,8 +331,8 @@ typedef struct bNodeType {
   /* gpu */
   NodeGPUExecFunction gpu_fn;
 
-  /* Execute a compositor node. */
-  NodeCompositorGetOperationFunction compositor_get_operation;
+  /* Get an instance of this node's compositor operation. */
+  NodeGetCompositorOperationFunction get_compositor_operation;
 
   /* Build a multi-function for this node. */
   NodeMultiFunctionBuildFunction build_multi_function;

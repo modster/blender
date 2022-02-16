@@ -22,7 +22,7 @@
 
 #include "GPU_material.h"
 
-namespace blender::compositor {
+namespace blender::viewport_compositor {
 
 class ShaderModule {
  private:
@@ -43,4 +43,4 @@ class ShaderModule {
   char *pass_shader_code_defs_get();
 };
 
-}  // namespace blender::compositor
+}  // namespace blender::viewport_compositor

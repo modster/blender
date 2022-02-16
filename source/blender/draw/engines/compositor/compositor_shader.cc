@@ -33,7 +33,7 @@ extern char datatoc_compositor_nodetree_eval_lib_glsl[];
 extern char datatoc_gpu_shader_codegen_lib_glsl[];
 }
 
-namespace blender::compositor {
+namespace blender::viewport_compositor {
 
 ShaderModule::ShaderModule()
 {
@@ -112,4 +112,4 @@ GPUMaterial *ShaderModule::material_get(Scene *scene)
   return DRW_shader_from_compositor(scene, shader_id, true, codegen_callback, this);
 }
 
-}  // namespace blender::compositor
+}  // namespace blender::viewport_compositor

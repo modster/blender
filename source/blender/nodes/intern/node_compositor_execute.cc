@@ -14,11 +14,15 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_assert.h"
 #include "BLI_hash.hh"
 #include "BLI_map.hh"
+#include "BLI_math_vector.h"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
 #include "BLI_vector_set.hh"
+
+#include "BKE_node.h"
 
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
@@ -30,7 +34,7 @@
 #include "NOD_compositor_execute.hh"
 #include "NOD_derived_node_tree.hh"
 
-namespace blender::compositor {
+namespace blender::viewport_compositor {
 
 /* --------------------------------------------------------------------
  * Texture Pool.
@@ -80,31 +84,39 @@ void TexturePool::release(GPUTexture *texture)
 }
 
 /* --------------------------------------------------------------------
+ * Context.
+ */
+
+Context::Context(TexturePool &texture_pool) : texture_pool(texture_pool)
+{
+}
+
+/* --------------------------------------------------------------------
  * Operation.
  */
 
-Operation::Operation(Context &context) : context_(context)
+void Operation::release()
 {
 }
 
-void Operation::ensure_output(StringRef name)
+void Operation::add_result(StringRef identifier, Result result)
 {
-  outputs_.add_new(name, Result());
+  results_.add_new(identifier, result);
 }
 
-Result &Operation::get_result(StringRef name)
+Result &Operation::get_result(StringRef identifier)
 {
-  return outputs_.lookup(name);
+  return results_.lookup(identifier);
 }
 
-void Operation::populate_input(StringRef name, Result *result)
+void Operation::map_input_to_result(StringRef identifier, Result *result)
 {
-  inputs_.add_new(name, result);
+  inputs_to_results_map_.add_new(identifier, result);
 }
 
-const Result &Operation::get_input(StringRef name) const
+const Result &Operation::get_input(StringRef identifier) const
 {
-  return *inputs_.lookup(name);
+  return *inputs_to_results_map_.lookup(identifier);
 }
 
 /* --------------------------------------------------------------------
@@ -113,60 +125,167 @@ const Result &Operation::get_input(StringRef name) const
 
 using namespace nodes::derived_node_tree_types;
 
-NodeOperation::NodeOperation(Context &context, DNode &node) : Operation(context), node_(node)
+NodeOperation::NodeOperation(Context &context, DNode node) : context_(context), node_(node)
 {
 }
 
+/* Node operations are buffered in most cases, but the derived operation can override otherwise. */
 bool NodeOperation::is_buffered() const
 {
   return true;
 }
 
-bool NodeOperation::is_output_needed(StringRef name) const
+bool NodeOperation::is_output_needed(StringRef identifier) const
 {
-  return outputs_.contains(name);
+  DOutputSocket output = node_.output_by_identifier(identifier);
+  if (output->logically_linked_sockets().is_empty()) {
+    return false;
+  }
+  return true;
+}
+
+Context &NodeOperation::context()
+{
+  return context_;
 }
 
 /* --------------------------------------------------------------------
- * Compiler.
+ * Single Value Input Operation.
  */
 
-Compiler::Compiler(bNodeTree *scene_node_tree) : tree_(*scene_node_tree, tree_ref_map_){};
-
-void Compiler::compile()
+SingleValueInputOperation::SingleValueInputOperation(DInputSocket input) : input_(input)
 {
-  compute_output_node();
-  compute_needed_buffers(output_node_);
-  compute_schedule(output_node_);
 }
 
-void Compiler::dump_schedule()
+const StringRef SingleValueInputOperation::output_identifier = StringRef("Output");
+
+bool SingleValueInputOperation::is_buffered() const
 {
-  for (const DNode &node : node_schedule_) {
-    std::cout << node->name() << std::endl;
+  return false;
+}
+
+/* The result is a single value of the same type as the member socket. */
+void SingleValueInputOperation::initialize()
+{
+  Result result = {get_input_result_type(), false};
+  add_result(output_identifier, result);
+}
+
+/* Copy the default value of the member socket to the output result. The default value is a pointer
+ * to a float array having the same number of elements as the socket type components. */
+void SingleValueInputOperation::execute()
+{
+  Result &result = get_result(output_identifier);
+  switch (input_->bsocket()->type) {
+    case SOCK_FLOAT:
+      result.data.value = *input_->default_value<float>();
+      return;
+    case SOCK_VECTOR:
+      copy_v3_v3(result.data.vector, *input_->default_value<float[3]>());
+      return;
+    case SOCK_RGBA:
+      copy_v4_v4(result.data.color, *input_->default_value<float[4]>());
+      return;
+    default:
+      BLI_assert_unreachable();
   }
 }
 
-void Compiler::compute_output_node()
+ResultType SingleValueInputOperation::get_input_result_type() const
 {
-  const NodeTreeRef &root_tree = tree_.root_context().tree();
+  switch (input_->bsocket()->type) {
+    case SOCK_FLOAT:
+      return ResultType::Float;
+    case SOCK_VECTOR:
+      return ResultType::Vector;
+    case SOCK_RGBA:
+      return ResultType::Color;
+    default:
+      BLI_assert_unreachable();
+      return ResultType::Float;
+  }
+}
+
+/* --------------------------------------------------------------------
+ * Evaluator.
+ */
+
+Evaluator::Evaluator(Context &context, bNodeTree *scene_node_tree)
+    : context(context), tree(*scene_node_tree, tree_ref_map){};
+
+void Evaluator::evaluate()
+{
+  /* Get the output node whose result should be computed and drawn. */
+  DNode output_node = compute_output_node();
+
+  /* Validate the compositor node tree. */
+  if (!is_valid(output_node)) {
+    return;
+  }
+
+  /* Instantiate a node operation for every node reachable from the output. */
+  create_node_operations(output_node);
+
+  /* Compute the number of buffers needed by each node. */
+  NeededBuffers needed_buffers;
+  compute_needed_buffers(output_node, needed_buffers);
+
+  /* Compute the execution schedule of the nodes. */
+  NodeSchedule node_schedule;
+  compute_schedule(output_node, needed_buffers, node_schedule);
+
+  /* Compute the operations stream. */
+  compute_operations_stream(node_schedule);
+}
+
+/* The output node is the one marked as NODE_DO_OUTPUT. If multiple types of output nodes are
+ * marked, then preference will be CMP_NODE_COMPOSITE > CMP_NODE_VIEWER > CMP_NODE_SPLITVIEWER. */
+DNode Evaluator::compute_output_node() const
+{
+  const NodeTreeRef &root_tree = tree.root_context().tree();
   for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeComposite")) {
     if (node->bnode()->flag & NODE_DO_OUTPUT) {
-      output_node_ = DNode(&tree_.root_context(), node);
-      return;
+      return DNode(&tree.root_context(), node);
     }
   }
   for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeViewer")) {
     if (node->bnode()->flag & NODE_DO_OUTPUT) {
-      output_node_ = DNode(&tree_.root_context(), node);
-      return;
+      return DNode(&tree.root_context(), node);
     }
   }
   for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeSplitViewer")) {
     if (node->bnode()->flag & NODE_DO_OUTPUT) {
-      output_node_ = DNode(&tree_.root_context(), node);
-      return;
+      return DNode(&tree.root_context(), node);
     }
+  }
+  return DNode();
+}
+
+bool Evaluator::is_valid(DNode output_node)
+{
+  /* The node tree needs to have an output. */
+  if (!output_node) {
+    return false;
+  }
+
+  return true;
+}
+
+/* Traverse the node tree starting from the given node and instantiate the node operations for all
+ * reachable nodes, adding the instances to node_operations_. */
+void Evaluator::create_node_operations(DNode node)
+{
+  for (const InputSocketRef *input_ref : node->inputs()) {
+    const DInputSocket input{node.context(), input_ref};
+    input.foreach_origin_socket([&](const DSocket origin) {
+      if (node_operations_.contains(origin.node())) {
+        return;
+      }
+      bNodeType *type = origin.node()->typeinfo();
+      NodeOperation *operation = type->get_compositor_operation(context, origin.node());
+      node_operations_.add_new(origin.node(), operation);
+      create_node_operations(origin.node());
+    });
   }
 }
 
@@ -184,7 +303,7 @@ void Compiler::compute_output_node()
  * If the node tree was, in fact, a tree, then this would be an accurate computation. However,
  * the node tree is in fact a graph that allows output sharing, so the computation in this case
  * is merely a heuristic estimation that works well in most cases. */
-int Compiler::compute_needed_buffers(DNode node)
+int Evaluator::compute_needed_buffers(DNode node, NeededBuffers &needed_buffers)
 {
   /* Compute the number of buffers that the node takes as an input as well as the number of
    * buffers needed to compute the most demanding dependency node. */
@@ -196,11 +315,11 @@ int Compiler::compute_needed_buffers(DNode node)
     input.foreach_origin_socket([&](const DSocket origin) {
       input_buffers++;
       /* The origin node was already computed before, so skip it. */
-      if (needed_buffers_.contains(origin.node())) {
+      if (needed_buffers.contains(origin.node())) {
         return;
       }
       /* Recursively compute the number of buffers needed to compute this dependency node. */
-      const int buffers_needed_by_origin = compute_needed_buffers(origin.node());
+      const int buffers_needed_by_origin = compute_needed_buffers(origin.node(), needed_buffers);
       if (buffers_needed_by_origin > buffers_needed_by_dependencies) {
         buffers_needed_by_dependencies = buffers_needed_by_origin;
       }
@@ -210,7 +329,7 @@ int Compiler::compute_needed_buffers(DNode node)
   /* Compute the number of buffers that will be computed/output by this node. */
   int output_buffers = 0;
   for (const OutputSocketRef *output : node->outputs()) {
-    if (output->logically_linked_sockets().size() != 0) {
+    if (!output->logically_linked_sockets().is_empty()) {
       output_buffers++;
     }
   }
@@ -218,7 +337,7 @@ int Compiler::compute_needed_buffers(DNode node)
   /* Compute the heuristic estimation of the number of needed intermediate buffers to compute
    * this node and all of its dependencies. */
   const int total_buffers = MAX2(input_buffers + output_buffers, buffers_needed_by_dependencies);
-  needed_buffers_.add_new(node, total_buffers);
+  needed_buffers.add_new(node, total_buffers);
   return total_buffers;
 }
 
@@ -235,7 +354,9 @@ int Compiler::compute_needed_buffers(DNode node)
  * This is a heuristic generalization of the Sethi–Ullman algorithm, a generalization that
  * doesn't always guarantee an optimal evaluation order, as the optimal evaluation order is very
  * difficult to compute, however, this method works well in most cases. */
-void Compiler::compute_schedule(DNode node)
+void Evaluator::compute_schedule(DNode node,
+                                 NeededBuffers &needed_buffers,
+                                 NodeSchedule &node_schedule)
 {
   /* Compute the nodes directly connected to the node inputs sorted by their needed buffers such
    * that the node with the highest number of needed buffers comes first. */
@@ -246,14 +367,13 @@ void Compiler::compute_schedule(DNode node)
       /* The origin node was added before or was already schedule, so skip it. The number of
        * origin nodes is very small, so linear search is okay.
        */
-      if (sorted_origin_nodes.contains(origin.node()) || node_schedule_.contains(origin.node())) {
+      if (sorted_origin_nodes.contains(origin.node()) || node_schedule.contains(origin.node())) {
         return;
       }
       /* Sort on insertion, the number of origin nodes is very small, so this is okay. */
       int insertion_position = 0;
       for (int i = 0; i < sorted_origin_nodes.size(); i++) {
-        if (needed_buffers_.lookup(origin.node()) >
-            needed_buffers_.lookup(sorted_origin_nodes[i])) {
+        if (needed_buffers.lookup(origin.node()) > needed_buffers.lookup(sorted_origin_nodes[i])) {
           break;
         }
         insertion_position++;
@@ -265,10 +385,85 @@ void Compiler::compute_schedule(DNode node)
   /* Recursively schedule origin nodes. Nodes with higher number of needed intermediate buffers
    * are scheduled first. */
   for (const DNode &origin_node : sorted_origin_nodes) {
-    compute_schedule(origin_node);
+    compute_schedule(origin_node, needed_buffers, node_schedule);
   }
 
-  node_schedule_.add_new(node);
+  node_schedule.add_new(node);
 }
 
-}  // namespace blender::compositor
+/* Emit and initialize all node operations in the same order as the node schedule. */
+void Evaluator::compute_operations_stream(NodeSchedule &node_schedule)
+{
+  for (const DNode &node : node_schedule) {
+    emit_node_operation(node);
+  }
+}
+
+/* First map the inputs to their results, emitting and initializing any meta operations in the
+ * process. Then emit and initialize the node operation corresponding to the given node. */
+void Evaluator::emit_node_operation(DNode node)
+{
+  map_node_inputs_to_results(node);
+
+  NodeOperation *node_operation = node_operations_.lookup(node);
+  node_operation->initialize();
+  operations_stream_.append(node_operation);
+}
+
+/* Call map_node_input_to_result for every input in the node. */
+void Evaluator::map_node_inputs_to_results(DNode node)
+{
+  for (const InputSocketRef *input_ref : node->inputs()) {
+    const DInputSocket input{node.context(), input_ref};
+    map_node_input_to_result(input);
+  }
+}
+
+/* Either call map_node_linked_input_to_result or map_node_unlinked_input_to_result depending on
+ * whether the input is linked to an output or not. */
+void Evaluator::map_node_input_to_result(DInputSocket input)
+{
+  /* The input is unlinked. */
+  if (!input->logically_linked_sockets().is_empty()) {
+    map_node_unlinked_input_to_result(input);
+    return;
+  }
+
+  input.foreach_origin_socket([&](const DSocket origin) {
+    /* The input is linked to an input of a group input node that is actually unlinked, in this
+     * case, we pass the input of the group input node. */
+    if (origin->is_input()) {
+      const DInputSocket group_input{origin.context(), &origin->as_input()};
+      map_node_unlinked_input_to_result(group_input);
+      return;
+    }
+
+    /* The input is linked to an output. */
+    const DOutputSocket output{origin.context(), &origin->as_output()};
+    map_node_linked_input_to_result(input, output);
+  });
+}
+
+void Evaluator::map_node_linked_input_to_result(DInputSocket input, DOutputSocket output)
+{
+  NodeOperation *input_operation = node_operations_.lookup(input.node());
+  NodeOperation *output_operation = node_operations_.lookup(output.node());
+  /* Map the input to the result we get from the output. */
+  Result &result = output_operation->get_result(output->identifier());
+  input_operation->map_input_to_result(input->identifier(), &result);
+}
+
+void Evaluator::map_node_unlinked_input_to_result(DInputSocket input)
+{
+  /* Emit a SingleValueInputOperation for that input. */
+  SingleValueInputOperation *value_operation = new SingleValueInputOperation(input);
+  value_operation->initialize();
+  operations_stream_.append(value_operation);
+
+  /* Map the input to the result we get from the single value operation. */
+  NodeOperation *input_operation = node_operations_.lookup(input.node());
+  Result &result = value_operation->get_result(SingleValueInputOperation::output_identifier);
+  input_operation->map_input_to_result(input->identifier(), &result);
+}
+
+}  // namespace blender::viewport_compositor
