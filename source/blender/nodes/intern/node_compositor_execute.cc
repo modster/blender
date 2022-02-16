@@ -62,19 +62,37 @@ bool operator==(const TexturePoolKey &a, const TexturePoolKey &b)
   return a.width == b.width && a.height == b.height && a.format == b.format;
 }
 
-GPUTexture *TexturePool::acquire(int width, int height, eGPUTextureFormat format, int users_count)
+GPUTexture *TexturePool::acquire(int width, int height, eGPUTextureFormat format)
 {
   const TexturePoolKey key = TexturePoolKey(width, height, format);
   Vector<GPUTexture *> &available_textures = textures_.lookup_or_add_default(key);
-  GPUTexture *texture = available_textures.is_empty() ? allocate_texture(width, height, format) :
-                                                        available_textures.pop_last();
-  /* Add 1 to the users count because the texture pool itself is considered a user. */
-  GPU_texture_set_reference_count(texture, users_count + 1);
-  return texture;
+  if (available_textures.is_empty()) {
+    return allocate_texture(width, height, format);
+  }
+  return available_textures.pop_last();
+}
+
+GPUTexture *TexturePool::acquire_color(int width, int height)
+{
+  return acquire(width, height, GPU_RGBA16F);
+}
+
+GPUTexture *TexturePool::acquire_vector(int width, int height)
+{
+  return acquire(width, height, GPU_RGB16F);
+}
+
+GPUTexture *TexturePool::acquire_float(int width, int height)
+{
+  return acquire(width, height, GPU_R16F);
 }
 
 void TexturePool::release(GPUTexture *texture)
 {
+  /* Since the given texture will always have at least one more user beside the texture pool itself
+   * in a well behaved evaluation, this will not actually free the texture, it merely decrement the
+   * reference the count. */
+  GPU_texture_free(texture);
   /* Don't release if the texture still has more than 1 user. We check if the reference count is
    * more than 1, not zero, because the texture pool itself is considered a user of the texture. */
   if (GPU_texture_get_reference_count(texture) > 1) {
@@ -92,8 +110,34 @@ Context::Context(TexturePool &texture_pool) : texture_pool(texture_pool)
 }
 
 /* --------------------------------------------------------------------
+ * Result.
+ */
+
+Result::Result(ResultType type, bool is_texture) : type(type), is_texture(is_texture)
+{
+}
+
+void Result::incremenet_reference_count()
+{
+  if (is_texture) {
+    GPU_texture_ref(data.texture);
+  }
+}
+
+void Result::release(TexturePool &texture_pool)
+{
+  if (is_texture) {
+    texture_pool.release(data.texture);
+  }
+}
+
+/* --------------------------------------------------------------------
  * Operation.
  */
+
+Operation::Operation(Context &context) : context_(context)
+{
+}
 
 void Operation::release()
 {
@@ -112,11 +156,24 @@ Result &Operation::get_result(StringRef identifier)
 void Operation::map_input_to_result(StringRef identifier, Result *result)
 {
   inputs_to_results_map_.add_new(identifier, result);
+  result->incremenet_reference_count();
 }
 
 const Result &Operation::get_input(StringRef identifier) const
 {
   return *inputs_to_results_map_.lookup(identifier);
+}
+
+void Operation::release_inputs()
+{
+  for (Result *result : inputs_to_results_map_.values()) {
+    result->release(context_.texture_pool);
+  }
+}
+
+Context &Operation::context()
+{
+  return context_;
 }
 
 /* --------------------------------------------------------------------
@@ -125,7 +182,7 @@ const Result &Operation::get_input(StringRef identifier) const
 
 using namespace nodes::derived_node_tree_types;
 
-NodeOperation::NodeOperation(Context &context, DNode node) : context_(context), node_(node)
+NodeOperation::NodeOperation(Context &context, DNode node) : Operation(context), node_(node)
 {
 }
 
@@ -144,16 +201,20 @@ bool NodeOperation::is_output_needed(StringRef identifier) const
   return true;
 }
 
-Context &NodeOperation::context()
+/* --------------------------------------------------------------------
+ * Meta Operation.
+ */
+
+MetaOperation::MetaOperation(Context &context) : Operation(context)
 {
-  return context_;
 }
 
 /* --------------------------------------------------------------------
  * Single Value Input Operation.
  */
 
-SingleValueInputOperation::SingleValueInputOperation(DInputSocket input) : input_(input)
+SingleValueInputOperation::SingleValueInputOperation(Context &context, DInputSocket input)
+    : MetaOperation(context), input_(input)
 {
 }
 
@@ -167,7 +228,7 @@ bool SingleValueInputOperation::is_buffered() const
 /* The result is a single value of the same type as the member socket. */
 void SingleValueInputOperation::initialize()
 {
-  Result result = {get_input_result_type(), false};
+  Result result{get_input_result_type(), false};
   add_result(output_identifier, result);
 }
 
@@ -213,6 +274,13 @@ ResultType SingleValueInputOperation::get_input_result_type() const
 Evaluator::Evaluator(Context &context, bNodeTree *scene_node_tree)
     : context(context), tree(*scene_node_tree, tree_ref_map){};
 
+Evaluator::~Evaluator()
+{
+  for (const Operation *operation : operations_stream_) {
+    delete operation;
+  }
+}
+
 void Evaluator::evaluate()
 {
   /* Get the output node whose result should be computed and drawn. */
@@ -236,6 +304,9 @@ void Evaluator::evaluate()
 
   /* Compute the operations stream. */
   compute_operations_stream(node_schedule);
+
+  /* Execute the operations stream. */
+  execute_operations_stream();
 }
 
 /* The output node is the one marked as NODE_DO_OUTPUT. If multiple types of output nodes are
@@ -456,7 +527,7 @@ void Evaluator::map_node_linked_input_to_result(DInputSocket input, DOutputSocke
 void Evaluator::map_node_unlinked_input_to_result(DInputSocket input)
 {
   /* Emit a SingleValueInputOperation for that input. */
-  SingleValueInputOperation *value_operation = new SingleValueInputOperation(input);
+  SingleValueInputOperation *value_operation = new SingleValueInputOperation(context, input);
   value_operation->initialize();
   operations_stream_.append(value_operation);
 
@@ -464,6 +535,21 @@ void Evaluator::map_node_unlinked_input_to_result(DInputSocket input)
   NodeOperation *input_operation = node_operations_.lookup(input.node());
   Result &result = value_operation->get_result(SingleValueInputOperation::output_identifier);
   input_operation->map_input_to_result(input->identifier(), &result);
+}
+
+/* Call execute_operation for every operation in the stream in order. */
+void Evaluator::execute_operations_stream()
+{
+  for (Operation *operation : operations_stream_) {
+    execute_operation(operation);
+  }
+}
+
+void Evaluator::execute_operation(Operation *operation)
+{
+  operation->execute();
+  operation->release();
+  operation->release_inputs();
 }
 
 }  // namespace blender::viewport_compositor

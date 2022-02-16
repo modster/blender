@@ -88,11 +88,9 @@ static void draw()
 
 }  // namespace blender::viewport_compositor
 
-using namespace blender::viewport_compositor;
-
 static void compositor_draw(void *UNUSED(data))
 {
-  draw();
+  blender::viewport_compositor::draw();
 }
 
 extern "C" {

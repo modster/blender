@@ -61,17 +61,24 @@ class TexturePool {
 
  public:
   /* Check if there is an available texture with the given specification in the pool, if such
-   * texture exists, return it, otherwise, return a newly allocated texture. The texture can be
-   * reference counted by providing the number of users that will be using this texture. The
-   * reference count will then be users_count + 1, because the texture pool is itself considered a
-   * user. Expect the texture to be uncleared and contains garbage data. */
-  GPUTexture *acquire(int width, int height, eGPUTextureFormat format, int users_count = 1);
+   * texture exists, return it, otherwise, return a newly allocated texture. Expect the texture to
+   * be uncleared and contains garbage data. */
+  GPUTexture *acquire(int width, int height, eGPUTextureFormat format);
 
-  /* Put the texture back into the pool, potentially to be acquired later by another user. The
-   * texture is only effectively release when its reference count reaches one. Notice that the
-   * texture is release when the texture reference count reaches one not zero, because the texture
-   * pool is itself considered a user of the texture. Expects the texture to be one that was
-   * acquired using the same texture pool. */
+  /* Shorthand for acquire with GPU_RGBA16F format. */
+  GPUTexture *acquire_color(int width, int height);
+
+  /* Shorthand for acquire with GPU_RGB16F format. */
+  GPUTexture *acquire_vector(int width, int height);
+
+  /* Shorthand for acquire with GPU_R16F format. */
+  GPUTexture *acquire_float(int width, int height);
+
+  /* Decrement the reference count of the texture and put it back into the pool if its reference
+   * count reaches one, potentially to be acquired later by another user. Notice that the texture
+   * is release when the texture reference count reaches one, not zero, because the texture pool is
+   * itself considered a user of the texture. Expects the texture to be one that was acquired using
+   * the same texture pool. */
   void release(GPUTexture *texture);
 
  private:
@@ -115,9 +122,10 @@ enum class ResultType : uint8_t {
   Color,
 };
 
-/* A structure that describes the result of an operation. An operator can have multiple results
+/* A class that describes the result of an operation. An operator can have multiple results
  * corresponding to multiple outputs. A result either represents a single value or a texture. */
-struct Result {
+class Result {
+ public:
   /* The base type of the texture or the type of the single value. */
   ResultType type;
   /* If true, the result is a texture, otherwise, the result is a single value. */
@@ -130,6 +138,15 @@ struct Result {
     float vector[3];
     float color[4];
   } data;
+
+ public:
+  Result(ResultType type, bool is_texture);
+
+  /* If the result is a texture, increment its reference count.  */
+  void incremenet_reference_count();
+
+  /* If the result is a texture, release it back into the given texture pool.  */
+  void release(TexturePool &texture_pool);
 };
 
 /* --------------------------------------------------------------------
@@ -140,6 +157,9 @@ struct Result {
  * in the compositor. */
 class Operation {
  private:
+  /* A reference to the compositor context. This member references the same object in all
+   * operations but is included in the class for convenience. */
+  Context &context_;
   /* A mapping between each output of the operation identified by its identifier and the computed
    * result for that output. The initialize method is expected to add the needed results. The
    * contents of the results data are uninitialized prior to the invocation of the execute method,
@@ -153,6 +173,10 @@ class Operation {
   Map<StringRef, Result *> inputs_to_results_map_;
 
  public:
+  Operation(Context &context);
+
+  virtual ~Operation() = default;
+
   /* This method should return true if this operation can only operate on buffers, otherwise,
    * return false if the operation can be applied pixel-wise. */
   virtual bool is_buffered() const = 0;
@@ -179,11 +203,19 @@ class Operation {
   Result &get_result(StringRef identifier);
 
   /* Map the input identified by the given identifier to a reference to the result it is connected
-   * to. See inputs_to_results_map_ member for more details. */
+   * to. This also increments the reference count of texture results. See inputs_to_results_map_
+   * member for more details. */
   void map_input_to_result(StringRef identifier, Result *result);
 
   /* Get a reference to the result connected to the input identified by the given identifier. */
   const Result &get_input(StringRef identifier) const;
+
+  /* Release any textures allocated for the results mapped to the inputs of the operation. This is
+   * called after the execution of the operation to declare that the results are no longer needed
+   * by this operation. */
+  void release_inputs();
+
+  Context &context();
 };
 
 /* --------------------------------------------------------------------
@@ -196,9 +228,6 @@ using namespace nodes::derived_node_tree_types;
  * bNodeType.get_compositor_operation, passing the given inputs to the base constructor.  */
 class NodeOperation : public Operation {
  private:
-  /* A reference to the compositor context. This member references the same object in all
-   * operations but is included in the class for convenience. */
-  Context &context_;
   /* The node that this operation represents. */
   DNode node_;
 
@@ -206,8 +235,6 @@ class NodeOperation : public Operation {
   NodeOperation(Context &context, DNode node);
 
   virtual bool is_buffered() const override;
-
-  Context &context();
 
   /* Returns true if the output identified by the given identifier is needed and should be
    * computed, otherwise returns false. */
@@ -222,6 +249,8 @@ class NodeOperation : public Operation {
  * node operations by hiding certain implementations details. See any of the derived classes as an
  * example. */
 class MetaOperation : public Operation {
+ public:
+  MetaOperation(Context &context);
 };
 
 /* --------------------------------------------------------------------
@@ -240,7 +269,7 @@ class SingleValueInputOperation : public MetaOperation {
   DInputSocket input_;
 
  public:
-  SingleValueInputOperation(DInputSocket input);
+  SingleValueInputOperation(Context &context, DInputSocket input);
 
   virtual bool is_buffered() const override;
 
@@ -286,6 +315,10 @@ class Evaluator {
  public:
   Evaluator(Context &context, bNodeTree *scene_node_tree);
 
+  /* Delete operations in the operations stream. */
+  ~Evaluator();
+
+  /* Compile the compositor node tree into an operations stream then execute that stream. */
   void evaluate();
 
  private:
@@ -335,6 +368,13 @@ class Evaluator {
 
   /* Map the input to the result of a newly emitted and initialized SingleValueInputOperation. */
   void map_node_unlinked_input_to_result(DInputSocket input);
+
+  /* Execute every operation in the stream in order. This essentially calls execute_operation for
+   * every operation in order. */
+  void execute_operations_stream();
+
+  /* Execute the given operation then call its release method and release its inputs. */
+  void execute_operation(Operation *operation);
 };
 
 }  // namespace blender::viewport_compositor
