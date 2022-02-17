@@ -70,7 +70,7 @@ FIND_FILE(_openimageio_export
 FILE(STRINGS "${_openimageio_export}" _openimageio_util_define
      REGEX "^[ \t]*#[ \t]*define[ \t]+OIIO_UTIL_API.*$")
 
-If(_openimageio_util_define)
+IF(_openimageio_util_define)
   FIND_LIBRARY(OPENIMAGEIO_UTIL_LIBRARY
     NAMES
       OpenImageIO_Util
@@ -82,6 +82,10 @@ If(_openimageio_util_define)
 
   LIST(APPEND _openimageio_LIBRARIES ${OPENIMAGEIO_UTIL_LIBRARY})
 ENDIF()
+
+# In cmake version 3.21 and up, we can instead use the NO_CACHE option for
+# FIND_FILE so we don't need to clear it from the cache here.
+UNSET(_openimageio_export CACHE)
 UNSET(_openimageio_util_define)
 
 # handle the QUIETLY and REQUIRED arguments and set OPENIMAGEIO_FOUND to TRUE if

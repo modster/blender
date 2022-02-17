@@ -402,7 +402,9 @@ if(WITH_CODEC_FFMPEG)
   endif()
 endif()
 
-if(WITH_IMATH)
+if(WITH_IMAGE_OPENEXR)
+  # Imath and OpenEXR have a single combined build option and include and library variables
+  # used by the rest of the build system.
   set(IMATH_ROOT_DIR ${LIBDIR}/imath)
   set(IMATH_VERSION "3.14")
   windows_find_package(IMATH REQUIRED)
@@ -415,9 +417,7 @@ if(WITH_IMATH)
       optimized ${IMATH_LIBPATH}/Imath-3_1.lib
       debug ${IMATH_LIBPATH}/Imath-3_1_d.lib
     )
-  endif()
-endif()
-if(WITH_IMAGE_OPENEXR)
+
   set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
   set(OPENEXR_VERSION "3.14")
   windows_find_package(OPENEXR REQUIRED)

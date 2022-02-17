@@ -161,11 +161,11 @@ IF(OPENEXR_VERSION VERSION_GREATER_EQUAL "3.0.0")
     )
   LIST(APPEND _openexr_LIBRARIES "${IMATH_LIBRARY}")
 
-  UNSET(_imath_config)
+  # In cmake version 3.21 and up, we can instead use the NO_CACHE option for
+  # FIND_FILE so we don't need to clear it from the cache here.
+  UNSET(_imath_config CACHE)
   UNSET(_imath_libs_ver)
   UNSET(_imath_build_specification)
-ELSE()
-  set(IMATH_INCLUDE_DIR ${OPENEXR_INCLUDE_DIR})
 ENDIF()
 
 # handle the QUIETLY and REQUIRED arguments and set OPENEXR_FOUND to TRUE if
@@ -181,14 +181,20 @@ IF(OPENEXR_FOUND)
   # include <half.h> directly.
   SET(OPENEXR_INCLUDE_DIRS
     ${OPENEXR_INCLUDE_DIR}
-    ${OPENEXR_INCLUDE_DIR}/OpenEXR
-    ${IMATH_INCLUDE_DIR}
-    ${IMATH_INCLUDE_DIR}/Imath)
+    ${OPENEXR_INCLUDE_DIR}/OpenEXR)
+
+  IF(OPENEXR_VERSION VERSION_GREATER_EQUAL "3.0.0")
+    LIST(APPEND OPENEXR_INCLUDE_DIRS
+      ${IMATH_INCLUDE_DIR}
+      ${IMATH_INCLUDE_DIR}/Imath)
+  ENDIF()
 ENDIF()
 
 MARK_AS_ADVANCED(
   OPENEXR_INCLUDE_DIR
   OPENEXR_VERSION
+  IMATH_INCLUDE_DIR
+  IMATH_LIBRARY
 )
 FOREACH(COMPONENT ${_openexr_FIND_COMPONENTS})
   STRING(TOUPPER ${COMPONENT} UPPERCOMPONENT)
