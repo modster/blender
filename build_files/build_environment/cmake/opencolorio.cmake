@@ -31,6 +31,7 @@ if(WIN32)
     ${OPENCOLORIO_EXTRA_ARGS}
     -Dexpat_LIBRARY=${LIBDIR}/expat/lib/libexpatMD
     -Dyaml-cpp_LIBRARY=${LIBDIR}/expat/lib/libyaml-cppmd.lib
+    -DImath_LIBRARY=${LIBDIR}/imath/lib/imath${OPENEXR_VERSION_POSTFIX}
   )
 else()
   set(OPENCOLORIO_EXTRA_ARGS
