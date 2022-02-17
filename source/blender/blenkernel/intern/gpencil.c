@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008, Blender Foundation
- * This is a new part of Blender
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. */
 
 /** \file
  * \ingroup bke
@@ -2854,7 +2838,7 @@ void BKE_gpencil_frame_selected_hash(bGPdata *gpd, struct GHash *r_list)
 
 bool BKE_gpencil_can_avoid_full_copy_on_write(const Depsgraph *depsgraph, bGPdata *gpd)
 {
-  /* For now, we only use the update cache in the active depsgraph. Othwerwise we might access the
+  /* For now, we only use the update cache in the active depsgraph. Otherwise we might access the
    * cache while another depsgraph frees it. */
   if (!DEG_is_active(depsgraph)) {
     return false;
@@ -2894,7 +2878,7 @@ static bool gpencil_update_on_write_layer_cb(GPencilUpdateCache *gpl_cache, void
     td->gpl_eval->runtime.gpl_orig = gpl;
     return true;
   }
-  else if (gpl_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
+  if (gpl_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
     BLI_assert(gpl != NULL);
     BKE_gpencil_layer_copy_settings(gpl, td->gpl_eval);
     td->gpl_eval->runtime.gpl_orig = gpl;
@@ -2934,7 +2918,7 @@ static bool gpencil_update_on_write_frame_cb(GPencilUpdateCache *gpf_cache, void
 
     return true;
   }
-  else if (gpf_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
+  if (gpf_cache->flag == GP_UPDATE_NODE_LIGHT_COPY) {
     BLI_assert(gpf != NULL);
     BKE_gpencil_frame_copy_settings(gpf, td->gpf_eval);
     td->gpf_eval->runtime.gpf_orig = gpf;

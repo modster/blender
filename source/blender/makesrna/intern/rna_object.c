@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup RNA
@@ -98,6 +84,7 @@ const EnumPropertyItem rna_enum_object_mode_items[] = {
      ICON_VPAINT_HLT,
      "Vertex Paint",
      "Grease Pencil Vertex Paint Strokes"},
+    {OB_MODE_SCULPT_CURVES, "SCULPT_CURVES", ICON_SCULPTMODE_HLT, "Sculpt Mode", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -345,6 +332,7 @@ const EnumPropertyItem rna_enum_object_axis_items[] = {
 #  include "BKE_key.h"
 #  include "BKE_material.h"
 #  include "BKE_mesh.h"
+#  include "BKE_mesh_wrapper.h"
 #  include "BKE_modifier.h"
 #  include "BKE_object.h"
 #  include "BKE_particle.h"
@@ -522,6 +510,17 @@ void rna_Object_data_update(Main *bmain, Scene *scene, PointerRNA *ptr)
   }
 
   rna_Object_internal_update_data_dependency(bmain, scene, ptr);
+}
+
+static PointerRNA rna_Object_data_get(PointerRNA *ptr)
+{
+  Object *ob = (Object *)ptr->data;
+  if (ob->type == OB_MESH) {
+    Mesh *me = (Mesh *)ob->data;
+    me = BKE_mesh_wrapper_ensure_subdivision(ob, me);
+    return rna_pointer_inherit_refine(ptr, &RNA_Mesh, me);
+  }
+  return rna_pointer_inherit_refine(ptr, &RNA_ID, ob->data);
 }
 
 static void rna_Object_data_set(PointerRNA *ptr, PointerRNA value, struct ReportList *reports)
@@ -3055,8 +3054,11 @@ static void rna_def_object(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "data", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "ID");
-  RNA_def_property_pointer_funcs(
-      prop, NULL, "rna_Object_data_set", "rna_Object_data_typef", "rna_Object_data_poll");
+  RNA_def_property_pointer_funcs(prop,
+                                 "rna_Object_data_get",
+                                 "rna_Object_data_set",
+                                 "rna_Object_data_typef",
+                                 "rna_Object_data_poll");
   RNA_def_property_flag(prop, PROP_EDITABLE | PROP_NEVER_UNLINK);
   RNA_def_property_ui_text(prop, "Data", "Object data");
   RNA_def_property_update(prop, 0, "rna_Object_data_update");

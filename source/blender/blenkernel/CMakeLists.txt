@@ -1,22 +1,5 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2006 Blender Foundation. All rights reserved.
 
 set(INC
   .
@@ -120,6 +103,7 @@ set(SRC
   intern/cryptomatte.cc
   intern/curve.cc
   intern/curves.cc
+  intern/curves_geometry.cc
   intern/curve_bevel.c
   intern/curve_convert.c
   intern/curve_decimate.c
@@ -200,6 +184,7 @@ set(SRC
   intern/mball_tessellate.c
   intern/mesh.cc
   intern/mesh_boolean_convert.cc
+  intern/mesh_calc_edges.cc
   intern/mesh_convert.cc
   intern/mesh_debug.cc
   intern/mesh_evaluate.cc
@@ -216,7 +201,6 @@ set(SRC
   intern/mesh_tangent.c
   intern/mesh_tessellate.c
   intern/mesh_validate.c
-  intern/mesh_validate.cc
   intern/mesh_wrapper.c
   intern/modifier.c
   intern/movieclip.c
@@ -358,6 +342,7 @@ set(SRC
   BKE_cryptomatte.hh
   BKE_curve.h
   BKE_curves.h
+  BKE_curves.hh
   BKE_curve_to_mesh.hh
   BKE_curveprofile.h
   BKE_customdata.h

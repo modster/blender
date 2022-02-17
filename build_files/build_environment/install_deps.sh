@@ -1,21 +1,5 @@
 #!/usr/bin/env bash
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # A shell script installing/building all needed dependencies to build Blender, for some Linux distributions.
 
@@ -376,8 +360,9 @@ USE_CXX11=true
 # XXX_VERSION_SHORT is used for various things, like preferred version (when distribution provides several of them),
 #                   and to name shortcuts to built libraries' installation directories...
 
+CLANG_FORMAT_VERSION="10.0"
 CLANG_FORMAT_VERSION_MIN="6.0"
-CLANG_FORMAT_VERSION_MEX="10.0"
+CLANG_FORMAT_VERSION_MEX="14.0"
 
 PYTHON_VERSION="3.10.2"
 PYTHON_VERSION_SHORT="3.10"

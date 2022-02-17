@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2017 by Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2017 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup draw
@@ -38,7 +22,7 @@
 #include "DNA_curves_types.h"
 #include "DNA_object_types.h"
 
-#include "BKE_curves.h"
+#include "BKE_curves.hh"
 
 #include "GPU_batch.h"
 #include "GPU_material.h"
@@ -149,7 +133,7 @@ static void curves_batch_cache_fill_segments_proc_pos(Curves *curves,
 {
   /* TODO: use hair radius layer if available. */
   const int curve_size = curves->geometry.curve_size;
-  Span<int> offsets{curves->geometry.offsets, curves->geometry.curve_size + 1};
+  Span<int> offsets{curves->geometry.curve_offsets, curves->geometry.curve_size + 1};
 
   Span<float3> positions{(float3 *)curves->geometry.position, curves->geometry.point_size};
 
@@ -232,7 +216,7 @@ static void curves_batch_cache_fill_strands_data(Curves *curves,
                                                  GPUVertBufRaw *seg_step)
 {
   const int curve_size = curves->geometry.curve_size;
-  Span<int> offsets{curves->geometry.offsets, curves->geometry.curve_size + 1};
+  Span<int> offsets{curves->geometry.curve_offsets, curves->geometry.curve_size + 1};
 
   for (const int i : IndexRange(curve_size)) {
     const IndexRange curve_range(offsets[i], offsets[i + 1] - offsets[i]);

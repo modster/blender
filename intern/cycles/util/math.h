@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #ifndef __UTIL_MATH_H__
 #define __UTIL_MATH_H__
@@ -935,8 +922,14 @@ ccl_device_inline uint prev_power_of_two(uint x)
 ccl_device_inline uint32_t reverse_integer_bits(uint32_t x)
 {
   /* Use a native instruction if it exists. */
-#if defined(__arm__) || defined(__aarch64__)
+#if defined(__aarch64__) || defined(_M_ARM64)
+  /* Assume the rbit is always available on 64bit ARM architecture. */
   __asm__("rbit %w0, %w1" : "=r"(x) : "r"(x));
+  return x;
+#elif defined(__arm__) && ((__ARM_ARCH > 7) || __ARM_ARCH == 6 && __ARM_ARCH_ISA_THUMB >= 2)
+  /* This ARM instruction is available in ARMv6T2 and above.
+   * This 32-bit Thumb instruction is available in ARMv6T2 and above. */
+  __asm__("rbit %0, %1" : "=r"(x) : "r"(x));
   return x;
 #elif defined(__KERNEL_CUDA__)
   return __brev(x);

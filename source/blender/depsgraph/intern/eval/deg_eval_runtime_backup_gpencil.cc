@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2022 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2022 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup depsgraph
@@ -51,7 +35,7 @@ void GPencilBackup::restore_to_gpencil(bGPdata *gpd)
   }
   /* Doing a copy-on-write copies the update cache pointer. Make sure to reset it
    * to NULL as we should never use the update cache from eval data. */
-  gpd->runtime.update_cache = NULL;
+  gpd->runtime.update_cache = nullptr;
   /* Make sure to update the original runtime pointers in the eval data. */
   BKE_gpencil_data_update_orig_pointers(gpd_orig, gpd);
 }

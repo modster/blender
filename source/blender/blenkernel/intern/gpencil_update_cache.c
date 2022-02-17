@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2022, Blender Foundation
- * This is a new part of Blender
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2022 Blender Foundation. */
 
 /** \file
  * \ingroup bke
@@ -115,7 +99,7 @@ static void update_cache_node_create_ex(GPencilUpdateCache *root_cache,
                                         bool full_copy)
 {
   if (root_cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    /* Entire data-block has to be recaculated, e.g. nothing else needs to be added to the cache.
+    /* Entire data-block has to be recalculated, e.g. nothing else needs to be added to the cache.
      */
     return;
   }
@@ -126,14 +110,14 @@ static void update_cache_node_create_ex(GPencilUpdateCache *root_cache,
     root_cache->data = (bGPdata *)data;
     root_cache->flag = node_flag;
     if (full_copy) {
-      /* Entire data-block has to be recaculated, remove all caches of "lower" elements. */
+      /* Entire data-block has to be recalculated, remove all caches of "lower" elements. */
       BLI_dlrbTree_free(root_cache->children, cache_node_free);
     }
     return;
   }
 
   const bool is_layer_update_node = (gpf_index == -1);
-  /* If the data pointer in GPencilUpdateCache is NULL, this element is not actually cached
+  /* If the data pointer in #GPencilUpdateCache is NULL, this element is not actually cached
    * and does not need to be updated, but we do need the index to find elements that are in
    * levels below. E.g. if a stroke needs to be updated, the frame it is in would not hold a
    * pointer to it's data. */
@@ -167,8 +151,11 @@ static void update_cache_node_create_ex(GPencilUpdateCache *root_cache,
   }
 
   GPencilUpdateCache *gps_cache = update_cache_alloc(gps_index, node_flag, (bGPDstroke *)data);
-  BLI_dlrbTree_add(
-      gpf_node->cache->children, cache_node_compare, cache_node_alloc, cache_node_update, gps_cache);
+  BLI_dlrbTree_add(gpf_node->cache->children,
+                   cache_node_compare,
+                   cache_node_alloc,
+                   cache_node_update,
+                   gps_cache);
 
   BLI_dlrbTree_linkedlist_sync(gpf_node->cache->children);
 }
@@ -187,7 +174,7 @@ static void update_cache_node_create(
   }
 
   if (root_cache->flag == GP_UPDATE_NODE_FULL_COPY) {
-    /* Entire data-block has to be recaculated, e.g. nothing else needs to be added to the cache.
+    /* Entire data-block has to be recalculated, e.g. nothing else needs to be added to the cache.
      */
     return;
   }

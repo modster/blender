@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -21,6 +7,7 @@
  */
 
 struct ID;
+struct ImageUser;
 struct Main;
 struct bNode;
 struct bNodeLink;
@@ -68,6 +55,8 @@ void BKE_ntree_update_tag_missing_runtime_data(struct bNodeTree *ntree);
 void BKE_ntree_update_tag_interface(struct bNodeTree *ntree);
 /** Used when an id data block changed that might be used by nodes that need to be updated. */
 void BKE_ntree_update_tag_id_changed(struct Main *bmain, struct ID *id);
+/** Used when an image user is updated that is used by any part of the node tree. */
+void BKE_ntree_update_tag_image_user_changed(struct bNodeTree *ntree, struct ImageUser *iuser);
 
 typedef struct NodeTreeUpdateExtraParams {
   /**

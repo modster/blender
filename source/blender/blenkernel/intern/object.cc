@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -89,7 +73,7 @@
 #include "BKE_constraint.h"
 #include "BKE_crazyspace.h"
 #include "BKE_curve.h"
-#include "BKE_curves.h"
+#include "BKE_curves.hh"
 #include "BKE_deform.h"
 #include "BKE_displist.h"
 #include "BKE_duplilist.h"
@@ -1615,9 +1599,7 @@ bool BKE_object_modifier_stack_copy(Object *ob_dst,
       continue;
     }
 
-    ModifierData *md_dst = BKE_modifier_new(md_src->type);
-    BLI_strncpy(md_dst->name, md_src->name, sizeof(md_dst->name));
-    BKE_modifier_copydata_ex(md_src, md_dst, flag_subdata);
+    ModifierData *md_dst = BKE_modifier_copy_ex(md_src, flag_subdata);
     BLI_addtail(&ob_dst->modifiers, md_dst);
   }
 
@@ -3954,7 +3936,7 @@ bool BKE_object_minmax_dupli(Depsgraph *depsgraph,
 
   ListBase *lb = object_duplilist(depsgraph, scene, ob);
   LISTBASE_FOREACH (DupliObject *, dob, lb) {
-    if ((use_hidden == false) && (dob->no_draw != 0)) {
+    if (((use_hidden == false) && (dob->no_draw != 0)) || dob->ob_data == nullptr) {
       /* pass */
     }
     else {
