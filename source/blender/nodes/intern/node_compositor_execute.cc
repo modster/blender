@@ -139,6 +139,10 @@ Operation::Operation(Context &context) : context_(context)
 {
 }
 
+void Operation::initialize()
+{
+}
+
 void Operation::release()
 {
 }
@@ -232,20 +236,19 @@ void SingleValueInputOperation::initialize()
   add_result(output_identifier, result);
 }
 
-/* Copy the default value of the member socket to the output result. The default value is a pointer
- * to a float array having the same number of elements as the socket type components. */
+/* Copy the default value of the member socket to the output result. */
 void SingleValueInputOperation::execute()
 {
   Result &result = get_result(output_identifier);
   switch (input_->bsocket()->type) {
     case SOCK_FLOAT:
-      result.data.value = *input_->default_value<float>();
+      result.data.value = input_->default_value<bNodeSocketValueFloat>()->value;
       return;
     case SOCK_VECTOR:
-      copy_v3_v3(result.data.vector, *input_->default_value<float[3]>());
+      copy_v3_v3(result.data.vector, input_->default_value<bNodeSocketValueVector>()->value);
       return;
     case SOCK_RGBA:
-      copy_v4_v4(result.data.color, *input_->default_value<float[4]>());
+      copy_v4_v4(result.data.color, input_->default_value<bNodeSocketValueRGBA>()->value);
       return;
     default:
       BLI_assert_unreachable();
@@ -346,16 +349,16 @@ bool Evaluator::is_valid(DNode output_node)
  * reachable nodes, adding the instances to node_operations_. */
 void Evaluator::create_node_operations(DNode node)
 {
+  const bNodeType *type = node->typeinfo();
+  NodeOperation *operation = type->get_compositor_operation(context, node);
+  node_operations_.add_new(node, operation);
+
   for (const InputSocketRef *input_ref : node->inputs()) {
     const DInputSocket input{node.context(), input_ref};
     input.foreach_origin_socket([&](const DSocket origin) {
-      if (node_operations_.contains(origin.node())) {
-        return;
+      if (!node_operations_.contains(origin.node())) {
+        create_node_operations(origin.node());
       }
-      bNodeType *type = origin.node()->typeinfo();
-      NodeOperation *operation = type->get_compositor_operation(context, origin.node());
-      node_operations_.add_new(origin.node(), operation);
-      create_node_operations(origin.node());
     });
   }
 }
@@ -495,7 +498,7 @@ void Evaluator::map_node_inputs_to_results(DNode node)
 void Evaluator::map_node_input_to_result(DInputSocket input)
 {
   /* The input is unlinked. */
-  if (!input->logically_linked_sockets().is_empty()) {
+  if (input->logically_linked_sockets().is_empty()) {
     map_node_unlinked_input_to_result(input);
     return;
   }

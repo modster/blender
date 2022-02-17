@@ -185,7 +185,7 @@ class Operation {
    * the output results. This includes the output textures as well as any temporary intermediate
    * buffers used by the operation. The texture pool provided by the context should be used to any
    * texture allocations. */
-  virtual void initialize() = 0;
+  virtual void initialize();
 
   /* This method should execute the operation, compute its outputs, and write them to the
    * appropriate result. */
