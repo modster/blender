@@ -291,7 +291,6 @@ set(GLSL_SRC
   shaders/composite/gpu_shader_composite_color_matte.glsl
   shaders/composite/gpu_shader_composite_color_spill.glsl
   shaders/composite/gpu_shader_composite_color_to_luminance.glsl
-  shaders/composite/gpu_shader_composite_composite.glsl
   shaders/composite/gpu_shader_composite_difference_matte.glsl
   shaders/composite/gpu_shader_composite_distance_matte.glsl
   shaders/composite/gpu_shader_composite_ellipse_mask.glsl

@@ -29,6 +29,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_texture.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** VIEWER ******************** */
@@ -53,20 +57,6 @@ static void node_composit_init_viewer(bNodeTree *UNUSED(ntree), bNode *node)
   node->id = (ID *)BKE_image_ensure_viewer(G.main, IMA_TYPE_COMPOSITE, "Viewer Node");
 }
 
-static int node_composit_gpu_viewer(GPUMaterial *mat,
-                                    bNode *node,
-                                    bNodeExecData *UNUSED(execdata),
-                                    GPUNodeStack *in,
-                                    GPUNodeStack *out)
-{
-  GPUNodeLink *outlink;
-
-  GPU_stack_link(mat, node, "node_composite", in, out, &outlink);
-  GPU_material_output_surface(mat, outlink);
-
-  return true;
-}
-
 static void node_composit_buts_viewer(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "use_alpha", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
@@ -85,6 +75,32 @@ static void node_composit_buts_viewer_ex(uiLayout *layout, bContext *UNUSED(C), 
   }
 }
 
+using namespace blender::viewport_compositor;
+
+class ViewerOperation : public NodeOperation {
+ public:
+  using NodeOperation::NodeOperation;
+
+  void execute() override
+  {
+    const Result &input_image = get_input("Image");
+    GPUTexture *viewport_texture = context().get_viewport_texture();
+    if (get_input("Image").is_texture) {
+      /* If the input image is a texture, copy the input texture to the viewport texture. */
+      GPU_texture_copy(viewport_texture, input_image.data.texture);
+    }
+    else {
+      /* If the input image is a single color value, clear the viewport texture to that color. */
+      GPU_texture_clear(viewport_texture, GPU_DATA_FLOAT, input_image.data.color);
+    }
+  }
+};
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new ViewerOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_viewer_cc
 
 void register_node_type_cmp_viewer()
@@ -100,7 +116,7 @@ void register_node_type_cmp_viewer()
   ntype.flag |= NODE_PREVIEW;
   node_type_init(&ntype, file_ns::node_composit_init_viewer);
   node_type_storage(&ntype, "ImageUser", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composit_gpu_viewer);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   ntype.no_muting = true;
 
