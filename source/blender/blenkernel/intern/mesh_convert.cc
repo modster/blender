@@ -1037,7 +1037,12 @@ static Mesh *mesh_new_from_mesh(Object *object, Mesh *mesh)
 {
   /* While we could copy this into the new mesh,
    * add the data to 'mesh' so future calls to this function don't need to re-convert the data. */
-  BKE_mesh_wrapper_ensure_mdata(mesh);
+  if (mesh->runtime.wrapper_type == ME_WRAPPER_TYPE_BMESH) {
+    BKE_mesh_wrapper_ensure_mdata(mesh);
+  }
+  else {
+    mesh = BKE_mesh_wrapper_ensure_subdivision(object, mesh);
+  }
 
   Mesh *mesh_result = (Mesh *)BKE_id_copy_ex(
       nullptr, &mesh->id, nullptr, LIB_ID_CREATE_NO_MAIN | LIB_ID_CREATE_NO_USER_REFCOUNT);
@@ -1074,7 +1079,7 @@ static Mesh *mesh_new_from_mesh_object_with_layers(Depsgraph *depsgraph,
     mask.pmask |= CD_MASK_ORIGINDEX;
   }
   Mesh *result = mesh_create_eval_final(depsgraph, scene, &object_for_eval, &mask);
-  return result;
+  return BKE_mesh_wrapper_ensure_subdivision(object, result);
 }
 
 static Mesh *mesh_new_from_mesh_object(Depsgraph *depsgraph,
@@ -1216,6 +1221,9 @@ Mesh *BKE_mesh_new_from_object_to_bmain(Main *bmain,
   mesh->mat = nullptr;
 
   BKE_mesh_nomain_to_mesh(mesh, mesh_in_bmain, nullptr, &CD_MASK_MESH, true);
+
+  /* Anonymous attributes shouldn't exist on original data. */
+  BKE_mesh_anonymous_attributes_remove(mesh_in_bmain);
 
   /* User-count is required because so far mesh was in a limbo, where library management does
    * not perform any user management (i.e. copy of a mesh will not increase users of materials). */
