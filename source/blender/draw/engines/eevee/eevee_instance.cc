@@ -131,7 +131,7 @@ void Instance::object_sync(Object *ob)
 {
   const bool is_renderable_type = ELEM(ob->type,
                                        OB_MESH,
-                                       OB_CURVE,
+                                       OB_CURVES_LEGACY,
                                        OB_SURF,
                                        OB_FONT,
                                        OB_MBALL,
@@ -165,7 +165,7 @@ void Instance::object_sync(Object *ob)
         lights.sync_light(ob, ob_handle);
         break;
       case OB_MESH:
-      case OB_CURVE:
+      case OB_CURVES_LEGACY:
       case OB_SURF:
       case OB_FONT:
       case OB_MBALL: {
