@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 #pragma once
 
 /** \file
@@ -23,6 +7,7 @@
  */
 
 #include "BKE_mesh_types.h"
+#include "BLI_compiler_attrs.h"
 #include "BLI_utildefines.h"
 
 struct BLI_Stack;
@@ -85,6 +70,13 @@ struct Mesh *BKE_mesh_from_bmesh_for_eval_nomain(struct BMesh *bm,
                                                  const struct Mesh *me_settings);
 
 /**
+ * Add original index (#CD_ORIGINDEX) layers if they don't already exist. This is meant to be used
+ * when creating an evaluated mesh from an original edit mode mesh, to allow mapping from the
+ * evaluated vertices to the originals.
+ */
+void BKE_mesh_ensure_default_orig_index_customdata(struct Mesh *mesh);
+
+/**
  * Find the index of the loop in 'poly' which references vertex,
  * returns -1 if not found
  */
@@ -118,6 +110,9 @@ void BKE_mesh_looptri_get_real_edges(const struct Mesh *mesh,
 void BKE_mesh_free_data_for_undo(struct Mesh *me);
 void BKE_mesh_clear_geometry(struct Mesh *me);
 struct Mesh *BKE_mesh_add(struct Main *bmain, const char *name);
+
+void BKE_mesh_free_editmesh(struct Mesh *mesh);
+
 /**
  * A version of #BKE_mesh_copy_parameters that is intended for evaluated output
  * (the modifier stack for example).
@@ -323,6 +318,8 @@ void BKE_mesh_vert_coords_apply_with_mat4(struct Mesh *mesh,
                                           const float mat[4][4]);
 void BKE_mesh_vert_coords_apply(struct Mesh *mesh, const float (*vert_coords)[3]);
 
+void BKE_mesh_anonymous_attributes_remove(struct Mesh *mesh);
+
 /* *** mesh_tessellate.c *** */
 
 /**
@@ -342,8 +339,7 @@ int BKE_mesh_tessface_calc_ex(struct CustomData *fdata,
                               struct MVert *mvert,
                               int totface,
                               int totloop,
-                              int totpoly,
-                              bool do_face_nor_copy);
+                              int totpoly);
 void BKE_mesh_tessface_calc(struct Mesh *mesh);
 
 /**
@@ -1037,6 +1033,13 @@ void BKE_mesh_batch_cache_free(struct Mesh *me);
 
 extern void (*BKE_mesh_batch_cache_dirty_tag_cb)(struct Mesh *me, eMeshBatchDirtyMode mode);
 extern void (*BKE_mesh_batch_cache_free_cb)(struct Mesh *me);
+
+/* mesh_debug.c */
+#ifndef NDEBUG
+char *BKE_mesh_debug_info(const struct Mesh *me)
+    ATTR_NONNULL(1) ATTR_MALLOC ATTR_WARN_UNUSED_RESULT;
+void BKE_mesh_debug_print(const struct Mesh *me) ATTR_NONNULL(1);
+#endif
 
 /* Inlines */
 

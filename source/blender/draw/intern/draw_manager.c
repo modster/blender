@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2016, Blender Foundation.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2016 Blender Foundation. */
 
 /** \file
  * \ingroup draw
@@ -35,11 +20,11 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
+#include "BKE_curves.h"
 #include "BKE_duplilist.h"
 #include "BKE_editmesh.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
-#include "BKE_hair.h"
 #include "BKE_lattice.h"
 #include "BKE_main.h"
 #include "BKE_mball.h"
@@ -70,6 +55,7 @@
 #include "GPU_framebuffer.h"
 #include "GPU_immediate.h"
 #include "GPU_matrix.h"
+#include "GPU_shader_shared.h"
 #include "GPU_state.h"
 #include "GPU_uniform_buffer.h"
 #include "GPU_viewport.h"
@@ -211,21 +197,7 @@ bool DRW_object_is_in_edit_mode(const Object *ob)
   if (BKE_object_is_in_editmode(ob)) {
     if (ob->type == OB_MESH) {
       if ((ob->mode & OB_MODE_EDIT) == 0) {
-        Mesh *me = (Mesh *)ob->data;
-        BMEditMesh *embm = me->edit_mesh;
-        /* Sanity check when rendering in multiple windows. */
-        if (embm && embm->mesh_eval_final == NULL) {
-          return false;
-        }
-        /* Do not draw ob with edit overlay when edit data is present and is modified. */
-        if (embm && embm->mesh_eval_cage && (embm->mesh_eval_cage != embm->mesh_eval_final)) {
-          return false;
-        }
-        /* Check if the object that we are drawing is modified. */
-        if (!DEG_is_original_id(&me->id)) {
-          return false;
-        }
-        return true;
+        return false;
       }
     }
     return true;
@@ -1495,7 +1467,7 @@ void DRW_draw_callbacks_post_scene(void)
      * Don't trust them! */
     DRW_state_reset();
 
-    /* needed so gizmo isn't obscured */
+    /* Needed so gizmo isn't occluded. */
     if ((v3d->gizmo_flag & V3D_GIZMO_HIDE) == 0) {
       GPU_depth_test(GPU_DEPTH_NONE);
       DRW_draw_gizmo_3d();
@@ -1778,6 +1750,8 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
                                     GPUOffScreen *ofs,
                                     GPUViewport *viewport)
 {
+  const bool is_xr_surface = ((v3d->flag & V3D_XR_SESSION_SURFACE) != 0);
+
   /* Create temporary viewport if needed or update the existing viewport. */
   GPUViewport *render_viewport = viewport;
   if (viewport == NULL) {
@@ -1787,7 +1761,7 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
     drw_notify_view_update_offscreen(depsgraph, engine_type, region, v3d, render_viewport);
   }
 
-  GPU_viewport_bind_from_offscreen(render_viewport, ofs);
+  GPU_viewport_bind_from_offscreen(render_viewport, ofs, is_xr_surface);
 
   /* Just here to avoid an assert but shouldn't be required in practice. */
   GPU_framebuffer_restore();
@@ -2756,11 +2730,15 @@ void DRW_draw_depth_object(
   GPU_framebuffer_clear_depth(depth_fb, 1.0f);
   GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
 
-  const float(*world_clip_planes)[4] = NULL;
-  if (RV3D_CLIPPING_ENABLED(v3d, rv3d)) {
+  struct GPUClipPlanes planes;
+  const bool use_clipping_planes = RV3D_CLIPPING_ENABLED(v3d, rv3d);
+  if (use_clipping_planes) {
     GPU_clip_distances(6);
     ED_view3d_clipping_local(rv3d, object->obmat);
-    world_clip_planes = rv3d->clip_local;
+    for (int i = 0; i < 6; i++) {
+      copy_v4_v4(planes.world[i], rv3d->clip_local[i]);
+    }
+    copy_m4_m4(planes.ModelMatrix, object->obmat);
   }
 
   drw_batch_cache_validate(object);
@@ -2782,16 +2760,21 @@ void DRW_draw_depth_object(
       BLI_task_graph_work_and_wait(task_graph);
       BLI_task_graph_free(task_graph);
 
-      const eGPUShaderConfig sh_cfg = world_clip_planes ? GPU_SHADER_CFG_CLIPPED :
-                                                          GPU_SHADER_CFG_DEFAULT;
+      const eGPUShaderConfig sh_cfg = use_clipping_planes ? GPU_SHADER_CFG_CLIPPED :
+                                                            GPU_SHADER_CFG_DEFAULT;
       GPU_batch_program_set_builtin_with_config(batch, GPU_SHADER_3D_DEPTH_ONLY, sh_cfg);
-      if (world_clip_planes != NULL) {
-        GPU_batch_uniform_4fv_array(batch, "WorldClipPlanes", 6, world_clip_planes);
+
+      GPUUniformBuf *ubo = NULL;
+      if (use_clipping_planes) {
+        ubo = GPU_uniformbuf_create_ex(sizeof(struct GPUClipPlanes), &planes, __func__);
+        GPU_batch_uniformbuf_bind(batch, "clipPlanes", ubo);
       }
 
       GPU_batch_draw(batch);
+      GPU_uniformbuf_free(ubo);
+
     } break;
-    case OB_CURVE:
+    case OB_CURVES_LEGACY:
     case OB_SURF:
       break;
   }
@@ -2952,8 +2935,8 @@ void DRW_engines_register(void)
     BKE_gpencil_batch_cache_dirty_tag_cb = DRW_gpencil_batch_cache_dirty_tag;
     BKE_gpencil_batch_cache_free_cb = DRW_gpencil_batch_cache_free;
 
-    BKE_hair_batch_cache_dirty_tag_cb = DRW_hair_batch_cache_dirty_tag;
-    BKE_hair_batch_cache_free_cb = DRW_hair_batch_cache_free;
+    BKE_curves_batch_cache_dirty_tag_cb = DRW_curves_batch_cache_dirty_tag;
+    BKE_curves_batch_cache_free_cb = DRW_curves_batch_cache_free;
 
     BKE_pointcloud_batch_cache_dirty_tag_cb = DRW_pointcloud_batch_cache_dirty_tag;
     BKE_pointcloud_batch_cache_free_cb = DRW_pointcloud_batch_cache_free;

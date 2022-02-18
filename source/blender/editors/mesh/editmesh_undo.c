@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup edmesh
@@ -690,12 +676,12 @@ static void undomesh_to_editmesh(UndoMesh *um, Object *ob, BMEditMesh *em, Key *
   em_tmp = BKE_editmesh_create(bm);
   *em = *em_tmp;
 
-  /* Calculate face normals and tessellation at once since it's multi-threaded.
-   * The vertex normals are stored in the undo-mesh, so this doesn't need to be updated. */
-  BKE_editmesh_looptri_calc_ex(em,
-                               &(const struct BMeshCalcTessellation_Params){
-                                   .face_normals = true,
-                               });
+  /* Normals should not be stored in the undo mesh, so recalculate them. The edit
+   * mesh is expected to have valid normals and there is no tracked dirty state. */
+  BLI_assert(BKE_mesh_vertex_normals_are_dirty(&um->me));
+
+  /* Calculate face normals and tessellation at once since it's multi-threaded. */
+  BKE_editmesh_looptri_and_normals_calc(em);
 
   em->selectmode = um->selectmode;
   bm->selectmode = um->selectmode;

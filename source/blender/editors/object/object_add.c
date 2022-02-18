@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup edobj
@@ -62,6 +46,7 @@
 #include "BKE_constraint.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
+#include "BKE_curves.h"
 #include "BKE_displist.h"
 #include "BKE_duplilist.h"
 #include "BKE_effect.h"
@@ -69,7 +54,6 @@
 #include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
 #include "BKE_gpencil_modifier.h"
-#include "BKE_hair.h"
 #include "BKE_key.h"
 #include "BKE_lattice.h"
 #include "BKE_layer.h"
@@ -857,7 +841,7 @@ static int effector_add_exec(bContext *C, wmOperator *op)
     Scene *scene = CTX_data_scene(C);
     Curve *cu;
     ob = ED_object_add_type(
-        C, OB_CURVE, get_effector_defname(type), loc, rot, false, local_view_bits);
+        C, OB_CURVES_LEGACY, get_effector_defname(type), loc, rot, false, local_view_bits);
 
     cu = ob->data;
     cu->flag |= CU_PATH | CU_3D;
@@ -1894,18 +1878,18 @@ void OBJECT_OT_speaker_add(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Add Hair Operator
+/** \name Add Hair Curves Operator
  * \{ */
 
-static bool object_hair_add_poll(bContext *C)
+static bool object_hair_curves_add_poll(bContext *C)
 {
-  if (!U.experimental.use_new_hair_type) {
+  if (!U.experimental.use_new_curves_type) {
     return false;
   }
   return ED_operator_objectmode(C);
 }
 
-static int object_hair_add_exec(bContext *C, wmOperator *op)
+static int object_hair_curves_add_exec(bContext *C, wmOperator *op)
 {
   ushort local_view_bits;
   float loc[3], rot[3];
@@ -1913,22 +1897,22 @@ static int object_hair_add_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  Object *object = ED_object_add_type(C, OB_HAIR, NULL, loc, rot, false, local_view_bits);
+  Object *object = ED_object_add_type(C, OB_CURVES, NULL, loc, rot, false, local_view_bits);
   object->dtx |= OB_DRAWBOUNDOX; /* TODO: remove once there is actual drawing. */
 
   return OPERATOR_FINISHED;
 }
 
-void OBJECT_OT_hair_add(wmOperatorType *ot)
+void OBJECT_OT_hair_curves_add(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Add Hair";
-  ot->description = "Add a hair object to the scene";
-  ot->idname = "OBJECT_OT_hair_add";
+  ot->name = "Add Hair Curves";
+  ot->description = "Add a hair curves object to the scene";
+  ot->idname = "OBJECT_OT_hair_curves_add";
 
   /* api callbacks */
-  ot->exec = object_hair_add_exec;
-  ot->poll = object_hair_add_poll;
+  ot->exec = object_hair_curves_add_exec;
+  ot->poll = object_hair_curves_add_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -1998,6 +1982,10 @@ void ED_object_base_free_and_unlink(Main *bmain, Scene *scene, Object *ob)
         ob->id.name + 2);
     return;
   }
+  if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
+    /* Do not delete objects used by overrides of collections. */
+    return;
+  }
 
   DEG_id_tag_update_ex(bmain, &ob->id, ID_RECALC_BASE_FLAGS);
 
@@ -2038,10 +2026,9 @@ static int object_delete_exec(bContext *C, wmOperator *op)
     }
 
     if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
-      /* Can this case ever happen? */
       BKE_reportf(op->reports,
                   RPT_WARNING,
-                  "Cannot delete object '%s' as it used by override collections",
+                  "Cannot delete object '%s' as it is used by override collections",
                   ob->id.name + 2);
       continue;
     }
@@ -2344,11 +2331,6 @@ static void make_object_duplilist_real(bContext *C,
     BKE_animdata_free(&ob_dst->id, true);
     ob_dst->adt = NULL;
 
-    /* Proxies are not to be copied. */
-    ob_dst->proxy_from = NULL;
-    ob_dst->proxy_group = NULL;
-    ob_dst->proxy = NULL;
-
     ob_dst->parent = NULL;
     BKE_constraints_free(&ob_dst->constraints);
     ob_dst->runtime.curve_cache = NULL;
@@ -2463,13 +2445,6 @@ static void make_object_duplilist_real(bContext *C,
   }
 
   if (base->object->transflag & OB_DUPLICOLLECTION && base->object->instance_collection) {
-    LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
-      if (ob->proxy_group == base->object) {
-        ob->proxy = NULL;
-        ob->proxy_from = NULL;
-        DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
-      }
-    }
     base->object->instance_collection = NULL;
   }
 
@@ -2550,7 +2525,11 @@ void OBJECT_OT_duplicates_make_real(wmOperatorType *ot)
  * \{ */
 
 static const EnumPropertyItem convert_target_items[] = {
-    {OB_CURVE, "CURVE", ICON_OUTLINER_OB_CURVE, "Curve", "Curve from Mesh or Text objects"},
+    {OB_CURVES_LEGACY,
+     "CURVE",
+     ICON_OUTLINER_OB_CURVE,
+     "Curve",
+     "Curve from Mesh or Text objects"},
     {OB_MESH,
      "MESH",
      ICON_OUTLINER_OB_MESH,
@@ -2583,7 +2562,7 @@ static void object_data_convert_ensure_curve_cache(Depsgraph *depsgraph, Scene *
      * Also happens in case we are working on a copy of the object
      * (all its caches have been nuked then).
      */
-    if (ELEM(ob->type, OB_SURF, OB_CURVE, OB_FONT)) {
+    if (ELEM(ob->type, OB_SURF, OB_CURVES_LEGACY, OB_FONT)) {
       /* We need 'for render' ON here, to enable computing bevel dipslist if needed.
        * Also makes sense anyway, we would not want e.g. to lose hidden parts etc. */
       BKE_displist_make_curveTypes(depsgraph, scene, ob, true);
@@ -2798,7 +2777,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         }
       }
     }
-    else if (ob->type == OB_MESH && target == OB_CURVE) {
+    else if (ob->type == OB_MESH && target == OB_CURVES_LEGACY) {
       ob->flag |= OB_DONE;
 
       if (keep_original) {
@@ -2818,7 +2797,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
 
       BKE_mesh_to_curve(bmain, depsgraph, scene, newob);
 
-      if (newob->type == OB_CURVE) {
+      if (newob->type == OB_CURVES_LEGACY) {
         BKE_object_free_modifiers(newob, 0); /* after derivedmesh calls! */
         if (newob->rigidbody_object != NULL) {
           ED_rigidbody_object_remove(bmain, scene, newob);
@@ -2927,7 +2906,10 @@ static int object_convert_exec(bContext *C, wmOperator *op)
       /* Full (edge-angle based) draw calculation should ideally be performed. */
       BKE_mesh_edges_set_draw_render(me_eval);
       BKE_object_material_from_eval_data(bmain, newob, &me_eval->id);
-      BKE_mesh_nomain_to_mesh(me_eval, newob->data, newob, &CD_MASK_MESH, true);
+      Mesh *new_mesh = (Mesh *)newob->data;
+      BKE_mesh_nomain_to_mesh(me_eval, new_mesh, newob, &CD_MASK_MESH, true);
+      /* Anonymous attributes shouldn't be available on the applied geometry. */
+      BKE_mesh_anonymous_attributes_remove(new_mesh);
       BKE_object_free_modifiers(newob, 0); /* after derivedmesh calls! */
     }
     else if (ob->type == OB_FONT) {
@@ -2952,8 +2934,8 @@ static int object_convert_exec(bContext *C, wmOperator *op)
       Object *ob_eval = DEG_get_evaluated_object(depsgraph, ob);
       BKE_vfont_to_curve_ex(ob_eval, ob_eval->data, FO_EDIT, &cu->nurb, NULL, NULL, NULL, NULL);
 
-      newob->type = OB_CURVE;
-      cu->type = OB_CURVE;
+      newob->type = OB_CURVES_LEGACY;
+      cu->type = OB_CURVES_LEGACY;
 
       if (cu->vfont) {
         id_us_min(&cu->vfont->id);
@@ -2977,7 +2959,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         if (ID_REAL_USERS(&cu->id) > 1) {
           for (ob1 = bmain->objects.first; ob1; ob1 = ob1->id.next) {
             if (ob1->data == ob->data) {
-              ob1->type = OB_CURVE;
+              ob1->type = OB_CURVES_LEGACY;
               DEG_id_tag_update(&ob1->id,
                                 ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
             }
@@ -3010,7 +2992,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         basen = NULL;
       }
     }
-    else if (ELEM(ob->type, OB_CURVE, OB_SURF)) {
+    else if (ELEM(ob->type, OB_CURVES_LEGACY, OB_SURF)) {
       ob->flag |= OB_DONE;
 
       if (target == OB_MESH) {
@@ -3035,7 +3017,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         BKE_object_free_curve_cache(newob);
       }
       else if (target == OB_GPENCIL) {
-        if (ob->type != OB_CURVE) {
+        if (ob->type != OB_CURVES_LEGACY) {
           ob->flag &= ~OB_DONE;
           BKE_report(op->reports, RPT_ERROR, "Convert Surfaces to Grease Pencil is not supported");
         }
@@ -3181,7 +3163,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
     /* Remove curves and meshes converted to Grease Pencil object. */
     if (gpencilConverted) {
       FOREACH_SCENE_OBJECT_BEGIN (scene, ob_delete) {
-        if (ELEM(ob_delete->type, OB_CURVE, OB_MESH)) {
+        if (ELEM(ob_delete->type, OB_CURVES_LEGACY, OB_MESH)) {
           if (ob_delete->flag & OB_DONE) {
             ED_object_base_free_and_unlink(bmain, scene, ob_delete);
           }
@@ -3194,7 +3176,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
     /* Remove Text curves converted to Grease Pencil object to avoid duplicated curves. */
     if (gpencilCurveConverted) {
       FOREACH_SCENE_OBJECT_BEGIN (scene, ob_delete) {
-        if (ELEM(ob_delete->type, OB_CURVE) && (ob_delete->flag & OB_DONE)) {
+        if (ELEM(ob_delete->type, OB_CURVES_LEGACY) && (ob_delete->flag & OB_DONE)) {
           ED_object_base_free_and_unlink(bmain, scene, ob_delete);
         }
       }
@@ -3723,7 +3705,7 @@ static bool object_join_poll(bContext *C)
     return false;
   }
 
-  if (ELEM(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_ARMATURE, OB_GPENCIL)) {
+  if (ELEM(ob->type, OB_MESH, OB_CURVES_LEGACY, OB_SURF, OB_ARMATURE, OB_GPENCIL)) {
     return ED_operator_screenactive(C);
   }
   return false;
@@ -3731,6 +3713,7 @@ static bool object_join_poll(bContext *C)
 
 static int object_join_exec(bContext *C, wmOperator *op)
 {
+  Main *bmain = CTX_data_main(C);
   Object *ob = CTX_data_active_object(C);
 
   if (ob->mode & OB_MODE_EDIT) {
@@ -3741,6 +3724,14 @@ static int object_join_exec(bContext *C, wmOperator *op)
     BKE_report(op->reports, RPT_ERROR, "Cannot edit external library data");
     return OPERATOR_CANCELLED;
   }
+  if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
+    BKE_reportf(op->reports,
+                RPT_WARNING,
+                "Cannot edit object '%s' as it is used by override collections",
+                ob->id.name + 2);
+    return OPERATOR_CANCELLED;
+  }
+
   if (ob->type == OB_GPENCIL) {
     bGPdata *gpd = (bGPdata *)ob->data;
     if ((!gpd) || GPENCIL_ANY_MODE(gpd)) {
@@ -3753,7 +3744,7 @@ static int object_join_exec(bContext *C, wmOperator *op)
   if (ob->type == OB_MESH) {
     ret = ED_mesh_join_objects_exec(C, op);
   }
-  else if (ELEM(ob->type, OB_CURVE, OB_SURF)) {
+  else if (ELEM(ob->type, OB_CURVES_LEGACY, OB_SURF)) {
     ret = ED_curve_join_objects_exec(C, op);
   }
   else if (ob->type == OB_ARMATURE) {
@@ -3829,6 +3820,7 @@ static bool join_shapes_poll(bContext *C)
 
 static int join_shapes_exec(bContext *C, wmOperator *op)
 {
+  Main *bmain = CTX_data_main(C);
   Object *ob = CTX_data_active_object(C);
 
   if (ob->mode & OB_MODE_EDIT) {
@@ -3837,6 +3829,13 @@ static int join_shapes_exec(bContext *C, wmOperator *op)
   }
   if (BKE_object_obdata_is_libdata(ob)) {
     BKE_report(op->reports, RPT_ERROR, "Cannot edit external library data");
+    return OPERATOR_CANCELLED;
+  }
+  if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
+    BKE_reportf(op->reports,
+                RPT_WARNING,
+                "Cannot edit object '%s' as it is used by override collections",
+                ob->id.name + 2);
     return OPERATOR_CANCELLED;
   }
 

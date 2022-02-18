@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -1518,7 +1504,7 @@ static void dynamic_paint_set_init_color_tex_to_vcol_cb(
     multitex_ext_safe(tex, uv, &texres, pool, scene_color_manage, false);
 
     if (texres.tin > pPoint[vert].color[3]) {
-      copy_v3_v3(pPoint[vert].color, &texres.tr);
+      copy_v3_v3(pPoint[vert].color, texres.trgba);
       pPoint[vert].color[3] = texres.tin;
     }
   }
@@ -1559,7 +1545,7 @@ static void dynamic_paint_set_init_color_tex_to_imseq_cb(
   multitex_ext_safe(tex, uv_final, &texres, NULL, scene_color_manage, false);
 
   /* apply color */
-  copy_v3_v3(pPoint[i].color, &texres.tr);
+  copy_v3_v3(pPoint[i].color, texres.trgba);
   pPoint[i].color[3] = texres.tin;
 }
 
@@ -1985,9 +1971,6 @@ static Mesh *dynamicPaint_Modifier_apply(DynamicPaintModifierData *pmd, Object *
             }
 
             MEM_freeN(fcolor);
-
-            /* Mark tessellated CD layers as dirty. */
-            // result->dirty |= DM_DIRTY_TESS_CDLAYERS;
           }
           /* vertex group paint */
           else if (surface->type == MOD_DPAINT_SURFACE_T_WEIGHT) {

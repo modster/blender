@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2006 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2006 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -50,10 +34,8 @@ typedef struct {
 extern const CustomData_MeshMasks CD_MASK_BAREMESH;
 extern const CustomData_MeshMasks CD_MASK_BAREMESH_ORIGINDEX;
 extern const CustomData_MeshMasks CD_MASK_MESH;
-extern const CustomData_MeshMasks CD_MASK_EDITMESH;
 extern const CustomData_MeshMasks CD_MASK_DERIVEDMESH;
 extern const CustomData_MeshMasks CD_MASK_BMESH;
-extern const CustomData_MeshMasks CD_MASK_FACECORNERS;
 extern const CustomData_MeshMasks CD_MASK_EVERYTHING;
 
 /* for ORIGINDEX layer type, indicates no original index for this element */
@@ -254,6 +236,11 @@ bool CustomData_free_layer_active(struct CustomData *data, int type, int totelem
 void CustomData_free_layers(struct CustomData *data, int type, int totelem);
 
 /**
+ * Free all anonymous attributes.
+ */
+void CustomData_free_layers_anonymous(struct CustomData *data, int totelem);
+
+/**
  * Returns true if a layer with the specified type exists.
  */
 bool CustomData_has_layer(const struct CustomData *data, int type);
@@ -435,6 +422,12 @@ int CustomData_get_active_layer(const struct CustomData *data, int type);
 int CustomData_get_render_layer(const struct CustomData *data, int type);
 int CustomData_get_clone_layer(const struct CustomData *data, int type);
 int CustomData_get_stencil_layer(const struct CustomData *data, int type);
+
+/**
+ * Returns name of the active layer of the given type or NULL
+ * if no such active layer is defined.
+ */
+const char *CustomData_get_active_layer_name(const struct CustomData *data, int type);
 
 /**
  * Copies the data from source to the data element at index in the first layer of type
@@ -746,6 +739,14 @@ void CustomData_blend_write(struct BlendWriter *writer,
                             CustomDataMask cddata_mask,
                             struct ID *id);
 void CustomData_blend_read(struct BlendDataReader *reader, struct CustomData *data, int count);
+
+#ifndef NDEBUG
+struct DynStr;
+/** Use to inspect mesh data when debugging. */
+void CustomData_debug_info_from_layers(const struct CustomData *data,
+                                       const char *indent,
+                                       struct DynStr *dynstr);
+#endif /* NDEBUG */
 
 #ifdef __cplusplus
 }

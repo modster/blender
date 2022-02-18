@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -42,7 +26,7 @@
 #include "BLI_linklist.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
-#include "BLI_math_vec_types.hh"
+#include "BLI_math_vector.hh"
 #include "BLI_memarena.h"
 #include "BLI_string.h"
 #include "BLI_task.hh"
@@ -150,6 +134,8 @@ static void mesh_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int 
 
   BKE_mesh_update_customdata_pointers(mesh_dst, do_tessface);
 
+  mesh_dst->cd_flag = mesh_src->cd_flag;
+
   mesh_dst->edit_mesh = nullptr;
 
   mesh_dst->mselect = (MSelect *)MEM_dupallocN(mesh_dst->mselect);
@@ -171,19 +157,26 @@ static void mesh_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int 
   BKE_mesh_assert_normals_dirty_or_calculated(mesh_dst);
 }
 
+void BKE_mesh_free_editmesh(struct Mesh *mesh)
+{
+  if (mesh->edit_mesh == nullptr) {
+    return;
+  }
+
+  if (mesh->edit_mesh->is_shallow_copy == false) {
+    BKE_editmesh_free_data(mesh->edit_mesh);
+  }
+  MEM_freeN(mesh->edit_mesh);
+  mesh->edit_mesh = nullptr;
+}
+
 static void mesh_free_data(ID *id)
 {
   Mesh *mesh = (Mesh *)id;
 
   BLI_freelistN(&mesh->vertex_group_names);
 
-  if (mesh->edit_mesh) {
-    if (mesh->edit_mesh->is_shallow_copy == false) {
-      BKE_editmesh_free_data(mesh->edit_mesh);
-    }
-    MEM_freeN(mesh->edit_mesh);
-    mesh->edit_mesh = nullptr;
-  }
+  BKE_mesh_free_editmesh(mesh);
 
   BKE_mesh_runtime_free_data(mesh);
   mesh_clear_geometry(mesh);
@@ -676,6 +669,17 @@ static int customdata_compare(
           }
           break;
         }
+        case CD_PROP_INT8: {
+          const int8_t *l1_data = (int8_t *)l1->data;
+          const int8_t *l2_data = (int8_t *)l2->data;
+
+          for (int i = 0; i < total_length; i++) {
+            if (l1_data[i] != l2_data[i]) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+          }
+          break;
+        }
         case CD_PROP_BOOL: {
           const bool *l1_data = (bool *)l1->data;
           const bool *l2_data = (bool *)l2->data;
@@ -1107,11 +1111,9 @@ Mesh *BKE_mesh_new_nomain_from_template_ex(const Mesh *me_src,
 
   /* Ensure that when no normal layers exist, they are marked dirty, because
    * normals might not have been included in the mask of copied layers. */
-  if (!CustomData_has_layer(&me_dst->vdata, CD_NORMAL)) {
-    me_dst->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
-  }
-  if (!CustomData_has_layer(&me_dst->pdata, CD_NORMAL)) {
-    me_dst->runtime.cd_dirty_poly |= CD_MASK_NORMAL;
+  if (!CustomData_has_layer(&me_dst->vdata, CD_NORMAL) ||
+      !CustomData_has_layer(&me_dst->pdata, CD_NORMAL)) {
+    BKE_mesh_normals_tag_dirty(me_dst);
   }
 
   /* The destination mesh should at least have valid primary CD layers,
@@ -1198,6 +1200,23 @@ Mesh *BKE_mesh_from_bmesh_for_eval_nomain(BMesh *bm,
   BM_mesh_bm_to_me_for_eval(bm, mesh, cd_mask_extra);
   BKE_mesh_copy_parameters_for_eval(mesh, me_settings);
   return mesh;
+}
+
+static void ensure_orig_index_layer(CustomData &data, const int size)
+{
+  if (CustomData_has_layer(&data, CD_ORIGINDEX)) {
+    return;
+  }
+  int *indices = (int *)CustomData_add_layer(&data, CD_ORIGINDEX, CD_DEFAULT, nullptr, size);
+  range_vn_i(indices, size, 0);
+}
+
+void BKE_mesh_ensure_default_orig_index_customdata(Mesh *mesh)
+{
+  BLI_assert(mesh->runtime.wrapper_type == ME_WRAPPER_TYPE_MDATA);
+  ensure_orig_index_layer(mesh->vdata, mesh->totvert);
+  ensure_orig_index_layer(mesh->edata, mesh->totedge);
+  ensure_orig_index_layer(mesh->pdata, mesh->totpoly);
 }
 
 BoundBox *BKE_mesh_boundbox_get(Object *ob)
@@ -1911,6 +1930,14 @@ void BKE_mesh_vert_coords_apply_with_mat4(Mesh *mesh,
     mul_v3_m4v3(mv->co, mat, vert_coords[i]);
   }
   BKE_mesh_normals_tag_dirty(mesh);
+}
+
+void BKE_mesh_anonymous_attributes_remove(Mesh *mesh)
+{
+  CustomData_free_layers_anonymous(&mesh->vdata, mesh->totvert);
+  CustomData_free_layers_anonymous(&mesh->edata, mesh->totedge);
+  CustomData_free_layers_anonymous(&mesh->pdata, mesh->totpoly);
+  CustomData_free_layers_anonymous(&mesh->ldata, mesh->totloop);
 }
 
 void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spacearr)

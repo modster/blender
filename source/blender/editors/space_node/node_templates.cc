@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup edinterface
@@ -53,8 +39,9 @@
 
 #include "ED_undo.h"
 
-using blender::Vector;
 using blender::nodes::NodeDeclaration;
+
+namespace blender::ed::space_node {
 
 /************************* Node Socket Manipulation **************************/
 
@@ -716,9 +703,13 @@ static void ui_template_node_link_menu(bContext *C, uiLayout *layout, void *but_
   ui_node_menu_column(arg, NODE_CLASS_GROUP, N_("Group"));
 }
 
+}  // namespace blender::ed::space_node
+
 void uiTemplateNodeLink(
     uiLayout *layout, bContext *C, bNodeTree *ntree, bNode *node, bNodeSocket *input)
 {
+  using namespace blender::ed::space_node;
+
   uiBlock *block = uiLayoutGetBlock(layout);
   NodeLinkArg *arg;
   uiBut *but;
@@ -759,6 +750,8 @@ void uiTemplateNodeLink(
     }
   }
 }
+
+namespace blender::ed::space_node {
 
 /**************************** Node Tree Layout *******************************/
 
@@ -912,9 +905,13 @@ static void ui_node_draw_input(
   node->flag &= ~NODE_TEST;
 }
 
+}  // namespace blender::ed::space_node
+
 void uiTemplateNodeView(
     uiLayout *layout, bContext *C, bNodeTree *ntree, bNode *node, bNodeSocket *input)
 {
+  using namespace blender::ed::space_node;
+
   bNode *tnode;
 
   if (!ntree) {

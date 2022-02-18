@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup RNA
@@ -366,6 +352,12 @@ static bool rna_Brush_mode_with_tool_poll(PointerRNA *ptr, PointerRNA value)
     }
     mode = OB_MODE_WEIGHT_GPENCIL;
   }
+  else if (paint_contains_brush_slot(&ts->curves_sculpt->paint, tslot, &slot_index)) {
+    if (slot_index != brush->curves_sculpt_tool) {
+      return false;
+    }
+    mode = OB_MODE_SCULPT_CURVES;
+  }
 
   return brush->ob_mode & mode;
 }
@@ -672,7 +664,7 @@ static void rna_def_paint(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Cavity Mask", "Mask painting according to mesh geometry cavity");
   RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL);
 
-  prop = RNA_def_property(srna, "tile_offset", PROP_FLOAT, PROP_XYZ);
+  prop = RNA_def_property(srna, "tile_offset", PROP_FLOAT, PROP_XYZ_LENGTH);
   RNA_def_property_float_sdna(prop, NULL, "tile_offset");
   RNA_def_property_array(prop, 3);
   RNA_def_property_range(prop, 0.01, FLT_MAX);

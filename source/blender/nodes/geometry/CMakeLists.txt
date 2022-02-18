@@ -1,20 +1,4 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
@@ -95,6 +79,7 @@ set(SRC
   nodes/node_geo_curve_fillet.cc
   nodes/node_geo_curve_handle_type_selection.cc
   nodes/node_geo_curve_length.cc
+  nodes/node_geo_curve_primitive_arc.cc
   nodes/node_geo_curve_primitive_bezier_segment.cc
   nodes/node_geo_curve_primitive_circle.cc
   nodes/node_geo_curve_primitive_line.cc
@@ -116,6 +101,9 @@ set(SRC
   nodes/node_geo_distribute_points_on_faces.cc
   nodes/node_geo_dual_mesh.cc
   nodes/node_geo_edge_split.cc
+  nodes/node_geo_extrude_mesh.cc
+  nodes/node_geo_field_at_index.cc
+  nodes/node_geo_flip_faces.cc
   nodes/node_geo_geometry_to_instance.cc
   nodes/node_geo_image_texture.cc
   nodes/node_geo_input_curve_handles.cc
@@ -146,6 +134,7 @@ set(SRC
   nodes/node_geo_join_geometry.cc
   nodes/node_geo_material_replace.cc
   nodes/node_geo_material_selection.cc
+  nodes/node_geo_merge_by_distance.cc
   nodes/node_geo_mesh_primitive_circle.cc
   nodes/node_geo_mesh_primitive_cone.cc
   nodes/node_geo_mesh_primitive_cube.cc
@@ -165,6 +154,7 @@ set(SRC
   nodes/node_geo_remesh_blocks.cc
   nodes/node_geo_realize_instances.cc
   nodes/node_geo_rotate_instances.cc
+  nodes/node_geo_scale_elements.cc
   nodes/node_geo_scale_instances.cc
   nodes/node_geo_separate_components.cc
   nodes/node_geo_separate_geometry.cc
@@ -232,10 +222,6 @@ if(WITH_PYTHON)
     ${PYTHON_LIBRARIES}
   )
   add_definitions(-DWITH_PYTHON)
-endif()
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 if(WITH_TBB)
