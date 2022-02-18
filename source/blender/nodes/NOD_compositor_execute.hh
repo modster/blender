@@ -25,11 +25,24 @@
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 
+#include "GPU_shader.h"
 #include "GPU_texture.h"
 
 #include "NOD_derived_node_tree.hh"
 
 namespace blender::viewport_compositor {
+
+/* --------------------------------------------------------------------
+ * Result Type.
+ */
+
+/* Possible data types that operations can operate on. They either represent the base type of the
+ * result texture or a single value result. */
+enum class ResultType : uint8_t {
+  Float,
+  Vector,
+  Color,
+};
 
 /* --------------------------------------------------------------------
  * Texture Pool.
@@ -68,11 +81,16 @@ class TexturePool {
   /* Shorthand for acquire with GPU_RGBA16F format. */
   GPUTexture *acquire_color(int width, int height);
 
-  /* Shorthand for acquire with GPU_RGB16F format. */
+  /* Shorthand for acquire with GPU_RGBA16F format. Identical to acquire_color because vector
+   * textures are and should internally be stored in RGBA textures. */
   GPUTexture *acquire_vector(int width, int height);
 
   /* Shorthand for acquire with GPU_R16F format. */
   GPUTexture *acquire_float(int width, int height);
+
+  /* Shorthand for acquire_[color|vector|float], whichever is appropriate for the given result
+   * type. */
+  GPUTexture *acquire(int width, int height, ResultType type);
 
   /* Decrement the reference count of the texture and put it back into the pool if its reference
    * count reaches one, potentially to be acquired later by another user. Notice that the texture
@@ -117,14 +135,6 @@ class Context {
 /* --------------------------------------------------------------------
  * Result.
  */
-
-/* Possible data types that operations can operate on. They either represent the base type of the
- * result texture or a single value result. */
-enum class ResultType : uint8_t {
-  Float,
-  Vector,
-  Color,
-};
 
 /* A class that describes the result of an operation. An operator can have multiple results
  * corresponding to multiple outputs. A result either represents a single value or a texture. */
@@ -260,7 +270,7 @@ class NodeOperation : public Operation {
  * example. */
 class MetaOperation : public Operation {
  public:
-  MetaOperation(Context &context);
+  using Operation::Operation;
 };
 
 /* --------------------------------------------------------------------
@@ -290,6 +300,131 @@ class SingleValueInputOperation : public MetaOperation {
  private:
   /* Returns the result type corresponding to the type of the member input socket. */
   ResultType get_input_result_type() const;
+};
+
+/* --------------------------------------------------------------------
+ * Conversion Operation.
+ */
+
+/* A conversion operation is an operation that converts a result from a certain type to another.
+ * See the derived classes. */
+class ConversionOperation : public MetaOperation {
+ public:
+  /* The identifier of the output for this operation. This is constant for all operations. */
+  static const StringRef output_identifier;
+  /* The identifier of the input for this operation. This is constant for all operations. */
+  static const StringRef input_identifier;
+  /* The name of the input sampler in the conversion shader.
+   * This is constant for all operations. */
+  static const char *shader_input_sampler_name;
+  /* The name of the output image in the conversion shader.
+   * This is constant for all operations. */
+  static const char *shader_output_image_name;
+
+ public:
+  using MetaOperation::MetaOperation;
+
+  virtual bool is_buffered() const override;
+
+  virtual void execute() override;
+
+  virtual void initialize() override;
+
+  /* Convert the input single value result to the output single value result. */
+  virtual void execute_single(const Result &input, Result &output) = 0;
+
+  /* Get the Result Type of the output. */
+  virtual ResultType get_output_result_type() const = 0;
+
+  /* Get the shader the will be used for conversion. It should have an input sampler called
+   * shader_input_sampler_name and an output image of an appropriate type called
+   * shader_output_image_name. */
+  virtual GPUShader *get_conversion_shader() const = 0;
+};
+
+/* --------------------------------------------------------------------
+ * Convert Float To Vector Operation.
+ */
+
+/* Takes a float result and outputs a vector result. All three components of the output are filled
+ * with the input float. */
+class ConvertFloatToVectorOperation : public ConversionOperation {
+ public:
+  using ConversionOperation::ConversionOperation;
+
+  virtual void execute_single(const Result &input, Result &output) override;
+
+  virtual ResultType get_output_result_type() const override;
+
+  virtual GPUShader *get_conversion_shader() const override;
+};
+
+/* --------------------------------------------------------------------
+ * Convert Float To Color Operation.
+ */
+
+/* Takes a float result and outputs a color result. All three color channels of the output are
+ * filled with the input float and the alpha channel is set to 1. */
+class ConvertFloatToColorOperation : public ConversionOperation {
+ public:
+  using ConversionOperation::ConversionOperation;
+
+  virtual void execute_single(const Result &input, Result &output) override;
+
+  virtual ResultType get_output_result_type() const override;
+
+  virtual GPUShader *get_conversion_shader() const override;
+};
+
+/* --------------------------------------------------------------------
+ * Convert Color To Float Operation.
+ */
+
+/* Takes a color result and outputs a float result. The output is the average of the three color
+ * channels, the alpha channel is ignored. */
+class ConvertColorToFloatOperation : public ConversionOperation {
+ public:
+  using ConversionOperation::ConversionOperation;
+
+  virtual void execute_single(const Result &input, Result &output) override;
+
+  virtual ResultType get_output_result_type() const override;
+
+  virtual GPUShader *get_conversion_shader() const override;
+};
+
+/* --------------------------------------------------------------------
+ * Convert Vector To Float Operation.
+ */
+
+/* Takes a vector result and outputs a float result. The output is the average of the three
+ * components. */
+class ConvertVectorToFloatOperation : public ConversionOperation {
+ public:
+  using ConversionOperation::ConversionOperation;
+
+  virtual void execute_single(const Result &input, Result &output) override;
+
+  virtual ResultType get_output_result_type() const override;
+
+  virtual GPUShader *get_conversion_shader() const override;
+};
+
+/* --------------------------------------------------------------------
+ * Convert Vector To Color Operation.
+ */
+
+/* Takes a vector result and outputs a color result. The output is a copy of the three vector
+ * components to the three color channels with the alpha channel set to 1. */
+class ConvertVectorToColorOperation : public ConversionOperation {
+ public:
+  using ConversionOperation::ConversionOperation;
+
+  virtual void execute_single(const Result &input, Result &output) override;
+
+  virtual ResultType get_output_result_type() const override;
+
+  virtual GPUShader *get_conversion_shader() const override;
 };
 
 /* --------------------------------------------------------------------
@@ -375,6 +510,16 @@ class Evaluator {
 
   /* Map the input to the result of the given node operation output. */
   void map_node_linked_input_to_result(DInputSocket input, DOutputSocket output);
+
+  /* Get a reference to the result of the given output that is linked to the given input. The
+   * method may emit and initialize a conversion operation if the result is not compatible with the
+   * input. */
+  Result &get_result_linked_to_node_input(DInputSocket input, DOutputSocket output);
+
+  /* Emit and initialize a new conversion operation that converts the result of the given node
+   * output to a result compatible with the given node input. The method returns a reference to the
+   * result of the conversion operation. */
+  Result &emit_conversion_operation(DInputSocket input, DOutputSocket output);
 
   /* Map the input to the result of a newly emitted and initialized SingleValueInputOperation. */
   void map_node_unlinked_input_to_result(DInputSocket input);

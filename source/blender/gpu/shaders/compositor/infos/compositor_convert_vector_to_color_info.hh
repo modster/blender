@@ -19,9 +19,9 @@
 
 #include "gpu_shader_create_info.hh"
 
-GPU_SHADER_CREATE_INFO(sampler2D_to_RGBA16F_2D_image)
+GPU_SHADER_CREATE_INFO(compositor_convert_vector_to_color)
     .local_group_size(16, 16)
     .sampler(0, ImageType::FLOAT_2D, "input_sampler")
     .image(0, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "output_image")
-    .compute_source("sampler2D_to_RGBA16F_2D_image.glsl")
+    .compute_source("compositor_convert_vector_to_color.glsl")
     .do_static_compilation(true);

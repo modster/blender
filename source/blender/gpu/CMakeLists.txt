@@ -308,6 +308,9 @@ set(GLSL_SRC
   shaders/compositor/material/gpu_shader_compositor_set_alpha.glsl
   shaders/compositor/material/gpu_shader_compositor_split_viewer.glsl
 
+  shaders/compositor/compositor_convert_color_to_float.glsl
+  shaders/compositor/compositor_convert_float_to_color.glsl
+  shaders/compositor/compositor_convert_vector_to_color.glsl
   shaders/compositor/sampler2D_to_RGBA16F_2D_image.glsl
 
   shaders/material/gpu_shader_material_add_shader.glsl
@@ -490,6 +493,9 @@ set(SHADER_CREATE_INFOS
   shaders/infos/gpu_shader_text_info.hh
   shaders/infos/gpu_srgb_to_framebuffer_space_info.hh
 
+  shaders/compositor/infos/compositor_convert_color_to_float_info.hh
+  shaders/compositor/infos/compositor_convert_float_to_color_info.hh
+  shaders/compositor/infos/compositor_convert_vector_to_color_info.hh
   shaders/compositor/infos/sampler2D_to_RGBA16F_2D_image_info.hh
 )
 

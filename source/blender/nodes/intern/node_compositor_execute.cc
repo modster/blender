@@ -27,6 +27,8 @@
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 
+#include "GPU_compute.h"
+#include "GPU_shader.h"
 #include "GPU_texture.h"
 
 #include "IMB_colormanagement.h"
@@ -77,14 +79,27 @@ GPUTexture *TexturePool::acquire_color(int width, int height)
   return acquire(width, height, GPU_RGBA16F);
 }
 
+/* Vectors are and should be stored in RGBA textures. */
 GPUTexture *TexturePool::acquire_vector(int width, int height)
 {
-  return acquire(width, height, GPU_RGB16F);
+  return acquire(width, height, GPU_RGBA16F);
 }
 
 GPUTexture *TexturePool::acquire_float(int width, int height)
 {
   return acquire(width, height, GPU_R16F);
+}
+
+GPUTexture *TexturePool::acquire(int width, int height, ResultType type)
+{
+  switch (type) {
+    case ResultType::Float:
+      return acquire_float(width, height);
+    case ResultType::Vector:
+      return acquire_vector(width, height);
+    case ResultType::Color:
+      return acquire_color(width, height);
+  }
 }
 
 void TexturePool::release(GPUTexture *texture)
@@ -221,14 +236,6 @@ const bNode &NodeOperation::node() const
 }
 
 /* --------------------------------------------------------------------
- * Meta Operation.
- */
-
-MetaOperation::MetaOperation(Context &context) : Operation(context)
-{
-}
-
-/* --------------------------------------------------------------------
  * Single Value Input Operation.
  */
 
@@ -283,6 +290,176 @@ ResultType SingleValueInputOperation::get_input_result_type() const
       BLI_assert_unreachable();
       return ResultType::Float;
   }
+}
+
+/* --------------------------------------------------------------------
+ * Conversion Operation.
+ */
+
+const StringRef ConversionOperation::input_identifier = StringRef("Input");
+const StringRef ConversionOperation::output_identifier = StringRef("Output");
+const char *ConversionOperation::shader_input_sampler_name = "input_sampler";
+const char *ConversionOperation::shader_output_image_name = "output_image";
+
+bool ConversionOperation::is_buffered() const
+{
+  return true;
+}
+
+void ConversionOperation::initialize()
+{
+  /* Create a result with an appropriate description. */
+  const Result &input = get_input(input_identifier);
+  Result result{get_output_result_type(), input.is_texture};
+
+  /* If the result is not a texture, no need to initialize anything further. */
+  if (!result.is_texture) {
+    add_result(output_identifier, result);
+    return;
+  }
+
+  /* Allocate and assign a texture with the required specification. */
+  const int width = GPU_texture_width(result.data.texture);
+  const int height = GPU_texture_height(result.data.texture);
+  result.data.texture = texture_pool().acquire(width, height, result.type);
+  add_result(output_identifier, result);
+}
+
+void ConversionOperation::execute()
+{
+  const Result &input = get_input(input_identifier);
+  Result &result = get_result(output_identifier);
+
+  /* Call the execute_single method of the derived class. */
+  if (!input.is_texture) {
+    execute_single(input, result);
+    return;
+  }
+
+  /* Get the conversion shader from the derived class and bind it. */
+  GPUShader *shader = get_conversion_shader();
+  GPU_shader_bind(shader);
+
+  /* Bind input texture and output image. */
+  const int input_unit = GPU_shader_get_texture_binding(shader, shader_input_sampler_name);
+  GPU_texture_bind(input.data.texture, input_unit);
+  const int output_unit = GPU_shader_get_texture_binding(shader, shader_output_image_name);
+  GPU_texture_image_bind(result.data.texture, output_unit);
+
+  /* Dispatch shader. */
+  const int width = GPU_texture_width(result.data.texture);
+  const int height = GPU_texture_height(result.data.texture);
+  GPU_compute_dispatch(shader, width / 16 + 1, height / 16 + 1, 1);
+
+  /* Make sure the output is written before using it. */
+  GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
+
+  /* Unbind and free resources. */
+  GPU_shader_unbind();
+  GPU_texture_unbind(input.data.texture);
+  GPU_texture_image_unbind(result.data.texture);
+  GPU_shader_free(shader);
+}
+
+/* --------------------------------------------------------------------
+ * Convert Float To Vector Operation.
+ */
+
+void ConvertFloatToVectorOperation::execute_single(const Result &input, Result &output)
+{
+  copy_v3_fl(output.data.vector, input.data.value);
+}
+
+ResultType ConvertFloatToVectorOperation::get_output_result_type() const
+{
+  return ResultType::Vector;
+}
+
+/* Use the shader for color conversion since they are stored in similar textures and the conversion
+ * is practically the same. */
+GPUShader *ConvertFloatToVectorOperation::get_conversion_shader() const
+{
+  return GPU_shader_create_from_info_name("compositor_convert_float_to_color");
+}
+
+/* --------------------------------------------------------------------
+ * Convert Float To Color Operation.
+ */
+
+void ConvertFloatToColorOperation::execute_single(const Result &input, Result &output)
+{
+  copy_v3_fl(output.data.color, input.data.value);
+  output.data.color[3] = 1.0f;
+}
+
+ResultType ConvertFloatToColorOperation::get_output_result_type() const
+{
+  return ResultType::Color;
+}
+
+GPUShader *ConvertFloatToColorOperation::get_conversion_shader() const
+{
+  return GPU_shader_create_from_info_name("compositor_convert_float_to_color");
+}
+
+/* --------------------------------------------------------------------
+ * Convert Color To Float Operation.
+ */
+
+void ConvertColorToFloatOperation::execute_single(const Result &input, Result &output)
+{
+  output.data.value = (input.data.color[0] + input.data.color[1] + input.data.color[1]) / 3.0f;
+}
+
+ResultType ConvertColorToFloatOperation::get_output_result_type() const
+{
+  return ResultType::Float;
+}
+
+GPUShader *ConvertColorToFloatOperation::get_conversion_shader() const
+{
+  return GPU_shader_create_from_info_name("compositor_convert_color_to_float");
+}
+
+/* --------------------------------------------------------------------
+ * Convert Vector To Float Operation.
+ */
+
+void ConvertVectorToFloatOperation::execute_single(const Result &input, Result &output)
+{
+  output.data.value = (input.data.vector[0] + input.data.vector[1] + input.data.vector[1]) / 3.0f;
+}
+
+ResultType ConvertVectorToFloatOperation::get_output_result_type() const
+{
+  return ResultType::Float;
+}
+
+/* Use the shader for color conversion since they are stored in similar textures and the conversion
+ * is practically the same. */
+GPUShader *ConvertVectorToFloatOperation::get_conversion_shader() const
+{
+  return GPU_shader_create_from_info_name("compositor_convert_color_to_float");
+}
+
+/* --------------------------------------------------------------------
+ * Convert Vector To Color Operation.
+ */
+
+void ConvertVectorToColorOperation::execute_single(const Result &input, Result &output)
+{
+  copy_v3_v3(output.data.color, input.data.vector);
+  output.data.color[3] = 1.0f;
+}
+
+ResultType ConvertVectorToColorOperation::get_output_result_type() const
+{
+  return ResultType::Color;
+}
+
+GPUShader *ConvertVectorToColorOperation::get_conversion_shader() const
+{
+  return GPU_shader_create_from_info_name("compositor_convert_vector_to_color");
 }
 
 /* --------------------------------------------------------------------
@@ -535,11 +712,70 @@ void Evaluator::map_node_input_to_result(DInputSocket input)
 
 void Evaluator::map_node_linked_input_to_result(DInputSocket input, DOutputSocket output)
 {
+  Result &result = get_result_linked_to_node_input(input, output);
+  /* Map the input to the result we got from the output. */
   NodeOperation *input_operation = node_operations_.lookup(input.node());
-  NodeOperation *output_operation = node_operations_.lookup(output.node());
-  /* Map the input to the result we get from the output. */
-  Result &result = output_operation->get_result(output->identifier());
   input_operation->map_input_to_result(input->identifier(), &result);
+}
+
+/* Returns true if the result we get from the output can be consumed by the input with any need for
+ * conversion. */
+static bool is_output_compatible_with_input(DInputSocket input, DOutputSocket output)
+{
+  /* Trivial case. */
+  if (output->typeinfo()->type == input->typeinfo()->type) {
+    return true;
+  }
+  /* Vectors are stored in RGBA textures, so shaders can treat color textures as vectors
+   * transparently. */
+  if (output->typeinfo()->type == SOCK_RGBA && input->typeinfo()->type == SOCK_VECTOR) {
+    return true;
+  }
+  /* The rest of the combinations required conversion. */
+  return false;
+}
+
+Result &Evaluator::get_result_linked_to_node_input(DInputSocket input, DOutputSocket output)
+{
+  NodeOperation *output_operation = node_operations_.lookup(output.node());
+  Result &result = output_operation->get_result(output->identifier());
+  /* The output result is compatible with the input, return the result directly. */
+  if (is_output_compatible_with_input(input, output)) {
+    return result;
+  }
+  /* Conversion is needed, insert an appropriate conversion operation and return its result. */
+  return emit_conversion_operation(input, output);
+}
+
+Result &Evaluator::emit_conversion_operation(DInputSocket input, DOutputSocket output)
+{
+  /* Instantiate an appropriate conversion operation. */
+  ConversionOperation *conversion_operation = nullptr;
+  if (output->typeinfo()->type == SOCK_FLOAT && input->typeinfo()->type == SOCK_VECTOR) {
+    conversion_operation = new ConvertFloatToVectorOperation(context);
+  }
+  else if (output->typeinfo()->type == SOCK_FLOAT && input->typeinfo()->type == SOCK_RGBA) {
+    conversion_operation = new ConvertFloatToColorOperation(context);
+  }
+  else if (output->typeinfo()->type == SOCK_RGBA && input->typeinfo()->type == SOCK_FLOAT) {
+    conversion_operation = new ConvertColorToFloatOperation(context);
+  }
+  else if (output->typeinfo()->type == SOCK_VECTOR && input->typeinfo()->type == SOCK_FLOAT) {
+    conversion_operation = new ConvertVectorToFloatOperation(context);
+  }
+  else if (output->typeinfo()->type == SOCK_VECTOR && input->typeinfo()->type == SOCK_RGBA) {
+    conversion_operation = new ConvertVectorToColorOperation(context);
+  }
+  else {
+    BLI_assert_unreachable();
+  }
+  conversion_operation->initialize();
+
+  /* Map the input of the conversion operation to the output and return its result. */
+  NodeOperation *output_operation = node_operations_.lookup(output.node());
+  Result &result = output_operation->get_result(output->identifier());
+  conversion_operation->map_input_to_result(ConversionOperation::input_identifier, &result);
+  return conversion_operation->get_result(ConversionOperation::output_identifier);
 }
 
 void Evaluator::map_node_unlinked_input_to_result(DInputSocket input)
