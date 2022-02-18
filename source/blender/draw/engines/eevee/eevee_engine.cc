@@ -28,7 +28,7 @@ static void eevee_engine_init(void *vedata)
 {
   EEVEE_Data *ved = (EEVEE_Data *)vedata;
 
-  if (ved->instance == NULL) {
+  if (ved->instance == nullptr) {
     ved->instance = new Instance();
   }
 
@@ -192,8 +192,8 @@ static void eevee_render_update_passes(RenderEngine *engine, Scene *scene, ViewL
 static const DrawEngineDataSize eevee_data_size = DRW_VIEWPORT_DATA_SIZE(EEVEE_Data);
 
 DrawEngineType draw_engine_eevee_type = {
-    NULL,
-    NULL,
+    nullptr,
+    nullptr,
     N_("Eevee"),
     &eevee_data_size,
     &eevee_engine_init,
@@ -203,31 +203,31 @@ DrawEngineType draw_engine_eevee_type = {
     &eevee_cache_populate,
     &eevee_cache_finish,
     &eevee_draw_scene,
-    NULL,
-    NULL,
+    nullptr,
+    nullptr,
     &eevee_render_to_image,
-    NULL,
+    nullptr,
 };
 
 #define EEVEE_ENGINE "BLENDER_EEVEE"
 
 RenderEngineType DRW_engine_viewport_eevee_type = {
-    NULL,
-    NULL,
+    nullptr,
+    nullptr,
     EEVEE_ENGINE,
     N_("Eevee"),
     RE_INTERNAL | RE_USE_PREVIEW | RE_USE_STEREO_VIEWPORT | RE_USE_GPU_CONTEXT,
-    NULL,
+    nullptr,
     &DRW_render_to_image,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
     &eevee_render_update_passes,
     &draw_engine_eevee_type,
-    {NULL, NULL, NULL},
+    {nullptr, nullptr, nullptr},
 };
 
 #undef EEVEE_ENGINE

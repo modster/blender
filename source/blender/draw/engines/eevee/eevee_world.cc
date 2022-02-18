@@ -23,9 +23,9 @@ namespace blender::eevee {
 
 DefaultWorldNodeTree::DefaultWorldNodeTree()
 {
-  bNodeTree *ntree = ntreeAddTree(NULL, "World Nodetree", ntreeType_Shader->idname);
-  bNode *background = nodeAddStaticNode(NULL, ntree, SH_NODE_BACKGROUND);
-  bNode *output = nodeAddStaticNode(NULL, ntree, SH_NODE_OUTPUT_WORLD);
+  bNodeTree *ntree = ntreeAddTree(nullptr, "World Nodetree", ntreeType_Shader->idname);
+  bNode *background = nodeAddStaticNode(nullptr, ntree, SH_NODE_BACKGROUND);
+  bNode *output = nodeAddStaticNode(nullptr, ntree, SH_NODE_OUTPUT_WORLD);
   bNodeSocket *background_out = nodeFindSocket(background, SOCK_OUT, "Background");
   bNodeSocket *output_in = nodeFindSocket(output, SOCK_IN, "Surface");
   nodeAddLink(ntree, background, background_out, output, output_in);

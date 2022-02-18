@@ -598,7 +598,7 @@ class LightBake {
   {
     /* If a new light-cache was created, free the old one and reference the new. */
     if (lcache_ && scene_->eevee.light_cache_data != lcache_) {
-      if (scene_->eevee.light_cache_data != NULL) {
+      if (scene_->eevee.light_cache_data != nullptr) {
         EEVEE_lightcache_free(scene_->eevee.light_cache_data);
       }
       scene_->eevee.light_cache_data = lcache_;
@@ -684,7 +684,7 @@ class LightBake {
     lcache_->flag |= LIGHTCACHE_BAKED;
     lcache_->flag &= ~LIGHTCACHE_BAKING;
 
-    /* Assume that if lbake->gl_context is NULL
+    /* Assume that if lbake->gl_context is nullptr
      * we are not running in this in a job, so update
      * the scene light-cache pointer before deleting it. */
     if (gl_context_ == nullptr) {
@@ -977,8 +977,8 @@ class LightBake {
 
     if (gl_context_) {
       DRW_opengl_render_context_enable(gl_context_);
-      if (gpu_context_ == NULL) {
-        gpu_context_ = GPU_context_create(NULL);
+      if (gpu_context_ == nullptr) {
+        gpu_context_ = GPU_context_create(nullptr);
       }
       DRW_gpu_render_context_enable(gpu_context_);
     }

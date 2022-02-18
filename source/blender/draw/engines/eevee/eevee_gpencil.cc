@@ -39,7 +39,7 @@ struct gpIterData {
 
 static void gpencil_drawcall_flush(gpIterData &iter)
 {
-  if (iter.geom != NULL) {
+  if (iter.geom != nullptr) {
     shgroup_geometry_call(iter.material->shading.shgrp,
                           iter.ob,
                           iter.geom,
@@ -59,7 +59,7 @@ static void gpencil_drawcall_flush(gpIterData &iter)
                           iter.vcount,
                           iter.instancing);
   }
-  iter.geom = NULL;
+  iter.geom = nullptr;
   iter.vfirst = -1;
   iter.vcount = 0;
 }

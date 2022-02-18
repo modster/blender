@@ -28,9 +28,9 @@ namespace blender::eevee {
 
 LookDevWorldNodeTree::LookDevWorldNodeTree()
 {
-  bNodeTree *ntree = ntreeAddTree(NULL, "Lookdev Nodetree", ntreeType_Shader->idname);
-  bNode *background = nodeAddStaticNode(NULL, ntree, SH_NODE_BACKGROUND);
-  bNode *output = nodeAddStaticNode(NULL, ntree, SH_NODE_OUTPUT_WORLD);
+  bNodeTree *ntree = ntreeAddTree(nullptr, "Lookdev Nodetree", ntreeType_Shader->idname);
+  bNode *background = nodeAddStaticNode(nullptr, ntree, SH_NODE_BACKGROUND);
+  bNode *output = nodeAddStaticNode(nullptr, ntree, SH_NODE_OUTPUT_WORLD);
   bNodeSocket *background_out = nodeFindSocket(background, SOCK_OUT, "Background");
   bNodeSocket *output_in = nodeFindSocket(output, SOCK_IN, "Surface");
   nodeAddLink(ntree, background, background_out, output, output_in);
@@ -38,7 +38,7 @@ LookDevWorldNodeTree::LookDevWorldNodeTree()
 
   /* Note that we do not populate the environment texture input.
    * We plug the GPUTexture directly using the sampler binding name ("samp1"). */
-  bNode *environment = nodeAddStaticNode(NULL, ntree, SH_NODE_TEX_ENVIRONMENT);
+  bNode *environment = nodeAddStaticNode(nullptr, ntree, SH_NODE_TEX_ENVIRONMENT);
   bNodeSocket *background_in = nodeFindSocket(background, SOCK_IN, "Color");
   bNodeSocket *environment_out = nodeFindSocket(environment, SOCK_OUT, "Color");
   nodeAddLink(ntree, environment, environment_out, background, background_in);

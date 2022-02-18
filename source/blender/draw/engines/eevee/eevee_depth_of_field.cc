@@ -518,7 +518,7 @@ void DepthOfField::convolve_pass_sync(void)
     DRW_shgroup_uniform_texture(grp, "tiles_fg_tx", tiles_dilated_fg_tx_);
     DRW_shgroup_uniform_block(grp, "dof_buf", data_);
     DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
     /* Reuse textures from the setup pass. */
     /* NOTE: We could use the texture pool do that for us but it does not track
@@ -545,7 +545,7 @@ void DepthOfField::convolve_pass_sync(void)
     }
     DRW_shgroup_uniform_block(grp, "dof_buf", data_);
     DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
     color_fg_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
     weight_fg_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
@@ -565,7 +565,7 @@ void DepthOfField::convolve_pass_sync(void)
     }
     DRW_shgroup_uniform_block(grp, "dof_buf", data_);
     DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
     color_bg_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
     weight_bg_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
@@ -588,7 +588,7 @@ void DepthOfField::convolve_pass_sync(void)
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_ps_);
     DRW_shgroup_uniform_texture_ex(grp, "color_tx", color_holefill_tx_, no_filter);
     DRW_shgroup_uniform_texture_ex(grp, "weight_tx", weight_holefill_tx_, no_filter);
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
     filter_fg_fb_.ensure(GPU_ATTACHMENT_NONE,
                          GPU_ATTACHMENT_TEXTURE(color_fg_tx_),
@@ -617,7 +617,7 @@ void DepthOfField::convolve_pass_sync(void)
       DRW_shgroup_uniform_texture(grp, "bokehLut", bokeh_scatter_lut_tx_);
     }
     DRW_shgroup_uniform_block(grp, "dof_buf", data_);
-    DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, sprite_count);
 
     scatter_fg_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(color_fg_tx_));
   }
@@ -633,7 +633,7 @@ void DepthOfField::convolve_pass_sync(void)
       DRW_shgroup_uniform_texture(grp, "bokehLut", bokeh_scatter_lut_tx_);
     }
     DRW_shgroup_uniform_block(grp, "dof_buf", data_);
-    DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, sprite_count);
 
     scatter_bg_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(color_bg_tx_));
   }
@@ -702,7 +702,7 @@ void DepthOfField::resolve_pass_sync(void)
   if (bokeh_resolve_lut_tx_) {
     DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_resolve_lut_tx_);
   }
-  DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+  DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 }
 
 void DepthOfField::resolve_pass_render(GPUTexture *output_tx)

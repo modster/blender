@@ -148,7 +148,7 @@ void MotionBlur::sync(int extent[2])
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tiles_flatten_ps_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "velocity_tx", &input_velocity_tx_, no_filter);
     DRW_shgroup_uniform_block(grp, "motion_blur_buf", data_);
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
     tiles_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
 
@@ -161,7 +161,7 @@ void MotionBlur::sync(int extent[2])
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tiles_dilate_ps_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "tiles_tx", &tiles_tx_, no_filter);
     DRW_shgroup_uniform_block(grp, "motion_blur_buf", data_);
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 
     tiles_dilated_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
 
@@ -182,7 +182,7 @@ void MotionBlur::sync(int extent[2])
     DRW_shgroup_uniform_texture_ref_ex(grp, "velocity_tx", &input_velocity_tx_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "tiles_tx", &tiles_dilated_tx_, no_filter);
 
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 
   data_.is_viewport = !DRW_state_is_image_render();

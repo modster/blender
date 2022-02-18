@@ -110,7 +110,7 @@ void Film::sync(void)
     DRW_shgroup_uniform_texture_ref_ex(grp, "input_tx", &input_tx_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
   {
     SNPRINTF(full_name, "Film.%s.Resolve", name_.c_str());
@@ -127,7 +127,7 @@ void Film::sync(void)
     DRW_shgroup_uniform_texture_ref_ex(grp, "first_sample_tx", &first_sample_ref_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 }
 

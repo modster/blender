@@ -239,7 +239,7 @@ void VelocityPass::mesh_add(Object *ob, ObjectHandle &handle)
   VelocityObjectBuf *data = *data_ptr;
 
   GPUBatch *geom = DRW_cache_object_surface_get(ob);
-  if (geom == NULL) {
+  if (geom == nullptr) {
     return;
   }
 

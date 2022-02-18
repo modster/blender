@@ -26,9 +26,9 @@ namespace blender::eevee {
 
 DefaultSurfaceNodeTree::DefaultSurfaceNodeTree()
 {
-  bNodeTree *ntree = ntreeAddTree(NULL, "Shader Nodetree", ntreeType_Shader->idname);
-  bNode *bsdf = nodeAddStaticNode(NULL, ntree, SH_NODE_BSDF_PRINCIPLED);
-  bNode *output = nodeAddStaticNode(NULL, ntree, SH_NODE_OUTPUT_MATERIAL);
+  bNodeTree *ntree = ntreeAddTree(nullptr, "Shader Nodetree", ntreeType_Shader->idname);
+  bNode *bsdf = nodeAddStaticNode(nullptr, ntree, SH_NODE_BSDF_PRINCIPLED);
+  bNode *output = nodeAddStaticNode(nullptr, ntree, SH_NODE_OUTPUT_MATERIAL);
   bNodeSocket *bsdf_out = nodeFindSocket(bsdf, SOCK_OUT, "BSDF");
   bNodeSocket *output_in = nodeFindSocket(output, SOCK_IN, "Surface");
   nodeAddLink(ntree, bsdf, bsdf_out, output, output_in);
@@ -73,7 +73,7 @@ bNodeTree *DefaultSurfaceNodeTree::nodetree_get(::Material *ma)
 MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
 {
   {
-    bNodeTree *ntree = ntreeAddTree(NULL, "Shader Nodetree", ntreeType_Shader->idname);
+    bNodeTree *ntree = ntreeAddTree(nullptr, "Shader Nodetree", ntreeType_Shader->idname);
 
     diffuse_mat_ = (::Material *)BKE_id_new_nomain(ID_MA, "EEVEE default diffuse");
     diffuse_mat_->nodetree = ntree;
@@ -81,11 +81,11 @@ MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
     /* To use the forward pipeline. */
     diffuse_mat_->blend_method = MA_BM_BLEND;
 
-    bNode *bsdf = nodeAddStaticNode(NULL, ntree, SH_NODE_BSDF_DIFFUSE);
+    bNode *bsdf = nodeAddStaticNode(nullptr, ntree, SH_NODE_BSDF_DIFFUSE);
     bNodeSocket *base_color = nodeFindSocket(bsdf, SOCK_IN, "Color");
     copy_v3_fl(((bNodeSocketValueRGBA *)base_color->default_value)->value, 0.8f);
 
-    bNode *output = nodeAddStaticNode(NULL, ntree, SH_NODE_OUTPUT_MATERIAL);
+    bNode *output = nodeAddStaticNode(nullptr, ntree, SH_NODE_OUTPUT_MATERIAL);
 
     nodeAddLink(ntree,
                 bsdf,
@@ -96,7 +96,7 @@ MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
     nodeSetActive(ntree, output);
   }
   {
-    bNodeTree *ntree = ntreeAddTree(NULL, "Shader Nodetree", ntreeType_Shader->idname);
+    bNodeTree *ntree = ntreeAddTree(nullptr, "Shader Nodetree", ntreeType_Shader->idname);
 
     glossy_mat_ = (::Material *)BKE_id_new_nomain(ID_MA, "EEVEE default metal");
     glossy_mat_->nodetree = ntree;
@@ -104,13 +104,13 @@ MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
     /* To use the forward pipeline. */
     glossy_mat_->blend_method = MA_BM_BLEND;
 
-    bNode *bsdf = nodeAddStaticNode(NULL, ntree, SH_NODE_BSDF_GLOSSY);
+    bNode *bsdf = nodeAddStaticNode(nullptr, ntree, SH_NODE_BSDF_GLOSSY);
     bNodeSocket *base_color = nodeFindSocket(bsdf, SOCK_IN, "Color");
     copy_v3_fl(((bNodeSocketValueRGBA *)base_color->default_value)->value, 1.0f);
     bNodeSocket *roughness = nodeFindSocket(bsdf, SOCK_IN, "Roughness");
     ((bNodeSocketValueFloat *)roughness->default_value)->value = 0.0f;
 
-    bNode *output = nodeAddStaticNode(NULL, ntree, SH_NODE_OUTPUT_MATERIAL);
+    bNode *output = nodeAddStaticNode(nullptr, ntree, SH_NODE_OUTPUT_MATERIAL);
 
     nodeAddLink(ntree,
                 bsdf,
@@ -121,18 +121,18 @@ MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
     nodeSetActive(ntree, output);
   }
   {
-    bNodeTree *ntree = ntreeAddTree(NULL, "Shader Nodetree", ntreeType_Shader->idname);
+    bNodeTree *ntree = ntreeAddTree(nullptr, "Shader Nodetree", ntreeType_Shader->idname);
 
     error_mat_ = (::Material *)BKE_id_new_nomain(ID_MA, "EEVEE default error");
     error_mat_->nodetree = ntree;
     error_mat_->use_nodes = true;
 
     /* Use emission and output material to be compatible with both World and Material. */
-    bNode *bsdf = nodeAddStaticNode(NULL, ntree, SH_NODE_EMISSION);
+    bNode *bsdf = nodeAddStaticNode(nullptr, ntree, SH_NODE_EMISSION);
     bNodeSocket *color = nodeFindSocket(bsdf, SOCK_IN, "Color");
     copy_v3_fl3(((bNodeSocketValueRGBA *)color->default_value)->value, 1.0f, 0.0f, 1.0f);
 
-    bNode *output = nodeAddStaticNode(NULL, ntree, SH_NODE_OUTPUT_MATERIAL);
+    bNode *output = nodeAddStaticNode(nullptr, ntree, SH_NODE_OUTPUT_MATERIAL);
 
     nodeAddLink(ntree,
                 bsdf,
@@ -154,9 +154,9 @@ MaterialModule::~MaterialModule()
     delete shgroup;
     shgroup = nullptr;
   }
-  BKE_id_free(NULL, glossy_mat_);
-  BKE_id_free(NULL, diffuse_mat_);
-  BKE_id_free(NULL, error_mat_);
+  BKE_id_free(nullptr, glossy_mat_);
+  BKE_id_free(nullptr, diffuse_mat_);
+  BKE_id_free(nullptr, error_mat_);
 }
 
 void MaterialModule::begin_sync(void)
@@ -245,10 +245,10 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
 Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeometry geometry_type)
 {
   eMaterialPipeline surface_pipe = (blender_mat->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
-                                                                                MAT_PIPE_DEFERRED;
+                                                                                MAT_PIPE_FORWARD;
   eMaterialPipeline prepass_pipe = (blender_mat->blend_method == MA_BM_BLEND) ?
                                        MAT_PIPE_FORWARD_PREPASS :
-                                       MAT_PIPE_DEFERRED_PREPASS;
+                                       MAT_PIPE_FORWARD_PREPASS;
 
   MaterialKey material_key(blender_mat, geometry_type, surface_pipe);
 
