@@ -130,11 +130,9 @@ ivec2 shadow_tile_coord_in_atlas(ivec2 tile, int tilemap_index, int lod)
 
 ShadowTileData shadow_tile_load(usampler2D tilemaps_tx, ivec2 tile_co, int lod, int tilemap_index)
 {
-  uint tile_data = SHADOW_TILE_NO_DATA;
-  if (in_range_inclusive(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
-    tile_data =
-        texelFetch(tilemaps_tx, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), 0).x;
-  }
+  tile_co = clamp(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1));
+  uint tile_data =
+      texelFetch(tilemaps_tx, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), 0).x;
   return shadow_tile_data_unpack(tile_data);
 }
 
