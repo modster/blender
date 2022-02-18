@@ -90,13 +90,14 @@ template<
      *
      * The data type should implement the +=, =, -, / and * operator.
      */
-    typename Data>
+    typename Inner>
 class VertexOutInterface {
  public:
-  using Self = VertexOutInterface<Data>;
+  using InnerType = Inner;
+  using Self = VertexOutInterface<InnerType>;
   /** Coordinate of a vertex inside the image buffer. (0..image_buffer.x, 0..image_buffer.y). */
   float2 coord;
-  Data data;
+  InnerType data;
 
   Self &operator+=(const Self &other)
   {
@@ -240,11 +241,15 @@ template<typename VertexShader,
          typename Statistics = NullStats>
 class Rasterizer {
  public:
-  using RasterlineType = Rasterline<typename FragmentShader::FragmentInputType>;
+  using InterfaceInnerType = typename VertexShader::VertexOutputType::InnerType;
+  using RasterlineType = Rasterline<InterfaceInnerType>;
   using VertexInputType = typename VertexShader::VertexInputType;
   using VertexOutputType = typename VertexShader::VertexOutputType;
   using FragmentInputType = typename FragmentShader::FragmentInputType;
   using FragmentOutputType = typename FragmentShader::FragmentOutputType;
+
+  /** Check if the vertex shader and the fragment shader can be linked together. */
+  static_assert(std::is_same_v<InterfaceInnerType, FragmentInputType>);
 
  private:
   VertexShader vertex_shader_;
@@ -463,8 +468,8 @@ class Rasterizer {
   std::optional<RasterlineType> clamped_rasterline(int32_t y,
                                                    float start_x,
                                                    float end_x,
-                                                   FragmentInputType start_data,
-                                                   FragmentInputType end_data)
+                                                   InterfaceInnerType start_data,
+                                                   InterfaceInnerType end_data)
   {
     BLI_assert(start_x <= end_x);
     BLI_assert(y >= 0 && y < image_buffer_->y);
