@@ -75,7 +75,7 @@
 
 #include <optional>
 
-#define DEBUG_PRINT
+//#define DEBUG_PRINT
 
 namespace blender::imbuf::rasterizer {
 
@@ -387,6 +387,15 @@ class Rasterizer {
       }
       left += left_add;
       right += right_add;
+    }
+
+    if (min_v == mid_v) {
+      if (sorted_vertices[0]->coord[0] > sorted_vertices[1]->coord[0]) {
+        left = *sorted_vertices[1];
+      }
+      else {
+        right = *sorted_vertices[1];
+      }
     }
 
     /* When both are the same we should the left/right branches are the same. */
