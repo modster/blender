@@ -149,6 +149,17 @@ uint packUvec2x16(uvec2 data)
   return (data.x << 16u) | (data.y & 0xFFFFu);
 }
 
+uvec4 unpackUvec4x8(uint data)
+{
+  return (uvec4(data) >> uvec4(0u, 8u, 16u, 24u)) & uvec4(0xFFu);
+}
+
+uint packUvec4x8(uvec4 data)
+{
+  data = (uvec4(data) & 0xFFu) << uvec4(0u, 8u, 16u, 24u);
+  return data.x | data.y | data.z | data.w;
+}
+
 float distance_squared(vec2 a, vec2 b)
 {
   a -= b;

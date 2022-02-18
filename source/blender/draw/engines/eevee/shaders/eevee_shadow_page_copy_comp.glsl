@@ -11,24 +11,44 @@
 
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
+bool do_corner_pattern(vec2 uv, float corner_ratio)
+{
+  uv = uv * 2.0 - 1.0;
+  return (any(greaterThan(abs(uv), vec2(1.0 - corner_ratio))) &&
+          all(greaterThan(abs(uv), vec2(1.0 - corner_ratio * 2.0))));
+}
+
 void main()
 {
   int page_size = textureSize(render_tx, 0).x / SHADOW_TILEMAP_RES;
-  int lod_size = SHADOW_TILEMAP_RES >> tilemap_lod;
-  /* TODO(fclem) Experiment with biggest dispatch instead of iterating. Or a list. */
-  for (int y = 0; y < lod_size; y++) {
-    for (int x = 0; x < lod_size; x++) {
-      ivec2 tile_co = ivec2(x, y);
-      ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_lod, tilemap_index);
-      if (tile.do_update && tile.is_used && tile.is_visible && tile.is_allocated) {
-        /* We dispatch enough group to cover one page. */
-        ivec2 page_texel = ivec2(gl_GlobalInvocationID.xy);
-        ivec2 in_texel = page_texel + tile_co * page_size;
-        ivec2 out_texel = page_texel + ivec2(tile.page) * page_size;
 
-        float depth = texelFetch(render_tx, in_texel, 0).r;
-        imageStore(out_atlas_img, out_texel, vec4(depth));
-      }
+  for (int p = 0; p < pages_infos_buf.page_rendered; p++) {
+    uvec4 render_tile = unpackUvec4x8(pages_list_buf[p]);
+
+    ivec2 tile_co = ivec2(render_tile.xy);
+    ivec2 page_co = ivec2(render_tile.zw);
+
+    /* We dispatch enough group to cover one page. */
+    ivec2 page_texel = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 in_texel = page_texel + tile_co * page_size;
+    ivec2 out_texel = page_texel + page_co * page_size;
+
+    float depth = texelFetch(render_tx, in_texel, 0).r;
+
+    /* Debugging. */
+    uvec2 page_size = gl_NumWorkGroups.xy * gl_WorkGroupSize.xy;
+    vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(page_size);
+    if (do_corner_pattern(uv, 0.05)) {
+      depth = 0.0;
     }
+    else if (do_corner_pattern(uv, 0.08)) {
+      depth = 1.0;
+    }
+
+    // if (do_char()) {
+
+    // }
+
+    imageStore(out_atlas_img, out_texel, vec4(depth));
   }
 }

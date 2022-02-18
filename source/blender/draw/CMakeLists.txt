@@ -334,6 +334,7 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_shadow_page_free_comp.glsl
   engines/eevee/shaders/eevee_shadow_page_init_comp.glsl
   engines/eevee/shaders/eevee_shadow_page_lib.glsl
+  engines/eevee/shaders/eevee_shadow_page_list_comp.glsl
   engines/eevee/shaders/eevee_shadow_page_mark_vert.glsl
   engines/eevee/shaders/eevee_shadow_tilemap_depth_scan_comp.glsl
   engines/eevee/shaders/eevee_shadow_tilemap_lod_mask_comp.glsl

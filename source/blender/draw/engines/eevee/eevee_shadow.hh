@@ -475,6 +475,8 @@ class ShadowModule {
 
   /** Pool of unallocated pages waiting to be assigned to specific tiles in the tilemap atlas. */
   ShadowPageHeapBuf pages_free_data_;
+  /** List of tiles that are to be rendered. */
+  ShadowPageHeapBuf pages_list_data_;
   /** Infos for book keeping and debug. */
   ShadowPagesInfoDataBuf pages_infos_data_;
 
@@ -486,6 +488,8 @@ class ShadowModule {
   DRWPass *page_free_ps_;
   /** Allocate pages for new tiles. */
   DRWPass *page_alloc_ps_;
+  /** Create render page list. */
+  DRWPass *page_list_ps_;
   /** Clear depth of tiles to render to 1.0 and 0.0 for others. */
   DRWPass *page_mark_ps_;
   /** Copy pages in the copy list. */

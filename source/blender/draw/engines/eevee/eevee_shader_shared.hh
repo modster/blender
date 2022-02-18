@@ -478,7 +478,8 @@ struct ShadowPagesInfoData {
   int page_free_next_prev;
   /** Number of pages that needs to be rendered. */
   int page_updated_count;
-  int _pad0;
+  /** Number of pages that needs to be rendered in the tilemap LOD being rendered. */
+  int page_rendered;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowPagesInfoData, 16)
 

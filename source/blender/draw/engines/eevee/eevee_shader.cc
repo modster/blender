@@ -219,6 +219,8 @@ const char *ShaderModule::static_shader_create_info_name_get(eShaderType shader_
       return "eevee_shadow_page_free";
     case SHADOW_PAGE_INIT:
       return "eevee_shadow_page_init";
+    case SHADOW_PAGE_LIST:
+      return "eevee_shadow_page_list";
     case SHADOW_PAGE_MARK:
       return "eevee_shadow_page_mark";
     case SHADOW_TILE_DEPTH_SCAN:

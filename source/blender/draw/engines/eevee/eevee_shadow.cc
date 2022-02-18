@@ -597,7 +597,6 @@ void ShadowModule::sync_object(Object *ob,
   }
 
   if (is_alpha_blend) {
-    printf("receivers_non_opaque_\n");
     DRW_buffer_add_entry_struct(receivers_non_opaque_, &shadow_ob.aabb);
   }
 }
@@ -863,12 +862,27 @@ void ShadowModule::end_sync(void)
     }
   }
   {
+    page_list_ps_ = DRW_pass_create("ShadowPageList", (DRWState)0);
+
+    GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_LIST);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, page_list_ps_);
+    DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
+    DRW_shgroup_storage_block(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_storage_block(grp, "pages_list_buf", pages_list_data_);
+    DRW_shgroup_uniform_int(grp, "tilemap_lod", &rendering_lod_, 1);
+    DRW_shgroup_uniform_int(grp, "tilemap_index", &rendering_tilemap_, 1);
+    DRW_shgroup_call_compute(grp, 1, 1, 1);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_STORAGE);
+  }
+  {
     DRWState state = DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_ALWAYS;
     page_mark_ps_ = DRW_pass_create("ShadowPageMark", state);
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_MARK);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_mark_ps_);
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
+    DRW_shgroup_storage_block(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_storage_block(grp, "pages_list_buf", pages_list_data_);
     DRW_shgroup_uniform_int(grp, "tilemap_lod", &rendering_lod_, 1);
     DRW_shgroup_uniform_int(grp, "tilemap_index", &rendering_tilemap_, 1);
     DRW_shgroup_clear_framebuffer(grp, GPU_DEPTH_BIT, 0, 0, 0, 0, 0.0f, 0x0);
@@ -879,7 +893,8 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_COPY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_copy_ps_);
-    DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
+    DRW_shgroup_storage_block(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_storage_block(grp, "pages_list_buf", pages_list_data_);
     DRW_shgroup_uniform_texture(grp, "render_tx", render_tx_);
     DRW_shgroup_uniform_image(grp, "out_atlas_img", atlas_tx_);
     DRW_shgroup_uniform_int(grp, "tilemap_lod", &rendering_lod_, 1);
@@ -1056,7 +1071,7 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
   {
     if (G.debug & G_DEBUG_GPU) {
       /* Bind another framebuffer in order to avoid triggering the feedback loop check.
-       * This is safe because we only use compute shaders in the portion of the code.
+       * This is safe because we only use compute shaders in this section of the code.
        * Ideally the check should be smarter. */
       GPU_framebuffer_bind(render_fb_);
     }
@@ -1129,6 +1144,8 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
         rendering_tilemap_ = regions_index[i];
         rendering_lod_ = regions_lod[i];
 
+        DRW_draw_pass(page_list_ps_);
+
         DRW_view_set_active(views_[i]);
         GPU_framebuffer_bind(render_fb_);
 
@@ -1141,6 +1158,14 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
 
         DRW_draw_pass(page_mark_ps_);
         inst_.shading_passes.shadow.render();
+
+        if (G.debug & G_DEBUG_GPU) {
+          /* Bind another framebuffer in order to avoid triggering the feedback loop check.
+           * This is safe because we only use compute shaders in this section of the code.
+           * Ideally the check should be smarter. */
+          GPU_framebuffer_restore();
+        }
+
         DRW_draw_pass(page_copy_ps_);
       }
     }

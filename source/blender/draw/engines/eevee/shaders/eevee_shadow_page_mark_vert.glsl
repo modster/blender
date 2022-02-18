@@ -12,16 +12,13 @@
 void main()
 {
   int tile_index = gl_VertexID / 6;
-  ivec2 tile_co = ivec2(tile_index % SHADOW_TILEMAP_RES, tile_index / SHADOW_TILEMAP_RES);
-  tile_co >>= tilemap_lod;
 
-  ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_lod, tilemap_index);
-
-  if (!tile.is_visible || !tile.is_used || !tile.do_update) {
-    /* Don't draw anything as we already cleared the render target for these areas. */
+  if (tile_index >= pages_infos_buf.page_rendered) {
     gl_Position = vec4(0.0);
     return;
   }
+
+  uvec2 render_co = unpackUvec4x8(pages_list_buf[tile_index]).xy;
 
   int v = gl_VertexID % 3;
   /* Triangle in lower left corner in [-1..1] square. */
@@ -29,7 +26,7 @@ void main()
   /* NOTE: this only renders if backface cull is off. */
   pos = ((gl_VertexID % 6) > 2) ? -pos : pos;
 
-  pos = ((pos * 0.5 + 0.5) + vec2(tile_co)) / float(SHADOW_TILEMAP_RES >> tilemap_lod);
+  pos = ((pos * 0.5 + 0.5) + vec2(render_co)) / float(SHADOW_TILEMAP_RES >> tilemap_lod);
 
   gl_Position = vec4(pos * 2.0 - 1.0, 1.0, 1.0);
 }
