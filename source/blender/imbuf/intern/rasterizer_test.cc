@@ -84,4 +84,194 @@ TEST(imbuf_rasterizer, draw_triangle)
   imb_freerectImbuf_all(&image_buffer);
 }
 
+TEST(imbuf_rasterizer, center_pixel_clamper_scanline_for)
+{
+  CenterPixelClampingMethod clamper;
+
+  EXPECT_EQ(clamper.scanline_for(-2.0f), -2);
+  EXPECT_EQ(clamper.scanline_for(-1.9f), -2);
+  EXPECT_EQ(clamper.scanline_for(-1.8f), -2);
+  EXPECT_EQ(clamper.scanline_for(-1.7f), -2);
+  EXPECT_EQ(clamper.scanline_for(-1.6f), -2);
+  EXPECT_EQ(clamper.scanline_for(-1.5f), -2);
+  EXPECT_EQ(clamper.scanline_for(-1.4f), -1);
+  EXPECT_EQ(clamper.scanline_for(-1.3f), -1);
+  EXPECT_EQ(clamper.scanline_for(-1.2f), -1);
+  EXPECT_EQ(clamper.scanline_for(-1.1f), -1);
+  EXPECT_EQ(clamper.scanline_for(-1.0f), -1);
+  EXPECT_EQ(clamper.scanline_for(-0.9f), -1);
+  EXPECT_EQ(clamper.scanline_for(-0.8f), -1);
+  EXPECT_EQ(clamper.scanline_for(-0.7f), -1);
+  EXPECT_EQ(clamper.scanline_for(-0.6f), -1);
+  EXPECT_EQ(clamper.scanline_for(-0.5f), -1);
+  EXPECT_EQ(clamper.scanline_for(-0.4f), 0);
+  EXPECT_EQ(clamper.scanline_for(-0.3f), 0);
+  EXPECT_EQ(clamper.scanline_for(-0.2f), 0);
+  EXPECT_EQ(clamper.scanline_for(-0.1f), 0);
+  EXPECT_EQ(clamper.scanline_for(0.0f), 0);
+  EXPECT_EQ(clamper.scanline_for(0.1f), 0);
+  EXPECT_EQ(clamper.scanline_for(0.2f), 0);
+  EXPECT_EQ(clamper.scanline_for(0.3f), 0);
+  EXPECT_EQ(clamper.scanline_for(0.4f), 0);
+  EXPECT_EQ(clamper.scanline_for(0.5f), 0);
+  EXPECT_EQ(clamper.scanline_for(0.6f), 1);
+  EXPECT_EQ(clamper.scanline_for(0.7f), 1);
+  EXPECT_EQ(clamper.scanline_for(0.8f), 1);
+  EXPECT_EQ(clamper.scanline_for(0.9f), 1);
+  EXPECT_EQ(clamper.scanline_for(1.0f), 1);
+  EXPECT_EQ(clamper.scanline_for(1.0f), 1);
+  EXPECT_EQ(clamper.scanline_for(1.1f), 1);
+  EXPECT_EQ(clamper.scanline_for(1.2f), 1);
+  EXPECT_EQ(clamper.scanline_for(1.3f), 1);
+  EXPECT_EQ(clamper.scanline_for(1.4f), 1);
+  EXPECT_EQ(clamper.scanline_for(1.5f), 1);
+  EXPECT_EQ(clamper.scanline_for(1.6f), 2);
+  EXPECT_EQ(clamper.scanline_for(1.7f), 2);
+  EXPECT_EQ(clamper.scanline_for(1.8f), 2);
+  EXPECT_EQ(clamper.scanline_for(1.9f), 2);
+  EXPECT_EQ(clamper.scanline_for(2.0f), 2);
+}
+
+TEST(imbuf_rasterizer, center_pixel_clamper_column_for)
+{
+  CenterPixelClampingMethod clamper;
+
+  EXPECT_EQ(clamper.column_for(-2.0f), -2);
+  EXPECT_EQ(clamper.column_for(-1.9f), -2);
+  EXPECT_EQ(clamper.column_for(-1.8f), -2);
+  EXPECT_EQ(clamper.column_for(-1.7f), -2);
+  EXPECT_EQ(clamper.column_for(-1.6f), -2);
+  EXPECT_EQ(clamper.column_for(-1.5f), -2);
+  EXPECT_EQ(clamper.column_for(-1.4f), -1);
+  EXPECT_EQ(clamper.column_for(-1.3f), -1);
+  EXPECT_EQ(clamper.column_for(-1.2f), -1);
+  EXPECT_EQ(clamper.column_for(-1.1f), -1);
+  EXPECT_EQ(clamper.column_for(-1.0f), -1);
+  EXPECT_EQ(clamper.column_for(-0.9f), -1);
+  EXPECT_EQ(clamper.column_for(-0.8f), -1);
+  EXPECT_EQ(clamper.column_for(-0.7f), -1);
+  EXPECT_EQ(clamper.column_for(-0.6f), -1);
+  EXPECT_EQ(clamper.column_for(-0.5f), -1);
+  EXPECT_EQ(clamper.column_for(-0.4f), 0);
+  EXPECT_EQ(clamper.column_for(-0.3f), 0);
+  EXPECT_EQ(clamper.column_for(-0.2f), 0);
+  EXPECT_EQ(clamper.column_for(-0.1f), 0);
+  EXPECT_EQ(clamper.column_for(0.0f), 0);
+  EXPECT_EQ(clamper.column_for(0.1f), 0);
+  EXPECT_EQ(clamper.column_for(0.2f), 0);
+  EXPECT_EQ(clamper.column_for(0.3f), 0);
+  EXPECT_EQ(clamper.column_for(0.4f), 0);
+  EXPECT_EQ(clamper.column_for(0.5f), 0);
+  EXPECT_EQ(clamper.column_for(0.6f), 1);
+  EXPECT_EQ(clamper.column_for(0.7f), 1);
+  EXPECT_EQ(clamper.column_for(0.8f), 1);
+  EXPECT_EQ(clamper.column_for(0.9f), 1);
+  EXPECT_EQ(clamper.column_for(1.0f), 1);
+  EXPECT_EQ(clamper.column_for(1.0f), 1);
+  EXPECT_EQ(clamper.column_for(1.1f), 1);
+  EXPECT_EQ(clamper.column_for(1.2f), 1);
+  EXPECT_EQ(clamper.column_for(1.3f), 1);
+  EXPECT_EQ(clamper.column_for(1.4f), 1);
+  EXPECT_EQ(clamper.column_for(1.5f), 1);
+  EXPECT_EQ(clamper.column_for(1.6f), 2);
+  EXPECT_EQ(clamper.column_for(1.7f), 2);
+  EXPECT_EQ(clamper.column_for(1.8f), 2);
+  EXPECT_EQ(clamper.column_for(1.9f), 2);
+  EXPECT_EQ(clamper.column_for(2.0f), 2);
+}
+
+TEST(imbuf_rasterizer, center_pixel_clamper_distance_to_scanline_anchorpoint)
+{
+  CenterPixelClampingMethod clamper;
+
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-2.0f), 0.5f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.9f), 0.4f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.8f), 0.3f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.7f), 0.2f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.6f), 0.1f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.5f), 0.0f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.4f), 0.9f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.3f), 0.8f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.2f), 0.7f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.1f), 0.6f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-1.0f), 0.5f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-0.9f), 0.4f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-0.8f), 0.3f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-0.7f), 0.2f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-0.6f), 0.1f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-0.5f), 0.0f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-0.4f), 0.9f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-0.3f), 0.8f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-0.2f), 0.7f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(-0.1f), 0.6f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.0f), 0.5f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.1f), 0.4f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.2f), 0.3f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.3f), 0.2f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.4f), 0.1f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.5f), 0.0f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.6f), 0.9f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.7f), 0.8f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.8f), 0.7f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(0.9f), 0.6f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.0f), 0.5f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.1f), 0.4f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.2f), 0.3f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.3f), 0.2f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.4f), 0.1f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.5f), 0.0f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.6f), 0.9f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.7f), 0.8f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.8f), 0.7f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(1.9f), 0.6f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_scanline_anchor(2.0f), 0.5f);
+}
+
+TEST(imbuf_rasterizer, center_pixel_clamper_distance_to_column_anchorpoint)
+{
+  CenterPixelClampingMethod clamper;
+
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-2.0f), 0.5f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.9f), 0.4f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.8f), 0.3f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.7f), 0.2f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.6f), 0.1f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.5f), 0.0f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.4f), 0.9f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.3f), 0.8f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.2f), 0.7f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.1f), 0.6f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-1.0f), 0.5f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-0.9f), 0.4f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-0.8f), 0.3f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-0.7f), 0.2f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-0.6f), 0.1f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-0.5f), 0.0f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-0.4f), 0.9f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-0.3f), 0.8f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-0.2f), 0.7f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(-0.1f), 0.6f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.0f), 0.5f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.1f), 0.4f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.2f), 0.3f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.3f), 0.2f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.4f), 0.1f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.5f), 0.0f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.6f), 0.9f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.7f), 0.8f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.8f), 0.7f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(0.9f), 0.6f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.0f), 0.5f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.1f), 0.4f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.2f), 0.3f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.3f), 0.2f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.4f), 0.1f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.5f), 0.0f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.6f), 0.9f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.7f), 0.8f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.8f), 0.7f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(1.9f), 0.6f);
+  EXPECT_FLOAT_EQ(clamper.distance_to_column_anchor(2.0f), 0.5f);
+}
+
 }  // namespace blender::imbuf::rasterizer::tests

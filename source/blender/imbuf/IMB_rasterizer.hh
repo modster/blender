@@ -70,11 +70,12 @@
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
+#include "intern/rasterizer_clamping.hh"
 #include "intern/rasterizer_stats.hh"
 
 #include <optional>
 
-//#define DEBUG_PRINT
+#define DEBUG_PRINT
 
 namespace blender::imbuf::rasterizer {
 
@@ -257,6 +258,8 @@ class Rasterizer {
   Rasterlines<RasterlineType, RasterlinesSize> rasterlines_;
   ImBuf *image_buffer_;
 
+  const CenterPixelClampingMethod clamping_method;
+
  public:
   Statistics stats;
 
@@ -338,10 +341,9 @@ class Rasterizer {
 #endif
     std::array<VertexOutputType *, 3> sorted_vertices = order_triangle_vertices(vertex_out);
 
-    // TODO: add y coordinate clamping for smoother result.
-    const int min_v = sorted_vertices[0]->coord[1];
-    const int mid_v = sorted_vertices[1]->coord[1];
-    const int max_v = sorted_vertices[2]->coord[1];
+    const int min_v = clamping_method.scanline_for(sorted_vertices[0]->coord[1]);
+    const int mid_v = clamping_method.scanline_for(sorted_vertices[1]->coord[1]);
+    const int max_v = clamping_method.scanline_for(sorted_vertices[2]->coord[1]) - 1;
 
     /* left and right branch. */
     VertexOutputType left = *sorted_vertices[0];
@@ -366,6 +368,13 @@ class Rasterizer {
       std::swap(left_add, right_add);
     }
 
+    /* Perform a substep to make sure that the data of left and right match the data on the anchor
+     * point (center of the pixel). */
+    const float distance_to_minline_anchor_point = clamping_method.distance_to_scanline_anchor(
+        sorted_vertices[0]->coord[1]);
+    left += left_add * distance_to_minline_anchor_point;
+    right += right_add * distance_to_minline_anchor_point;
+
     /* Add rasterlines from min_v to mid_v. */
     int v;
     for (v = min_v; v < mid_v; v++) {
@@ -381,21 +390,24 @@ class Rasterizer {
     }
 
     /* When both are the same we should the left/right branches are the same. */
-    if (min_v == mid_v) {
-      /* Use the x coordinate to identify which branch should be modified. */
-      if (sorted_vertices[0]->coord[0] > sorted_vertices[1]->coord[0]) {
-        left = *sorted_vertices[1];
-      }
-      else {
-        right = *sorted_vertices[1];
-      }
+    const float distance_to_midline_anchor_point = clamping_method.distance_to_scanline_anchor(
+        sorted_vertices[1]->coord[1]);
+    /* Use the x coordinate to identify which branch should be modified. */
+    // TODO when min_v and mid_v are on the same scanline....
+    const float distance_to_left = abs(left.coord[0] - sorted_vertices[1]->coord[0]);
+    const float distance_to_right = abs(right.coord[0] - sorted_vertices[1]->coord[0]);
+    if (distance_to_left < distance_to_right) {
+      left = *sorted_vertices[1];
+      left_target = sorted_vertices[2];
+      left_add = calc_vertex_output_data(left, *left_target);
+      left += left_add * distance_to_midline_anchor_point;
     }
-
-    /* Update the branch adders. */
-    left_target = sorted_vertices[2];
-    right_target = sorted_vertices[2];
-    left_add = calc_vertex_output_data(left, *left_target);
-    right_add = calc_vertex_output_data(right, *right_target);
+    else {
+      right = *sorted_vertices[1];
+      right_target = sorted_vertices[2];
+      right_add = calc_vertex_output_data(right, *right_target);
+      right += right_add * distance_to_midline_anchor_point;
+    }
 
     /* Add rasterlines from mid_v to max_v. */
     for (; v < max_v; v++) {
@@ -414,10 +426,11 @@ class Rasterizer {
   VertexOutputType calc_vertex_output_data(const VertexOutputType &from,
                                            const VertexOutputType &to)
   {
-    // TODO: this should be done without casting to int, but that needs a better pixel clamping
-    // strategic.
-    const int num_rasterlines = (((int)to.coord[1]) - ((int)from.coord[1]));
-    return (to - from) / max_ii(1, num_rasterlines);
+    const float num_rasterlines = to.coord[1] - from.coord[1];
+    if (num_rasterlines == 0.0) {
+      return (to - from);
+    }
+    return (to - from) / num_rasterlines;
   }
 
   std::array<VertexOutputType *, 3> order_triangle_vertices(
@@ -471,11 +484,10 @@ class Rasterizer {
                                                    InterfaceInnerType start_data,
                                                    InterfaceInnerType end_data)
   {
-    BLI_assert(start_x <= end_x);
     BLI_assert(y >= 0 && y < image_buffer_->y);
 
     stats.increase_rasterlines();
-    if (start_x == end_x) {
+    if (start_x >= end_x) {
       stats.increase_discarded_rasterlines();
       return std::nullopt;
     }
@@ -489,17 +501,20 @@ class Rasterizer {
     }
 
     FragmentInputType add_x = (end_data - start_data) / (end_x - start_x);
+    /* Is created rasterline clamped and should be added to the statistics. */
     bool is_clamped = false;
-    uint32_t start_xi;
-    if (start_x < 0.0) {
-      start_data += add_x * abs(start_x);
+
+    /* Clamp the start_x to the first visible column anchor. */
+    int32_t start_xi = clamping_method.column_for(start_x);
+    float delta_to_anchor = clamping_method.distance_to_column_anchor(start_x);
+    if (start_xi < 0) {
+      delta_to_anchor += -start_xi;
       start_xi = 0;
       is_clamped = true;
     }
-    else {
-      start_xi = ceil(start_x);
-    }
-    uint32_t end_xi = ceil(end_x);
+    start_data += add_x * delta_to_anchor;
+
+    uint32_t end_xi = clamping_method.column_for(end_x);
     if (end_xi > image_buffer_->x) {
       end_xi = image_buffer_->x;
       is_clamped = true;
@@ -509,7 +524,11 @@ class Rasterizer {
       stats.increase_clamped_rasterlines();
     }
 
-    return RasterlineType(y, start_xi, end_xi, start_data, add_x);
+#ifdef DEBUG_PRINT
+    printf("%s y(%d) x(%d-%u)\n", __func__, y, start_xi, end_xi);
+#endif
+
+    return RasterlineType(y, (uint32_t)start_xi, end_xi, start_data, add_x);
   }
 
   void render_rasterline(const RasterlineType &rasterline)
