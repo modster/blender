@@ -234,6 +234,11 @@ void ntreeGPUMaterialNodes(struct bNodeTree *UNUSED(localtree), struct GPUMateri
   BLI_assert_unreachable();
 }
 
+void ntreeGPUCompositeNodes(struct bNodeTree *UNUSED(localtree), struct GPUMaterial *UNUSED(mat))
+{
+  BLI_assert_unreachable();
+}
+
 struct bNodeTree *ntreeLocalize(struct bNodeTree *UNUSED(ntree))
 {
   BLI_assert_unreachable();
