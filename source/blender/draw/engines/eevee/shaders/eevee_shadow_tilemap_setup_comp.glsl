@@ -53,8 +53,10 @@ void main()
         ShadowTileData tile_data = shadow_tile_data_unpack(imageLoad(tilemaps_img, texel).x);
         tile_data.is_visible = false;
         tile_data.is_used = false;
-        tile_data.do_update = do_update;
         tile_data.lod = 0;
+        if (do_update) {
+          tile_data.do_update = true;
+        }
         imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile_data)));
       }
     }
