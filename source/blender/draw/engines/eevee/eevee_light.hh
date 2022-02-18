@@ -100,6 +100,7 @@ class LightModule {
   int batch_len_ = 1;
 
   float light_threshold_;
+  bool use_scene_lights_ = false;
 
   /** Debug Culling visualization. */
   DRWPass *debug_draw_ps_ = nullptr;
@@ -113,7 +114,10 @@ class LightModule {
   void sync_light(const Object *ob, ObjectHandle &handle);
   void end_sync(void);
 
-  void set_view(const DRWView *view, const int2 extent, bool enable_specular = true);
+  void set_view(const DRWView *view,
+                const int2 extent,
+                bool no_scene_lights,
+                bool enable_specular = true);
 
   void shgroup_resources(DRWShadingGroup *grp);
 

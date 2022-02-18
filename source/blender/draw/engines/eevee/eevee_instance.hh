@@ -138,7 +138,7 @@ class Instance {
     return !DRW_state_is_scene_render();
   }
 
-  bool use_scene_light(void) const
+  bool use_scene_lights(void) const
   {
     return (!v3d) ||
            ((v3d->shading.type == OB_MATERIAL) &&

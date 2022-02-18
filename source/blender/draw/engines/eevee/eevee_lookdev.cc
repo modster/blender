@@ -320,7 +320,7 @@ void LookDev::render_overlay(GPUFrameBuffer *fb)
   const DRWView *active_view = DRW_view_get_active();
 
   inst_.lightprobes.set_view(active_view, int2(0));
-  inst_.lights.set_view(active_view, int2(0));
+  inst_.lights.set_view(active_view, int2(sphere_size_), true);
 
   /* Create subview for correct shading. Sub because we don not care about culling. */
   const CameraData &cam = inst_.camera.data_get();

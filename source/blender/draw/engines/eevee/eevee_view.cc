@@ -184,7 +184,7 @@ void ShadingView::update_view(void)
   DRW_view_update_sub(render_view_, viewmat.ptr(), winmat.ptr());
 
   inst_.lightprobes.set_view(render_view_, extent_);
-  inst_.lights.set_view(render_view_, extent_);
+  inst_.lights.set_view(render_view_, extent_, !inst_.use_scene_lights());
 }
 
 /** \} */
@@ -222,7 +222,7 @@ void LightProbeView::render(void)
 {
   if (!is_only_background_) {
     inst_.lightprobes.set_view(view_, extent_);
-    inst_.lights.set_view(view_, extent_, false);
+    inst_.lights.set_view(view_, extent_, false, false);
   }
 
   DRW_stats_group_start(name_);

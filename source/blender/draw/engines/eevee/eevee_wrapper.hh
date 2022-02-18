@@ -14,6 +14,16 @@
 
 namespace blender::eevee {
 
+/* Returns true if the value is different and was assigned */
+template<typename T> inline bool assign_if_different(T &old_value, T new_value)
+{
+  if (old_value != new_value) {
+    old_value = new_value;
+    return true;
+  }
+  return false;
+}
+
 using draw::Framebuffer;
 using draw::Texture;
 using draw::TextureFromPool;
