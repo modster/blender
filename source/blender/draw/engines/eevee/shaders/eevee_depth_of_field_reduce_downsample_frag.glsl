@@ -8,11 +8,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
-uniform sampler2D color_tx;
-uniform sampler2D coc_tx;
-
-layout(location = 0) out vec4 out_color;
-
 void main()
 {
   vec2 halfres_texel_size = 1.0 / vec2(textureSize(color_tx, 0).xy);

@@ -5,14 +5,15 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_volume_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_volume_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 
-uniform sampler2D depth_max_tx;
-
-layout(location = 0) out uvec4 out_volume_data;      /* Volume Emission, Absorption, Scatter. */
-layout(location = 1) out vec4 out_transparency_data; /* Transparent BSDF, Holdout. */
+GlobalData init_globals(void)
+{
+  GlobalData volume;
+  volume.P = interp.P_start;
+  return volume;
+}
 
 void main(void)
 {

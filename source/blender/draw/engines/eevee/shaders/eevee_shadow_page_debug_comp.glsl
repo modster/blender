@@ -7,21 +7,8 @@
  * This is nice to inspect the state of the page allocation during the pipeline.
  */
 
-#pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
-
-layout(local_size_x = 8, local_size_y = 8) in;
-
-layout(std430, binding = 1) readonly restrict buffer pages_free_buf
-{
-  uint free_page_owners[];
-};
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
-
-layout(r32ui) restrict uniform uimage2D debug_img;
 
 /* Use this as custom channel viewer in renderdoc to inspect debug_img. */
 #if 0
@@ -83,7 +70,7 @@ void main()
         if (tile.is_cached) {
           imageAtomicOr(debug_img, ivec2(tile.page), SHADOW_PAGE_IS_CACHED);
           /* Verify reference. */
-          ivec2 ref = ivec2(unpackUvec2x16(free_page_owners[tile.free_page_owner_index]));
+          ivec2 ref = ivec2(unpackUvec2x16(pages_free_buf[tile.free_page_owner_index]));
           if (ref == co) {
             imageAtomicOr(debug_img, ivec2(tile.page), SHADOW_PAGE_IN_FREE_HEAP);
           }
@@ -100,8 +87,8 @@ void main()
 
 #if 0
   for (int x = 0; x < SHADOW_MAX_PAGE; x++) {
-    if (free_page_owners[x] != uint(-1)) {
-      uvec2 owner = unpackUvec2x16(free_page_owners[x]);
+    if (pages_free_buf[x] != uint(-1)) {
+      uvec2 owner = unpackUvec2x16(pages_free_buf[x]);
       uvec2 page = shadow_tile_data_unpack(imageLoad(tilemaps_img, ivec2(owner)).x).page;
       /* User count. */
       imageAtomicAdd(debug_img, ivec2(page), 1u);

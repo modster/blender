@@ -6,13 +6,13 @@
 #pragma BLENDER_REQUIRE(eevee_bsdf_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_raytrace_trace_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
+#pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 
 /* Returns viewspace ray. */
 Ray raytrace_create_reflection_ray(
-    SamplingData sampling, vec2 noise, ClosureReflection reflection, vec3 V, vec3 P, out float pdf)
+    SamplingData data, vec2 noise, ClosureReflection reflection, vec3 V, vec3 P, out float pdf)
 {
-  vec2 noise_offset = sampling_rng_2D_get(sampling, SAMPLING_RAYTRACE_U);
+  vec2 noise_offset = sampling_rng_2D_get(data, SAMPLING_RAYTRACE_U);
   vec3 Xi = sample_cylinder(fract(noise_offset + noise));
 
   float roughness_sqr = max(1e-3, sqr(reflection.roughness));
@@ -31,9 +31,9 @@ Ray raytrace_create_reflection_ray(
 }
 
 Ray raytrace_create_refraction_ray(
-    SamplingData sampling, vec2 noise, ClosureRefraction refraction, vec3 V, vec3 P, out float pdf)
+    SamplingData data, vec2 noise, ClosureRefraction refraction, vec3 V, vec3 P, out float pdf)
 {
-  vec2 noise_offset = sampling_rng_2D_get(sampling, SAMPLING_RAYTRACE_U);
+  vec2 noise_offset = sampling_rng_2D_get(data, SAMPLING_RAYTRACE_U);
   vec3 Xi = sample_cylinder(fract(noise_offset + noise));
 
   float roughness_sqr = max(1e-3, sqr(refraction.roughness));
@@ -51,9 +51,9 @@ Ray raytrace_create_refraction_ray(
 }
 
 Ray raytrace_create_diffuse_ray(
-    SamplingData sampling, vec2 noise, ClosureDiffuse diffuse, vec3 P, out float pdf)
+    SamplingData data, vec2 noise, ClosureDiffuse diffuse, vec3 P, out float pdf)
 {
-  vec2 noise_offset = sampling_rng_2D_get(sampling, SAMPLING_RAYTRACE_U);
+  vec2 noise_offset = sampling_rng_2D_get(data, SAMPLING_RAYTRACE_U);
   vec3 Xi = sample_cylinder(fract(noise_offset + noise));
 
   /* Bias the rays so we never get really high energy rays almost parallel to the surface. */

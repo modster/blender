@@ -40,6 +40,7 @@ typedef enum eParticleRefineShaderType {
 /* draw_shader.c */
 struct GPUShader *DRW_shader_hair_refine_get(ParticleRefineShader refinement,
                                              eParticleRefineShaderType sh_type);
+struct GPUShader *DRW_shader_debug_print_display_get(void);
 void DRW_shaders_free(void);
 
 #ifdef __cplusplus

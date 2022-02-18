@@ -4,14 +4,6 @@
  * This uses layered rendering to filter all cubeface / layers in one drawcall.
  */
 
-#pragma BLENDER_REQUIRE(eevee_lightprobe_filter_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(std140) uniform filter_block
-{
-  LightProbeFilterData probe;
-};
-
 void main(void)
 {
   /* Fullscreen triangle. */
@@ -21,8 +13,10 @@ void main(void)
   gl_Position = vec4(interp.coord.xy * 2.0 - 1.0, 1.0, 1.0);
 
   int cube_face = gl_VertexID / 3;
-  interp.layer = probe.target_layer + cube_face;
+  interp.layer = filter_buf.target_layer + cube_face;
   interp.coord.z = float(interp.layer);
+
+  gpu_Layer = interp.layer;
 
 #ifdef CUBEMAP
   switch (cube_face) {

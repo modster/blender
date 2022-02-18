@@ -39,6 +39,8 @@
 
 #include "DNA_userdef_types.h"
 
+#include "NOD_shader.h"
+
 #include "DRW_engine.h"
 
 #include "bmesh.h"
@@ -167,7 +169,7 @@ void BKE_mesh_looptri_get_real_edges(const struct Mesh *UNUSED(mesh),
 /** \name Stubs of BKE_material.h
  * \{ */
 
-void BKE_material_defaults_free_gpu(void)
+void BKE_material_defaults_free_gpu()
 {
   /* This function is reachable via GPU_exit. */
 }
@@ -178,7 +180,7 @@ void BKE_material_defaults_free_gpu(void)
 /** \name Stubs of BKE_world.h
  * \{ */
 
-void BKE_world_defaults_free_gpu(void)
+void BKE_world_defaults_free_gpu()
 {
   /* This function is reachable via GPU_exit. */
 }

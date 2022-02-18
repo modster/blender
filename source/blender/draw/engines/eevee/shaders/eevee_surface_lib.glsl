@@ -1,22 +1,18 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(common_hair_lib.glsl)
 #pragma BLENDER_REQUIRE(gpu_shader_codegen_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
 
-IN_OUT SurfaceInterface
+/* To be fed the result of hair_get_barycentric from vertex shader. */
+vec2 hair_resolve_barycentric(vec2 vert_barycentric)
 {
-  vec3 P;
-  vec3 N;
-  vec2 barycentric_coords;
-  flat vec3 barycentric_dists;
-  vec3 hair_binormal;
-  float hair_time;
-  float hair_time_width;
-  float hair_thickness;
-  flat int hair_strand_id;
+  if (fract(vert_barycentric.y) != 0.0) {
+    return vec2(vert_barycentric.x, 0.0);
+  }
+  else {
+    return vec2(1.0 - vert_barycentric.x, 0.0);
+  }
 }
-interp;
 
 #if defined(GPU_FRAGMENT_SHADER) || defined(GPU_VERTEX_SHADER)
 GlobalData init_globals(void)

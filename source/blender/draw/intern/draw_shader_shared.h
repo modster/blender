@@ -1,6 +1,10 @@
 
 #ifndef GPU_SHADER
-#  include "gpu_shader_shared_utils.h"
+#  include "GPU_shader_shared_utils.h"
+
+typedef struct ViewInfos ViewInfos;
+typedef struct ObjectMatrices ObjectMatrices;
+typedef struct ObjectInfos ObjectInfos;
 #endif
 
 #define DRW_SHADER_SHARED_H
@@ -20,10 +24,24 @@ struct ViewInfos {
   float4 viewvecs[2];
   /* Should not be here. Not view dependent (only main view). */
   float4 viewcamtexcofac;
+
+  float2 viewport_size;
+  float2 viewport_size_inverse;
+
+  /** Frustum culling data. */
+  /** NOTE: vec3 arrays are paded to vec4. */
+  float4 frustum_corners[8];
+  float4 frustum_planes[6];
+
+  /** For debugging purpose */
+  /* Mouse pixel. */
+  int2 mouse_pixel;
+
+  int2 _pad0;
 };
 BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
 
-/* TODO(fclem) Mass rename. */
+/* TODO(@fclem): Mass rename. */
 #define ViewProjectionMatrix drw_view.persmat
 #define ViewProjectionMatrixInverse drw_view.persinv
 #define ViewMatrix drw_view.viewmat
@@ -50,3 +68,8 @@ BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
 #define OrcoTexCoFactors (drw_infos[resource_id].drw_OrcoTexCoFactors)
 #define ObjectInfo (drw_infos[resource_id].drw_Infos)
 #define ObjectColor (drw_infos[resource_id].drw_ObjectColor)
+#define ObjectGpencilWorldScale abs(drw_infos[resource_id].drw_OrcoTexCoFactors[0].w)
+#define ObjectGpencilThicknessIsScreenSpace \
+  (drw_infos[resource_id].drw_OrcoTexCoFactors[0].w < 0.0)
+#define ObjectGpencilDepthOrder2D (drw_infos[resource_id].drw_OrcoTexCoFactors[1].w < 0.0)
+#define ObjectGpencilThickness abs(drw_infos[resource_id].drw_OrcoTexCoFactors[1].w)

@@ -7,13 +7,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 
-uniform sampler2D combined_tx;
-uniform sampler2D transparency_data_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 5) out vec3 out_holdout;
-
 void main(void)
 {
   vec3 combined_radiance = texture(combined_tx, uvcoordsvar.xy).rgb;

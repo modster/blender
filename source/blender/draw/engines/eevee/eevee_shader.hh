@@ -49,7 +49,6 @@ enum eShaderType {
   DEFERRED_EVAL_TRANSPARENT,
   DEFERRED_EVAL_VOLUME,
 
-  DEFERRED_MESH,
   DEFERRED_VOLUME,
 
   DOF_BOKEH_LUT,
@@ -137,19 +136,10 @@ enum eShaderType {
  */
 class ShaderModule {
  private:
-  struct ShaderDescription {
-    const char *name = nullptr;
-    const char *vertex_shader_code = nullptr;
-    const char *geometry_shader_code = nullptr;
-    const char *fragment_shader_code = nullptr;
-    const char *compute_shader_code = nullptr;
-    const char *defines_shader_code = nullptr;
-  };
-
-  DRWShaderLibrary *shader_lib_ = nullptr;
   std::array<GPUShader *, MAX_SHADER_TYPE> shaders_;
-  std::array<ShaderDescription, MAX_SHADER_TYPE> shader_descriptions_;
-  std::string shared_lib_;
+
+  /** Shared shader module accross all engine instances. */
+  static ShaderModule *g_shader_module;
 
  public:
   ShaderModule();
@@ -169,23 +159,14 @@ class ShaderModule {
                                    eMaterialGeometry geometry_type,
                                    bool is_lookdev);
 
-  GPUShaderSource material_shader_code_generate(GPUMaterial *mat, const GPUCodegenOutput *codegen);
+  void material_create_info_ammend(GPUMaterial *mat, GPUCodegenOutput *codegen);
+
+  /** Only to be used by Instance constructor. */
+  static ShaderModule *module_get();
+  static void module_free();
 
  private:
-  /* Run some custom preprocessor shader rewrite and returns a new string. */
-  std::string enum_preprocess(const char *input);
-
-  char *material_shader_code_defs_get(eMaterialGeometry geometry_type);
-  char *material_shader_code_vert_get(const GPUCodegenOutput *codegen,
-                                      GPUMaterial *mat,
-                                      eMaterialGeometry geometry_type);
-  char *material_shader_code_geom_get(const GPUCodegenOutput *codegen,
-                                      GPUMaterial *mat,
-                                      eMaterialGeometry geometry_type);
-  char *material_shader_code_frag_get(const GPUCodegenOutput *codegen,
-                                      GPUMaterial *mat,
-                                      eMaterialGeometry geometry_type,
-                                      eMaterialPipeline pipeline_type);
+  const char *static_shader_create_info_name_get(eShaderType shader_type);
 };
 
 }  // namespace blender::eevee

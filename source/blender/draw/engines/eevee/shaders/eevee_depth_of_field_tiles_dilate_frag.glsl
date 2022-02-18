@@ -9,16 +9,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
-uniform int ring_count;
-uniform int ring_width_multiplier;
-uniform bool dilate_slight_focus;
-
-uniform sampler2D tiles_fg_tx;
-uniform sampler2D tiles_bg_tx;
-
-layout(location = 0) out vec4 out_tile_fg;
-layout(location = 1) out vec3 out_tile_bg;
-
 /* Error introduced by the random offset of the gathering kernel's center. */
 const float bluring_radius_error = 1.0 + 1.0 / (float(DOF_GATHER_RING_COUNT) + 0.5);
 const float tile_to_fullres_factor = float(DOF_TILE_DIVISOR);

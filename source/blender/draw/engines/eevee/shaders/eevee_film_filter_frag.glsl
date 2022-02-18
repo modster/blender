@@ -13,25 +13,6 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_film_lib.glsl)
 
-layout(std140) uniform camera_block
-{
-  CameraData camera;
-};
-
-layout(std140) uniform film_block
-{
-  FilmData film;
-};
-
-uniform sampler2D input_tx;
-uniform sampler2D data_tx;
-uniform sampler2D weight_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_data;
-layout(location = 1) out float out_weight;
-
 /* clang-format off */
 const vec2 sample_offsets_plus[5] = vec2[5](vec2(0, 1), vec2(-1, 0), vec2(0, 0), vec2(1, 0), vec2(0, -1));
 const vec2 sample_offsets_3x3[9] = vec2[9](vec2(-1, 1), vec2(0, 1), vec2(1, 1), vec2(-1, 0), vec2(0, 0), vec2(1, 0), vec2(-1, -1), vec2(0, -1), vec2(1, -1));

@@ -138,7 +138,7 @@ class DeferredLayer {
               GBuffer &gbuffer,
               HiZBuffer &hiz_front,
               HiZBuffer &hiz_back,
-              RaytraceBuffer &rtbuffer,
+              RaytraceBuffer &rt_buffer,
               GPUFrameBuffer *view_fb);
 
  private:

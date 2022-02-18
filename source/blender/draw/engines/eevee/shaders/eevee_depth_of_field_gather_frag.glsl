@@ -14,27 +14,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_accumulator_lib.glsl)
 
-layout(std140) uniform sampling_block
-{
-  SamplingData sampling;
-};
-
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-uniform sampler2D color_tx;
-uniform sampler2D color_bilinear_tx;
-uniform sampler2D coc_tx;
-uniform sampler2D tiles_fg_tx;
-uniform sampler2D tiles_bg_tx;
-uniform sampler2D bokeh_lut_tx;
-
-layout(location = 0) out vec4 out_color;
-layout(location = 1) out float out_weight;
-layout(location = 2) out vec2 out_occlusion;
-
 void main()
 {
   ivec2 tile_co = ivec2(gl_FragCoord.xy / float(DOF_TILE_DIVISOR / 2));
@@ -71,8 +50,8 @@ void main()
     out_occlusion = vec2(0.0, 0.0);
   }
   else if (do_fast_gather) {
-    dof_gather_accumulator(sampling,
-                           dof,
+    dof_gather_accumulator(sampling_buf,
+                           dof_buf,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,
@@ -86,8 +65,8 @@ void main()
                            out_occlusion);
   }
   else if (do_density_change) {
-    dof_gather_accumulator(sampling,
-                           dof,
+    dof_gather_accumulator(sampling_buf,
+                           dof_buf,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,
@@ -101,8 +80,8 @@ void main()
                            out_occlusion);
   }
   else {
-    dof_gather_accumulator(sampling,
-                           dof,
+    dof_gather_accumulator(sampling_buf,
+                           dof_buf,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,

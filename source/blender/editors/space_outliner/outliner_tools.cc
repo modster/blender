@@ -764,38 +764,6 @@ static void id_local_fn(bContext *C,
   }
 }
 
-static void object_proxy_to_override_convert_fn(bContext *C,
-                                                ReportList *reports,
-                                                Scene *UNUSED(scene),
-                                                TreeElement *UNUSED(te),
-                                                TreeStoreElem *UNUSED(tsep),
-                                                TreeStoreElem *tselem,
-                                                void *UNUSED(user_data))
-{
-  BLI_assert(TSE_IS_REAL_ID(tselem));
-  ID *id_proxy = tselem->id;
-  BLI_assert(GS(id_proxy->name) == ID_OB);
-  Object *ob_proxy = (Object *)id_proxy;
-  Scene *scene = CTX_data_scene(C);
-
-  if (ob_proxy->proxy == nullptr) {
-    return;
-  }
-
-  if (!BKE_lib_override_library_proxy_convert(
-          CTX_data_main(C), scene, CTX_data_view_layer(C), ob_proxy)) {
-    BKE_reportf(
-        reports,
-        RPT_ERROR_INVALID_INPUT,
-        "Could not create a library override from proxy '%s' (might use already local data?)",
-        ob_proxy->id.name + 2);
-    return;
-  }
-
-  DEG_id_tag_update(&scene->id, ID_RECALC_BASE_FLAGS | ID_RECALC_COPY_ON_WRITE);
-  WM_event_add_notifier(C, NC_WINDOW, nullptr);
-}
-
 struct OutlinerLibOverrideData {
   bool do_hierarchy;
   /**
@@ -859,8 +827,9 @@ static void id_override_library_create_fn(bContext *C,
         if (!ID_IS_LINKED(te->store_elem->id)) {
           break;
         }
-        /* If we'd need to override that aren't ID, but it is not overridable, abort. */
-        if (!ID_IS_OVERRIDABLE_LIBRARY(te->store_elem->id)) {
+        /* If some element in the tree needs to be overridden, but its ID is not overridable,
+         * abort. */
+        if (!ID_IS_OVERRIDABLE_LIBRARY_HIERARCHY(te->store_elem->id)) {
           BKE_main_id_tag_all(bmain, LIB_TAG_DOIT, false);
           BKE_reportf(reports,
                       RPT_WARNING,
@@ -873,8 +842,13 @@ static void id_override_library_create_fn(bContext *C,
         te->store_elem->id->tag |= LIB_TAG_DOIT;
       }
 
-      success = BKE_lib_override_library_create(
-          bmain, CTX_data_scene(C), CTX_data_view_layer(C), id_root, id_reference, nullptr);
+      success = BKE_lib_override_library_create(bmain,
+                                                CTX_data_scene(C),
+                                                CTX_data_view_layer(C),
+                                                nullptr,
+                                                id_root,
+                                                id_reference,
+                                                nullptr);
     }
     else if (ID_IS_OVERRIDABLE_LIBRARY(id_root)) {
       success = BKE_lib_override_library_create_from_id(bmain, id_root, true) != nullptr;
@@ -1531,7 +1505,6 @@ enum {
   OL_OP_SELECT_HIERARCHY,
   OL_OP_REMAP,
   OL_OP_RENAME,
-  OL_OP_PROXY_TO_OVERRIDE_CONVERT,
 };
 
 static const EnumPropertyItem prop_object_op_types[] = {
@@ -1544,11 +1517,6 @@ static const EnumPropertyItem prop_object_op_types[] = {
      "Remap Users",
      "Make all users of selected data-blocks to use instead a new chosen one"},
     {OL_OP_RENAME, "RENAME", 0, "Rename", ""},
-    {OL_OP_PROXY_TO_OVERRIDE_CONVERT,
-     "OBJECT_PROXY_TO_OVERRIDE",
-     0,
-     "Convert Proxy to Override",
-     "Convert a Proxy object to a full library override, including all its dependencies"},
     {0, nullptr, 0, nullptr, nullptr},
 };
 
@@ -1612,15 +1580,6 @@ static int outliner_object_operation_exec(bContext *C, wmOperator *op)
     outliner_do_object_operation(
         C, op->reports, scene, space_outliner, &space_outliner->tree, item_rename_fn);
     str = "Rename Object";
-  }
-  else if (event == OL_OP_PROXY_TO_OVERRIDE_CONVERT) {
-    outliner_do_object_operation(C,
-                                 op->reports,
-                                 scene,
-                                 space_outliner,
-                                 &space_outliner->tree,
-                                 object_proxy_to_override_convert_fn);
-    str = "Convert Proxy to Override";
   }
   else {
     BLI_assert(0);
@@ -1793,7 +1752,6 @@ enum eOutlinerIdOpTypes {
   OUTLINER_IDOP_LOCAL,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_CREATE,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_CREATE_HIERARCHY,
-  OUTLINER_IDOP_OVERRIDE_LIBRARY_PROXY_CONVERT,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET_HIERARCHY,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_RESYNC_HIERARCHY,
@@ -1835,11 +1793,6 @@ static const EnumPropertyItem prop_id_op_types[] = {
      0,
      "Make Library Override Hierarchy",
      "Make a local override of this linked data-block, and its hierarchy of dependencies"},
-    {OUTLINER_IDOP_OVERRIDE_LIBRARY_PROXY_CONVERT,
-     "OVERRIDE_LIBRARY_PROXY_CONVERT",
-     0,
-     "Convert Proxy to Override",
-     "Convert a Proxy object to a full library override, including all its dependencies"},
     {OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET,
      "OVERRIDE_LIBRARY_RESET",
      0,
@@ -1912,16 +1865,6 @@ static bool outliner_id_operation_item_poll(bContext *C,
         return true;
       }
       return false;
-    case OUTLINER_IDOP_OVERRIDE_LIBRARY_PROXY_CONVERT: {
-      if (GS(tselem->id->name) == ID_OB) {
-        Object *ob = (Object *)tselem->id;
-
-        if ((ob != nullptr) && (ob->proxy != nullptr)) {
-          return true;
-        }
-      }
-      return false;
-    }
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET:
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET_HIERARCHY:
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESYNC_HIERARCHY:
@@ -2096,16 +2039,6 @@ static int outliner_id_operation_exec(bContext *C, wmOperator *op)
                                     id_override_library_create_fn,
                                     &override_data);
       ED_undo_push(C, "Overridden Data Hierarchy");
-      break;
-    }
-    case OUTLINER_IDOP_OVERRIDE_LIBRARY_PROXY_CONVERT: {
-      outliner_do_object_operation(C,
-                                   op->reports,
-                                   scene,
-                                   space_outliner,
-                                   &space_outliner->tree,
-                                   object_proxy_to_override_convert_fn);
-      ED_undo_push(C, "Convert Proxy to Override");
       break;
     }
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET: {

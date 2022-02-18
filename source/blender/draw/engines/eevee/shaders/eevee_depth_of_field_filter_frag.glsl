@@ -8,14 +8,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
-uniform sampler2D color_tx;
-uniform sampler2D weight_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_color;
-layout(location = 1) out float out_weight;
-
 /* From:
  * Implementing Median Filters in XC4000E FPGAs
  * JOHN L. SMITH, Univision Technologies Inc., Billerica, MA

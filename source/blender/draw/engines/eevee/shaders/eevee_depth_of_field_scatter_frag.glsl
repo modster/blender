@@ -6,17 +6,7 @@
  * invocations and overdraw.
  */
 
-#pragma BLENDER_REQUIRE(eevee_depth_of_field_scatter_lib.glsl)
-
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-uniform sampler2D occlusion_tx;
-uniform sampler2D bokeh_lut_tx;
-
-layout(location = 0) out vec4 fragColor;
+#pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
 float bokeh_shape(vec2 center)
 {
@@ -27,7 +17,7 @@ float bokeh_shape(vec2 center)
       /* Negate to flip bokeh shape. Mimics optical phenomenon. */
       co = -co;
     }
-    co *= dof.bokeh_anisotropic_scale_inv;
+    co *= dof_buf.bokeh_anisotropic_scale_inv;
     float texture_size = float(textureSize(bokeh_lut_tx, 0).x);
     /* Bias scale to avoid sampling at the texture's border. */
     float scale_fac = spritesize * (float(DOF_BOKEH_LUT_SIZE) / float(DOF_BOKEH_LUT_SIZE - 1));

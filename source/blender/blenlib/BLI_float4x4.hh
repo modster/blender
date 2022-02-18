@@ -90,7 +90,7 @@ struct float4x4 {
     return matrix;
   }
 
-  static float4x4 identity()
+  static float4x4 identity() ATTR_WARN_UNUSED_RESULT
   {
     float4x4 mat;
     unit_m4(mat.values);
@@ -258,6 +258,16 @@ struct float4x4 {
       h = h * 33 + *reinterpret_cast<const uint32_t *>(&value);
     }
     return h;
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, const float4x4 &m)
+  {
+    stream << "(\n";
+    for (int i = 0; i < 4; i++) {
+      stream << " " << *reinterpret_cast<const float4 *>(m.values[i]) << std::endl;
+    }
+    stream << ")";
+    return stream;
   }
 };
 

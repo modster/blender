@@ -1,6 +1,5 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 /* -------------------------------------------------------------------- */
 /** \name Utility functions to work with BSDFs
@@ -175,7 +174,7 @@ vec2 lut_coords(float cos_theta, float roughness)
 /* Returns the GGX split-sum precomputed in LUT. */
 vec2 brdf_lut(float cos_theta, float roughness)
 {
-  return utility_tx_sample(lut_coords(cos_theta, roughness), UTIL_BSDF_LAYER).rg;
+  return utility_tx_sample(utility_tx, lut_coords(cos_theta, roughness), UTIL_BSDF_LAYER).rg;
 }
 
 /* Return texture coordinates to sample Surface LUT. */
@@ -228,10 +227,10 @@ vec2 btdf_lut(float cos_theta, float roughness, float ior)
   float layer_floored = floor(layer);
 
   coords.z = UTIL_BTDF_LAYER + layer_floored;
-  vec2 btdf_low = utility_tx_sample(coords.xy, coords.z).rg;
+  vec2 btdf_low = utility_tx_sample(utility_tx, coords.xy, coords.z).rg;
 
   coords.z += 1.0;
-  vec2 btdf_high = utility_tx_sample(coords.xy, coords.z).rg;
+  vec2 btdf_high = utility_tx_sample(utility_tx, coords.xy, coords.z).rg;
 
   /* Manual trilinear interpolation. */
   vec2 btdf = mix(btdf_low, btdf_high, layer - layer_floored);

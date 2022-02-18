@@ -4,7 +4,7 @@
  * Also contains some sample mapping functions.
  **/
 
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
+#pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
 /* -------------------------------------------------------------------- */
 /** \name Sampling data.
@@ -49,6 +49,7 @@ float interlieved_gradient_noise(vec2 pixel, float seed, float offset)
 /* From: http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html */
 float van_der_corput_radical_inverse(uint bits)
 {
+  /* TODO(fclem) Replace with bitfieldReverse(). */
   bits = (bits << 16u) | (bits >> 16u);
   bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
   bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);

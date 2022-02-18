@@ -313,39 +313,34 @@ static int gpu_shader_curve_float(GPUMaterial *mat,
                                   GPUNodeStack *in,
                                   GPUNodeStack *out)
 {
-  float *array, layer;
-  int size;
+  CurveMapping *curve_mapping = (CurveMapping *)node->storage;
 
-  CurveMapping *cumap = (CurveMapping *)node->storage;
+  BKE_curvemapping_init(curve_mapping);
+  float *band_values;
+  int band_size;
+  BKE_curvemapping_table_RGBA(curve_mapping, &band_values, &band_size);
+  float band_layer;
+  GPUNodeLink *band_texture = GPU_color_band(mat, band_size, band_values, &band_layer);
 
-  BKE_curvemapping_table_F(cumap, &array, &size);
-  GPUNodeLink *tex = GPU_color_band(mat, size, array, &layer);
+  float start_slopes[CM_TOT];
+  float end_slopes[CM_TOT];
+  BKE_curvemapping_compute_slopes(curve_mapping, start_slopes, end_slopes);
+  float range_minimums[CM_TOT];
+  BKE_curvemapping_get_range_minimums(curve_mapping, range_minimums);
+  float range_dividers[CM_TOT];
+  BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
 
-  float ext_xyz[4];
-  float range_x;
-
-  const CurveMap *cm = &cumap->cm[0];
-  ext_xyz[0] = cm->mintable;
-  ext_xyz[2] = cm->maxtable;
-  range_x = 1.0f / max_ff(1e-8f, cm->maxtable - cm->mintable);
-  /* Compute extrapolation gradients. */
-  if ((cumap->flag & CUMA_EXTEND_EXTRAPOLATE) != 0) {
-    ext_xyz[1] = (cm->ext_in[0] != 0.0f) ? (cm->ext_in[1] / (cm->ext_in[0] * range_x)) : 1e8f;
-    ext_xyz[3] = (cm->ext_out[0] != 0.0f) ? (cm->ext_out[1] / (cm->ext_out[0] * range_x)) : 1e8f;
-  }
-  else {
-    ext_xyz[1] = 0.0f;
-    ext_xyz[3] = 0.0f;
-  }
   return GPU_stack_link(mat,
                         node,
-                        "curve_float",
+                        "curves_float_mixed",
                         in,
                         out,
-                        tex,
-                        GPU_constant(&layer),
-                        GPU_uniform(&range_x),
-                        GPU_uniform(ext_xyz));
+                        band_texture,
+                        GPU_constant(&band_layer),
+                        GPU_uniform(range_minimums),
+                        GPU_uniform(range_dividers),
+                        GPU_uniform(start_slopes),
+                        GPU_uniform(end_slopes));
 }
 
 class CurveFloatFunction : public blender::fn::MultiFunction {

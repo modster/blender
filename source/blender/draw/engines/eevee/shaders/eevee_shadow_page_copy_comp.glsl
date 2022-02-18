@@ -11,17 +11,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
-layout(local_size_x = SHADOW_PAGE_COPY_GROUP_SIZE, local_size_y = SHADOW_PAGE_COPY_GROUP_SIZE) in;
-
-uniform usampler2D tilemaps_tx;
-uniform sampler2D render_tx;
-
-/* TODO(fclem): 16bit format. */
-layout(r32f) writeonly restrict uniform image2D out_atlas_img;
-
-uniform int tilemap_index;
-uniform int tilemap_lod;
-
 void main()
 {
   int page_size = textureSize(render_tx, 0).x / SHADOW_TILEMAP_RES;

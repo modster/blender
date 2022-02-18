@@ -1,7 +1,6 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 /* ---------------------------------------------------------------------- */
 /** \name Tilemap data
@@ -115,22 +114,6 @@ ivec2 shadow_tile_coord_in_atlas(ivec2 tile, int tilemap_index, int lod)
 /** \name Load / Store functions.
  * \{ */
 
-void shadow_tile_store(restrict uimage2D tilemaps_img,
-                       ivec2 tile_co,
-                       int tilemap_index,
-                       ShadowTileData data)
-{
-  uint tile_data = shadow_tile_data_pack(data);
-  imageStore(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index), uvec4(tile_data));
-}
-
-void shadow_tile_store(
-    restrict uimage2D tilemaps_img, ivec2 tile_co, int lod, int tilemap_index, ShadowTileData data)
-{
-  uint tile_data = shadow_tile_data_pack(data);
-  imageStore(
-      tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), uvec4(tile_data));
-}
 /* Ugly define because some compilers seems to not like the fact the imageAtomicOr is inside
  * a function. */
 #define shadow_tile_set_flag(tilemaps_img, tile_co, lod, tilemap_index, flag) \
@@ -138,17 +121,12 @@ void shadow_tile_store(
 #define shadow_tile_unset_flag(tilemaps_img, tile_co, lod, tilemap_index, flag) \
   imageAtomicAnd(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), ~(flag))
 
-ShadowTileData shadow_tile_load(restrict uimage2D tilemaps_img,
-                                ivec2 tile_co,
-                                int lod,
-                                int tilemap_index)
-{
-  uint tile_data = SHADOW_TILE_NO_DATA;
-  if (in_range_inclusive(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
-    tile_data = imageLoad(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod)).x;
-  }
-  return shadow_tile_data_unpack(tile_data);
-}
+/* Compilers have different requirements about image qualifiers in function arguments. */
+#define shadow_tile_load_img(tilemaps_img, tile_co, lod, tilemap_index) \
+  shadow_tile_data_unpack( \
+      in_range_inclusive(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1)) ? \
+          imageLoad(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod)).x : \
+          SHADOW_TILE_NO_DATA);
 
 ShadowTileData shadow_tile_load(usampler2D tilemaps_tx, ivec2 tile_co, int lod, int tilemap_index)
 {

@@ -39,11 +39,11 @@ using namespace blender::gpu;
 
 #define MATRIX_STACK_DEPTH 32
 
-using Mat4 = float[4][4];
-using Mat3 = float[3][3];
+using Matrix4 = float[4][4];
+using Matrix3 = float[3][3];
 
 struct MatrixStack {
-  Mat4 stack[MATRIX_STACK_DEPTH];
+  Matrix4 stack[MATRIX_STACK_DEPTH];
   uint top;
 };
 
@@ -189,7 +189,7 @@ void GPU_matrix_identity_set()
 
 void GPU_matrix_translate_2f(float x, float y)
 {
-  Mat4 m;
+  Matrix4 m;
   unit_m4(m);
   m[3][0] = x;
   m[3][1] = y;
@@ -207,7 +207,7 @@ void GPU_matrix_translate_3f(float x, float y, float z)
   translate_m4(ModelView, x, y, z);
   CHECKMAT(ModelView);
 #else /* above works well in early testing, below is generic version */
-  Mat4 m;
+  Matrix4 m;
   unit_m4(m);
   m[3][0] = x;
   m[3][1] = y;
@@ -224,14 +224,14 @@ void GPU_matrix_translate_3fv(const float vec[3])
 
 void GPU_matrix_scale_1f(float factor)
 {
-  Mat4 m;
+  Matrix4 m;
   scale_m4_fl(m, factor);
   GPU_matrix_mul(m);
 }
 
 void GPU_matrix_scale_2f(float x, float y)
 {
-  Mat4 m = {{0.0f}};
+  Matrix4 m = {{0.0f}};
   m[0][0] = x;
   m[1][1] = y;
   m[2][2] = 1.0f;
@@ -246,7 +246,7 @@ void GPU_matrix_scale_2fv(const float vec[2])
 
 void GPU_matrix_scale_3f(float x, float y, float z)
 {
-  Mat4 m = {{0.0f}};
+  Matrix4 m = {{0.0f}};
   m[0][0] = x;
   m[1][1] = y;
   m[2][2] = z;
@@ -282,7 +282,7 @@ void GPU_matrix_rotate_3f(float deg, float x, float y, float z)
 
 void GPU_matrix_rotate_3fv(float deg, const float axis[3])
 {
-  Mat4 m;
+  Matrix4 m;
   axis_angle_to_mat4(m, axis, DEG2RADF(deg));
   GPU_matrix_mul(m);
 }
@@ -429,7 +429,7 @@ void GPU_matrix_ortho_set_z(float near, float far)
 
 void GPU_matrix_ortho_2d_set(float left, float right, float bottom, float top)
 {
-  Mat4 m;
+  Matrix4 m;
   mat4_ortho_set(m, left, right, bottom, top, -1.0f, 1.0f);
   CHECKMAT(Projection2D);
   gpu_matrix_state_active_set_dirty(true);
@@ -460,7 +460,7 @@ void GPU_matrix_look_at(float eyeX,
                         float upY,
                         float upZ)
 {
-  Mat4 cm;
+  Matrix4 cm;
   float lookdir[3];
   float camup[3] = {upX, upY, upZ};
 
@@ -588,7 +588,7 @@ const float (*GPU_matrix_projection_get(float m[4][4]))[4]
 const float (*GPU_matrix_model_view_projection_get(float m[4][4]))[4]
 {
   if (m == nullptr) {
-    static Mat4 temp;
+    static Matrix4 temp;
     m = temp;
   }
 
@@ -599,7 +599,7 @@ const float (*GPU_matrix_model_view_projection_get(float m[4][4]))[4]
 const float (*GPU_matrix_normal_get(float m[3][3]))[3]
 {
   if (m == nullptr) {
-    static Mat3 temp3;
+    static Matrix3 temp3;
     m = temp3;
   }
 
@@ -614,7 +614,7 @@ const float (*GPU_matrix_normal_get(float m[3][3]))[3]
 const float (*GPU_matrix_normal_inverse_get(float m[3][3]))[3]
 {
   if (m == nullptr) {
-    static Mat3 temp3;
+    static Matrix3 temp3;
     m = temp3;
   }
 
@@ -653,13 +653,13 @@ void GPU_matrix_bind(GPUShader *shader)
     GPU_shader_uniform_vector(shader, N, 9, 1, (const float *)GPU_matrix_normal_get(nullptr));
   }
   if (MV_inv != -1) {
-    Mat4 m;
+    Matrix4 m;
     GPU_matrix_model_view_get(m);
     invert_m4(m);
     GPU_shader_uniform_vector(shader, MV_inv, 16, 1, (const float *)m);
   }
   if (P_inv != -1) {
-    Mat4 m;
+    Matrix4 m;
     GPU_matrix_projection_get(m);
     invert_m4(m);
     GPU_shader_uniform_vector(shader, P_inv, 16, 1, (const float *)m);

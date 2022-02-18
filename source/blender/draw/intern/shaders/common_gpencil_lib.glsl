@@ -1,7 +1,6 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(common_obinfos_lib.glsl)
 
 #ifdef GPU_FRAGMENT_SHADER
 float gpencil_stroke_round_cap_mask(vec2 p1, vec2 p2, vec2 aspect, float thickness, float hardfac)

@@ -9,43 +9,12 @@
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
 
-layout(local_size_x = SHADOW_DEPTH_SCAN_GROUP_SIZE,
-       local_size_y = SHADOW_DEPTH_SCAN_GROUP_SIZE) in;
-
-layout(std430, binding = 0) readonly restrict buffer lights_buf
-{
-  LightData lights[];
-};
-
-layout(std430, binding = 1) readonly restrict buffer lights_zbins_buf
-{
-  CullingZBin lights_zbins[];
-};
-
-layout(std430, binding = 2) readonly restrict buffer lights_culling_buf
-{
-  CullingData light_culling;
-};
-
-layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
-{
-  CullingWord lights_culling_words[];
-};
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
-
-uniform sampler2D depth_tx;
-
-uniform float tilemap_pixel_radius;
-uniform float screen_pixel_radius_inv;
-
 void tag_tilemap(uint l_idx, vec3 P, float dist_to_cam, const bool is_directional)
 {
-  LightData light = lights[l_idx];
+  LightData light = lights_buf[l_idx];
   ShadowData shadow = light.shadow_data;
 
   if (light.shadow_id == LIGHT_NO_SHADOW) {
@@ -121,13 +90,13 @@ void main()
 
   float dist_to_cam = length(vP);
 
-  LIGHT_FOREACH_BEGIN_DIRECTIONAL (light_culling, l_idx) {
+  LIGHT_FOREACH_BEGIN_DIRECTIONAL (lights_cull_buf, l_idx) {
     tag_tilemap(l_idx, P, dist_to_cam, true);
   }
   LIGHT_FOREACH_END
 
-  LIGHT_FOREACH_BEGIN_LOCAL (
-      light_culling, lights_zbins, lights_culling_words, gl_GlobalInvocationID.xy, vP.z, l_idx) {
+  vec2 px = vec2(gl_GlobalInvocationID.xy);
+  LIGHT_FOREACH_BEGIN_LOCAL (lights_cull_buf, lights_zbin_buf, lights_tile_buf, px, vP.z, l_idx) {
     tag_tilemap(l_idx, P, dist_to_cam, false);
   }
   LIGHT_FOREACH_END

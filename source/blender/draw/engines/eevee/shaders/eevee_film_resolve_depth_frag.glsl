@@ -1,16 +1,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_film_lib.glsl)
 
-layout(std140) uniform film_block
-{
-  FilmData film;
-};
-
-uniform sampler2D data_tx;
-uniform sampler2D weight_tx;
-
-in vec4 uvcoordsvar;
-
 void main(void)
 {
   vec2 uv = uvcoordsvar.xy;

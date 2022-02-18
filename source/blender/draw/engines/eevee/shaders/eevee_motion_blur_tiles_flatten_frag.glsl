@@ -12,16 +12,6 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_motion_blur_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(std140) uniform motion_blur_block
-{
-  MotionBlurData mb;
-};
-
-uniform sampler2D velocity_tx;
-
-layout(location = 0) out vec4 out_max_motion;
 
 void main()
 {
@@ -33,7 +23,7 @@ void main()
   for (int x = 0; x < MB_TILE_DIVISOR; x++) {
     for (int y = 0; y < MB_TILE_DIVISOR; y++) {
       ivec2 sample_texel = tile_co * MB_TILE_DIVISOR + ivec2(x, y);
-      vec4 motion = sample_velocity(mb, velocity_tx, min(sample_texel, texture_bounds));
+      vec4 motion = sample_velocity(mb_buf, velocity_tx, min(sample_texel, texture_bounds));
 
       float motion_len_sqr_prev = len_squared(motion.xy);
       float motion_len_sqr_next = len_squared(motion.zw);

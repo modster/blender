@@ -534,12 +534,14 @@ typedef struct PreviewImage {
 
 #define ID_IS_LINKED(_id) (((const ID *)(_id))->lib != NULL)
 
-/* Note that this is a fairly high-level check, should be used at user interaction level, not in
+/* Note that these are fairly high-level checks, should be used at user interaction level, not in
  * BKE_library_override typically (especially due to the check on LIB_TAG_EXTERN). */
-#define ID_IS_OVERRIDABLE_LIBRARY(_id) \
-  (ID_IS_LINKED(_id) && !ID_MISSING(_id) && (((const ID *)(_id))->tag & LIB_TAG_EXTERN) != 0 && \
+#define ID_IS_OVERRIDABLE_LIBRARY_HIERARCHY(_id) \
+  (ID_IS_LINKED(_id) && !ID_MISSING(_id) && \
    (BKE_idtype_get_info_from_id((const ID *)(_id))->flags & IDTYPE_FLAGS_NO_LIBLINKING) == 0 && \
    !ELEM(GS(((ID *)(_id))->name), ID_SCE))
+#define ID_IS_OVERRIDABLE_LIBRARY(_id) \
+  (ID_IS_OVERRIDABLE_LIBRARY_HIERARCHY((_id)) && (((const ID *)(_id))->tag & LIB_TAG_EXTERN) != 0)
 
 /* NOTE: The three checks below do not take into account whether given ID is linked or not (when
  * chaining overrides over several libraries). User must ensure the ID is not linked itself
@@ -798,7 +800,9 @@ typedef enum IDRecalcFlag {
    * Use this tag with a scene ID which owns the sequences. */
   ID_RECALC_SEQUENCER_STRIPS = (1 << 14),
 
-  ID_RECALC_AUDIO_SEEK = (1 << 15),
+  /* Runs on frame-change (used for seeking audio too). */
+  ID_RECALC_FRAME_CHANGE = (1 << 15),
+
   ID_RECALC_AUDIO_FPS = (1 << 16),
   ID_RECALC_AUDIO_VOLUME = (1 << 17),
   ID_RECALC_AUDIO_MUTE = (1 << 18),

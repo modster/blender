@@ -2,10 +2,8 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_attribute_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_bsdf_stubs_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_surface_lib.glsl)
-
-in vec3 pos;
-in vec3 nor;
 
 /* TODO(fclem) remove use of macro. use interface block instead. */
 RESOURCE_ID_VARYING

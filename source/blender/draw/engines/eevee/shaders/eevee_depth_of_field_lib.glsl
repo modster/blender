@@ -4,7 +4,6 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 /* -------------------------------------------------------------------- */
 /** \name Constants.
@@ -107,16 +106,16 @@ vec4 dof_bilateral_color_weights(vec4 colors[4])
 }
 
 /* Returns signed Circle of confusion radius (in pixel) based on depth buffer value [0..1]. */
-float dof_coc_from_depth(DepthOfFieldData dof, vec2 uv, float depth)
+float dof_coc_from_depth(DepthOfFieldData dof_data, vec2 uv, float depth)
 {
-  if (is_panoramic(dof.camera_type)) {
+  if (is_panoramic(dof_data.camera_type)) {
     /* Use radial depth. */
     depth = -length(get_view_space_from_depth(uv, depth));
   }
   else {
     depth = get_view_z_from_depth(depth);
   }
-  return coc_radius_from_camera_depth(dof, depth);
+  return coc_radius_from_camera_depth(dof_data, depth);
 }
 
 /** \} */

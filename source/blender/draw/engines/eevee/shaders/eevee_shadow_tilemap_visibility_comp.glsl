@@ -9,23 +9,13 @@
 #pragma BLENDER_REQUIRE(common_intersection_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-layout(local_size_x = SHADOW_TILEMAP_RES, local_size_y = SHADOW_TILEMAP_RES) in;
-
-layout(std430, binding = 0) readonly buffer tilemaps_buf
-{
-  ShadowTileMapData tilemaps[];
-};
-
-uniform float tilemap_pixel_radius;
-uniform float screen_pixel_radius_inv;
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
+/* Bitmap of intersection tests. Use one uint per row. */
+shared uint intersect_map[SHADOW_TILEMAP_RES];
 
 void main()
 {
-  ShadowTileMapData tilemap = tilemaps[gl_GlobalInvocationID.z];
+  ShadowTileMapData tilemap = tilemaps_buf[gl_GlobalInvocationID.z];
   ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
 
   bool is_intersecting;
@@ -57,8 +47,9 @@ void main()
        * LOD). NOTE: There is some inacuracy because we only project one point instead of
        * projecting each individual pixels.  */
       for (int p = 0; p < 6; p++) {
-        float facing = dot(tile_center_dir, -frustum_planes[p].xyz);
-        float d = line_plane_intersect_dist(shape.corners[0], tile_center_dir, frustum_planes[p]);
+        float facing = dot(tile_center_dir, -drw_view.frustum_planes[p].xyz);
+        float d = line_plane_intersect_dist(
+            shape.corners[0], tile_center_dir, drw_view.frustum_planes[p]);
         if (d > 0.0 && facing > 0.0) {
           len = min(d, len);
         }
@@ -92,9 +83,6 @@ void main()
       lod_visible_max = clamp(lod_visible_max, 0, SHADOW_TILEMAP_LOD);
       lod_visible_min = clamp(lod_visible_min, 0, SHADOW_TILEMAP_LOD);
     }
-
-    /* Bitmap of intersection tests. Use one uint per row. */
-    shared uint intersect_map[SHADOW_TILEMAP_RES];
 
     /* Number of lod0 tiles covered by the current lod level (in one dimension). */
     uint lod_stride = 1u;

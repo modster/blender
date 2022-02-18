@@ -334,6 +334,7 @@ void DRW_state_reset(void)
 
   GPU_texture_unbind_all();
   GPU_uniformbuf_unbind_all();
+  GPU_storagebuf_unbind_all();
 
   /* Should stay constant during the whole rendering. */
   GPU_point_size(5);
@@ -598,6 +599,12 @@ static void draw_update_uniforms(DRWShadingGroup *shgroup,
                                  DRWCommandsState *state,
                                  bool *use_tfeedback)
 {
+#define CHECK(a) \
+  if (a == NULL) { \
+    printf("Resource %s is null\n", uni->name); \
+    break; \
+  }
+
   for (DRWUniformChunk *unichunk = shgroup->uniforms; unichunk; unichunk = unichunk->next) {
     DRWUniform *uni = unichunk->uniforms;
     for (int i = 0; i < unichunk->uniform_used; i++, uni++) {
@@ -619,22 +626,36 @@ static void draw_update_uniforms(DRWShadingGroup *shgroup,
               shgroup->shader, uni->location, uni->length, uni->arraysize, uni->pvalue);
           break;
         case DRW_UNIFORM_TEXTURE:
+          CHECK(uni->texture);
           GPU_texture_bind_ex(uni->texture, uni->sampler_state, uni->location, false);
           break;
         case DRW_UNIFORM_TEXTURE_REF:
+          CHECK(*uni->texture_ref);
           GPU_texture_bind_ex(*uni->texture_ref, uni->sampler_state, uni->location, false);
           break;
         case DRW_UNIFORM_IMAGE:
+          CHECK(uni->texture);
           GPU_texture_image_bind(uni->texture, uni->location);
           break;
         case DRW_UNIFORM_IMAGE_REF:
+          CHECK(*uni->texture_ref);
           GPU_texture_image_bind(*uni->texture_ref, uni->location);
           break;
         case DRW_UNIFORM_BLOCK:
+          CHECK(uni->block);
           GPU_uniformbuf_bind(uni->block, uni->location);
           break;
         case DRW_UNIFORM_BLOCK_REF:
+          CHECK(*uni->block_ref);
           GPU_uniformbuf_bind(*uni->block_ref, uni->location);
+          break;
+        case DRW_UNIFORM_STORAGE_BLOCK:
+          CHECK(uni->ssbo);
+          GPU_storagebuf_bind(uni->ssbo, uni->location);
+          break;
+        case DRW_UNIFORM_STORAGE_BLOCK_REF:
+          CHECK(*uni->ssbo_ref);
+          GPU_storagebuf_bind(*uni->ssbo_ref, uni->location);
           break;
         case DRW_UNIFORM_BLOCK_OBMATS:
           state->obmats_loc = uni->location;
@@ -930,6 +951,7 @@ static void draw_shgroup(DRWShadingGroup *shgroup, DRWState pass_state)
       if (G.debug & G_DEBUG_GPU) {
         GPU_texture_unbind_all();
         GPU_uniformbuf_unbind_all();
+        GPU_storagebuf_unbind_all();
       }
     }
     GPU_shader_bind(shgroup->shader);
@@ -1074,10 +1096,10 @@ static void draw_shgroup(DRWShadingGroup *shgroup, DRWState pass_state)
 
 static void drw_update_view(const float viewport_size[2])
 {
-  DRWViewUboStorage *storage = &DST.view_active->storage;
+  ViewInfos *storage = &DST.view_active->storage;
   copy_v2_v2(storage->viewport_size, viewport_size);
-  copy_v2_v2(storage->viewport_size_inv, viewport_size);
-  invert_v2(storage->viewport_size_inv);
+  copy_v2_v2(storage->viewport_size_inverse, viewport_size);
+  invert_v2(storage->viewport_size_inverse);
 
   /* TODO(fclem): update a big UBO and only bind ranges here. */
   GPU_uniformbuf_update(G_draw.view_ubo, &DST.view_active->storage);

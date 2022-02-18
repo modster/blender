@@ -101,7 +101,7 @@ class LookDev {
   bool render_background(void);
   void render_overlay(GPUFrameBuffer *view_fb);
 
-  void rotation_get(float4x4 r_mat);
+  void rotation_get(float4x4 &r_mat);
 
  private:
   bool do_overlay(const int2 &output_res, const rcti *render_border);

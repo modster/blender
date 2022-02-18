@@ -68,6 +68,7 @@ class ShaderInterface {
   uint16_t enabled_ubo_mask_ = 0;
   uint8_t enabled_ima_mask_ = 0;
   uint64_t enabled_tex_mask_ = 0;
+  uint16_t enabled_ssbo_mask_ = 0;
   /** Location of builtin uniforms. Fast access, no lookup needed. */
   int32_t builtins_[GPU_NUM_UNIFORMS];
   int32_t builtin_blocks_[GPU_NUM_UNIFORM_BLOCKS];
@@ -240,6 +241,8 @@ inline const char *ShaderInterface::builtin_buffer_block_name(GPUBufferBlockBuil
   switch (u) {
     case GPU_BUFFER_BLOCK_DEBUG:
       return "debugBuf";
+    case GPU_BUFFER_BLOCK_DEBUG_PRINT:
+      return "drw_print_buf";
     default:
       return NULL;
   }
