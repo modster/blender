@@ -170,8 +170,8 @@ class LightProbeView {
 
   void sync(Texture &color_tx,
             Texture &depth_tx,
-            const float4x4 winmat,
-            const float4x4 viewmat,
+            const float4x4 &winmat,
+            const float4x4 &viewmat,
             bool is_only_background);
 
   void render(void);

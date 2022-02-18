@@ -30,10 +30,14 @@
 
 #include "BLI_link_utils.h"
 
+#include "GPU_capabilities.h"
+#include "GPU_compute.h"
 #include "GPU_immediate.h"
+#include "GPU_uniform_buffer.h"
 
 #include "draw_debug.h"
 #include "draw_manager.h"
+#include "draw_shader.h"
 
 /* --------- Register --------- */
 
@@ -149,8 +153,9 @@ void DRW_debug_sphere(const float center[3], const float radius, const float col
 
 /* --------- Indirect Rendering --------- */
 
-/* Keep in sync with shader. */
+/* Keep in sync with shaders. */
 #define DEBUG_VERT_MAX 16 * 4096
+#define DRW_DEBUG_PRINT_MAX 4096
 
 static GPUVertFormat *debug_buf_format(void)
 {
@@ -183,6 +188,25 @@ GPUVertBuf *drw_debug_line_buffer_get()
   BLI_LINKS_PREPEND(DST.debug.line_buffers, buf);
 
   return buf->verts;
+}
+
+GPUVertBuf *drw_debug_print_buffer_get()
+{
+  if (!DST.debug.print_buffer) {
+    static GPUVertFormat format = {0};
+    if (format.attr_len == 0) {
+      GPU_vertformat_attr_add(&format, "char_data", GPU_COMP_U32, 1, GPU_FETCH_INT);
+    }
+
+    GPUVertBuf *char_buf = GPU_vertbuf_create_with_format(&format);
+    GPU_vertbuf_data_alloc(char_buf, DRW_DEBUG_PRINT_MAX);
+
+    uint *data = GPU_vertbuf_get_data(char_buf);
+    memset(data, 0, sizeof(*data) * DRW_DEBUG_PRINT_MAX);
+
+    DST.debug.print_buffer = char_buf;
+  }
+  return DST.debug.print_buffer;
 }
 
 /* --------- Render --------- */
@@ -293,11 +317,47 @@ static void drw_debug_draw_buffers(void)
   }
 }
 
+static void drw_debug_draw_print(void)
+{
+  if (!GPU_compute_shader_support() || DST.debug.print_buffer == NULL) {
+    return;
+  }
+
+  {
+    /* Display the characters. */
+    GPUUniformBuf *view_ubo = G_draw.view_ubo;
+
+    GPUShader *sh = DRW_shader_debug_print_display_get();
+    GPUBatch *batch = GPU_batch_create_ex(
+        GPU_PRIM_POINTS, DST.debug.print_buffer, NULL, GPU_BATCH_OWNS_VBO);
+    GPU_batch_set_shader(batch, sh);
+
+    eGPUBlend blend = GPU_blend_get();
+
+    GPU_blend(GPU_BLEND_ALPHA_PREMULT);
+    GPU_program_point_size(true);
+    GPU_uniformbuf_bind(view_ubo, GPU_shader_get_builtin_block(sh, GPU_UNIFORM_BLOCK_DRW_VIEW));
+
+    /* Wait for all writting jobs */
+    GPU_memory_barrier(GPU_BARRIER_VERTEX_ATTRIB_ARRAY);
+
+    GPU_batch_draw(batch);
+    GPU_batch_discard(batch);
+    /* Freed, with the batch. */
+    DST.debug.print_buffer = NULL;
+
+    GPU_uniformbuf_unbind(G_draw.view_ubo);
+    GPU_program_point_size(false);
+    GPU_blend(blend);
+  }
+}
+
 void drw_debug_draw(void)
 {
   drw_debug_draw_lines();
   drw_debug_draw_spheres();
   drw_debug_draw_buffers();
+  drw_debug_draw_print();
 }
 
 void drw_debug_init(void)

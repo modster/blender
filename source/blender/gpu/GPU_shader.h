@@ -42,14 +42,6 @@ typedef enum eGPUShaderTFBType {
   GPU_SHADER_TFB_TRIANGLES = 3,
 } eGPUShaderTFBType;
 
-/* TODO(fclem) Only used by GPUPass but could be used by GPU_shader_create too. */
-typedef struct GPUShaderSource {
-  char *vertex;
-  char *geometry;
-  char *fragment;
-  char *defines;
-} GPUShaderSource;
-
 GPUShader *GPU_shader_create(const char *vertcode,
                              const char *fragcode,
                              const char *geomcode,
@@ -78,6 +70,8 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
                                 const char *shname);
 GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info);
 GPUShader *GPU_shader_create_from_info_name(const char *info_name);
+
+const GPUShaderCreateInfo *GPU_shader_create_info_get(const char *info_name);
 
 struct GPU_ShaderCreateFromArray_Params {
   const char **vert, **geom, **frag, **defs;
@@ -170,7 +164,8 @@ typedef enum {
 } GPUUniformBlockBuiltin;
 
 typedef enum {
-  GPU_BUFFER_BLOCK_DEBUG = 0, /* debugBuf */
+  GPU_BUFFER_BLOCK_DEBUG = 0,   /* debugBuf */
+  GPU_BUFFER_BLOCK_DEBUG_PRINT, /* drw_print_buf */
 
   GPU_NUM_BUFFER_BLOCKS, /* Special value, denotes number of builtin buffer blocks. */
 } GPUBufferBlockBuiltin;

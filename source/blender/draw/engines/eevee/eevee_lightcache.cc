@@ -41,7 +41,6 @@
 
 #include "eevee_instance.hh"
 #include "eevee_lightcache.h"
-#include "eevee_private.h"
 
 #include "GPU_capabilities.h"
 #include "GPU_context.h"
@@ -922,7 +921,7 @@ class LightBake {
     lcache_->load();
     lcache_->flag |= LIGHTCACHE_BAKING;
 
-    inst_ = reinterpret_cast<Instance *>(EEVEE_instance_alloc());
+    inst_ = new Instance();
 
     done_ = 0;
     total_ = irradiance_samples_count * sce_eevee.gi_diffuse_bounces + grid_len_;
@@ -946,7 +945,8 @@ class LightBake {
     // EEVEE_view_layer_data_free(sldata_);
 
     if (inst_) {
-      EEVEE_instance_free(reinterpret_cast<EEVEE_Instance *>(inst_));
+      delete inst_;
+      inst_ = nullptr;
     }
 
     if (gpu_context_) {

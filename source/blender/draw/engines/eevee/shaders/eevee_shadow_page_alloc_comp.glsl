@@ -20,29 +20,12 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
-layout(local_size_x = SHADOW_TILEMAP_RES, local_size_y = SHADOW_TILEMAP_RES) in;
-
-layout(std430, binding = 0) restrict readonly buffer tilemaps_buf
-{
-  ShadowTileMapData tilemaps[];
-};
-
-layout(std430, binding = 1) restrict buffer pages_free_buf
-{
-  uint free_page_owners[];
-};
-
-layout(std430, binding = 3) restrict buffer pages_infos_buf
-{
-  ShadowPagesInfoData infos;
-};
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
-layout(r32i) writeonly restrict uniform iimage2D tilemap_rects_img;
+shared ivec2 min_tile;
+shared ivec2 max_tile;
 
 void main()
 {
-  ShadowTileMapData tilemap_data = tilemaps[gl_GlobalInvocationID.z];
+  ShadowTileMapData tilemap_data = tilemaps_buf[gl_GlobalInvocationID.z];
   int tilemap_idx = tilemap_data.index;
   int lod_max = tilemap_data.is_cubeface ? SHADOW_TILEMAP_LOD : 0;
 
@@ -62,10 +45,10 @@ void main()
     if (valid_thread) {
       if (tile.is_visible && tile.is_used && !tile.is_allocated) {
         /** Tile allocation. */
-        int free_index = atomicAdd(infos.page_free_next, -1);
+        int free_index = atomicAdd(pages_infos_buf.page_free_next, -1);
         if (free_index >= 0) {
-          ivec2 owner_texel = ivec2(unpackUvec2x16(free_page_owners[free_index]));
-          free_page_owners[free_index] = uint(-1);
+          ivec2 owner_texel = ivec2(unpackUvec2x16(pages_free_buf[free_index]));
+          pages_free_buf[free_index] = uint(-1);
 
           tile.page = shadow_tile_data_unpack(imageLoad(tilemaps_img, owner_texel).x).page;
           tile.do_update = true;
@@ -100,8 +83,6 @@ void main()
 
     /** Compute area to render and write to buffer for CPU to read. */
     {
-      shared ivec2 min_tile;
-      shared ivec2 max_tile;
       ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
 
       if (gl_GlobalInvocationID.xy == uvec2(0)) {
@@ -112,7 +93,7 @@ void main()
       barrier();
 
       if (valid_thread && tile.do_update && tile.is_visible && tile.is_used) {
-        atomicAdd(infos.page_updated_count, 1);
+        atomicAdd(pages_infos_buf.page_updated_count, 1);
         atomicMin(min_tile.x, tile_co.x);
         atomicMin(min_tile.y, tile_co.y);
         atomicMax(max_tile.x, tile_co.x);

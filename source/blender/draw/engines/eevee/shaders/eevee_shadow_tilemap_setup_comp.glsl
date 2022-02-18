@@ -6,34 +6,12 @@
  */
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
-layout(local_size_x = SHADOW_TILEMAP_RES, local_size_y = SHADOW_TILEMAP_RES) in;
-
-layout(std430, binding = 0) readonly buffer tilemaps_buf
-{
-  ShadowTileMapData tilemaps[];
-};
-
-layout(std430, binding = 1) restrict buffer pages_free_buf
-{
-  uint free_page_owners[];
-};
-
-layout(std430, binding = 3) restrict buffer pages_infos_buf
-{
-  ShadowPagesInfoData infos;
-};
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
-
-uniform bool do_tilemap_setup;
-
 void main()
 {
-  ShadowTileMapData tilemap = tilemaps[gl_GlobalInvocationID.z];
+  ShadowTileMapData tilemap = tilemaps_buf[gl_GlobalInvocationID.z];
   ivec2 grid_shift = (do_tilemap_setup) ? tilemap.grid_shift : ivec2(0);
   ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
   ivec2 tile_shifted = tile_co + grid_shift;
@@ -56,7 +34,7 @@ void main()
 
   if (grid_shift != ivec2(0) && tile_data.is_cached) {
     /* Update page location after shift. */
-    free_page_owners[tile_data.free_page_owner_index] = packUvec2x16(uvec2(texel_out));
+    pages_free_buf[tile_data.free_page_owner_index] = packUvec2x16(uvec2(texel_out));
   }
 
   imageStore(tilemaps_img, texel_out, uvec4(shadow_tile_data_pack(tile_data)));
@@ -83,8 +61,8 @@ void main()
   }
 
   if (gl_GlobalInvocationID == uvec3(0)) {
-    infos.page_free_next = max(-1, infos.page_free_next);
-    infos.page_free_next_prev = infos.page_free_next;
-    infos.page_updated_count = 0;
+    pages_infos_buf.page_free_next = max(-1, pages_infos_buf.page_free_next);
+    pages_infos_buf.page_free_next_prev = pages_infos_buf.page_free_next;
+    pages_infos_buf.page_updated_count = 0;
   }
 }

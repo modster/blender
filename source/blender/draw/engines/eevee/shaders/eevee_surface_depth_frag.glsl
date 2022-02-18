@@ -5,18 +5,10 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_bsdf_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_bsdf_stubs_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_surface_lib.glsl)
-
-layout(std140) uniform sampling_block
-{
-  SamplingData sampling;
-};
-
-utility_tx_sample_define_stub(utility_tx)
 
 /* From the paper "Hashed Alpha Testing" by Chris Wyman and Morgan McGuire. */
 float hash(vec2 a)
@@ -77,7 +69,7 @@ void main(void)
 
   nodetree_surface();
 
-  float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_TRANSPARENCY);
+  float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_TRANSPARENCY);
   float random_threshold = hashed_alpha_threshold(1.0, noise_offset, g_data.P);
 
   float transparency = avg(g_transparency_data.transmittance);

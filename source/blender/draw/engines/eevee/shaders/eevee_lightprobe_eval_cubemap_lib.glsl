@@ -1,20 +1,12 @@
 
 /**
- * This is an eval function that needs to be added after main fragment shader.
- * A prototype needs to be declared before main in order to use it.
- *
  * The resources expected to be defined are:
- * - probes_info
+ * - probes_buf
  * - lightprobe_cube_tx
  * - cubes
- *
- * All of this is needed to avoid using macros and performance issues with large
- * arrays as function arguments.
  */
 
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_cubemap_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 float lightprobe_cubemap_weight(CubemapData cube, vec3 P)
 {
@@ -68,7 +60,7 @@ vec3 lightprobe_cubemap_evaluate(CubemapInfoData info,
     R = transform_direction(info.lookdev_rotation, R);
   }
   float lod = linear_roughness * info.roughness_max_lod;
-  return cubemap_array_sample(cubemap_tx, vec4(R, cube._layer), lod).rgb;
+  return textureLod(cubemap_tx, vec4(R, cube._layer), lod).rgb;
 }
 
 vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold)
@@ -76,14 +68,14 @@ vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_thres
   /* Go through all cubemaps, computing and adding their weights for this pixel
    * until reaching a random threshold. */
   float weight = 0.0;
-  int cube_index = probes_info.cubes.cube_count - 1;
+  int cube_index = probes_buf.cubes_info.cube_count - 1;
   for (; cube_index > 0; cube_index--) {
-    weight += lightprobe_cubemap_weight(cubes[cube_index], P);
+    weight += lightprobe_cubemap_weight(cubes_buf[cube_index], P);
     if (weight >= random_threshold) {
       break;
     }
   }
 
   return lightprobe_cubemap_evaluate(
-      probes_info.cubes, lightprobe_cube_tx, cubes[cube_index], P, R, roughness);
+      probes_buf.cubes_info, lightprobe_cube_tx, cubes_buf[cube_index], P, R, roughness);
 }

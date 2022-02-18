@@ -42,6 +42,7 @@
 #include "GPU_viewport.h"
 
 #include "draw_instance_data.h"
+#include "draw_shader_shared.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -312,7 +313,7 @@ struct DRWCallBuffer {
 };
 
 /** Used by #DRWUniform.type */
-/* TODO(jbakker): rename to DRW_RESOURCE/DRWResourceType. */
+/* TODO(@jbakker): rename to DRW_RESOURCE/DRWResourceType. */
 typedef enum {
   DRW_UNIFORM_INT = 0,
   DRW_UNIFORM_INT_COPY,
@@ -324,6 +325,8 @@ typedef enum {
   DRW_UNIFORM_IMAGE_REF,
   DRW_UNIFORM_BLOCK,
   DRW_UNIFORM_BLOCK_REF,
+  DRW_UNIFORM_STORAGE_BLOCK,
+  DRW_UNIFORM_STORAGE_BLOCK_REF,
   DRW_UNIFORM_TFEEDBACK_TARGET,
   DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE,
   DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE_REF,
@@ -358,6 +361,11 @@ struct DRWUniform {
       GPUUniformBuf *block;
       GPUUniformBuf **block_ref;
     };
+    /* DRW_UNIFORM_STORAGE_BLOCK */
+    union {
+      GPUStorageBuf *ssbo;
+      GPUStorageBuf **ssbo_ref;
+    };
     /* DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE */
     union {
       GPUVertBuf *vertbuf;
@@ -374,6 +382,10 @@ struct DRWUniform {
   uint8_t type;      /* #DRWUniformType */
   uint8_t length;    /* Length of vector types. */
   uint8_t arraysize; /* Array size of scalar/vector types. */
+#ifdef DEBUG
+  /** Name pointer for debugging. Hopefully still points to a valid string. */
+  const char *name;
+#endif
 };
 
 struct DRWShadingGroup {
@@ -426,38 +438,13 @@ struct DRWPass {
   char name[MAX_PASS_NAME];
 };
 
-/* keep in sync with viewBlock */
-typedef struct DRWViewUboStorage {
-  /* View matrices */
-  float persmat[4][4];
-  float persinv[4][4];
-  float viewmat[4][4];
-  float viewinv[4][4];
-  float winmat[4][4];
-  float wininv[4][4];
-
-  float clipplanes[6][4];
-  float viewvecs[2][4];
-  /* Should not be here. Not view dependent (only main view). */
-  float viewcamtexcofac[4];
-  float viewport_size[2];
-  float viewport_size_inv[2];
-
-  /** Frustum culling data. */
-  /** NOTE: vec3 arrays are paded to vec4. */
-  float frustum_corners[8][4];
-  float frustum_planes[6][4];
-} DRWViewUboStorage;
-
-BLI_STATIC_ASSERT_ALIGN(DRWViewUboStorage, 16)
-
 #define MAX_CULLED_VIEWS 32
 
 struct DRWView {
   /** Parent view if this is a sub view. NULL otherwise. */
   struct DRWView *parent;
 
-  DRWViewUboStorage storage;
+  ViewInfos storage;
   /** Number of active clipplanes. */
   int clip_planes_len;
   /** Does culling result needs to be updated. */
@@ -559,7 +546,7 @@ typedef struct DRWData {
   struct GHash *obattrs_ubo_pool;
   uint ubo_len;
   /** Texture pool to reuse temp texture across engines. */
-  /* TODO(fclem) the pool could be shared even between viewports. */
+  /* TODO(@fclem): The pool could be shared even between view-ports. */
   struct DRWTexturePool *texture_pool;
   /** Per stereo view data. Contains engine data and default framebuffers. */
   struct DRWViewData *view_data[2];
@@ -583,7 +570,7 @@ typedef struct DupliKey {
 typedef struct DRWManager {
   /* TODO: clean up this struct a bit. */
   /* Cache generation */
-  /* TODO(fclem) Rename to data. */
+  /* TODO(@fclem): Rename to data. */
   DRWData *vmempool;
   /** Active view data structure for one of the 2 stereo view. Not related to DRWView. */
   struct DRWViewData *view_data_active;
@@ -606,7 +593,7 @@ typedef struct DRWManager {
   struct ID *dupli_origin_data;
   /** Hash-map: #DupliKey -> void pointer for each enabled engine. */
   struct GHash *dupli_ghash;
-  /** TODO(fclem): try to remove usage of this. */
+  /** TODO(@fclem): try to remove usage of this. */
   DRWInstanceData *object_instance_data[MAX_INSTANCE_DATA_SIZE];
   /* Dupli data for the current dupli for each enabled engine. */
   void **dupli_datas;
@@ -650,9 +637,9 @@ typedef struct DRWManager {
   DRWView *view_active;
   DRWView *view_previous;
   uint primary_view_ct;
-  /** TODO(fclem): Remove this. Only here to support
+  /** TODO(@fclem): Remove this. Only here to support
    * shaders without common_view_lib.glsl */
-  DRWViewUboStorage view_storage_cpy;
+  ViewInfos view_storage_cpy;
 
 #ifdef USE_GPU_SELECT
   uint select_id;
@@ -675,10 +662,11 @@ typedef struct DRWManager {
   GPUDrawList *draw_list;
 
   struct {
-    /* TODO(fclem): optimize: use chunks. */
+    /* TODO(@fclem): optimize: use chunks. */
     DRWDebugLine *lines;
     DRWDebugSphere *spheres;
     DRWDebugBuffer *line_buffers;
+    GPUVertBuf *print_buffer;
   } debug;
 } DRWManager;
 
@@ -693,6 +681,7 @@ void *drw_viewport_engine_data_ensure(void *engine_type);
 void drw_state_set(DRWState state);
 
 GPUVertBuf *drw_debug_line_buffer_get(void);
+GPUVertBuf *drw_debug_print_buffer_get(void);
 void drw_debug_draw(void);
 void drw_debug_init(void);
 

@@ -319,6 +319,7 @@ GLShaderInterface::GLShaderInterface(GLuint program)
     input->binding = input->location = binding;
 
     name_buffer_offset += this->set_input_name(input, name, name_len);
+    enabled_ssbo_mask_ |= (input->binding != -1) ? (1lu << input->binding) : 0lu;
   }
 
   /* Builtin Uniforms */
@@ -482,7 +483,7 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
     if (res.bind_type == ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER) {
       copy_input_name(input, res.storagebuf.name, name_buffer_, name_buffer_offset);
       input->location = input->binding = res.slot;
-      enabled_ubo_mask_ |= (1 << input->binding);
+      enabled_ssbo_mask_ |= (1 << input->binding);
       input++;
     }
   }
@@ -499,6 +500,13 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
     GPUUniformBlockBuiltin u = static_cast<GPUUniformBlockBuiltin>(u_int);
     const ShaderInput *block = this->ubo_get(builtin_uniform_block_name(u));
     builtin_blocks_[u] = (block != nullptr) ? block->binding : -1;
+  }
+
+  /* Builtin Uniforms */
+  for (int32_t u_int = 0; u_int < GPU_NUM_BUFFER_BLOCKS; u_int++) {
+    GPUBufferBlockBuiltin u = static_cast<GPUBufferBlockBuiltin>(u_int);
+    const ShaderInput *buffer = this->ssbo_get(builtin_buffer_block_name(u));
+    builtin_buffers_[u] = (buffer != nullptr) ? buffer->binding : -1;
   }
 
   this->sort_inputs();
@@ -524,7 +532,7 @@ GLShaderInterface::~GLShaderInterface()
 void GLShaderInterface::ref_add(GLVaoCache *ref)
 {
   for (int i = 0; i < refs_.size(); i++) {
-    if (refs_[i] == NULL) {
+    if (refs_[i] == nullptr) {
       refs_[i] = ref;
       return;
     }
@@ -536,7 +544,7 @@ void GLShaderInterface::ref_remove(GLVaoCache *ref)
 {
   for (int i = 0; i < refs_.size(); i++) {
     if (refs_[i] == ref) {
-      refs_[i] = NULL;
+      refs_[i] = nullptr;
       break; /* cannot have duplicates */
     }
   }

@@ -1,7 +1,6 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 /* ---------------------------------------------------------------------- */
 /** \name Intersection Tests
@@ -136,22 +135,22 @@ Cone cylinder_from_quad(vec3 corners[8])
   return Cone(center, sqrt(max_v4(corners_dist)));
 }
 
-vec2 tile_to_ndc(CullingData culling, vec2 tile_co, vec2 offset)
+vec2 tile_to_ndc(CullingData cull_data, vec2 tile_co, vec2 offset)
 {
   /* Add a margin to prevent culling too much if the frustum becomes too much unstable. */
-  tile_co += /* culling.tile_margin * */ offset;
-  return tile_co * culling.tile_to_uv_fac * 2.0 - 1.0;
+  tile_co += /* cull_data.tile_margin * */ offset;
+  return tile_co * cull_data.tile_to_uv_fac * 2.0 - 1.0;
 }
 
-CullingTile culling_tile_get(CullingData culling, uvec2 tile_co)
+CullingTile culling_tile_get(CullingData cull_data, uvec2 tile_co)
 {
   vec2 ftile = vec2(tile_co);
   /* Culling frustum corners for this tile. */
   vec3 corners[8];
-  corners[0].xy = corners[4].xy = tile_to_ndc(culling, ftile, vec2(1, 1));
-  corners[1].xy = corners[5].xy = tile_to_ndc(culling, ftile, vec2(1, 0));
-  corners[2].xy = corners[6].xy = tile_to_ndc(culling, ftile, vec2(0, 0));
-  corners[3].xy = corners[7].xy = tile_to_ndc(culling, ftile, vec2(0, 1));
+  corners[0].xy = corners[4].xy = tile_to_ndc(cull_data, ftile, vec2(1, 1));
+  corners[1].xy = corners[5].xy = tile_to_ndc(cull_data, ftile, vec2(1, 0));
+  corners[2].xy = corners[6].xy = tile_to_ndc(cull_data, ftile, vec2(0, 0));
+  corners[3].xy = corners[7].xy = tile_to_ndc(cull_data, ftile, vec2(0, 1));
   /* The corners depth only matter for precision. Use a mix of not so close to clip plane to
    * avoid small float imprecision if near clip is low. */
   corners[0].z = corners[1].z = corners[2].z = corners[3].z = -0.5;

@@ -30,7 +30,7 @@ GPU_SHADER_CREATE_INFO(draw_resource_id_uniform)
 
 /**
  * Declare a resource handle that identify a unique object.
- * Requires draw_resource_id[_constant].
+ * Requires draw_resource_id[_uniform].
  */
 GPU_SHADER_CREATE_INFO(draw_resource_handle)
     .define("resource_handle (drw_resourceChunk * DRW_RESOURCE_CHUNK_LEN + resource_id)")
@@ -83,7 +83,7 @@ GPU_SHADER_CREATE_INFO(draw_hair)
     .sampler(15, ImageType::FLOAT_BUFFER, "hairPointBuffer")
     .sampler(14, ImageType::UINT_BUFFER, "hairStrandBuffer")
     .sampler(13, ImageType::UINT_BUFFER, "hairStrandSegBuffer")
-    /* TODO(fclem) Pack thoses into one UBO. */
+    /* TODO(@fclem): Pack these into one UBO. */
     .push_constant(Type::INT, "hairStrandsRes")
     .push_constant(Type::INT, "hairThicknessRes")
     .push_constant(Type::FLOAT, "hairRadRoot")
@@ -101,5 +101,21 @@ GPU_SHADER_CREATE_INFO(draw_pointcloud)
     .additional_info("draw_modelmat_instanced_attr", "draw_resource_id_uniform");
 
 GPU_SHADER_CREATE_INFO(draw_volume).additional_info("draw_modelmat", "draw_resource_id_uniform");
+
+GPU_SHADER_CREATE_INFO(draw_gpencil)
+    .vertex_in(0, Type::IVEC4, "ma")
+    .vertex_in(1, Type::IVEC4, "ma1")
+    .vertex_in(2, Type::IVEC4, "ma2")
+    .vertex_in(3, Type::IVEC4, "ma3")
+    .vertex_in(4, Type::VEC4, "pos")
+    .vertex_in(5, Type::VEC4, "pos1")
+    .vertex_in(6, Type::VEC4, "pos2")
+    .vertex_in(7, Type::VEC4, "pos3")
+    .vertex_in(8, Type::VEC4, "uv1")
+    .vertex_in(9, Type::VEC4, "uv2")
+    .vertex_in(10, Type::VEC4, "col1")
+    .vertex_in(11, Type::VEC4, "col2")
+    .vertex_in(12, Type::VEC4, "fcol1")
+    .additional_info("draw_modelmat", "draw_resource_id_uniform", "draw_object_infos");
 
 /** \} */

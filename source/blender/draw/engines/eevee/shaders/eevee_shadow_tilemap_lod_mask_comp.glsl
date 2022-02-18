@@ -8,23 +8,14 @@
 
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
-layout(local_size_x = SHADOW_TILEMAP_RES, local_size_y = SHADOW_TILEMAP_RES) in;
-
-layout(std430, binding = 0) restrict readonly buffer tilemaps_buf
-{
-  ShadowTileMapData tilemaps[];
-};
-
-layout(r32ui) restrict uniform uimage2D tilemaps_img;
+/* Bitmap of usage tests. Use one uint per tile. One bit per lod level. */
+shared uint lod_map[SHADOW_TILEMAP_RES * SHADOW_TILEMAP_RES];
 
 void main()
 {
-  ShadowTileMapData tilemap_data = tilemaps[gl_GlobalInvocationID.z];
+  ShadowTileMapData tilemap_data = tilemaps_buf[gl_GlobalInvocationID.z];
   int tilemap_idx = tilemap_data.index;
   int lod_max = tilemap_data.is_cubeface ? SHADOW_TILEMAP_LOD : 0;
-
-  /* Bitmap of usage tests. Use one uint per tile. One bit per lod level. */
-  shared uint lod_map[SHADOW_TILEMAP_RES * SHADOW_TILEMAP_RES];
 
   /* For now there is nothing to do for directional shadows. */
   if (tilemap_data.is_cubeface) {
@@ -35,7 +26,7 @@ void main()
     int map_index = tile_co.y * SHADOW_TILEMAP_RES + tile_co.x;
     for (int lod = 0; lod <= lod_max; lod++) {
       ivec2 tile_co_lod = ivec2(gl_GlobalInvocationID.xy) >> lod;
-      ShadowTileData tile = shadow_tile_load(tilemaps_img, tile_co_lod, lod, tilemap_idx);
+      ShadowTileData tile = shadow_tile_load_img(tilemaps_img, tile_co_lod, lod, tilemap_idx);
 
       if (tile.is_used && tile.is_visible) {
         lod_map[map_index] |= 1u << uint(lod);

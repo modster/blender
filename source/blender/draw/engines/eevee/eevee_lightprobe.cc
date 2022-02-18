@@ -68,23 +68,23 @@ void LightProbeModule::init()
     view = nullptr;
   }
 
-  if (info_data_.cubes.display_size != sce_eevee.gi_cubemap_draw_size ||
-      info_data_.grids.display_size != sce_eevee.gi_irradiance_draw_size ||
-      info_data_.grids.irradiance_smooth != square_f(sce_eevee.gi_irradiance_smoothing)) {
+  if (info_data_.cubes_info.display_size != sce_eevee.gi_cubemap_draw_size ||
+      info_data_.grids_info.display_size != sce_eevee.gi_irradiance_draw_size ||
+      info_data_.grids_info.irradiance_smooth != square_f(sce_eevee.gi_irradiance_smoothing)) {
     /* TODO(fclem) reset on scene update instead. */
     inst_.sampling.reset();
   }
 
-  info_data_.cubes.display_size = sce_eevee.gi_cubemap_draw_size;
-  info_data_.grids.display_size = sce_eevee.gi_irradiance_draw_size;
-  info_data_.grids.irradiance_smooth = square_f(sce_eevee.gi_irradiance_smoothing);
-  info_data_.grids.irradiance_cells_per_row = lightcache_->irradiance_cells_per_row_get();
-  info_data_.grids.visibility_size = lightcache_->vis_res;
-  info_data_.grids.visibility_cells_per_row = lightcache_->grid_tx.tex_size[0] /
-                                              info_data_.grids.visibility_size;
-  info_data_.grids.visibility_cells_per_layer = (lightcache_->grid_tx.tex_size[1] /
-                                                 info_data_.grids.visibility_size) *
-                                                info_data_.grids.visibility_cells_per_row;
+  info_data_.cubes_info.display_size = sce_eevee.gi_cubemap_draw_size;
+  info_data_.grids_info.display_size = sce_eevee.gi_irradiance_draw_size;
+  info_data_.grids_info.irradiance_smooth = square_f(sce_eevee.gi_irradiance_smoothing);
+  info_data_.grids_info.irradiance_cells_per_row = lightcache_->irradiance_cells_per_row_get();
+  info_data_.grids_info.visibility_size = lightcache_->vis_res;
+  info_data_.grids_info.visibility_cells_per_row = lightcache_->grid_tx.tex_size[0] /
+                                                   info_data_.grids_info.visibility_size;
+  info_data_.grids_info.visibility_cells_per_layer =
+      (lightcache_->grid_tx.tex_size[1] / info_data_.grids_info.visibility_size) *
+      info_data_.grids_info.visibility_cells_per_row;
 
   glossy_clamp_ = sce_eevee.gi_glossy_clamp;
   filter_quality_ = clamp_f(sce_eevee.gi_filter_quality, 1.0f, 8.0f);
@@ -98,7 +98,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DOWNSAMPLE_CUBE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, cube_downsample_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "input_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
+    DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
   }
   {
@@ -107,7 +107,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_GLOSSY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_glossy_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
+    DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
   }
   {
@@ -116,7 +116,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DIFFUSE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_diffuse_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
+    DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
   {
@@ -125,7 +125,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_VISIBILITY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_visibility_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
+    DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 
@@ -142,8 +142,8 @@ void LightProbeModule::begin_sync()
         GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_CUBEMAP);
         DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
         DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", cube_tx_ref_get());
-        DRW_shgroup_uniform_block(grp, "cubes_block", cube_ubo_get());
-        DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
+        DRW_shgroup_uniform_block(grp, "cubes_buf", cube_ubo_get());
+        DRW_shgroup_uniform_block(grp, "probes_buf", info_ubo_get());
 
         uint cubemap_count = 0;
         /* Skip world. */
@@ -165,8 +165,8 @@ void LightProbeModule::begin_sync()
         GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_IRRADIANCE);
         DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
         DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", grid_tx_ref_get());
-        DRW_shgroup_uniform_block(grp, "grids_block", grid_ubo_get());
-        DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
+        DRW_shgroup_uniform_block(grp, "grids_buf", grid_ubo_get());
+        DRW_shgroup_uniform_block(grp, "probes_buf", info_ubo_get());
 
         /* Skip world. */
         for (auto grid_id : IndexRange(1, lightcache_->grid_len - 1)) {
@@ -199,8 +199,7 @@ void LightProbeModule::cubemap_prepare(float3 position,
   int cube_res = sce_eevee.gi_cubemap_resolution;
   int cube_mip_count = (int)log2_ceil_u(cube_res);
 
-  float4x4 viewmat;
-  viewmat.identity();
+  float4x4 viewmat = float4x4::identity();
   negate_v3_v3(viewmat[3], position);
 
   /* TODO(fclem) We might want to have theses as temporary textures. */
@@ -305,8 +304,8 @@ void LightProbeModule::filter_diffuse(int sample_index, float intensity)
 
   int2 extent = int2(3, 2);
   int2 offset = extent;
-  offset.x *= sample_index % info_data_.grids.irradiance_cells_per_row;
-  offset.y *= sample_index / info_data_.grids.irradiance_cells_per_row;
+  offset.x *= sample_index % info_data_.grids_info.irradiance_cells_per_row;
+  offset.y *= sample_index / info_data_.grids_info.irradiance_cells_per_row;
 
   GPU_framebuffer_bind(filter_grid_fb_);
   GPU_framebuffer_viewport_set(filter_grid_fb_, UNPACK2(offset), UNPACK2(extent));
@@ -318,13 +317,13 @@ void LightProbeModule::filter_visibility(int sample_index,
                                          float visibility_blur,
                                          float visibility_range)
 {
-  int2 extent = int2(info_data_.grids.visibility_size);
+  int2 extent = int2(info_data_.grids_info.visibility_size);
   int2 offset = extent;
-  offset.x *= sample_index % info_data_.grids.visibility_cells_per_row;
-  offset.y *= (sample_index / info_data_.grids.visibility_cells_per_row) %
-              info_data_.grids.visibility_cells_per_layer;
+  offset.x *= sample_index % info_data_.grids_info.visibility_cells_per_row;
+  offset.y *= (sample_index / info_data_.grids_info.visibility_cells_per_row) %
+              info_data_.grids_info.visibility_cells_per_layer;
 
-  filter_data_.target_layer = 1 + sample_index / info_data_.grids.visibility_cells_per_layer;
+  filter_data_.target_layer = 1 + sample_index / info_data_.grids_info.visibility_cells_per_layer;
   filter_data_.sample_count = 512.0f; /* TODO refine */
   filter_data_.visibility_blur = visibility_blur;
   filter_data_.visibility_range = visibility_range;
@@ -494,7 +493,7 @@ void LightProbeModule::sync_grid(const DRWView *UNUSED(view),
   if (grid_index == 0 || grid_cache.is_ready != 1) {
     return;
   }
-  GridData &grid = grid_data_[info_data_.grids.grid_count];
+  GridData &grid = grid_data_[info_data_.grids_info.grid_count];
   copy_m4_m4(grid.local_mat.ptr(), grid_cache.mat);
   grid.resolution = int3(grid_cache.resolution);
   grid.offset = grid_cache.offset;
@@ -509,7 +508,7 @@ void LightProbeModule::sync_grid(const DRWView *UNUSED(view),
   grid.increment_z = float3(grid_cache.increment_z);
   grid.corner = float3(grid_cache.corner);
 
-  info_data_.grids.grid_count++;
+  info_data_.grids_info.grid_count++;
 }
 
 void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
@@ -520,7 +519,7 @@ void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
   if (cube_index == 0 || cube_cache.is_ready != 1) {
     return;
   }
-  CubemapData &cube = cube_data_[info_data_.cubes.cube_count];
+  CubemapData &cube = cube_data_[info_data_.cubes_info.cube_count];
   copy_m4_m4(cube.parallax_mat.ptr(), cube_cache.parallaxmat);
   copy_m4_m4(cube.influence_mat.ptr(), cube_cache.attenuationmat);
   cube._attenuation_factor = cube_cache.attenuation_fac;
@@ -531,7 +530,7 @@ void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
   cube._world_position_y = cube_cache.position[1];
   cube._world_position_z = cube_cache.position[2];
 
-  info_data_.cubes.cube_count++;
+  info_data_.cubes_info.cube_count++;
 }
 
 /* Only enables world light probe if extent is invalid (no culling possible). */
@@ -545,8 +544,8 @@ void LightProbeModule::set_view(const DRWView *view, const int2 extent)
 
   /* Only sync when setting the view. This way we can cull probes not in frustum. */
   /* TODO(fclem) implement culling. But needs to fix display when not all probes are present. */
-  info_data_.grids.grid_count = 1;
-  info_data_.cubes.cube_count = 1;
+  info_data_.grids_info.grid_count = 1;
+  info_data_.cubes_info.cube_count = 1;
 
   sync_world(view);
   /* Only world if extent is 0. */
@@ -559,9 +558,9 @@ void LightProbeModule::set_view(const DRWView *view, const int2 extent)
     }
   }
 
-  info_data_.cubes.roughness_max_lod = lightcache_->mips_len;
-  inst_.lookdev.rotation_get(info_data_.cubes.lookdev_rotation);
-  inst_.lookdev.rotation_get(info_data_.grids.lookdev_rotation);
+  info_data_.cubes_info.roughness_max_lod = lightcache_->mips_len;
+  inst_.lookdev.rotation_get(info_data_.cubes_info.lookdev_rotation);
+  inst_.lookdev.rotation_get(info_data_.grids_info.lookdev_rotation);
 
   active_grid_tx_ = lightcache_->grid_tx.tex;
   active_cube_tx_ = lightcache_->cube_tx.tex;

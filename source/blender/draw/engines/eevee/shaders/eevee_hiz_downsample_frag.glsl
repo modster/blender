@@ -9,12 +9,6 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
-uniform sampler2D depth_tx;
-
-uniform vec2 texel_size;
-
-layout(location = 0) out float out_depth;
-
 #ifndef GPU_ARB_texture_gather
 vec4 texGather(sampler2D tex, vec2 uv)
 {

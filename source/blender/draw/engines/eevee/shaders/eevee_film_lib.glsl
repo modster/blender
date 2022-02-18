@@ -3,48 +3,47 @@
  * Film accumulation utils functions.
  **/
 
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_camera_lib.glsl)
 
-bool film_is_color_data(FilmData film)
+bool film_is_color_data(FilmData film_data)
 {
-  return film.data_type < FILM_DATA_FLOAT;
+  return film_data.data_type < FILM_DATA_FLOAT;
 }
 
-vec4 film_data_encode(FilmData film, vec4 data, float weight)
+vec4 film_data_encode(FilmData film_data, vec4 data, float weight)
 {
-  if (film_is_color_data(film)) {
+  if (film_is_color_data(film_data)) {
     /* Could we assume safe color from earlier pass? */
     data = safe_color(data);
     /* Convert transmittance to opacity. */
     data.a = saturate(1.0 - data.a);
   }
 
-  if (film.data_type == FILM_DATA_COLOR_LOG) {
+  if (film_data.data_type == FILM_DATA_COLOR_LOG) {
     /* TODO(fclem) Pre-expose. */
     data.rgb = log2(1.0 + data.rgb);
   }
-  else if (film.data_type == FILM_DATA_DEPTH) {
+  else if (film_data.data_type == FILM_DATA_DEPTH) {
     /* TODO(fclem) Depth should be converted to radial depth in panoramic projection. */
   }
-  else if (film.data_type == FILM_DATA_MOTION) {
+  else if (film_data.data_type == FILM_DATA_MOTION) {
     /* Motion vectors are in camera uv space. But final motion vectors are in pixel units. */
-    data *= film.uv_scale_inv.xyxy;
+    data *= film_data.uv_scale_inv.xyxy;
   }
 
-  if (film_is_color_data(film)) {
+  if (film_is_color_data(film_data)) {
     data *= weight;
   }
   return data;
 }
 
-vec4 film_data_decode(FilmData film, vec4 data, float weight)
+vec4 film_data_decode(FilmData film_data, vec4 data, float weight)
 {
-  if (film_is_color_data(film)) {
+  if (film_is_color_data(film_data)) {
     data *= safe_rcp(weight);
   }
 
-  if (film.data_type == FILM_DATA_COLOR_LOG) {
+  if (film_data.data_type == FILM_DATA_COLOR_LOG) {
     /* TODO(fclem) undo Pre-expose. */
     data.rgb = exp2(data.rgb) - 1.0;
   }
@@ -52,10 +51,10 @@ vec4 film_data_decode(FilmData film, vec4 data, float weight)
 }
 
 /* Returns uv's position in the previous frame. */
-vec2 film_uv_history_get(CameraData camera, CameraData camera_history, vec2 uv)
+vec2 film_uv_history_get(CameraData cam, CameraData camera_history, vec2 uv)
 {
 #if 0 /* TODO reproject history */
-  vec3 V = camera_view_from_uv(camera, uv);
+  vec3 V = camera_view_from_uv(cam, uv);
   vec3 V_prev = transform_point(hitory_mat, V);
   vec2 uv_history = camera_uv_from_view(camera_history, V_prev);
   return uv_history;
@@ -67,11 +66,11 @@ vec2 film_uv_history_get(CameraData camera, CameraData camera_history, vec2 uv)
 /** \name Filter
  * \{ */
 
-float film_filter_weight(CameraData camera, vec2 offset)
+float film_filter_weight(CameraData cam, vec2 offset)
 {
 #if 1 /* Faster */
   /* Gaussian fitted to Blackman-Harris. */
-  float r = len_squared(offset) / sqr(camera.filter_size);
+  float r = len_squared(offset) / sqr(cam.filter_size);
   const float sigma = 0.284;
   const float fac = -0.5 / (sigma * sigma);
   float weight = exp(fac * r);
@@ -85,18 +84,18 @@ float film_filter_weight(CameraData camera, vec2 offset)
 }
 
 /* Camera UV is the full-frame UV. Film uv is after cropping from render border. */
-vec2 film_sample_from_camera_uv(FilmData film, vec2 sample_uv)
+vec2 film_sample_from_camera_uv(FilmData film_data, vec2 sample_uv)
 {
-  return (sample_uv - film.uv_bias) * film.uv_scale_inv;
+  return (sample_uv - film_data.uv_bias) * film_data.uv_scale_inv;
 }
 
-vec2 film_sample_to_camera_uv(FilmData film, vec2 sample_co)
+vec2 film_sample_to_camera_uv(FilmData film_data, vec2 sample_co)
 {
-  return sample_co * film.uv_scale + film.uv_bias;
+  return sample_co * film_data.uv_scale + film_data.uv_bias;
 }
 
-void film_process_sample(CameraData camera,
-                         FilmData film,
+void film_process_sample(CameraData cam,
+                         FilmData film_data,
                          mat4 input_persmat,
                          mat4 input_persinv,
                          sampler2D input_tx,
@@ -106,14 +105,14 @@ void film_process_sample(CameraData camera,
 {
   /* Project sample from destrination space to source texture. */
   vec2 sample_center = gl_FragCoord.xy;
-  vec2 sample_uv = film_sample_to_camera_uv(film, sample_center + sample_offset);
-  vec3 vV_dst = camera_view_from_uv(camera, sample_uv);
+  vec2 sample_uv = film_sample_to_camera_uv(film_data, sample_center + sample_offset);
+  vec3 vV_dst = camera_view_from_uv(cam, sample_uv);
   /* Pixels outside of projection range. */
   if (vV_dst == vec3(0.0)) {
     return;
   }
 
-  bool is_persp = camera.type != CAMERA_ORTHO;
+  bool is_persp = cam.type != CAMERA_ORTHO;
   vec2 uv_src = camera_uv_from_view(input_persmat, is_persp, vV_dst);
   /* Snap to sample actual location (pixel center). */
   vec2 input_size = vec2(textureSize(input_tx, 0));
@@ -126,21 +125,21 @@ void film_process_sample(CameraData camera,
 
   /* Reproject sample location in destination space to have correct distance metric. */
   vec3 vV_src = camera_view_from_uv(input_persinv, uv_src);
-  vec2 uv_cam = camera_uv_from_view(camera, vV_src);
-  vec2 sample_dst = film_sample_from_camera_uv(film, uv_cam);
+  vec2 uv_cam = camera_uv_from_view(cam, vV_src);
+  vec2 sample_dst = film_sample_from_camera_uv(film_data, uv_cam);
 
   /* Equirectangular projection might wrap and have more than one point mapping to the same
    * original coordinate. We need to get the closest pixel center.
    * NOTE: This is wrong for projection outside the main frame. */
-  if (camera.type == CAMERA_PANO_EQUIRECT) {
-    sample_center = film_sample_to_camera_uv(film, sample_center);
-    vec3 vV_center = camera_view_from_uv(camera, sample_center);
-    sample_center = camera_uv_from_view(camera, vV_center);
-    sample_center = film_sample_from_camera_uv(film, sample_center);
+  if (cam.type == CAMERA_PANO_EQUIRECT) {
+    sample_center = film_sample_to_camera_uv(film_data, sample_center);
+    vec3 vV_center = camera_view_from_uv(cam, sample_center);
+    sample_center = camera_uv_from_view(cam, vV_center);
+    sample_center = film_sample_from_camera_uv(film_data, sample_center);
   }
   /* Compute filter weight and add to weighted sum. */
   vec2 offset = sample_dst - sample_center;
-  float sample_weight = film_filter_weight(camera, offset);
+  float sample_weight = film_filter_weight(cam, offset);
   vec4 sample_data = textureLod(input_tx, uv_src, 0.0);
   data += film_data_encode(film, sample_data, sample_weight);
   weight += sample_weight;

@@ -10,7 +10,6 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 /**
  * As input to the tracing function, direction is premultiplied by its maximum length.
@@ -40,7 +39,7 @@ void raytrace_clip_ray_to_near_plane(inout Ray ray)
   }
 }
 
-void raytrace_screenspace_ray_finalize(HiZData hiz, inout ScreenSpaceRay ray)
+void raytrace_screenspace_ray_finalize(HiZData data, inout ScreenSpaceRay ray)
 {
   /* Constant bias (due to depth buffer precision). Helps with self intersection. */
   /* Magic numbers for 24bits of precision.
@@ -59,7 +58,7 @@ void raytrace_screenspace_ray_finalize(HiZData hiz, inout ScreenSpaceRay ray)
   /* Make ray.direction cover one pixel. */
   bool is_more_vertical = abs(ray.direction.x) < abs(ray.direction.y);
   ray.direction /= (is_more_vertical) ? abs(ray.direction.y) : abs(ray.direction.x);
-  ray.direction *= (is_more_vertical) ? hiz.pixel_to_ndc.y : hiz.pixel_to_ndc.x;
+  ray.direction *= (is_more_vertical) ? data.pixel_to_ndc.y : data.pixel_to_ndc.x;
   /* Clip to segment's end. */
   ray.max_time = sqrt(ray_len_sqr * safe_rcp(len_squared(ray.direction.xyz)));
   /* Clipping to frustum sides. */
@@ -70,17 +69,17 @@ void raytrace_screenspace_ray_finalize(HiZData hiz, inout ScreenSpaceRay ray)
   ray.direction *= 0.5;
 }
 
-ScreenSpaceRay raytrace_screenspace_ray_create(HiZData hiz, Ray ray)
+ScreenSpaceRay raytrace_screenspace_ray_create(HiZData data, Ray ray)
 {
   ScreenSpaceRay ssray;
   ssray.origin.xyz = project_point(ProjectionMatrix, ray.origin);
   ssray.direction.xyz = project_point(ProjectionMatrix, ray.origin + ray.direction);
 
-  raytrace_screenspace_ray_finalize(hiz, ssray);
+  raytrace_screenspace_ray_finalize(data, ssray);
   return ssray;
 }
 
-ScreenSpaceRay raytrace_screenspace_ray_create(HiZData hiz, Ray ray, float thickness)
+ScreenSpaceRay raytrace_screenspace_ray_create(HiZData data, Ray ray, float thickness)
 {
   ScreenSpaceRay ssray;
   ssray.origin.xyz = project_point(ProjectionMatrix, ray.origin);
@@ -92,7 +91,7 @@ ScreenSpaceRay raytrace_screenspace_ray_create(HiZData hiz, Ray ray, float thick
   ssray.origin.w = ssray.origin.w * 2.0 - 1.0;
   ssray.direction.w = ssray.direction.w * 2.0 - 1.0;
 
-  raytrace_screenspace_ray_finalize(hiz, ssray);
+  raytrace_screenspace_ray_finalize(data, ssray);
   return ssray;
 }
 
@@ -110,8 +109,8 @@ ScreenSpaceRay raytrace_screenspace_ray_create(HiZData hiz, Ray ray, float thick
  *
  * \return True if there is a valid intersection.
  */
-bool raytrace_screen(RaytraceData raytrace,
-                     HiZData hiz,
+bool raytrace_screen(RaytraceData rt_data,
+                     HiZData data,
                      sampler2D hiz_tx,
                      float stride_rand,
                      float roughness,
@@ -124,7 +123,7 @@ bool raytrace_screen(RaytraceData raytrace,
     raytrace_clip_ray_to_near_plane(ray);
   }
 
-  ScreenSpaceRay ssray = raytrace_screenspace_ray_create(hiz, ray, raytrace.thickness);
+  ScreenSpaceRay ssray = raytrace_screenspace_ray_create(data, ray, rt_data.thickness);
   /* Avoid no iteration. */
   if (!allow_self_intersection && ssray.max_time < 1.1) {
     /* Still output the clipped ray. */
@@ -147,7 +146,7 @@ bool raytrace_screen(RaytraceData raytrace,
   bool hit = false;
   const float max_steps = 255.0;
   for (float iter = 1.0; !hit && (time < ssray.max_time) && (iter < max_steps); iter++) {
-    float stride = 1.0 + iter * raytrace.quality;
+    float stride = 1.0 + iter * rt_data.quality;
     float lod = log2(stride) * lod_fac;
 
     prev_time = time;
@@ -157,7 +156,7 @@ bool raytrace_screen(RaytraceData raytrace,
     t += stride;
 
     vec4 ss_p = ssray.origin + ssray.direction * time;
-    depth_sample = textureLod(hiz_tx, ss_p.xy * hiz.uv_scale, floor(lod)).r;
+    depth_sample = textureLod(hiz_tx, ss_p.xy * data.uv_scale, floor(lod)).r;
 
     delta = depth_sample - ss_p.z;
     /* Check if the ray is below the surface ... */

@@ -10,32 +10,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_accumulator_lib.glsl)
 
-layout(std140) uniform sampling_block
-{
-  SamplingData sampling;
-};
-
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-uniform sampler2D depth_tx;
-uniform sampler2D color_tx;
-uniform sampler2D color_bg_tx;
-uniform sampler2D color_fg_tx;
-uniform sampler2D color_holefill_tx;
-uniform sampler2D tiles_bg_tx;
-uniform sampler2D tiles_fg_tx;
-uniform sampler2D weight_bg_tx;
-uniform sampler2D weight_fg_tx;
-uniform sampler2D weight_holefill_tx;
-uniform sampler2D bokeh_lut_tx;
-
-in vec4 uvcoordsvar;
-
-layout(location = 0) out vec4 out_color;
-
 void main(void)
 {
   ivec2 tile_co = ivec2(gl_FragCoord.xy / float(DOF_TILE_DIVISOR));
@@ -72,8 +46,8 @@ void main(void)
   }
 
   if (!no_slight_focus_pass && prediction.do_slight_focus) {
-    dof_slight_focus_gather(sampling,
-                            dof,
+    dof_slight_focus_gather(sampling_buf,
+                            dof_buf,
                             depth_tx,
                             color_tx,
                             bokeh_lut_tx,

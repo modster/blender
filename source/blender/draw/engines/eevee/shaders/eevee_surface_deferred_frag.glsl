@@ -6,43 +6,13 @@
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(std140) uniform sampling_block
-{
-  SamplingData sampling;
-};
-
-uniform sampler2DArray utility_tx;
-
-utility_tx_fetch_define(utility_tx);
-utility_tx_sample_define(utility_tx);
-
-/* Diffuse or Transmission Color. */
-layout(location = 0) out vec3 out_transmit_color;
-/* RG: Normal (negative if Tranmission), B: SSS ID, A: Min-Thickness */
-layout(location = 1) out vec4 out_transmit_normal;
-/* RGB: SSS RGB Radius.
- * or
- * R: Transmission IOR, G: Transmission Roughness, B: Unused. */
-layout(location = 2) out vec3 out_transmit_data;
-/* Reflection Color. */
-layout(location = 3) out vec3 out_reflection_color;
-/* RG: Normal, B: Roughness X, A: Roughness Y. */
-layout(location = 4) out vec4 out_reflection_normal;
-/* Volume Emission, Absorption, Scatter, Phase. */
-layout(location = 5) out uvec4 out_volume_data;
-/* Emission. */
-layout(location = 6) out vec3 out_emission_data;
-/* Transparent BSDF, Holdout. */
-layout(location = 7) out vec4 out_transparency_data;
 
 void main(void)
 {
   g_data = init_globals();
 
-  float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_CLOSURE);
-  float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
+  float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_CLOSURE);
+  float noise = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
   g_data.closure_rand = fract(noise + noise_offset);
   /* TODO(fclem) other RNG. */
   g_data.transmit_rand = fract(g_data.closure_rand * 6.1803398875);
@@ -82,6 +52,9 @@ void main(void)
     out_transmit_data.y = g_refraction_data.roughness;
   }
   else {
+    if (g_diffuse_data.sss_id == 1u) {
+      g_diffuse_data.sss_id = uint(resource_handle + 1);
+    }
     /* Output diffuse / SSS in transmit data. */
     out_transmit_color = g_diffuse_data.color;
     out_transmit_normal.xy = gbuffer_encode_normal(g_diffuse_data.N);

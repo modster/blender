@@ -16,6 +16,8 @@
  * Copyright 2021, Blender Foundation.
  */
 
+#include "BLT_translation.h"
+
 #include "DNA_scene_types.h"
 
 #include "DRW_render.h"
@@ -25,8 +27,6 @@
 #include "NOD_compositor_execute.hh"
 
 #include "GPU_texture.h"
-
-#include "compositor_shader.hh"
 
 namespace blender::viewport_compositor {
 

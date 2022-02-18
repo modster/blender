@@ -63,7 +63,7 @@ void RaytracingModule::sync(void)
   refraction_data_.push_update();
   diffuse_data_.push_update();
 
-  enabled_ = (sce_eevee.flag & SCE_EEVEE_RAYTRACING_ENABLED) != 0;
+  // enabled_ = (sce_eevee.flag & SCE_EEVEE_RAYTRACING_ENABLED) != 0;
 }
 
 /** \} */
@@ -98,7 +98,7 @@ void RaytraceBuffer::sync(int2 extent)
       GPUShader *sh = inst_.shaders.static_shader_get(do_rt ? RAYTRACE_REFLECTION :
                                                               RAYTRACE_REFLECTION_FALLBACK);
       grps[0] = DRW_shgroup_create(sh, trace_reflection_ps_);
-      DRW_shgroup_uniform_block(grps[0], "raytrace_block", inst_.raytracing.reflection_ubo_get());
+      DRW_shgroup_uniform_block(grps[0], "raytrace_buf", inst_.raytracing.reflection_ubo_get());
       DRW_shgroup_stencil_set(grps[0], 0x0, 0x0, CLOSURE_REFLECTION);
     }
     {
@@ -106,7 +106,7 @@ void RaytraceBuffer::sync(int2 extent)
       GPUShader *sh = inst_.shaders.static_shader_get(do_rt ? RAYTRACE_REFRACTION :
                                                               RAYTRACE_REFRACTION_FALLBACK);
       grps[1] = DRW_shgroup_create(sh, trace_refraction_ps_);
-      DRW_shgroup_uniform_block(grps[1], "raytrace_block", inst_.raytracing.refraction_ubo_get());
+      DRW_shgroup_uniform_block(grps[1], "raytrace_buf", inst_.raytracing.refraction_ubo_get());
       DRW_shgroup_stencil_set(grps[1], 0x0, 0x0, CLOSURE_REFRACTION);
     }
     {
@@ -114,15 +114,15 @@ void RaytraceBuffer::sync(int2 extent)
       GPUShader *sh = inst_.shaders.static_shader_get(do_rt ? RAYTRACE_DIFFUSE :
                                                               RAYTRACE_DIFFUSE_FALLBACK);
       grps[2] = DRW_shgroup_create(sh, trace_diffuse_ps_);
-      DRW_shgroup_uniform_block(grps[2], "raytrace_block", inst_.raytracing.diffuse_ubo_get());
+      DRW_shgroup_uniform_block(grps[2], "raytrace_buf", inst_.raytracing.diffuse_ubo_get());
       DRW_shgroup_stencil_set(grps[2], 0x0, 0x0, CLOSURE_DIFFUSE);
     }
 
     for (DRWShadingGroup *grp : grps) {
-      DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
-      DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
-      DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
-      DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+      DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
+      DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
+      DRW_shgroup_uniform_block(grp, "cubes_buf", lightprobes.cube_ubo_get());
+      DRW_shgroup_uniform_block(grp, "probes_buf", lightprobes.info_ubo_get());
       DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
       DRW_shgroup_uniform_texture_ref(grp, "hiz_front_tx", &input_hiz_front_tx_);
       DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
@@ -158,9 +158,9 @@ void RaytraceBuffer::sync(int2 extent)
 
     for (DRWShadingGroup *grp : grps) {
       /* Does not matter which raytrace_block we use. */
-      DRW_shgroup_uniform_block(grp, "raytrace_block", inst_.raytracing.diffuse_ubo_get());
-      DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
-      DRW_shgroup_uniform_block(grp, "rtbuffer_block", data_);
+      DRW_shgroup_uniform_block(grp, "raytrace_buf", inst_.raytracing.diffuse_ubo_get());
+      DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
+      DRW_shgroup_uniform_block(grp, "rtbuf_buf", data_);
       DRW_shgroup_uniform_texture_ref_ex(grp, "ray_data_tx", &input_ray_data_tx_, no_interp);
       DRW_shgroup_uniform_texture_ref_ex(grp, "ray_radiance_tx", &input_ray_color_tx_, no_interp);
       DRW_shgroup_uniform_texture_ref_ex(grp, "hiz_tx", &input_hiz_front_tx_, no_interp);
@@ -199,7 +199,7 @@ void RaytraceBuffer::sync(int2 extent)
     }
 
     for (DRWShadingGroup *grp : grps) {
-      DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+      DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
       DRW_shgroup_uniform_texture_ref_ex(grp, "ray_radiance_tx", &output_history_tx_, no_interp);
       DRW_shgroup_uniform_texture_ref_ex(grp, "ray_variance_tx", &output_variance_tx_, no_interp);
       DRW_shgroup_uniform_texture_ref_ex(grp, "cl_color_tx", &input_cl_color_tx_, no_interp);

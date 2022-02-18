@@ -18,12 +18,9 @@ vec3 calc_barycentric_distances(vec3 pos0, vec3 pos1, vec3 pos2)
   vec3 d02 = normalize(edge02);
 
   vec3 dists;
-  float d = dot(d21, edge02);
-  dists.x = sqrt(dot(edge02, edge02) - d * d);
-  d = dot(d02, edge10);
-  dists.y = sqrt(dot(edge10, edge10) - d * d);
-  d = dot(d10, edge21);
-  dists.z = sqrt(dot(edge21, edge21) - d * d);
+  dists.x = sqrt(dot(edge02, edge02) - sqr(dot(d21, edge02)));
+  dists.y = sqrt(dot(edge10, edge10) - sqr(dot(d02, edge10)));
+  dists.z = sqrt(dot(edge21, edge21) - sqr(dot(d10, edge21)));
   return dists;
 }
 

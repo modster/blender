@@ -4,9 +4,6 @@
 #pragma BLENDER_REQUIRE(common_gpencil_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_surface_lib.glsl)
 
-in ivec4 ma, ma1, ma2, ma3;
-in vec4 pos, pos1, pos2, pos3, uv1, uv2, col1, col2, fcol1;
-
 /* Globals to feed the load functions */
 vec2 uvs;
 vec4 color;
@@ -33,7 +30,7 @@ void main(void)
                                col1,
                                col2,
                                fcol1,
-                               vec4(ViewportSize, ViewportSizeInverse),
+                               vec4(drw_view.viewport_size, drw_view.viewport_size_inverse),
                                interp.P,
                                interp.N,
                                color,
@@ -41,9 +38,6 @@ void main(void)
                                sspos,
                                aspect,
                                thickness);
-
-  interp.barycentric_coords = vec2(0.0);
-  interp.barycentric_dists = vec3(0.0);
 
   PASS_RESOURCE_ID
   attrib_load();

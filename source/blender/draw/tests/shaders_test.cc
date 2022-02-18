@@ -14,7 +14,6 @@
 #include "intern/draw_manager_testing.h"
 
 #include "engines/basic/basic_private.h"
-#include "engines/eevee/eevee_private.h"
 #include "engines/gpencil/gpencil_engine.h"
 #include "engines/image/image_private.hh"
 #include "engines/overlay/overlay_private.h"
@@ -183,10 +182,8 @@ DRAW_TEST(gpencil_glsl_shaders)
 
 static void test_image_glsl_shaders()
 {
-  IMAGE_shader_library_ensure();
-
-  EXPECT_NE(IMAGE_shader_image_get(false), nullptr);
-  EXPECT_NE(IMAGE_shader_image_get(true), nullptr);
+  EXPECT_NE(IMAGE_shader_image_get(), nullptr);
+  EXPECT_NE(IMAGE_shader_depth_get(), nullptr);
 
   IMAGE_shader_free();
 }
@@ -286,97 +283,6 @@ static void test_overlay_glsl_shaders()
   OVERLAY_shader_free();
 }
 DRAW_TEST(overlay_glsl_shaders)
-
-static void test_eevee_glsl_shaders_static()
-{
-  EEVEE_shaders_material_shaders_init();
-
-  EXPECT_NE(EEVEE_shaders_bloom_blit_get(false), nullptr);
-  EXPECT_NE(EEVEE_shaders_bloom_blit_get(true), nullptr);
-  EXPECT_NE(EEVEE_shaders_bloom_downsample_get(false), nullptr);
-  EXPECT_NE(EEVEE_shaders_bloom_downsample_get(true), nullptr);
-  EXPECT_NE(EEVEE_shaders_bloom_upsample_get(false), nullptr);
-  EXPECT_NE(EEVEE_shaders_bloom_upsample_get(true), nullptr);
-  EXPECT_NE(EEVEE_shaders_bloom_resolve_get(false), nullptr);
-  EXPECT_NE(EEVEE_shaders_bloom_resolve_get(true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_bokeh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_setup_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_flatten_tiles_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_dilate_tiles_get(false), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_dilate_tiles_get(true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_downsample_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_reduce_get(true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_reduce_get(false), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_FOREGROUND, false), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_FOREGROUND, true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_BACKGROUND, false), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_BACKGROUND, true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_HOLEFILL, false), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_HOLEFILL, true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_filter_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_scatter_get(false, false), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_scatter_get(false, true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_scatter_get(true, false), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_scatter_get(true, true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_resolve_get(false, true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_resolve_get(false, false), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_resolve_get(true, true), nullptr);
-  EXPECT_NE(EEVEE_shaders_depth_of_field_resolve_get(true, false), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_downsample_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_downsample_cube_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_minz_downlevel_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_maxz_downlevel_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_minz_downdepth_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_maxz_downdepth_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_minz_downdepth_layer_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_maxz_downdepth_layer_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_maxz_copydepth_layer_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_minz_copydepth_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_maxz_copydepth_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_mist_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_motion_blur_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_motion_blur_object_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_motion_blur_hair_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_motion_blur_velocity_tiles_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_motion_blur_velocity_tiles_expand_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_ambient_occlusion_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_ambient_occlusion_debug_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_ggx_lut_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_ggx_refraction_lut_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_probe_filter_glossy_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_probe_filter_diffuse_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_probe_filter_visibility_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_probe_grid_fill_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_probe_planar_downsample_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_renderpasses_post_process_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_cryptomatte_sh_get(false), nullptr);
-  EXPECT_NE(EEVEE_shaders_cryptomatte_sh_get(true), nullptr);
-  EXPECT_NE(EEVEE_shaders_shadow_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_shadow_accum_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_subsurface_first_pass_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_subsurface_second_pass_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_volumes_clear_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_volumes_clear_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_volumes_scatter_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_volumes_scatter_with_lights_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_volumes_integration_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_volumes_resolve_sh_get(false), nullptr);
-  EXPECT_NE(EEVEE_shaders_volumes_resolve_sh_get(true), nullptr);
-  EXPECT_NE(EEVEE_shaders_volumes_accum_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_studiolight_probe_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_studiolight_background_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_probe_cube_display_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_probe_grid_display_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_probe_planar_display_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_update_noise_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_velocity_resolve_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_taa_resolve_sh_get(EFFECT_TAA), nullptr);
-  EXPECT_NE(EEVEE_shaders_taa_resolve_sh_get(EFFECT_TAA_REPROJECT), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_reflection_trace_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_reflection_resolve_sh_get(), nullptr);
-  EEVEE_shaders_free();
-}
-DRAW_TEST(eevee_glsl_shaders_static)
 
 static void test_draw_shaders(eParticleRefineShaderType sh_type)
 {

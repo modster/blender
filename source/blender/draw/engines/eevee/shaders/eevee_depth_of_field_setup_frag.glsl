@@ -15,17 +15,6 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-uniform sampler2D color_tx;
-uniform sampler2D depth_tx;
-
-layout(location = 0) out vec4 out_color;
-layout(location = 1) out vec2 out_coc;
-
 float dof_abs_max_slight_of_focus_coc(vec4 cocs)
 {
   /* Clamp to 0.5 if full in defocus to differentiate full focus tiles with coc == 0.0.
@@ -57,10 +46,10 @@ void main()
   for (int i = 0; i < 4; i++) {
     vec2 sample_uv = quad_center + quad_offsets[i] * fullres_texel_size;
     colors[i] = safe_color(textureLod(color_tx, sample_uv, 0.0));
-    cocs[i] = dof_coc_from_depth(dof, sample_uv, textureLod(depth_tx, sample_uv, 0.0).r);
+    cocs[i] = dof_coc_from_depth(dof_buf, sample_uv, textureLod(depth_tx, sample_uv, 0.0).r);
   }
 
-  cocs = clamp(cocs, -dof.coc_abs_max, dof.coc_abs_max);
+  cocs = clamp(cocs, -dof_buf.coc_abs_max, dof_buf.coc_abs_max);
 
   vec4 weights = dof_bilateral_coc_weights(cocs);
   weights *= dof_bilateral_color_weights(colors);

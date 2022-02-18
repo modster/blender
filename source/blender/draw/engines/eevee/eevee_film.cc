@@ -101,7 +101,7 @@ void Film::sync(void)
 {
   char full_name[32];
   for (int i = 0; i < 2; i++) {
-    if (data_tx_[i] == nullptr) {
+    if (data_tx_[i].is_valid() == false) {
       eGPUTextureFormat tex_format = to_gpu_texture_format(data_.data_type);
       data_tx_[i].ensure_2d(tex_format, data_.extent);
       /* TODO(fclem) The weight texture could be shared between all similar accumulators. */
@@ -119,8 +119,8 @@ void Film::sync(void)
     accumulate_ps_ = DRW_pass_create(full_name, DRW_STATE_WRITE_COLOR);
     GPUShader *sh = inst_.shaders.static_shader_get(FILM_FILTER);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, accumulate_ps_);
-    DRW_shgroup_uniform_block(grp, "film_block", data_);
-    DRW_shgroup_uniform_block(grp, "camera_block", inst_.camera.ubo_get());
+    DRW_shgroup_uniform_block(grp, "film", data_);
+    DRW_shgroup_uniform_block(grp, "camera", inst_.camera.ubo_get());
     DRW_shgroup_uniform_texture_ref_ex(grp, "input_tx", &input_tx_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);
@@ -137,7 +137,7 @@ void Film::sync(void)
     resolve_ps_ = DRW_pass_create(full_name, state);
     GPUShader *sh = inst_.shaders.static_shader_get(sh_type);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_ps_);
-    DRW_shgroup_uniform_block(grp, "film_block", data_);
+    DRW_shgroup_uniform_block(grp, "film", data_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "first_sample_tx", &first_sample_ref_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);

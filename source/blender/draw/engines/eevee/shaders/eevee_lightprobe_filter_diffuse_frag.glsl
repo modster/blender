@@ -11,17 +11,6 @@
 #pragma BLENDER_REQUIRE(eevee_irradiance_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_bsdf_sampling_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_lightprobe_filter_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-uniform samplerCube radiance_tx;
-
-layout(std140) uniform filter_block
-{
-  LightProbeFilterData probe;
-};
-
-layout(location = 0) out vec4 out_irradiance;
 
 void main()
 {
@@ -50,8 +39,8 @@ void main()
   /* Integrating Envmap. */
   float weight = 0.0;
   vec3 radiance = vec3(0.0);
-  for (float i = 0; i < probe.sample_count; i++) {
-    vec3 Xi = sample_cylinder(hammersley_2d(i, probe.sample_count));
+  for (float i = 0; i < filter_buf.sample_count; i++) {
+    vec3 Xi = sample_cylinder(hammersley_2d(i, filter_buf.sample_count));
 
     float pdf;
     vec3 L = sample_uniform_hemisphere(Xi, N, T, B, pdf);
@@ -62,12 +51,12 @@ void main()
        * Unit Sphere -> Cubemap Face. */
       const float dist = 4.0 * M_PI / 6.0;
       /* http://http.developer.nvidia.com/GPUGems3/gpugems3_ch20.html : Equation 13 */
-      float lod = probe.lod_bias - 0.5 * log2(pdf * dist);
+      float lod = filter_buf.lod_bias - 0.5 * log2(pdf * dist);
 
       radiance += textureLod(radiance_tx, L, lod).rgb * NL;
       weight += NL;
     }
   }
 
-  out_irradiance = irradiance_encode(probe.instensity_fac * radiance / weight);
+  out_irradiance = irradiance_encode(filter_buf.instensity_fac * radiance / weight);
 }

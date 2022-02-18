@@ -6,20 +6,13 @@
  * invocations and overdraw.
  **/
 
-#pragma BLENDER_REQUIRE(eevee_depth_of_field_scatter_lib.glsl)
-
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-uniform sampler2D color_tx;
-uniform sampler2D coc_tx;
+#pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
 /* Load 4 Circle of confusion values. texel_co is centered around the 4 taps. */
 vec4 fetch_cocs(vec2 texel_co)
 {
-  /* TODO(fclem) The textureGather(sampler, co, comp) variant isn't here on some implementations.
+  /* TODO(@fclem): The `textureGather(sampler, co, comp)` variant isn't here on some
+   * implementations.
    */
 #if 0  // GPU_ARB_texture_gather
   vec2 uvs = texel_co / vec2(textureSize(coc_tx, 0));
@@ -34,7 +27,7 @@ vec4 fetch_cocs(vec2 texel_co)
   cocs.w = texelFetchOffset(coc_tx, texel, 0, ivec2(0, 0)).r;
 #endif
 
-  if (is_foreground) {
+  if (DOF_FOREGROUND_PASS) {
     cocs *= -1.0;
   }
 
@@ -56,7 +49,9 @@ void main()
   int t_id = gl_VertexID / 3; /* Triangle Id */
 
   /* Some math to get the target pixel. */
-  ivec2 texelco = ivec2(t_id % dof.scatter_sprite_per_row, t_id / dof.scatter_sprite_per_row) * 2;
+  ivec2 texelco = ivec2(t_id % dof_buf.scatter_sprite_per_row,
+                        t_id / dof_buf.scatter_sprite_per_row) *
+                  2;
 
   /* Center sprite around the 4 texture taps. */
   spritepos = vec2(texelco) + 1.0;
@@ -122,11 +117,11 @@ void main()
 
   /* Add 2.5 to max_coc because the max_coc may not be centered on the sprite origin
    * and because we smooth the bokeh shape a bit in the pixel shader. */
-  gl_Position.xy *= spritesize * dof.bokeh_anisotropic_scale + 2.5;
+  gl_Position.xy *= spritesize * dof_buf.bokeh_anisotropic_scale + 2.5;
   /* Position the sprite. */
   gl_Position.xy += spritepos;
   /* NDC range [-1..1]. */
-  gl_Position.xy = gl_Position.xy * dof.texel_size * 2.0 - 1.0;
+  gl_Position.xy = gl_Position.xy * dof_buf.texel_size * 2.0 - 1.0;
 
   /* Add 2.5 for the same reason but without the ratio. */
   spritesize += 2.5;

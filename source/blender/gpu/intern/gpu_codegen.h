@@ -34,15 +34,7 @@ extern "C" {
 
 struct GPUNodeGraph;
 
-typedef struct GPUPass {
-  struct GPUPass *next;
-
-  GPUShader *shader;
-  GPUShaderSource source;
-  uint refcount; /* Orphaned GPUPasses gets freed by the garbage collector. */
-  uint32_t hash; /* Identity hash generated from all GLSL code. */
-  bool compiled; /* Did we already tried to compile the attached GPUShader. */
-} GPUPass;
+typedef struct GPUPass GPUPass;
 
 /* Pass */
 

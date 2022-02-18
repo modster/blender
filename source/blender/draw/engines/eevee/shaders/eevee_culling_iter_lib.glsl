@@ -1,5 +1,4 @@
 
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
 {
@@ -33,7 +32,7 @@ uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
 #define LIGHT_FOREACH_BEGIN_LOCAL(_culling, _zbins, _words, _pixel, _linearz, _item_index) \
   { \
     uint batch_count = divide_ceil_u(_culling.visible_count, CULLING_BATCH_SIZE); \
-    uvec2 tile_co = uvec2(_pixel) / _culling.tile_size; \
+    uvec2 tile_co = uvec2(_pixel / _culling.tile_size); \
     uint tile_word_offset = (tile_co.x + tile_co.y * _culling.tile_x_len) * \
                             _culling.tile_word_len; \
     for (uint batch = 0; batch < batch_count; batch++) { \
@@ -45,8 +44,9 @@ uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
       /* Ensure all threads inside a subgroup get the same value to reduce VGPR usage. */ \
       min_index = subgroupBroadcastFirst(subgroupMin(min_index)); \
       max_index = subgroupBroadcastFirst(subgroupMax(max_index)); \
-      uint word_min = min_index / 32u; \
-      uint word_max = max_index / 32u; \
+      /* Same as divide by 32 but avoid interger division. */ \
+      uint word_min = min_index >> 5u; \
+      uint word_max = max_index >> 5u; \
       for (uint word_idx = word_min; word_idx <= word_max; word_idx++) { \
         uint word = _words[tile_word_offset + word_idx]; \
         word &= zbin_mask(word_idx, min_index, max_index); \

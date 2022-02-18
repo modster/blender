@@ -8,37 +8,19 @@
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(common_intersection_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(local_size_x = CULLING_ITEM_BATCH) in;
-
-layout(std430, binding = 0) readonly restrict buffer lights_buf
-{
-  LightData lights[];
-};
-
-layout(std430, binding = 1) restrict buffer culling_buf
-{
-  CullingData culling;
-};
-
-layout(std430, binding = 2) restrict buffer key_buf
-{
-  uint keys[];
-};
 
 void main()
 {
   uint l_idx = gl_GlobalInvocationID.x;
-  if (l_idx >= culling.items_count) {
+  if (l_idx >= lights_cull_buf.items_count) {
     return;
   }
 
-  LightData light = lights[l_idx];
+  LightData light = lights_buf[l_idx];
 
   /* Sun lights are packed at the start of the array. */
   if (light.type == LIGHT_SUN) {
-    keys[l_idx] = l_idx;
+    keys_buf[l_idx] = l_idx;
     return;
   }
 
@@ -54,7 +36,8 @@ void main()
   }
 
   if (intersect_view(sphere)) {
-    uint index = culling.items_no_cull_count + atomicAdd(culling.visible_count, 1u);
-    keys[index] = l_idx;
+    uint index = lights_cull_buf.items_no_cull_count +
+                 atomicAdd(lights_cull_buf.visible_count, 1u);
+    keys_buf[index] = l_idx;
   }
 }

@@ -14,23 +14,10 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
-layout(std140) uniform dof_block
-{
-  DepthOfFieldData dof;
-};
-
-uniform sampler2D color_tx;
-uniform sampler2D coc_tx;
-uniform sampler2D downsampled_tx;
-
-layout(location = 0) out vec4 out_color_gather;
-layout(location = 1) out float out_coc;
-layout(location = 2) out vec3 out_color_scatter;
-
 /* NOTE: Do not compare alpha as it is not scattered by the scatter pass. */
 float dof_scatter_neighborhood_rejection(vec3 color)
 {
-  color = min(vec3(dof.scatter_neighbor_max_color), color);
+  color = min(vec3(dof_buf.scatter_neighbor_max_color), color);
 
   float validity = 0.0;
 
@@ -43,7 +30,7 @@ float dof_scatter_neighborhood_rejection(vec3 color)
     vec2 sample_uv = uv + quad_offsets[i] * texel_size;
     vec3 ref = textureLod(downsampled_tx, sample_uv, 0.0).rgb;
 
-    ref = min(vec3(dof.scatter_neighbor_max_color), ref);
+    ref = min(vec3(dof_buf.scatter_neighbor_max_color), ref);
     float diff = max_v3(max(vec3(0.0), abs(ref - color)));
 
     const float rejection_threshold = 0.7;
@@ -70,13 +57,13 @@ float dof_scatter_screen_border_rejection(float coc, vec2 uv, vec2 screen_size)
 float dof_scatter_luminosity_rejection(vec3 color)
 {
   const float rejection_hardness = 1.0;
-  return saturate(max_v3(color - dof.scatter_color_threshold) * rejection_hardness);
+  return saturate(max_v3(color - dof_buf.scatter_color_threshold) * rejection_hardness);
 }
 
 float dof_scatter_coc_radius_rejection(float coc)
 {
   const float rejection_hardness = 0.3;
-  return saturate((abs(coc) - dof.scatter_coc_threshold) * rejection_hardness);
+  return saturate((abs(coc) - dof_buf.scatter_coc_threshold) * rejection_hardness);
 }
 
 float fast_luma(vec3 color)
@@ -107,8 +94,8 @@ vec3 dof_neighborhood_clamping(vec3 color)
   float avg_luma = avg8(c00, c01, c02, c10, c12, c20, c21, c22);
   float max_luma = max8(c00, c01, c02, c10, c12, c20, c21, c22);
 
-  float upper_bound = mix(max_luma, avg_luma, dof.denoise_factor);
-  upper_bound = mix(c11, upper_bound, dof.denoise_factor);
+  float upper_bound = mix(max_luma, avg_luma, dof_buf.denoise_factor);
+  upper_bound = mix(c11, upper_bound, dof_buf.denoise_factor);
 
   float clamped_luma = min(upper_bound, c11);
 
@@ -140,5 +127,5 @@ void main()
   out_color_gather.rgb = mix(out_color_gather.rgb, vec3(0.0), do_scatter);
 
   /* Apply energy conservation to anamorphic scattered bokeh. */
-  out_color_scatter *= max_v2(dof.bokeh_anisotropic_scale_inv);
+  out_color_scatter *= max_v2(dof_buf.bokeh_anisotropic_scale_inv);
 }

@@ -17,38 +17,8 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_bsdf_microfacet_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
-#pragma BLENDER_EQUIRE(eevee_raytrace_resolve_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_raytrace_resolve_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(local_size_x = 8, local_size_y = 8) in;
-
-layout(std140) uniform raytrace_block
-{
-  RaytraceData raytrace;
-};
-
-layout(std140) uniform rtbuffer_block
-{
-  RaytraceBufferData rtbuffer;
-};
-
-layout(std140) uniform hiz_block
-{
-  HiZData hiz;
-};
-
-uniform sampler2D hiz_tx;
-uniform sampler2D ray_data_tx;
-uniform sampler2D ray_radiance_tx;
-uniform sampler2D cl_color_tx;
-uniform sampler2D cl_normal_tx;
-uniform sampler2D cl_data_tx;
-uniform sampler2D ray_history_tx;
-uniform sampler2D ray_variance_tx;
-
-layout(rgba16f) restrict uniform image2D out_history_img;
-layout(r8) restrict uniform image2D out_variance_img;
 
 //#define USE_HISTORY
 
@@ -94,7 +64,7 @@ void main(void)
   float gbuffer_depth = texelFetch(hiz_tx, texel, 0).r;
   vec3 vP = get_view_space_from_depth(uv, gbuffer_depth);
   vec3 vV = viewCameraVec(vP);
-  vec2 texel_size = hiz.pixel_to_ndc * 0.5;
+  vec2 texel_size = hiz_buf.pixel_to_ndc * 0.5;
 
   int sample_count = resolve_sample_max;
 #if defined(DIFFUSE)
@@ -154,7 +124,7 @@ void main(void)
   /* Blue noise categorised into 4 sets of samples.
    * See "Stochastic all the things" presentation slide 32-37. */
   int sample_pool = int((gl_GlobalInvocationID.x & 1u) + (gl_GlobalInvocationID.y & 1u) * 2u);
-  sample_pool = (sample_pool + raytrace.pool_offset) % 4;
+  sample_pool = (sample_pool + raytrace_buf.pool_offset) % 4;
   int sample_id = sample_pool * resolve_sample_max;
 
   float hit_depth_mean = 0.0;
@@ -215,11 +185,11 @@ void main(void)
   weight_accum = 1.0;
 
 #if defined(DIFFUSE)
-  if (rtbuffer.valid_history_diffuse) {
+  if (rtbuf_buf.valid_history_diffuse) {
 #elif defined(REFRACTION)
-  if (rtbuffer.valid_history_refraction) {
+  if (rtbuf_buf.valid_history_refraction) {
 #else
-  if (rtbuffer.valid_history_reflection) {
+  if (rtbuf_buf.valid_history_reflection) {
 #endif
 
     vec3 rgb_min = rgb_mean - rgb_deviation;
@@ -227,7 +197,7 @@ void main(void)
 
     /* Surface reprojection. */
     vec3 P_surf = transform_point(ViewMatrixInverse, vP);
-    vec2 uv_surf = project_point(rtbuffer.history_persmat, P_surf).xy * 0.5 + 0.5;
+    vec2 uv_surf = project_point(rtbuf_buf.history_persmat, P_surf).xy * 0.5 + 0.5;
     ivec2 texel_surf = ivec2(uv_surf * vec2(img_size));
     if (all(lessThan(texel_surf, img_size)) && all(greaterThan(texel_surf, ivec2(0)))) {
       vec3 radiance = texelFetch(ray_history_tx, texel_surf, 0).rgb;
@@ -242,7 +212,7 @@ void main(void)
 #if !defined(DIFFUSE)
     /* Reflexion reprojection. */
     vec3 P_hit = get_world_space_from_depth(uv, hit_depth_mean);
-    vec2 uv_hit = project_point(rtbuffer.history_persmat, P_hit).xy * 0.5 + 0.5;
+    vec2 uv_hit = project_point(rtbuf_buf.history_persmat, P_hit).xy * 0.5 + 0.5;
     ivec2 texel_hit = ivec2(uv_hit * vec2(img_size));
     if (all(lessThan(texel_hit, img_size)) && all(greaterThan(texel_hit, ivec2(0)))) {
       vec3 radiance = texelFetch(ray_history_tx, texel_hit, 0).rgb;

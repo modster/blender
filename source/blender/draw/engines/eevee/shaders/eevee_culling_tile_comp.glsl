@@ -8,46 +8,30 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_culling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 
-layout(local_size_x = 1024) in;
-
-layout(std430, binding = 0) readonly restrict buffer lights_buf
-{
-  LightData lights[];
-};
-
-layout(std430, binding = 1) readonly restrict buffer culling_buf
-{
-  CullingData culling;
-};
-
-layout(std430, binding = 2) writeonly restrict buffer culling_tile_buf
-{
-  CullingWord culling_words[];
-};
-
 void main(void)
 {
-  uint word_idx = gl_GlobalInvocationID.x % culling.tile_word_len;
-  uint tile_idx = gl_GlobalInvocationID.x / culling.tile_word_len;
-  uvec2 tile_co = uvec2(tile_idx % culling.tile_x_len, tile_idx / culling.tile_x_len);
+  uint word_idx = gl_GlobalInvocationID.x % lights_cull_buf.tile_word_len;
+  uint tile_idx = gl_GlobalInvocationID.x / lights_cull_buf.tile_word_len;
+  uvec2 tile_co = uvec2(tile_idx % lights_cull_buf.tile_x_len,
+                        tile_idx / lights_cull_buf.tile_x_len);
 
-  if (tile_co.y >= culling.tile_y_len) {
+  if (tile_co.y >= lights_cull_buf.tile_y_len) {
     return;
   }
 
   /* TODO(fclem): We could stop the tile at the HiZ depth. */
-  CullingTile tile = culling_tile_get(culling, tile_co);
+  CullingTile tile = culling_tile_get(lights_cull_buf, tile_co);
 
-  uint l_idx = max(word_idx * 32u, culling.items_no_cull_count);
-  uint l_end = min(l_idx + 32u, culling.visible_count + culling.items_no_cull_count);
+  uint l_idx = max(word_idx * 32u, lights_cull_buf.items_no_cull_count);
+  uint l_end = min(l_idx + 32u,
+                   lights_cull_buf.visible_count + lights_cull_buf.items_no_cull_count);
   uint word = 0u;
 
   for (; l_idx < l_end; l_idx++) {
-    LightData light = lights[l_idx];
+    LightData light = lights_buf[l_idx];
 
     bool intersect_tile;
     switch (light.type) {
@@ -66,5 +50,5 @@ void main(void)
     }
   }
 
-  culling_words[gl_GlobalInvocationID.x] = word;
+  lights_tile_buf[gl_GlobalInvocationID.x] = word;
 }

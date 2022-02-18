@@ -45,6 +45,7 @@ set(INC
   ../../../intern/glew-mx
   ../../../intern/guardedalloc
   ../../../intern/opensubdiv
+  ../../../intern/clog
 
   # dna_type_offsets.h
   ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
@@ -136,12 +137,10 @@ set(SRC
   engines/basic/basic_engine.c
   engines/basic/basic_shader.c
   engines/compositor/compositor_engine.cc
-  engines/compositor/compositor_shader.cc
   engines/image/image_engine.cc
   engines/image/image_shader.cc
   engines/eevee/eevee_camera.cc
   engines/eevee/eevee_depth_of_field.cc
-  engines/eevee/eevee_engine.c
   engines/eevee/eevee_engine.cc
   engines/eevee/eevee_film.cc
   engines/eevee/eevee_gpencil.cc
@@ -244,7 +243,6 @@ set(SRC
   engines/basic/basic_engine.h
   engines/basic/basic_private.h
   engines/compositor/compositor_engine.h
-  engines/compositor/compositor_shader.hh
   engines/eevee/eevee_engine.h
   engines/eevee/eevee_lightcache.h
   engines/eevee/eevee_camera.hh
@@ -252,13 +250,18 @@ set(SRC
   engines/eevee/eevee_light.hh
   engines/eevee/eevee_depth_of_field.hh
   engines/eevee/eevee_lut.h
-  engines/eevee/eevee_private.h
   engines/external/external_engine.h
-  engines/image/image_drawing_mode_image_space.hh
+  engines/image/image_batches.hh
+  engines/image/image_drawing_mode.hh
   engines/image/image_engine.h
+  engines/image/image_instance_data.hh
+  engines/image/image_partial_updater.hh
   engines/image/image_private.hh
+  engines/image/image_shader_params.hh
   engines/image/image_space_image.hh
   engines/image/image_space_node.hh
+  engines/image/image_space.hh
+  engines/image/image_wrappers.hh
   engines/workbench/workbench_engine.h
   engines/workbench/workbench_private.h
   engines/workbench/workbench_shader_shared.h
@@ -284,9 +287,7 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_bsdf_sampling_lib.glsl
   engines/eevee/shaders/eevee_bsdf_stubs_lib.glsl
   engines/eevee/shaders/eevee_camera_lib.glsl
-  engines/eevee/shaders/eevee_camera_velocity_frag.glsl
   engines/eevee/shaders/eevee_closure_lib.glsl
-  engines/eevee/shaders/eevee_cubemap_lib.glsl
   engines/eevee/shaders/eevee_culling_debug_frag.glsl
   engines/eevee/shaders/eevee_culling_iter_lib.glsl
   engines/eevee/shaders/eevee_culling_lib.glsl
@@ -311,7 +312,6 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_depth_of_field_reduce_recursive_frag.glsl
   engines/eevee/shaders/eevee_depth_of_field_resolve_frag.glsl
   engines/eevee/shaders/eevee_depth_of_field_scatter_frag.glsl
-  engines/eevee/shaders/eevee_depth_of_field_scatter_lib.glsl
   engines/eevee/shaders/eevee_depth_of_field_scatter_vert.glsl
   engines/eevee/shaders/eevee_depth_of_field_setup_frag.glsl
   engines/eevee/shaders/eevee_depth_of_field_tiles_dilate_frag.glsl
@@ -328,14 +328,11 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_lightprobe_display_cubemap_vert.glsl
   engines/eevee/shaders/eevee_lightprobe_display_grid_frag.glsl
   engines/eevee/shaders/eevee_lightprobe_display_grid_vert.glsl
-  engines/eevee/shaders/eevee_lightprobe_display_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_eval_cubemap_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_eval_grid_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_diffuse_frag.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_downsample_frag.glsl
-  engines/eevee/shaders/eevee_lightprobe_filter_geom.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_glossy_frag.glsl
-  engines/eevee/shaders/eevee_lightprobe_filter_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_vert.glsl
   engines/eevee/shaders/eevee_lightprobe_filter_visibility_frag.glsl
   engines/eevee/shaders/eevee_lookdev_background_frag.glsl
@@ -379,16 +376,16 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_surface_lookdev_vert.glsl
   engines/eevee/shaders/eevee_surface_mesh_geom.glsl
   engines/eevee/shaders/eevee_surface_mesh_vert.glsl
-  engines/eevee/shaders/eevee_surface_velocity_frag.glsl
-  engines/eevee/shaders/eevee_surface_velocity_lib.glsl
-  engines/eevee/shaders/eevee_surface_velocity_mesh_vert.glsl
   engines/eevee/shaders/eevee_surface_world_vert.glsl
   engines/eevee/shaders/eevee_velocity_lib.glsl
+  engines/eevee/shaders/eevee_velocity_camera_frag.glsl
+  engines/eevee/shaders/eevee_velocity_surface_mesh_vert.glsl
+  engines/eevee/shaders/eevee_velocity_surface_frag.glsl
   engines/eevee/shaders/eevee_volume_deferred_frag.glsl
   engines/eevee/shaders/eevee_volume_eval_lib.glsl
-  engines/eevee/shaders/eevee_volume_lib.glsl
   engines/eevee/shaders/eevee_volume_vert.glsl
 
+  engines/eevee/eevee_defines.hh
   engines/eevee/eevee_shader_shared.hh
 
   engines/workbench/shaders/workbench_cavity_lib.glsl
@@ -424,6 +421,7 @@ set(GLSL_SRC
   intern/shaders/common_attribute_lib.glsl
   intern/shaders/common_colormanagement_lib.glsl
   intern/shaders/common_debug_lib.glsl
+  intern/shaders/common_debug_print_lib.glsl
   intern/shaders/common_fullscreen_vert.glsl
   intern/shaders/common_fxaa_lib.glsl
   intern/shaders/common_globals_lib.glsl
@@ -437,7 +435,6 @@ set(GLSL_SRC
   intern/shaders/common_obinfos_lib.glsl
   intern/shaders/common_pointcloud_lib.glsl
   intern/shaders/common_smaa_lib.glsl
-  intern/shaders/common_uniform_attribute_lib.glsl
   intern/shaders/common_view_lib.glsl
   intern/shaders/common_view_clipping_lib.glsl
 
@@ -453,6 +450,9 @@ set(GLSL_SRC
   intern/shaders/common_subdiv_vbo_edituv_strech_area_comp.glsl
   intern/shaders/common_subdiv_vbo_lnor_comp.glsl
   intern/shaders/common_subdiv_vbo_sculpt_data_comp.glsl
+
+  intern/shaders/draw_debug_print_display_vert.glsl
+  intern/shaders/draw_debug_print_display_frag.glsl
 
   intern/draw_shader_shared.h
 
@@ -571,14 +571,24 @@ set(GLSL_SRC
   engines/overlay/shaders/wireframe_frag.glsl
   engines/overlay/shaders/xray_fade_frag.glsl
 
-  engines/image/shaders/engine_image_frag.glsl
-  engines/image/shaders/engine_image_vert.glsl
+  engines/image/shaders/image_engine_color_frag.glsl
+  engines/image/shaders/image_engine_color_vert.glsl
+  engines/image/shaders/image_engine_depth_frag.glsl
+  engines/image/shaders/image_engine_depth_vert.glsl
 )
 
 set(GLSL_C)
 foreach(GLSL_FILE ${GLSL_SRC})
   data_to_c_simple(${GLSL_FILE} GLSL_C)
 endforeach()
+
+# Generated shader files
+# TODO(@fclem): Clean that by wrapping it into a function.
+data_to_c(${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl.c GLSL_C)
+
+list(APPEND GLSL_SRC
+  ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl
+)
 
 blender_add_lib(bf_draw_shaders "${GLSL_C}" "" "" "")
 

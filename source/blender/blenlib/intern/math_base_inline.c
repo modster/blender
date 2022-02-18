@@ -388,6 +388,14 @@ MINLINE uint divide_ceil_u(uint a, uint b)
   return (a + b - 1) / b;
 }
 
+/**
+ * Return the next multiple of `b` after `a`.
+ */
+MINLINE uint ceil_multiple_u(uint a, uint b)
+{
+  return ((a + b - 1) / b) * b;
+}
+
 MINLINE int mod_i(int i, int n)
 {
   return (i % n + n) % n;

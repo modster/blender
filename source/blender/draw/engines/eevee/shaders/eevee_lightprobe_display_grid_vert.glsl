@@ -4,47 +4,33 @@
  */
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_lightprobe_display_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(std140) uniform grids_block
-{
-  GridData grids[GRID_MAX];
-};
-
-layout(std140) uniform lightprobes_info_block
-{
-  LightProbeInfoData probes_info;
-};
-
-uniform int grid_id;
-
-const vec2 pos[6] = vec2[6](vec2(-1.0, -1.0),
-                            vec2(1.0, -1.0),
-                            vec2(-1.0, 1.0),
-
-                            vec2(1.0, -1.0),
-                            vec2(1.0, 1.0),
-                            vec2(-1.0, 1.0));
+#pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
 void main(void)
 {
+  const vec2 pos[6] = vec2[6](vec2(-1.0, -1.0),
+                              vec2(1.0, -1.0),
+                              vec2(-1.0, 1.0),
 
-  interp.sample = gl_VertexID / 6;
+                              vec2(1.0, -1.0),
+                              vec2(1.0, 1.0),
+                              vec2(-1.0, 1.0));
+
+  interp.samp = gl_VertexID / 6;
   interp.coord = pos[gl_VertexID % 6];
 
-  GridData grid = grids[grid_id];
+  GridData grid = grids_buf[grid_id];
 
-  ivec3 cell_coord = grid_cell_index_to_coordinate(interp.sample, grid.resolution);
+  ivec3 cell_coord = grid_cell_index_to_coordinate(interp.samp, grid.resolution);
 
-  interp.sample += grid.offset;
+  interp.samp += grid.offset;
 
   mat4 cell_to_world = mat4(vec4(grid.increment_x, 0.0),
                             vec4(grid.increment_y, 0.0),
                             vec4(grid.increment_z, 0.0),
                             vec4(grid.corner, 1.0));
 
-  vec3 quad = vec3(interp.coord * probes_info.grids.display_size * 0.5, 0.0);
+  vec3 quad = vec3(interp.coord * probes_buf.grids_info.display_size * 0.5, 0.0);
 
   interp.P = transform_point(cell_to_world, vec3(cell_coord));
   interp.P += transform_direction(ViewMatrixInverse, quad);

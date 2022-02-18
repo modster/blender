@@ -2,7 +2,6 @@
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_ltc_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 /* ---------------------------------------------------------------------- */
 /** \name Light Functions
@@ -73,9 +72,9 @@ float light_attenuation(LightData ld, vec3 L, float dist)
 
 /* Cheaper alternative than evaluating the LTC.
  * The result needs to be multiplied by BSDF or Phase Function. */
-float light_point_light(LightData ld, vec3 L, float dist)
+float light_point_light(LightData ld, const bool is_directional, vec3 L, float dist)
 {
-  if (ld.type == LIGHT_SUN) {
+  if (is_directional) {
     return 1.0;
   }
   /**
@@ -95,9 +94,15 @@ float light_point_light(LightData ld, vec3 L, float dist)
   return power;
 }
 
-float light_diffuse(sampler2DArray utility_tx, LightData ld, vec3 N, vec3 V, vec3 L, float dist)
+float light_diffuse(sampler2DArray utility_tx,
+                    const bool is_directional,
+                    LightData ld,
+                    vec3 N,
+                    vec3 V,
+                    vec3 L,
+                    float dist)
 {
-  if (!is_area_light(ld.type)) {
+  if (is_directional || !is_area_light(ld.type)) {
     float radius = ld._radius / dist;
     return ltc_evaluate_disk_simple(utility_tx, radius, dot(N, L));
   }
@@ -129,10 +134,35 @@ float light_diffuse(sampler2DArray utility_tx, LightData ld, vec3 N, vec3 V, vec
   }
 }
 
-float light_ltc(
-    sampler2DArray utility_tx, LightData ld, vec3 N, vec3 V, vec3 L, float dist, vec4 ltc_mat)
+float light_ltc(sampler2DArray utility_tx,
+                const bool is_directional,
+                LightData ld,
+                vec3 N,
+                vec3 V,
+                vec3 L,
+                float dist,
+                vec4 ltc_mat)
 {
-  if (ld.type == LIGHT_RECT) {
+  if (is_directional || ld.type != LIGHT_RECT) {
+    vec3 Px = ld._right;
+    vec3 Py = ld._up;
+
+    if (is_directional || !is_area_light(ld.type)) {
+      make_orthonormal_basis(L, Px, Py);
+    }
+
+    vec3 points[3];
+    points[0] = Px * -ld._area_size_x + Py * -ld._area_size_y;
+    points[1] = Px * ld._area_size_x + Py * -ld._area_size_y;
+    points[2] = -points[0];
+
+    points[0] += L * dist;
+    points[1] += L * dist;
+    points[2] += L * dist;
+
+    return ltc_evaluate_disk(utility_tx, N, V, ltc_matrix(ltc_mat), points);
+  }
+  else {
     vec3 corners[4];
     corners[0] = ld._right * ld._area_size_x + ld._up * -ld._area_size_y;
     corners[1] = ld._right * ld._area_size_x + ld._up * ld._area_size_y;
@@ -148,28 +178,10 @@ float light_ltc(
 
     return ltc_evaluate_quad(utility_tx, corners, vec3(0.0, 0.0, 1.0));
   }
-  else {
-    vec3 Px = ld._right;
-    vec3 Py = ld._up;
-
-    if (!is_area_light(ld.type)) {
-      make_orthonormal_basis(L, Px, Py);
-    }
-
-    vec3 points[3];
-    points[0] = Px * -ld._area_size_x + Py * -ld._area_size_y;
-    points[1] = Px * ld._area_size_x + Py * -ld._area_size_y;
-    points[2] = -points[0];
-
-    points[0] += L * dist;
-    points[1] += L * dist;
-    points[2] += L * dist;
-
-    return ltc_evaluate_disk(utility_tx, N, V, ltc_matrix(ltc_mat), points);
-  }
 }
 
 vec3 light_translucent(sampler1D transmittance_tx,
+                       const bool is_directional,
                        LightData ld,
                        vec3 N,
                        vec3 L,
@@ -180,7 +192,7 @@ vec3 light_translucent(sampler1D transmittance_tx,
   /* TODO(fclem): We should compute the power at the entry point. */
   /* NOTE(fclem): we compute the light attenuation using the light vector but the transmittance
    * using the shadow depth delta. */
-  float power = light_point_light(ld, L, dist);
+  float power = light_point_light(ld, is_directional, L, dist);
   /* Do not add more energy on front faces. Also apply lambertian BSDF. */
   power *= max(0.0, dot(-N, L)) * M_1_PI;
 

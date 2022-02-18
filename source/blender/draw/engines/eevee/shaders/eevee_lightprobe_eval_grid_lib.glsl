@@ -1,20 +1,13 @@
 
 /**
- * This is an eval function that needs to be added after main fragment shader.
- * A prototype needs to be declared before main in order to use it.
- *
  * The resources expected to be defined are:
- * - probes_info
+ * - probes_buf
  * - lightprobe_grid_tx
  * - grids
- *
- * All of this is needed to avoid using macros and performance issues with large
- * arrays as function arguments.
  */
 
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_irradiance_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 float lightprobe_grid_weight(GridData grid, vec3 P)
 {
@@ -93,13 +86,14 @@ vec3 lightprobe_grid_eval(vec3 P, vec3 N, float random_threshold)
   /* Go through all grids, computing and adding their weights for this pixel
    * until reaching a random threshold. */
   float weight = 0.0;
-  int grid_index = probes_info.grids.grid_count - 1;
+  int grid_index = probes_buf.grids_info.grid_count - 1;
   for (; grid_index > 0; grid_index--) {
-    weight += lightprobe_grid_weight(grids[grid_index], P);
+    weight += lightprobe_grid_weight(grids_buf[grid_index], P);
     if (weight >= random_threshold) {
       break;
     }
   }
 
-  return lightprobe_grid_evaluate(probes_info.grids, lightprobe_grid_tx, grids[grid_index], P, N);
+  return lightprobe_grid_evaluate(
+      probes_buf.grids_info, lightprobe_grid_tx, grids_buf[grid_index], P, N);
 }

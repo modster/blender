@@ -204,6 +204,38 @@ void curves_vector_mixed(float factor,
   result = mix(vector, result, factor);
 }
 
+void curves_float(float value,
+                  sampler1DArray curve_map,
+                  const float layer,
+                  float range_minimum,
+                  float range_divider,
+                  float start_slope,
+                  float end_slope,
+                  out float result)
+{
+  /* Evaluate the normalized value on the first curve map. */
+  float parameter = NORMALIZE_PARAMETER(value, range_minimum, range_divider);
+  result = texture(curve_map, vec2(parameter, layer)).x;
+
+  /* Then, extrapolate if needed. */
+  result = extrapolate_if_needed(parameter, result, start_slope, end_slope);
+}
+
+void curves_float_mixed(float factor,
+                        float value,
+                        sampler1DArray curve_map,
+                        const float layer,
+                        float range_minimum,
+                        float range_divider,
+                        float start_slope,
+                        float end_slope,
+                        out float result)
+{
+  curves_float(
+      value, curve_map, layer, range_minimum, range_divider, start_slope, end_slope, result);
+  result = mix(value, result, factor);
+}
+
 void curves_time(sampler1DArray curve_map,
                  float layer,
                  float range_minimum,

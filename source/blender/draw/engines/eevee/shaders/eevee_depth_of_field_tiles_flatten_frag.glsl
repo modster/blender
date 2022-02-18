@@ -14,11 +14,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
-uniform sampler2D coc_tx;
-
-layout(location = 0) out vec4 out_tile_fg;
-layout(location = 1) out vec3 out_tile_bg;
-
 const int halfres_tile_divisor = DOF_TILE_DIVISOR / 2;
 
 void main()

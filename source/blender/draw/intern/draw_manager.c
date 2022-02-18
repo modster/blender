@@ -829,7 +829,7 @@ static void drw_manager_init(DRWManager *dst, GPUViewport *viewport, const int s
   }
 
   if (G_draw.view_ubo == NULL) {
-    G_draw.view_ubo = GPU_uniformbuf_create_ex(sizeof(DRWViewUboStorage), NULL, "G_draw.view_ubo");
+    G_draw.view_ubo = GPU_uniformbuf_create_ex(sizeof(ViewInfos), NULL, "G_draw.view_ubo");
   }
 
   if (dst->draw_list == NULL) {
@@ -1886,7 +1886,7 @@ void DRW_draw_callbacks_post_scene(void)
      * Don't trust them! */
     DRW_state_reset();
 
-    /* needed so gizmo isn't obscured */
+    /* Needed so gizmo isn't occluded. */
     if ((v3d->gizmo_flag & V3D_GIZMO_HIDE) == 0) {
       GPU_depth_test(GPU_DEPTH_NONE);
       DRW_draw_gizmo_3d();

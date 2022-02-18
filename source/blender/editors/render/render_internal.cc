@@ -90,7 +90,7 @@ struct RenderJob {
   Scene *scene;
   ViewLayer *single_layer;
   Scene *current_scene;
-  /* TODO(sergey): Should not be needed once engine will have own
+  /* TODO(sergey): Should not be needed once engine will have its own
    * depsgraph and copy-on-write will be implemented.
    */
   Depsgraph *depsgraph;
@@ -616,8 +616,14 @@ static void image_rect_update(void *rjv, RenderResult *rr, volatile rcti *renrec
         ED_draw_imbuf_method(ibuf) != IMAGE_DRAW_METHOD_GLSL) {
       image_buffer_rect_update(rj, rr, ibuf, &rj->iuser, &tile_rect, offset_x, offset_y, viewname);
     }
-    BKE_image_update_gputexture_delayed(
-        ima, ibuf, offset_x, offset_y, BLI_rcti_size_x(&tile_rect), BLI_rcti_size_y(&tile_rect));
+    ImageTile *image_tile = BKE_image_get_tile(ima, 0);
+    BKE_image_update_gputexture_delayed(ima,
+                                        image_tile,
+                                        ibuf,
+                                        offset_x,
+                                        offset_y,
+                                        BLI_rcti_size_x(&tile_rect),
+                                        BLI_rcti_size_y(&tile_rect));
 
     /* make jobs timer to send notifier */
     *(rj->do_update) = true;
@@ -975,7 +981,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, const wmEvent *even
   rj->scene = scene;
   rj->current_scene = rj->scene;
   rj->single_layer = single_layer;
-  /* TODO(sergey): Render engine should be using own depsgraph.
+  /* TODO(sergey): Render engine should be using its own depsgraph.
    *
    * NOTE: Currently is only used by ED_update_for_newframe() at the end of the render, so no
    * need to ensure evaluation here. */
