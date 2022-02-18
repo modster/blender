@@ -4,6 +4,7 @@
  * See eShadowDebug for more information.
  */
 
+#pragma BLENDER_REQUIRE(common_debug_print_lib.glsl)
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
@@ -34,37 +35,19 @@ vec3 debug_tile_state_color(ShadowTileData tile)
   if (tile.do_update && tile.is_used && tile.is_visible) {
     return vec3(1, 0, 0);
   }
-  else if (tile.is_used && tile.is_visible) {
+  if (tile.is_used && tile.is_visible) {
     return vec3(0, 1, 0);
   }
-  else if (tile.is_visible) {
+  if (tile.is_visible) {
     return vec3(0, 0.2, 0.8);
   }
-  return vec3(0);
-}
-
-bool debug_tilemap()
-{
-  ivec2 tile = ivec2(gl_FragCoord.xy / pixel_scale);
-  int tilemap_lod = tile.y / (SHADOW_TILEMAP_RES + 2);
-  int tilemap_index = tile.x / (SHADOW_TILEMAP_RES + 2);
-  tile = (tile % (SHADOW_TILEMAP_RES + 2)) - 1;
-  tilemap_index += debug.shadow.tilemap_index;
-  int tilemap_lod_max = (debug.light.type != LIGHT_SUN) ? SHADOW_TILEMAP_LOD : 0;
-
-  if ((tilemap_index >= debug.shadow.tilemap_index) &&
-      (tilemap_index <= debug.shadow.tilemap_last) && (tilemap_lod >= 0) &&
-      (tilemap_lod <= tilemap_lod_max) &&
-      in_range_inclusive(tile, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
-    tile >>= tilemap_lod;
-    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, tilemap_lod, tilemap_index);
-    /* Write depth to overlap overlays. */
-    gl_FragDepth = 0.0;
-    out_color_add = vec4(debug_tile_state_color(tile_data), 0);
-    out_color_mul = vec4(0);
-    return true;
+  if (tile.is_cached && tile.do_update) {
+    return vec3(1, 0, 1);
   }
-  return false;
+  if (tile.is_cached) {
+    return vec3(0.2, 0, 0.5);
+  }
+  return vec3(0);
 }
 
 bool debug_tilemap_point_is_inside(vec3 P, int tilemap_index)
@@ -103,15 +86,55 @@ int debug_punctual_tilemap_index(vec3 P)
   return -1;
 }
 
-void debug_pages(vec3 P)
+bool debug_tile_index_from_position(vec3 P, out ivec4 index)
 {
   int tilemap_index = (debug.light.type == LIGHT_SUN) ? debug_directional_tilemap_index(P) :
                                                         debug_punctual_tilemap_index(P);
   if (tilemap_index != -1) {
     int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
     vec3 clipP = project_point(tilemaps_buf[tilemap_data_index].tilemat, P);
-    ivec2 tile = ivec2(clipP.xy);
-    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, 0, tilemap_index);
+    ivec2 tile_co = ivec2(clipP.xy);
+    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile_co, 0, tilemap_index);
+    index = ivec4(tile_co, tilemap_index, tile_data.lod);
+    return true;
+  }
+  index = ivec4(-1);
+  return false;
+}
+
+bool debug_tilemap(ivec4 mouse_tile)
+{
+  ivec2 tile = ivec2(gl_FragCoord.xy / pixel_scale);
+  int tilemap_lod = tile.y / (SHADOW_TILEMAP_RES + 2);
+  int tilemap_index = tile.x / (SHADOW_TILEMAP_RES + 2);
+  tile = (tile % (SHADOW_TILEMAP_RES + 2)) - 1;
+  tilemap_index += debug.shadow.tilemap_index;
+  int tilemap_lod_max = (debug.light.type != LIGHT_SUN) ? SHADOW_TILEMAP_LOD : 0;
+
+  if ((tilemap_index >= debug.shadow.tilemap_index) &&
+      (tilemap_index <= debug.shadow.tilemap_last) && (tilemap_lod >= 0) &&
+      (tilemap_lod <= tilemap_lod_max) &&
+      in_range_inclusive(tile, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
+    tile >>= tilemap_lod;
+    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, tilemap_lod, tilemap_index);
+    /* Write depth to overlap overlays. */
+    gl_FragDepth = 0.0;
+    out_color_add = vec4(debug_tile_state_color(tile_data), 0);
+    out_color_mul = vec4(0);
+    if (ivec4(mouse_tile.xy >> mouse_tile.w, mouse_tile.z, mouse_tile.w) ==
+        ivec4(tile, tilemap_index, tilemap_lod)) {
+      out_color_add = out_color_add * 0.8 + 0.2;
+    }
+    return true;
+  }
+  return false;
+}
+
+void debug_pages(vec3 P)
+{
+  ivec4 tile;
+  if (debug_tile_index_from_position(P, tile)) {
+    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile.xy >> tile.w, tile.w, tile.z);
     vec3 color = debug_random_color(ivec2(tile_data.page));
     out_color_add = vec4(color * 0.5, 0);
     out_color_mul = out_color_add * 0.5 + 0.5;
@@ -137,18 +160,17 @@ void debug_lod(vec3 P)
   }
 }
 
-void debug_tile_state(vec3 P)
+void debug_tile_state(vec3 P, ivec4 mouse_tile)
 {
-  int tilemap_index = (debug.light.type == LIGHT_SUN) ? debug_directional_tilemap_index(P) :
-                                                        debug_punctual_tilemap_index(P);
-  if (tilemap_index != -1) {
-    int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
-    vec3 clipP = project_point(tilemaps_buf[tilemap_data_index].tilemat, P);
-    ivec2 tile = ivec2(clipP.xy);
-    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, 0, tilemap_index);
+  ivec4 tile;
+  if (debug_tile_index_from_position(P, tile)) {
+    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile.xy >> tile.w, tile.w, tile.z);
     vec3 color = debug_tile_state_color(tile_data);
     out_color_add = vec4(color * 0.5, 0);
     out_color_mul = out_color_add * 0.5 + 0.5;
+    if (ivec4(mouse_tile.xy >> mouse_tile.w, mouse_tile.z, mouse_tile.w) == tile) {
+      out_color_add = out_color_add * 0.8 + 0.2;
+    }
   }
   else {
     out_color_add = vec4(0.0);
@@ -163,11 +185,14 @@ void debug_page_allocation(void)
   if (in_range_inclusive(page, ivec2(0), textureSize(debug_page_tx, 0).xy - 1)) {
     uint page = texelFetch(debug_page_tx, page, 0).x;
 
+    /* Each page should be referenced only once. */
     bool error = (page & 0xFFFFu) != 1u;
     bool is_cached = (page & SHADOW_PAGE_IS_CACHED) != 0u;
     bool is_needed = (page & SHADOW_PAGE_IS_NEEDED) != 0u;
     bool in_heap = (page & SHADOW_PAGE_IN_FREE_HEAP) != 0u;
+    /* If the tile is marked as cached, it must be referenced in the free heap. */
     error = error || (is_cached && !in_heap);
+    /* After page_free pass the needed tiles should not be marked as cached anymore. */
     error = error || (is_needed && is_cached);
 
     vec3 col = vec3(error, is_cached, is_needed);
@@ -202,11 +227,11 @@ void debug_shadow_depth(vec3 P)
   vec3 lP = transform_point(debug.shadow.mat, P);
   float depth;
   if (debug.light.type == LIGHT_SUN) {
-    shadow_directional_depth_get(
+    depth = shadow_directional_depth_get(
         atlas_tx, tilemaps_tx, debug.light, debug.shadow, debug.camera_position, lP, P);
   }
   else {
-    shadow_punctual_depth_get(atlas_tx, tilemaps_tx, debug.light, debug.shadow, lL);
+    depth = shadow_punctual_depth_get(atlas_tx, tilemaps_tx, debug.light, debug.shadow, lL);
   }
   out_color_add = vec4(vec3(depth), 0);
   out_color_mul = vec4(0);
@@ -229,7 +254,29 @@ void main()
     return;
   }
 
-  if (debug_tilemap()) {
+  float mouse_depth = texelFetch(depth_tx, drw_view.mouse_pixel, 0).r;
+  vec3 mouse_P = get_world_space_from_depth(
+      vec2(drw_view.mouse_pixel) / vec2(textureSize(depth_tx, 0)), mouse_depth);
+  ivec4 mouse_tile;
+  debug_tile_index_from_position(mouse_P, mouse_tile);
+
+  if (IS_DEBUG_MOUSE_FRAGMENT && mouse_tile.z != -1) {
+    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, mouse_tile.xy, 0, mouse_tile.z);
+    print(tile_data.lod);
+    if (tile_data.lod != 0) {
+      tile_data = shadow_tile_load(
+          tilemaps_tx, mouse_tile.xy >> mouse_tile.w, mouse_tile.w, mouse_tile.z);
+    }
+    print(tile_data.page);
+    print(tile_data.free_page_owner_index);
+    print(tile_data.is_visible);
+    print(tile_data.is_used);
+    print(tile_data.is_allocated);
+    print(tile_data.do_update);
+    print(tile_data.is_cached);
+  }
+
+  if (debug_tilemap(mouse_tile)) {
     return;
   }
 
@@ -241,7 +288,7 @@ void main()
   if (depth != 1.0) {
     switch (debug.type) {
       case SHADOW_DEBUG_TILEMAPS:
-        debug_tile_state(P);
+        debug_tile_state(P, mouse_tile);
         break;
       case SHADOW_DEBUG_PAGES:
         debug_pages(P);

@@ -162,7 +162,7 @@ GPU_SHADER_CREATE_INFO(eevee_shadow_data)
 GPU_SHADER_CREATE_INFO(eevee_shadow_page_debug)
     .do_static_compilation(true)
     .local_group_size(8, 8)
-    .additional_info("eevee_shared")
+    .additional_info("eevee_shared", "draw_view", "draw_debug_print")
     .storage_buf(1, Qualifier::READ, "uint", "pages_free_buf[]")
     .image(0, GPU_R32UI, Qualifier::READ_WRITE, ImageType::UINT_2D, "tilemaps_img")
     .image(1, GPU_R32UI, Qualifier::READ_WRITE, ImageType::UINT_2D, "debug_img")
@@ -180,6 +180,6 @@ GPU_SHADER_CREATE_INFO(eevee_shadow_debug)
     .fragment_out(0, Type::VEC4, "out_color_add", DualBlend::SRC_0)
     .fragment_out(0, Type::VEC4, "out_color_mul", DualBlend::SRC_1)
     .fragment_source("eevee_shadow_debug_frag.glsl")
-    .additional_info("draw_fullscreen");
+    .additional_info("draw_fullscreen", "draw_debug_print");
 
 /** \} */
