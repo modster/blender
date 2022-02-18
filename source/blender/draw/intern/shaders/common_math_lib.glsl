@@ -67,12 +67,12 @@ mat2 rot2_from_angle(float a)
 #define avg9(a, b, c, d, e, f, g, h, i) (a + b + c + d + e + f + g + h + i) * (1.0 / 9.0)
 
 /* clang-format off */
-float min_v2(vec2 v) { return min(v.x, v.y); }
-float min_v3(vec3 v) { return min(v.x, min(v.y, v.z)); }
-float min_v4(vec4 v) { return min(min(v.x, v.y), min(v.z, v.w)); }
-float max_v2(vec2 v) { return max(v.x, v.y); }
-float max_v3(vec3 v) { return max(v.x, max(v.y, v.z)); }
-float max_v4(vec4 v) { return max(max(v.x, v.y), max(v.z, v.w)); }
+#define min_v2(v) min((v).x, (v).y)
+#define min_v3(v) min((v).x, min((v).y, (v).z))
+#define min_v4(v) min(min((v).x, (v).y), min((v).z, (v).w))
+#define max_v2(v) max((v).x, (v).y)
+#define max_v3(v) max((v).x, max((v).y, (v).z))
+#define max_v4(v) max(max((v).x, (v).y), max((v).z, (v).w))
 
 float sum(vec2 v) { return dot(vec2(1.0), v); }
 float sum(vec3 v) { return dot(vec3(1.0), v); }

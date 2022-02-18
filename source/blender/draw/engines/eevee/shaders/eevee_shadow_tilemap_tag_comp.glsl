@@ -5,16 +5,6 @@
  * Some entities may need to tag certain shadow pages to be updated or needed.
  */
 
-/**
- * TODO(fclem) : Future plans. Do not rely on rasterization and use a single compute shader for
- * both visibility and usage. Une one thread group per tilemap and each thread compute one AABB.
- * Use groupshared memory to hold a bitmap of the result. Each thread "rasterize" onto the bitmap
- * using atomicOr. Iterate through all AABBs using this threagroup and can early out if all tiles
- * are tagged. Could even compute AABB of each batch of 64 to skip an entire batch.
- *
- * This would avoid relying on arbitrary point size support and be more performant.
- */
-
 #pragma BLENDER_REQUIRE(common_intersection_lib.glsl)
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
@@ -138,8 +128,8 @@ void main()
       else {
         /* Reject false positive when box is on the side of the frustum but fail other tests. */
         /* AABB of the entire light is enough for this case. */
-        AABB aabb_light = AABB(frustum.corners[0] - vec3(tilemap._punctual_distance),
-                               frustum.corners[0] + vec3(tilemap._punctual_distance));
+        AABB aabb_light = AABB(frustum.corners[0] - vec3(tilemap._punctual_far),
+                               frustum.corners[0] + vec3(tilemap._punctual_far));
         if (!intersect(aabb, aabb_light)) {
           continue;
         }

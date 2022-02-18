@@ -38,10 +38,10 @@ void main()
     }
 
     if (is_intersecting) {
-      /* Test minimum receiver distance and compute min and max visible LOD.  */
-      float len;
+      /* Test min/max receiver distance and compute min and max visible LOD.  */
+      float len_min, len_max = tilemap._punctual_near;
       vec3 tile_center = (shape.corners[1] + shape.corners[3]) * 0.5;
-      vec3 tile_center_dir = normalize_len(tile_center - shape.corners[0], len);
+      vec3 tile_center_dir = normalize_len(tile_center - shape.corners[0], len_min);
       /* Project the tile center to the frustum and compare the shadow texel density at this
        * position since this is where the density ratio will be the lowest (meanning the highest
        * LOD). NOTE: There is some inacuracy because we only project one point instead of
@@ -51,17 +51,24 @@ void main()
         float d = line_plane_intersect_dist(
             shape.corners[0], tile_center_dir, drw_view.frustum_planes[p]);
         if (d > 0.0 && facing > 0.0) {
-          len = min(d, len);
+          len_min = min(d, len_min);
+        }
+        if (d > 0.0 && facing < 0.0) {
+          len_max = max(d, len_max);
         }
       }
-      vec3 nearest_receiver = shape.corners[0] + tile_center_dir * len;
+      vec3 nearest_receiver = shape.corners[0] + tile_center_dir * len_min;
+      vec3 farthest_receiver = shape.corners[0] + tile_center_dir * len_max;
       /* How much a shadow map pixel covers a final image pixel. */
-      float footprint_ratio = len * (tilemap_pixel_radius * screen_pixel_radius_inv);
+      vec2 footprint_ratio = vec2(len_min, len_max) *
+                             (tilemap_pixel_radius * screen_pixel_radius_inv);
+      float footprint_ratio_max = len_max * (tilemap_pixel_radius * screen_pixel_radius_inv);
       /* Project the radius to the screen. 1 unit away from the camera the same way
        * pixel_world_radius_inv was computed. Not needed in orthographic mode. */
       bool is_persp = (ProjectionMatrix[3][3] == 0.0);
       if (is_persp) {
-        footprint_ratio /= distance(nearest_receiver, cameraPos);
+        footprint_ratio /= vec2(distance(nearest_receiver, cameraPos),
+                                distance(farthest_receiver, cameraPos));
       }
 
 #if 0 /* DEBUG */
@@ -70,18 +77,17 @@ void main()
         vec4 yellow = vec4(1, 1, 0, 1);
         vec4 red = vec4(1, 0, 0, 1);
         float dist_fac = (is_persp) ? distance(nearest_receiver, cameraPos) : 1.0;
-        drw_debug_point(nearest_receiver, 128.0 * dist_fac / screen_pixel_radius_inv, green);
-        drw_debug_point(shape.corners[0] + tile_center_dir, tilemap_pixel_radius * 128.0, red);
-        drw_debug_point(nearest_receiver, len * tilemap_pixel_radius * 128.0, yellow);
+        drw_debug_point(nearest_receiver, 16.0 * dist_fac / screen_pixel_radius_inv, green);
+        drw_debug_point(shape.corners[0] + tile_center_dir, tilemap_pixel_radius * 16.0, red);
+        drw_debug_point(nearest_receiver, len_min * tilemap_pixel_radius * 16.0, yellow);
+        drw_debug_point(farthest_receiver, len_max * tilemap_pixel_radius * 16.0, yellow);
       }
 #endif
 
-      lod_visible_min = int(ceil(-log2(footprint_ratio)));
-      /* FIXME(fclem): This should be computed using the farthest intersection with the view.  */
-      lod_visible_max = SHADOW_TILEMAP_LOD;
+      ivec2 lod_visible = clamp(ivec2(ceil(-log2(footprint_ratio))), 0, SHADOW_TILEMAP_LOD);
+      lod_visible_min = min_v2(lod_visible);
+      lod_visible_max = max_v2(lod_visible);
 
-      lod_visible_max = clamp(lod_visible_max, 0, SHADOW_TILEMAP_LOD);
-      lod_visible_min = clamp(lod_visible_min, 0, SHADOW_TILEMAP_LOD);
     }
 
     /* Number of lod0 tiles covered by the current lod level (in one dimension). */

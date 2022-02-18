@@ -135,7 +135,8 @@ void ShadowTileMap::sync_cubeface(
   /* Need to be after the corners arithmetic because they are stored inside the last component. */
   _min_usage_depth = -1.0f;
   _max_usage_depth = 1.0f;
-  _punctual_distance = far_;
+  _punctual_far = far_;
+  _punctual_near = near_;
 }
 
 float4x4 ShadowTileMap::winmat_get(const rcti *tile_minmax) const

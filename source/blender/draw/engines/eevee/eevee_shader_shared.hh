@@ -435,7 +435,7 @@ BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
 /* Debug: Will freeze the camera used for shadow tagging if G.debug_value is >= 4. */
 // #define SHADOW_DEBUG_FREEZE_CAMERA
 
-#if defined(SHADOW_DEBUG_FREEZE_CAMERA) && defined(SHADOW_DEBUG_NO_DEPTH_SCAN)
+#if defined(SHADOW_DEBUG_FREEZE_CAMERA) && !defined(SHADOW_DEBUG_NO_DEPTH_SCAN)
 #  error Freeze camera debug option is incompatible with depth scanning.
 #endif
 
@@ -457,7 +457,8 @@ struct ShadowTileMapData {
   /** NDC depths to clip usage bbox. */
 #define _max_usage_depth corners[0].w
 #define _min_usage_depth corners[1].w
-#define _punctual_distance corners[2].w
+#define _punctual_far corners[2].w
+#define _punctual_near corners[3].w
   /** Shift to apply to the tile grid in the setup phase. */
   int2 grid_shift;
   /** True for punctual lights. */
