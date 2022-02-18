@@ -105,8 +105,13 @@ void TexturePool::release(GPUTexture *texture)
  * Context.
  */
 
-Context::Context(TexturePool &texture_pool) : texture_pool(texture_pool)
+Context::Context(TexturePool &texture_pool) : texture_pool_(texture_pool)
 {
+}
+
+TexturePool &Context::texture_pool()
+{
+  return texture_pool_;
 }
 
 /* --------------------------------------------------------------------
@@ -171,13 +176,18 @@ const Result &Operation::get_input(StringRef identifier) const
 void Operation::release_inputs()
 {
   for (Result *result : inputs_to_results_map_.values()) {
-    result->release(context_.texture_pool);
+    result->release(texture_pool());
   }
 }
 
 Context &Operation::context()
 {
   return context_;
+}
+
+TexturePool &Operation::texture_pool()
+{
+  return context_.texture_pool();
 }
 
 /* --------------------------------------------------------------------
@@ -203,6 +213,11 @@ bool NodeOperation::is_output_needed(StringRef identifier) const
     return false;
   }
   return true;
+}
+
+const bNode &NodeOperation::node() const
+{
+  return *node_->bnode();
 }
 
 /* --------------------------------------------------------------------

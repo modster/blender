@@ -282,32 +282,33 @@ set(GLSL_SRC
   shaders/common/gpu_shader_common_mix_rgb.glsl
   shaders/common/gpu_shader_common_hash.glsl
   
-  shaders/composite/gpu_shader_composite_alpha_over.glsl
-  shaders/composite/gpu_shader_composite_box_mask.glsl
-  shaders/composite/gpu_shader_composite_bright_contrast.glsl
-  shaders/composite/gpu_shader_composite_channel_matte.glsl
-  shaders/composite/gpu_shader_composite_chroma_matte.glsl
-  shaders/composite/gpu_shader_composite_color_balance.glsl
-  shaders/composite/gpu_shader_composite_color_correction.glsl
-  shaders/composite/gpu_shader_composite_color_matte.glsl
-  shaders/composite/gpu_shader_composite_color_spill.glsl
-  shaders/composite/gpu_shader_composite_color_to_luminance.glsl
-  shaders/composite/gpu_shader_composite_difference_matte.glsl
-  shaders/composite/gpu_shader_composite_distance_matte.glsl
-  shaders/composite/gpu_shader_composite_ellipse_mask.glsl
-  shaders/composite/gpu_shader_composite_exposure.glsl
-  shaders/composite/gpu_shader_composite_gamma.glsl
-  shaders/composite/gpu_shader_composite_hue_correct.glsl
-  shaders/composite/gpu_shader_composite_hue_saturation_value.glsl
-  shaders/composite/gpu_shader_composite_image.glsl
-  shaders/composite/gpu_shader_composite_invert.glsl
-  shaders/composite/gpu_shader_composite_luminance_matte.glsl
-  shaders/composite/gpu_shader_composite_map_value.glsl
-  shaders/composite/gpu_shader_composite_normal.glsl
-  shaders/composite/gpu_shader_composite_posterize.glsl
-  shaders/composite/gpu_shader_composite_separate_combine.glsl
-  shaders/composite/gpu_shader_composite_set_alpha.glsl
-  shaders/composite/gpu_shader_composite_split_viewer.glsl
+  shaders/compositor/material/gpu_shader_compositor_alpha_over.glsl
+  shaders/compositor/material/gpu_shader_compositor_box_mask.glsl
+  shaders/compositor/material/gpu_shader_compositor_bright_contrast.glsl
+  shaders/compositor/material/gpu_shader_compositor_channel_matte.glsl
+  shaders/compositor/material/gpu_shader_compositor_chroma_matte.glsl
+  shaders/compositor/material/gpu_shader_compositor_color_balance.glsl
+  shaders/compositor/material/gpu_shader_compositor_color_correction.glsl
+  shaders/compositor/material/gpu_shader_compositor_color_matte.glsl
+  shaders/compositor/material/gpu_shader_compositor_color_spill.glsl
+  shaders/compositor/material/gpu_shader_compositor_color_to_luminance.glsl
+  shaders/compositor/material/gpu_shader_compositor_difference_matte.glsl
+  shaders/compositor/material/gpu_shader_compositor_distance_matte.glsl
+  shaders/compositor/material/gpu_shader_compositor_ellipse_mask.glsl
+  shaders/compositor/material/gpu_shader_compositor_exposure.glsl
+  shaders/compositor/material/gpu_shader_compositor_gamma.glsl
+  shaders/compositor/material/gpu_shader_compositor_hue_correct.glsl
+  shaders/compositor/material/gpu_shader_compositor_hue_saturation_value.glsl
+  shaders/compositor/material/gpu_shader_compositor_invert.glsl
+  shaders/compositor/material/gpu_shader_compositor_luminance_matte.glsl
+  shaders/compositor/material/gpu_shader_compositor_map_value.glsl
+  shaders/compositor/material/gpu_shader_compositor_normal.glsl
+  shaders/compositor/material/gpu_shader_compositor_posterize.glsl
+  shaders/compositor/material/gpu_shader_compositor_separate_combine.glsl
+  shaders/compositor/material/gpu_shader_compositor_set_alpha.glsl
+  shaders/compositor/material/gpu_shader_compositor_split_viewer.glsl
+
+  shaders/compositor/sampler2D_to_RGBA16F_2D_image.glsl
 
   shaders/material/gpu_shader_material_add_shader.glsl
   shaders/material/gpu_shader_material_ambient_occlusion.glsl
@@ -488,6 +489,8 @@ set(SHADER_CREATE_INFOS
   shaders/infos/gpu_shader_simple_lighting_info.hh
   shaders/infos/gpu_shader_text_info.hh
   shaders/infos/gpu_srgb_to_framebuffer_space_info.hh
+
+  shaders/compositor/infos/sampler2D_to_RGBA16F_2D_image_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")

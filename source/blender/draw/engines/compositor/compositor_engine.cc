@@ -20,6 +20,8 @@
 
 #include "DNA_scene_types.h"
 
+#include "DEG_depsgraph_query.h"
+
 #include "DRW_render.h"
 
 #include "IMB_colormanagement.h"
@@ -49,7 +51,8 @@ class DRWContext : public Context {
 
   GPUTexture *get_pass_texture(int view_layer, eScenePassType pass_type) override
   {
-    return DRW_render_pass_find(DRW_context_state_get()->scene, view_layer, pass_type)->pass_tx;
+    Scene *original_scene = (Scene *)DEG_get_original_id(&DRW_context_state_get()->scene->id);
+    return DRW_render_pass_find(original_scene, view_layer, pass_type)->pass_tx;
   }
 };
 

@@ -96,8 +96,9 @@ class TexturePool {
  * engine. The compositor engine should implement the class to provide the necessary
  * functionalities for node operations. */
 class Context {
- public:
-  TexturePool &texture_pool;
+ private:
+  /* A texture pool that can be used to allocate textures for the compositor efficiently. */
+  TexturePool &texture_pool_;
 
  public:
   Context(TexturePool &texture_pool);
@@ -108,6 +109,9 @@ class Context {
   /* Get the texture where the given render pass is stored. This should be called by the Render
    * Layer node to populate its outputs. */
   virtual GPUTexture *get_pass_texture(int view_layer, eScenePassType pass_type) = 0;
+
+  /* Get a reference to the texture pool of this context. */
+  TexturePool &texture_pool();
 };
 
 /* --------------------------------------------------------------------
@@ -215,7 +219,11 @@ class Operation {
    * by this operation. */
   void release_inputs();
 
+  /* Returns a reference to the compositor context. */
   Context &context();
+
+  /* Returns a reference to the texture pool of the compositor context. */
+  TexturePool &texture_pool();
 };
 
 /* --------------------------------------------------------------------
@@ -239,6 +247,8 @@ class NodeOperation : public Operation {
   /* Returns true if the output identified by the given identifier is needed and should be
    * computed, otherwise returns false. */
   bool is_output_needed(StringRef identifier) const;
+
+  const bNode &node() const;
 };
 
 /* --------------------------------------------------------------------

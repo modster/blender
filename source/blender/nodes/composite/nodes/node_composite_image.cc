@@ -28,6 +28,7 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_image.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_scene.h"
@@ -42,6 +43,12 @@
 
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "GPU_compute.h"
+#include "GPU_shader.h"
+#include "GPU_texture.h"
+
+#include "NOD_compositor_execute.hh"
 
 /* **************** IMAGE (and RenderResult, multilayer image) ******************** */
 
@@ -449,32 +456,59 @@ static void node_composit_copy_image(bNodeTree *UNUSED(dest_ntree),
   }
 }
 
-static int node_composit_gpu_image(GPUMaterial *mat,
-                                   bNode *node,
-                                   bNodeExecData *UNUSED(execdata),
-                                   GPUNodeStack *UNUSED(in),
-                                   GPUNodeStack *out)
-{
-  Image *ima = (Image *)node->id;
-  /* We get the image user from the original node, since GPU image keeps
-   * a pointer to it and the dependency refreshes the original. */
-  bNode *node_original = node->original ? node->original : node;
-  ImageUser *iuser = (ImageUser *)node_original->storage;
+using namespace blender::viewport_compositor;
 
-  if (out[0].hasoutput) {
-    if (ima) {
-      GPU_link(mat,
-               "node_composite_image",
-               GPU_image(mat, ima, iuser, GPU_SAMPLER_FILTER),
-               &out[0].link);
-    }
-    else {
-      GPU_link(mat, "node_composite_image_empty", &out[0].link);
-    }
+class ImageOperation : public NodeOperation {
+ public:
+  using NodeOperation::NodeOperation;
+
+  void initialize() override
+  {
+    GPUTexture *image_texture = get_image_texture();
+    const int width = GPU_texture_width(image_texture);
+    const int height = GPU_texture_height(image_texture);
+
+    Result result{ResultType::Color, true};
+    result.data.texture = texture_pool().acquire_color(width, height);
+    add_result("Image", result);
   }
-  /* TODO(fclem) other passes. */
 
-  return true;
+  void execute() override
+  {
+    GPUShader *shader = GPU_shader_create_from_info_name("sampler2D_to_RGBA16F_2D_image");
+    GPU_shader_bind(shader);
+
+    const int input_unit = GPU_shader_get_texture_binding(shader, "input_sampler");
+    GPUTexture *image_texture = get_image_texture();
+    GPU_texture_bind(image_texture, input_unit);
+
+    const Result &result = get_result("Image");
+    const int output_unit = GPU_shader_get_texture_binding(shader, "output_image");
+    GPU_texture_image_bind(result.data.texture, output_unit);
+
+    const int width = GPU_texture_width(image_texture);
+    const int height = GPU_texture_height(image_texture);
+    GPU_compute_dispatch(shader, width / 16 + 1, height / 16 + 1, 1);
+
+    GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
+
+    GPU_shader_unbind();
+    GPU_texture_unbind(image_texture);
+    GPU_texture_image_unbind(result.data.texture);
+    GPU_shader_free(shader);
+  }
+
+  GPUTexture *get_image_texture()
+  {
+    Image *image = (Image *)node().id;
+    ImageUser *image_user = (ImageUser *)node().storage;
+    return BKE_image_get_gpu_texture(image, image_user, nullptr);
+  }
+};
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new ImageOperation(context, node);
 }
 
 }  // namespace blender::nodes::node_composite_image_cc
@@ -490,8 +524,8 @@ void register_node_type_cmp_image()
   node_type_storage(
       &ntype, "ImageUser", file_ns::node_composit_free_image, file_ns::node_composit_copy_image);
   node_type_update(&ntype, file_ns::cmp_node_image_update);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
   ntype.labelfunc = node_image_label;
-  node_type_gpu(&ntype, file_ns::node_composit_gpu_image);
   ntype.flag |= NODE_PREVIEW;
 
   nodeRegisterType(&ntype);
@@ -514,7 +548,7 @@ const char *node_cmp_rlayers_sock_to_pass(int sock_index)
   return (STREQ(name, "Alpha")) ? RE_PASSNAME_COMBINED : name;
 }
 
-namespace blender::nodes::node_composite_image_cc {
+namespace blender::nodes::node_composite_render_layer_cc {
 
 static void node_composit_init_rlayers(const bContext *C, PointerRNA *ptr)
 {
@@ -597,31 +631,6 @@ static void cmp_node_rlayers_update(bNodeTree *ntree, bNode *node)
   cmp_node_update_default(ntree, node);
 }
 
-static int node_composit_gpu_rlayers(GPUMaterial *mat,
-                                     bNode *node,
-                                     bNodeExecData *UNUSED(execdata),
-                                     GPUNodeStack *UNUSED(in),
-                                     GPUNodeStack *out)
-{
-  Scene *scene = (Scene *)node->id;
-
-  if (out[0].hasoutput) {
-    if (scene) {
-      Scene *scene_orig = (Scene *)DEG_get_original_id(&scene->id);
-      GPU_link(mat,
-               "node_composite_rlayers",
-               GPU_render_pass(mat, scene_orig, node->custom1, SCE_PASS_COMBINED),
-               &out[0].link);
-    }
-    else {
-      GPU_link(mat, "node_composite_image_empty", &out[0].link);
-    }
-  }
-  /* TODO(fclem) other passes. */
-
-  return true;
-}
-
 static void node_composit_buts_viewlayers(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
   bNode *node = (bNode *)ptr->data;
@@ -665,11 +674,43 @@ static void node_composit_buts_viewlayers(uiLayout *layout, bContext *C, Pointer
   RNA_string_set(&op_ptr, "scene", scene_name);
 }
 
-}  // namespace blender::nodes::node_composite_image_cc
+using namespace blender::viewport_compositor;
+
+class RenderLayerOperation : public NodeOperation {
+ public:
+  using NodeOperation::NodeOperation;
+
+  void initialize() override
+  {
+    const int view_layer = node().custom1;
+    const GPUTexture *pass_texture = context().get_pass_texture(view_layer, SCE_PASS_COMBINED);
+    const int width = GPU_texture_width(pass_texture);
+    const int height = GPU_texture_height(pass_texture);
+
+    Result result{ResultType::Color, true};
+    result.data.texture = texture_pool().acquire_color(width, height);
+    add_result("Image", result);
+  }
+
+  void execute() override
+  {
+    const int view_layer = node().custom1;
+    GPUTexture *pass_texture = context().get_pass_texture(view_layer, SCE_PASS_COMBINED);
+    const Result &result = get_result("Image");
+    GPU_texture_copy(result.data.texture, pass_texture);
+  }
+};
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new RenderLayerOperation(context, node);
+}
+
+}  // namespace blender::nodes::node_composite_render_layer_cc
 
 void register_node_type_cmp_rlayers()
 {
-  namespace file_ns = blender::nodes::node_composite_image_cc;
+  namespace file_ns = blender::nodes::node_composite_render_layer_cc;
 
   static bNodeType ntype;
 
@@ -678,13 +719,13 @@ void register_node_type_cmp_rlayers()
   ntype.draw_buttons = file_ns::node_composit_buts_viewlayers;
   ntype.initfunc_api = file_ns::node_composit_init_rlayers;
   ntype.poll = file_ns::node_composit_poll_rlayers;
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
   ntype.flag |= NODE_PREVIEW;
   node_type_storage(
       &ntype, nullptr, file_ns::node_composit_free_rlayers, file_ns::node_composit_copy_rlayers);
   node_type_update(&ntype, file_ns::cmp_node_rlayers_update);
   node_type_init(&ntype, node_cmp_rlayers_outputs);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
-  node_type_gpu(&ntype, file_ns::node_composit_gpu_rlayers);
 
   nodeRegisterType(&ntype);
 }
