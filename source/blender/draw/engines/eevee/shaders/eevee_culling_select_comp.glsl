@@ -3,7 +3,6 @@
  * Select the visible items inside the active view and put them inside the sorting buffer.
  */
 
-#pragma BLENDER_REQUIRE(common_debug_lib.glsl)
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(common_intersection_lib.glsl)
