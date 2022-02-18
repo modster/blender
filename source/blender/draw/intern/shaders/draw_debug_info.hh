@@ -23,3 +23,16 @@ GPU_SHADER_CREATE_INFO(draw_debug_print_display)
     .additional_info("draw_view");
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Debug draw shapes
+ *
+ * Allows to draw lines and points just like the DRW_debug module functions.
+ * \{ */
+
+GPU_SHADER_CREATE_INFO(draw_debug_draw)
+    .define("DRW_DEBUG_DRAW")
+    .typedef_source("draw_shader_shared.h")
+    .storage_buf(15, Qualifier::READ_WRITE, "DebugVert", "drw_debug_verts[]", Frequency::PASS);
+
+/** \} */

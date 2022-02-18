@@ -2,10 +2,8 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 
-/** Require/include common_debug_lib.glsl before this file to debug draw intersections volumes. */
-
-#if defined(DEBUG_DRAW_ISECT) && !defined(DEBUG_DRAW)
-#  error "You must include common_debug_lib.glsl before this file to enabled debug draw"
+#if defined(DRW_DEBUG_DRAW_ISECT) && !defined(DRW_DEBUG_DRAW)
+#  error "Missing draw_debug_draw additional create info on shader create info"
 #endif
 
 /* ---------------------------------------------------------------------- */
@@ -96,8 +94,8 @@ bool intersect_view(Pyramid pyramid)
     }
   }
 
-#if defined(DEBUG_DRAW) && defined(DEBUG_DRAW_ISECT)
-  drw_debug(pyramid, intersects ? vec4(0, 1, 0, 1) : vec4(1, 0, 0, 1));
+#if defined(DRW_DEBUG_DRAW) && defined(DRW_DEBUG_DRAW_ISECT)
+  drw_debug(pyramid, vec4(0, 1, 0, 1));
 #endif
   return intersects;
 }
@@ -136,9 +134,9 @@ bool intersect_view(Box box)
     }
   }
 
-#if defined(DEBUG_DRAW) && defined(DEBUG_DRAW_ISECT)
+#if defined(DRW_DEBUG_DRAW) && defined(DRW_DEBUG_DRAW_ISECT)
   if (intersects) {
-    drw_debug(box, intersects ? vec4(0, 1, 0, 1) : vec4(1, 0, 0, 1));
+    drw_debug(box, vec4(0, 1, 0, 1));
   }
 #endif
   return intersects;
@@ -157,9 +155,9 @@ bool intersect_view(Sphere sph)
 
   /* TODO reject false positive. */
 
-#if defined(DEBUG_DRAW) && defined(DEBUG_DRAW_ISECT)
+#if defined(DRW_DEBUG_DRAW) && defined(DRW_DEBUG_DRAW_ISECT)
   if (intersects) {
-    drw_debug(sph, intersects ? vec4(0, 1, 0, 1) : vec4(1, 0, 0, 1));
+    drw_debug(sph, vec4(0, 1, 0, 1));
   }
 #endif
   return intersects;

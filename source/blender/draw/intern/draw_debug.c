@@ -161,7 +161,7 @@ GPUVertBuf *drw_debug_line_buffer_get()
   uint(*data)[4] = GPU_vertbuf_get_data(buf->verts);
   /* Set vertex count to 1 to skip the first 2 degenerate verts.
    * This is because the first one is already being aliased in the shader definition. */
-  data[0][3] = 1;
+  data[0][3] = 2;
   /* Fill positions to NaN to avoid rendering unused verts. */
   /* TODO(fclem): This could be done on GPU if that becomes a bottleneck. */
   float(*fdata)[4] = (float(*)[4])data;

@@ -153,7 +153,7 @@ struct Pyramid {
   vec3 corners[5];
 };
 
-#if defined(DEBUG_DRAW)
+#if defined(DRW_DEBUG_DRAW)
 
 void drw_debug(Box shape, vec4 color)
 {
@@ -234,7 +234,7 @@ Box to_box(AABB aabb)
   return box;
 }
 
-#if defined(DEBUG_DRAW)
+#if defined(DRW_DEBUG_DRAW)
 
 void drw_debug(AABB shape, vec4 color)
 {

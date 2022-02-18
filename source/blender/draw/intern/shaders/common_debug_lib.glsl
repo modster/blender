@@ -5,26 +5,14 @@
  * Quick way to draw debug geometry. All input should be in world space and
  * will be rendered in the default view. No additional setup required.
  **/
-#define DEBUG_DRAW
+#ifndef DRW_DEBUG_DRAW
+#  error "Missing draw_debug_draw additional create info on shader create info"
+#endif
 
 /* Keep in sync with buffer creation. */
 #define DEBUG_VERT_MAX 16 * 4096
 
-struct DebugVert {
-  vec3 pos;
-  uint color;
-};
-
-layout(std430, binding = 7) restrict buffer debugBuf
-{
-  /** Start the buffer with a degenerate vertice. */
-  uint _pad0;
-  uint _pad1;
-  uint _pad2;
-  uint v_count;
-  DebugVert verts[];
-}
-drw_debug_verts;
+#define drw_debug_v_count drw_debug_verts[0].color
 
 bool drw_debug_draw_enable = true;
 
@@ -41,8 +29,8 @@ uint drw_debug_color_pack(vec4 color)
 
 void drw_debug_line_do(inout uint vertid, vec3 v1, vec3 v2, uint color)
 {
-  drw_debug_verts.verts[vertid++] = DebugVert(v1, color);
-  drw_debug_verts.verts[vertid++] = DebugVert(v2, color);
+  drw_debug_verts[vertid++] = DebugVert(v1, color);
+  drw_debug_verts[vertid++] = DebugVert(v2, color);
 }
 
 void drw_debug_line(vec3 v1, vec3 v2, vec4 color)
@@ -51,7 +39,7 @@ void drw_debug_line(vec3 v1, vec3 v2, vec4 color)
     return;
   }
   const uint vneeded = 2;
-  uint vertid = atomicAdd(drw_debug_verts.v_count, vneeded);
+  uint vertid = atomicAdd(drw_debug_v_count, vneeded);
   if (vertid + vneeded < DEBUG_VERT_MAX + 1) {
     drw_debug_line_do(vertid, v1, v2, drw_debug_color_pack(color));
   }
@@ -63,7 +51,7 @@ void drw_debug_quad(vec3 v1, vec3 v2, vec3 v3, vec3 v4, vec4 color)
     return;
   }
   const uint vneeded = 8;
-  uint vertid = atomicAdd(drw_debug_verts.v_count, vneeded);
+  uint vertid = atomicAdd(drw_debug_v_count, vneeded);
   if (vertid + vneeded < DEBUG_VERT_MAX + 1) {
     uint pcolor = drw_debug_color_pack(color);
     drw_debug_line_do(vertid, v1, v2, pcolor);
@@ -88,7 +76,7 @@ void drw_debug_point(vec3 p, float radius, vec4 color)
   vec3 v6 = p + c.zzy;
 
   const uint vneeded = 12 * 2;
-  uint vertid = atomicAdd(drw_debug_verts.v_count, vneeded);
+  uint vertid = atomicAdd(drw_debug_v_count, vneeded);
   if (vertid + vneeded < DEBUG_VERT_MAX + 1) {
     uint pcolor = drw_debug_color_pack(color);
     drw_debug_line_do(vertid, v1, v2, pcolor);

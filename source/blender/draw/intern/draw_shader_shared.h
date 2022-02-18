@@ -74,3 +74,8 @@ BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
   (drw_infos[resource_id].drw_OrcoTexCoFactors[0].w < 0.0)
 #define ObjectGpencilDepthOrder2D (drw_infos[resource_id].drw_OrcoTexCoFactors[1].w < 0.0)
 #define ObjectGpencilThickness abs(drw_infos[resource_id].drw_OrcoTexCoFactors[1].w)
+
+struct DebugVert {
+  float3 pos;
+  uint color;
+};
