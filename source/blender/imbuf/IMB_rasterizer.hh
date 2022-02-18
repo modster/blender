@@ -22,25 +22,27 @@
 
 namespace blender::imbuf::rasterizer {
 
+constexpr int64_t DefaultRasterlinesBufferSize = 4096;
+
 /**
  * Interface data of the vertex stage.
  */
 template<typename Data> class VertexOutInterface {
  public:
   using Self = VertexOutInterface<Data>;
-  float2 uv;
+  float2 coord;
   Data data;
 
   Self &operator+=(const Self &other)
   {
-    uv += other.uv;
+    coord += other.coord;
     data += other.data;
     return *this;
   }
 
   Self &operator=(const Self &other)
   {
-    uv = other.uv;
+    coord = other.coord;
     data = other.data;
     return *this;
   }
@@ -48,7 +50,7 @@ template<typename Data> class VertexOutInterface {
   Self operator-(const Self &other) const
   {
     Self result;
-    result.uv = uv - other.uv;
+    result.coord = coord - other.coord;
     result.data = data - other.data;
     return result;
   }
@@ -56,7 +58,7 @@ template<typename Data> class VertexOutInterface {
   Self operator/(const float divider) const
   {
     Self result;
-    result.uv = uv / divider;
+    result.coord = coord / divider;
     result.data = data / divider;
     return result;
   }
@@ -64,7 +66,7 @@ template<typename Data> class VertexOutInterface {
   Self operator*(const float multiplier) const
   {
     Self result;
-    result.uv = uv * multiplier;
+    result.coord = coord * multiplier;
     result.data = data * multiplier;
     return *this;
   }
@@ -162,7 +164,7 @@ template<typename VertexShader,
           * To improve branching performance the rasterlines are buffered and flushed when this
           * treshold is reached.
           */
-         int64_t RasterlinesSize = 4096,
+         int64_t RasterlinesSize = DefaultRasterlinesBufferSize,
 
          /**
           * Statistic collector. Should be a subclass of AbstractStats or implement the same
@@ -224,12 +226,12 @@ class Rasterizer {
     const VertexOutputType &p2_out = vertex_out[1];
     const VertexOutputType &p3_out = vertex_out[2];
     const bool triangle_not_visible =
-        (p1_out.uv[0] < 0.0 && p2_out.uv[0] < 0.0 && p3_out.uv[0] < 0.0) ||
-        (p1_out.uv[1] < 0.0 && p2_out.uv[1] < 0.0 && p3_out.uv[1] < 0.0) ||
-        (p1_out.uv[0] >= image_buffer_->x && p2_out.uv[0] >= image_buffer_->x &&
-         p3_out.uv[0] >= image_buffer_->x) ||
-        (p1_out.uv[1] >= image_buffer_->y && p2_out.uv[1] >= image_buffer_->y &&
-         p3_out.uv[1] >= image_buffer_->y);
+        (p1_out.coord[0] < 0.0 && p2_out.coord[0] < 0.0 && p3_out.coord[0] < 0.0) ||
+        (p1_out.coord[1] < 0.0 && p2_out.coord[1] < 0.0 && p3_out.coord[1] < 0.0) ||
+        (p1_out.coord[0] >= image_buffer_->x && p2_out.coord[0] >= image_buffer_->x &&
+         p3_out.coord[0] >= image_buffer_->x) ||
+        (p1_out.coord[1] >= image_buffer_->y && p2_out.coord[1] >= image_buffer_->y &&
+         p3_out.coord[1] >= image_buffer_->y);
     if (triangle_not_visible) {
       stats.increase_discarded_triangles();
       return;
@@ -260,13 +262,13 @@ class Rasterizer {
     VertexOutputType left = *sorted_vertices[0];
     VertexOutputType right = *sorted_vertices[0];
 
-    const int min_v = sorted_vertices[0]->uv[1];
-    const int mid_v = sorted_vertices[1]->uv[1];
-    const int max_v = sorted_vertices[2]->uv[1];
+    const int min_v = sorted_vertices[0]->coord[1];
+    const int mid_v = sorted_vertices[1]->coord[1];
+    const int max_v = sorted_vertices[2]->coord[1];
 
     VertexOutputType *left_target;
     VertexOutputType *right_target;
-    if (sorted_vertices[1]->uv[0] < sorted_vertices[2]->uv[0]) {
+    if (sorted_vertices[1]->coord[0] < sorted_vertices[2]->coord[0]) {
       left_target = sorted_vertices[1];
       right_target = sorted_vertices[2];
     }
@@ -279,7 +281,7 @@ class Rasterizer {
     VertexOutputType right_add = calc_vertex_output_data(right, *right_target);
 
     /* Change winding order to match the steepness of the edges. */
-    if (right_add.uv[0] < left_add.uv[1]) {
+    if (right_add.coord[0] < left_add.coord[0]) {
       std::swap(left_add, right_add);
     }
 
@@ -287,7 +289,7 @@ class Rasterizer {
     for (v = min_v; v < mid_v; v++) {
       if (v >= 0 && v < image_buffer_->y) {
         std::optional<RasterlineType> rasterline = clamped_rasterline(
-            v, left.uv[0], right.uv[0], left.data, right.data);
+            v, left.coord[0], right.coord[0], left.data, right.data);
         if (rasterline) {
           append(*rasterline);
         }
@@ -304,7 +306,7 @@ class Rasterizer {
     for (; v < max_v; v++) {
       if (v >= 0 && v < image_buffer_->y) {
         std::optional<RasterlineType> rasterline = clamped_rasterline(
-            v, left.uv[0], right.uv[0], left.data, right.data);
+            v, left.coord[0], right.coord[0], left.data, right.data);
         if (rasterline) {
           append(*rasterline);
         }
@@ -317,7 +319,7 @@ class Rasterizer {
   VertexOutputType calc_vertex_output_data(const VertexOutputType &from,
                                            const VertexOutputType &to)
   {
-    return (to - from) / (to.uv[1] - from.uv[1]);
+    return (to - from) / (to.coord[1] - from.coord[1]);
   }
 
   std::array<VertexOutputType *, 3> order_triangle_vertices(
@@ -327,7 +329,7 @@ class Rasterizer {
     /* Find min v-coordinate and store at index 0. */
     sorted[0] = &vertex_out[0];
     for (int i = 1; i < 3; i++) {
-      if (vertex_out[i].uv[1] < sorted[0]->uv[1]) {
+      if (vertex_out[i].coord[1] < sorted[0]->coord[1]) {
         sorted[0] = &vertex_out[i];
       }
     }
@@ -335,13 +337,13 @@ class Rasterizer {
     /* Find max v-coordinate and store at index 2. */
     sorted[2] = &vertex_out[0];
     for (int i = 1; i < 3; i++) {
-      if (vertex_out[i].uv[1] > sorted[2]->uv[1]) {
+      if (vertex_out[i].coord[1] > sorted[2]->coord[1]) {
         sorted[2] = &vertex_out[i];
       }
     }
 
     /* Exit when all 3 have the same v coordinate. Use the original input order. */
-    if (sorted[0]->uv[1] == sorted[2]->uv[1]) {
+    if (sorted[0]->coord[1] == sorted[2]->coord[1]) {
       for (int i = 0; i < 3; i++) {
         sorted[i] = &vertex_out[i];
       }
@@ -359,9 +361,9 @@ class Rasterizer {
     }
 
     BLI_assert(sorted[0] != sorted[1] && sorted[0] != sorted[2] && sorted[1] != sorted[2]);
-    BLI_assert(sorted[0]->uv[1] <= sorted[1]->uv[1]);
-    BLI_assert(sorted[0]->uv[1] < sorted[2]->uv[1]);
-    BLI_assert(sorted[1]->uv[1] <= sorted[2]->uv[1]);
+    BLI_assert(sorted[0]->coord[1] <= sorted[1]->coord[1]);
+    BLI_assert(sorted[0]->coord[1] < sorted[2]->coord[1]);
+    BLI_assert(sorted[1]->coord[1] <= sorted[2]->coord[1]);
     return sorted;
   }
 

@@ -2,6 +2,9 @@
 
 #include "testing/testing.h"
 
+#include "BLI_float4x4.hh"
+#include "BLI_path_util.h"
+
 #include "IMB_rasterizer.hh"
 
 namespace blender::imbuf::rasterizer::tests {
@@ -19,9 +22,11 @@ struct VertexInput {
 class VertexShader : public AbstractVertexShader<VertexInput, float> {
  public:
   float2 image_size;
+  float4x4 vp_mat;
   void vertex(const VertexInputType &input, VertexOutputType *r_output) override
   {
-    r_output->uv = input.uv * image_size;
+    float3 t = float3(input.uv[0], input.uv[1], 0.0);
+    r_output->coord = float2(vp_mat * t) * image_size;
     r_output->data = 1.0f;
   }
 };
@@ -37,9 +42,10 @@ class FragmentShader : public AbstractFragmentShader<float, float4> {
 TEST(imbuf_rasterizer, draw_triangle)
 {
   ImBuf image_buffer;
-  IMB_initImBuf(&image_buffer, IMBUF_SIZE, IMBUF_SIZE, 0, IB_rectfloat);
+  IMB_initImBuf(&image_buffer, IMBUF_SIZE, IMBUF_SIZE, 32, IB_rectfloat);
 
-  Rasterizer<VertexShader, FragmentShader, 4096, Stats> rasterizer(&image_buffer);
+  Rasterizer<VertexShader, FragmentShader, DefaultRasterlinesBufferSize, Stats> rasterizer(
+      &image_buffer);
 
   VertexShader &vertex_shader = rasterizer.vertex_shader();
   vertex_shader.image_size = float2(image_buffer.x, image_buffer.y);
@@ -51,26 +57,32 @@ TEST(imbuf_rasterizer, draw_triangle)
   EXPECT_EQ(rasterizer.stats.clamped_rasterlines, 0);
   EXPECT_EQ(rasterizer.stats.drawn_fragments, 0);
 
-  rasterizer.draw_triangle(
-      VertexInput(float2(0.1, 0.1)), VertexInput(float2(0.5, 0.9)), VertexInput(float2(0.8, 0.5)));
-  rasterizer.flush();
+  float clear_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  char file_name[FILE_MAX];
 
-  /*
-    EXPECT_EQ(rasterizer.stats.triangles, 1);
-    EXPECT_EQ(rasterizer.stats.discarded_triangles, 0);
-    EXPECT_EQ(rasterizer.stats.rasterlines, 245);
-    EXPECT_EQ(rasterizer.stats.discarded_rasterlines, 1);
-    EXPECT_EQ(rasterizer.stats.clamped_rasterlines, 0);
-    // EXPECT_EQ(rasterizer.stats.drawn_fragments, 0);
-  */
+  float3 location(0.5, 0.5, 0.0);
+  float3 rotation(0.0, 0.0, 0.0);
+  float3 scale(1.0, 1.0, 1.0);
 
-  for (int y = 0; y < IMBUF_SIZE; y++) {
-    for (int x = 0; x < IMBUF_SIZE; x++) {
-      int pixel_offset = y * IMBUF_SIZE + x;
-      float *pixel = &image_buffer.rect_float[pixel_offset * 4];
-      printf("%s", *pixel < 0.5 ? " " : "#");
+  for (int i = 0; i < 1000; i++) {
+    BLI_path_sequence_encode(file_name, "/tmp/test_", ".png", 4, i);
+    printf("%s: %s\n", __func__, file_name);
+
+    if (i == 43) {
+      printf("break\n");
     }
-    printf("\n");
+
+    IMB_rectfill(&image_buffer, clear_color);
+    rotation[2] = (i / 1000.0) * M_PI * 2;
+
+    vertex_shader.vp_mat = float4x4::from_loc_eul_scale(location, rotation, scale);
+    rasterizer.draw_triangle(VertexInput(float2(-0.4, -0.4)),
+                             VertexInput(float2(0.0, 0.4)),
+                             VertexInput(float2(0.3, 0.0)));
+    rasterizer.flush();
+
+    IMB_saveiff(&image_buffer, file_name, IB_rectfloat);
+    imb_freerectImBuf(&image_buffer);
   }
 
   imb_freerectImbuf_all(&image_buffer);
