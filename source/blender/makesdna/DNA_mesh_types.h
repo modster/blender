@@ -374,6 +374,7 @@ enum {
   ME_EDIT_PAINT_FACE_SEL = 1 << 3,
   ME_EDIT_MIRROR_TOPO = 1 << 4,
   ME_EDIT_PAINT_VERT_SEL = 1 << 5,
+  ME_EDIT_PAINT_MASK_HIDDEN = 1 << 6,
 };
 
 /* Helper macro to see if vertex group X mirror is on. */

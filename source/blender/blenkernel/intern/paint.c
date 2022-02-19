@@ -982,6 +982,13 @@ bool BKE_paint_select_vert_test(Object *ob)
           (ob->mode & OB_MODE_WEIGHT_PAINT || ob->mode & OB_MODE_VERTEX_PAINT));
 }
 
+bool BKE_paint_mask_hidden_test(Object *ob)
+{
+  return ((ob != NULL) && (ob->type == OB_MESH) && (ob->data != NULL) &&
+          (((Mesh *)ob->data)->editflag & ME_EDIT_PAINT_MASK_HIDDEN) &&
+          (ob->mode & OB_MODE_WEIGHT_PAINT || ob->mode & OB_MODE_VERTEX_PAINT));
+}
+
 bool BKE_paint_select_elem_test(Object *ob)
 {
   return (BKE_paint_select_vert_test(ob) || BKE_paint_select_face_test(ob));
@@ -2153,7 +2160,8 @@ PBVH *BKE_sculpt_object_pbvh_ensure(Depsgraph *depsgraph, Object *ob)
 
   bool respect_hide = true;
   if (ob->mode & (OB_MODE_VERTEX_PAINT | OB_MODE_WEIGHT_PAINT)) {
-    if (!(BKE_paint_select_vert_test(ob) || BKE_paint_select_face_test(ob))) {
+    if (!(BKE_paint_select_vert_test(ob) || BKE_paint_select_face_test(ob) ||
+          BKE_paint_mask_hidden_test(ob))) {
       respect_hide = false;
     }
   }

@@ -271,6 +271,15 @@ void rna_Mesh_update_draw(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA 
   WM_main_add_notifier(NC_GEOM | ND_DATA, id);
 }
 
+static void rna_Mesh_update_mask(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+  Mesh *me = ptr->data;
+
+  BKE_mesh_batch_cache_dirty_tag(me, BKE_MESH_BATCH_DIRTY_ALL);
+
+  rna_Mesh_update_draw(bmain, scene, ptr);
+}
+
 static void rna_Mesh_update_vertmask(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
   Mesh *me = ptr->data;
@@ -278,9 +287,7 @@ static void rna_Mesh_update_vertmask(Main *bmain, Scene *scene, PointerRNA *ptr)
     me->editflag &= ~ME_EDIT_PAINT_FACE_SEL;
   }
 
-  BKE_mesh_batch_cache_dirty_tag(me, BKE_MESH_BATCH_DIRTY_ALL);
-
-  rna_Mesh_update_draw(bmain, scene, ptr);
+  rna_Mesh_update_mask(bmain, scene, ptr);
 }
 
 static void rna_Mesh_update_facemask(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -290,9 +297,7 @@ static void rna_Mesh_update_facemask(Main *bmain, Scene *scene, PointerRNA *ptr)
     me->editflag &= ~ME_EDIT_PAINT_VERT_SEL;
   }
 
-  BKE_mesh_batch_cache_dirty_tag(me, BKE_MESH_BATCH_DIRTY_ALL);
-
-  rna_Mesh_update_draw(bmain, scene, ptr);
+  rna_Mesh_update_mask(bmain, scene, ptr);
 }
 
 /** \} */
@@ -3575,6 +3580,15 @@ static void rna_def_mesh(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Vertex Selection", "Vertex selection masking for painting");
   RNA_def_property_ui_icon(prop, ICON_VERTEXSEL, 0);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_Mesh_update_vertmask");
+
+  prop = RNA_def_property(srna, "use_paint_mask_hidden", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "editflag", ME_EDIT_PAINT_MASK_HIDDEN);
+  RNA_def_property_ui_text(
+      prop,
+      "Mask Hidden",
+      "Hide and mask vertices hidden in edit mode (implied by selection masking)");
+  RNA_def_property_ui_icon(prop, ICON_HIDE_OFF, -1);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_Mesh_update_mask");
 
   /* customdata flags */
   prop = RNA_def_property(srna, "use_customdata_vertex_bevel", PROP_BOOLEAN, PROP_NONE);

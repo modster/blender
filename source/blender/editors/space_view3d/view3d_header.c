@@ -139,6 +139,7 @@ static void uiTemplatePaintModeSelection(uiLayout *layout, struct bContext *C)
       uiLayout *row = uiLayoutRow(layout, true);
       uiItemR(row, &meshptr, "use_paint_mask", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
       uiItemR(row, &meshptr, "use_paint_mask_vertex", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+      uiItemR(layout, &meshptr, "use_paint_mask_hidden", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
     }
   }
 }

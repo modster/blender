@@ -190,6 +190,10 @@ bool BKE_paint_select_face_test(struct Object *ob);
  */
 bool BKE_paint_select_vert_test(struct Object *ob);
 /**
+ * Return true when in vertex/weight paint + mask hidden mode
+ */
+bool BKE_paint_mask_hidden_test(struct Object *ob);
+/**
  * used to check if selection is possible
  * (when we don't care if its face or vert)
  */
