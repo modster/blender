@@ -8,21 +8,21 @@
 
 /** Decoded tile data structure. */
 struct ShadowTileData {
-  /** Page inside the virtual shadow map atlas. */
+  /** Page inside the virtual shadow map atlas. If lod is > 1 */
   uvec2 page;
-  /** Page owner index inside free_page_owners heap. Only valid if is_cached is true. */
-  uint free_page_owner_index;
+  /** Page index inside pages_cached_buf. Only valid if `is_cached` is true. */
+  uint cache_index;
   /** Lod pointed to by LOD 0 tile page. (cubemap only) */
   uint lod;
   /** Set to true during the setup phase if the tile is inside the view frustum. */
   bool is_visible;
   /** If the tile is needed for rendering. */
   bool is_used;
-  /** True if this tile owns the page and if it points to a valid page. */
-  bool is_allocated;
   /** True if an update is needed. */
   bool do_update;
-  /** True if the tile is indexed inside the free_page_owners heap. */
+  /** True if the tile owns the page (mutually exclusive with `is_cached`). */
+  bool is_allocated;
+  /** True if the tile is inside the pages_cached_buf (mutually exclusive with `is_allocated`). */
   bool is_cached;
 };
 
@@ -39,10 +39,13 @@ ShadowTileData shadow_tile_data_unpack(uint data)
   /* Tweaked for SHADOW_PAGE_PER_ROW = 64. */
   tile.page.x = data & 63u;
   tile.page.y = (data >> 6u) & 63u;
+  /* -- 12 bits -- */
   /* Tweaked for SHADOW_TILEMAP_LOD < 8. */
   tile.lod = (data >> 12u) & 7u;
+  /* -- 15 bits -- */
   /* Tweaked for SHADOW_MAX_TILEMAP = 4096. */
-  tile.free_page_owner_index = (data >> 15u) & 4095u;
+  tile.cache_index = (data >> 15u) & 4095u;
+  /* -- 27 bits -- */
   tile.is_visible = flag_test(data, SHADOW_TILE_IS_VISIBLE);
   tile.is_used = flag_test(data, SHADOW_TILE_IS_USED);
   tile.is_cached = flag_test(data, SHADOW_TILE_IS_CACHED);
@@ -54,10 +57,10 @@ ShadowTileData shadow_tile_data_unpack(uint data)
 uint shadow_tile_data_pack(ShadowTileData tile)
 {
   uint data;
-  data = tile.page.x;
-  data |= tile.page.y << 6u;
-  data |= tile.lod << 12u;
-  data |= tile.free_page_owner_index << 15u;
+  data = (tile.page.x & 63u);
+  data |= (tile.page.y & 63u) << 6u;
+  data |= (tile.lod & 7u) << 12u;
+  data |= (tile.cache_index & 4095u) << 15u;
   set_flag_from_test(data, tile.is_visible, SHADOW_TILE_IS_VISIBLE);
   set_flag_from_test(data, tile.is_used, SHADOW_TILE_IS_USED);
   set_flag_from_test(data, tile.is_allocated, SHADOW_TILE_IS_ALLOCATED);

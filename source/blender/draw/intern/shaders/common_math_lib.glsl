@@ -141,12 +141,13 @@ uint bit_field_mask(uint bit_width, uint bit_min)
 
 uvec2 unpackUvec2x16(uint data)
 {
-  return uvec2(data >> 16u, data & 0xFFFFu);
+  return (uvec2(data) >> uvec2(0u, 16u)) & uvec2(0xFFFFu);
 }
 
 uint packUvec2x16(uvec2 data)
 {
-  return (data.x << 16u) | (data.y & 0xFFFFu);
+  data = (data & 0xFFFFu) << uvec2(0u, 16u);
+  return data.x | data.y;
 }
 
 uvec4 unpackUvec4x8(uint data)
@@ -156,7 +157,7 @@ uvec4 unpackUvec4x8(uint data)
 
 uint packUvec4x8(uvec4 data)
 {
-  data = (uvec4(data) & 0xFFu) << uvec4(0u, 8u, 16u, 24u);
+  data = (data & 0xFFu) << uvec4(0u, 8u, 16u, 24u);
   return data.x | data.y | data.z | data.w;
 }
 

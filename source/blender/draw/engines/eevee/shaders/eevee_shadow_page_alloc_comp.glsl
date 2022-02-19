@@ -17,7 +17,7 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_shadow_page_ops_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
 shared ivec2 min_tile;
@@ -30,6 +30,7 @@ void main()
   int lod_max = tilemap_data.is_cubeface ? SHADOW_TILEMAP_LOD : 0;
 
   int lod_valid = 0;
+  uvec2 page_valid;
   for (int lod = lod_max; lod >= 0; lod--) {
     ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy) >> lod;
     int tile_index = (SHADOW_TILEMAP_RES / 2) * tile_co.y + tile_co.x;
@@ -44,41 +45,24 @@ void main()
 
     if (valid_thread) {
       if (tile.is_visible && tile.is_used && !tile.is_allocated) {
-        /** Tile allocation. */
-        int free_index = atomicAdd(pages_infos_buf.page_free_next, -1);
-        if (free_index >= 0) {
-          ivec2 owner_texel = ivec2(unpackUvec2x16(pages_free_buf[free_index]));
-          pages_free_buf[free_index] = uint(-1);
-
-          tile.page = shadow_tile_data_unpack(imageLoad(tilemaps_img, owner_texel).x).page;
-          tile.do_update = true;
-          tile.is_allocated = true;
-          tile.is_cached = false;
-          imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
-
-          const uint flag = SHADOW_TILE_IS_ALLOCATED | SHADOW_TILE_IS_CACHED;
-          imageAtomicAnd(tilemaps_img, owner_texel, ~flag);
-        }
-        else {
-          /* Well, hum ... you blew up your budget! */
-        }
+        shadow_page_free_buf_pop_last(tile);
+        imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
       }
     }
 
     barrier();
 
     /* Save highest quality valid lod for this thread. */
-    if (tile.is_visible && tile.is_used) {
+    if (tile.is_visible && tile.is_used && lod > 0) {
+      /* Reload the page in case there was an allocation in the valid thread. */
+      page_valid = shadow_tile_data_unpack(imageLoad(tilemaps_img, texel).x).page;
       lod_valid = lod;
     }
-    else if (lod == 0) {
-      /* If the tile is not used, store the valid LOD level. */
-      /* This is tricky because the tile might be processed by another thread doing an allocation.
-       * So we need to set the LOD using atomics. */
-      uint lod_mask = 7u << 12u;
-      uint lod_store = uint(lod_valid) << 12u;
-      imageAtomicAnd(tilemaps_img, texel, ~lod_mask);
-      imageAtomicOr(tilemaps_img, texel, lod_store);
+    else if (lod == 0 && lod_valid != 0 && !tile.is_allocated) {
+      /* If the tile is not used, store the valid LOD level in LOD0. */
+      tile.page = page_valid;
+      tile.lod = lod_valid;
+      imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
     }
 
     /** Compute area to render and write to buffer for CPU to read. */
@@ -93,7 +77,6 @@ void main()
       barrier();
 
       if (valid_thread && tile.do_update && tile.is_visible && tile.is_used) {
-        atomicAdd(pages_infos_buf.page_updated_count, 1);
         atomicMin(min_tile.x, tile_co.x);
         atomicMin(min_tile.y, tile_co.y);
         atomicMax(max_tile.x, tile_co.x);

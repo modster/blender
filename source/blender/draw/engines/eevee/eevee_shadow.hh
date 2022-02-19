@@ -474,11 +474,13 @@ class ShadowModule {
   Texture atlas_tx_ = {"shadow_atlas_tx_"};
 
   /** Pool of unallocated pages waiting to be assigned to specific tiles in the tilemap atlas. */
-  ShadowPageHeapBuf pages_free_data_;
+  ShadowPageHeapBuf pages_free_data_ = {"pages_free_buf"};
+  /** Pool of cached tiles waiting to be reused. */
+  ShadowPageCacheBuf pages_cached_data_ = {"pages_cached_buf"};
   /** List of tiles that are to be rendered. */
-  ShadowPageHeapBuf pages_list_data_;
+  ShadowPageHeapBuf pages_list_data_ = {"pages_list_buf"};
   /** Infos for book keeping and debug. */
-  ShadowPagesInfoDataBuf pages_infos_data_;
+  ShadowPagesInfoDataBuf pages_infos_data_ = {"pages_infos_buf"};
 
   /** Page buffer clear. This is only done if shadow atlas is reallocated. */
   DRWPass *page_init_ps_;

@@ -168,7 +168,7 @@ void debug_tile_state(vec3 P, ivec4 mouse_tile)
     vec3 color = debug_tile_state_color(tile_data);
     out_color_add = vec4(color * 0.5, 0);
     out_color_mul = out_color_add * 0.5 + 0.5;
-    if (ivec4(mouse_tile.xy >> mouse_tile.w, mouse_tile.z, mouse_tile.w) == tile) {
+    if (mouse_tile == tile) {
       out_color_add = out_color_add * 0.8 + 0.2;
     }
   }
@@ -180,22 +180,58 @@ void debug_tile_state(vec3 P, ivec4 mouse_tile)
 
 void debug_page_allocation(void)
 {
-  ivec2 page = ivec2(gl_FragCoord.xy / pixel_scale) - 1;
+  ivec2 page = ivec2(gl_FragCoord.xy / pixel_scale) - 3;
+
+  bool do_print = IS_DEBUG_MOUSE_FRAGMENT;
 
   if (in_range_inclusive(page, ivec2(0), textureSize(debug_page_tx, 0).xy - 1)) {
     uint page = texelFetch(debug_page_tx, page, 0).x;
 
     /* Each page should be referenced only once. */
-    bool error = (page & 0xFFFFu) != 1u;
+    uint user_count = page & 0xFFFFu;
     bool is_cached = (page & SHADOW_PAGE_IS_CACHED) != 0u;
-    bool is_needed = (page & SHADOW_PAGE_IS_NEEDED) != 0u;
-    bool in_heap = (page & SHADOW_PAGE_IN_FREE_HEAP) != 0u;
-    /* If the tile is marked as cached, it must be referenced in the free heap. */
-    error = error || (is_cached && !in_heap);
-    /* After page_free pass the needed tiles should not be marked as cached anymore. */
-    error = error || (is_needed && is_cached);
+    bool is_free = (page & SHADOW_PAGE_IS_FREE) != 0u;
+    bool is_used = (page & SHADOW_PAGE_IS_USED) != 0u;
+    bool in_cache_heap = (page & SHADOW_PAGE_IN_CACHE_HEAP) != 0u;
 
-    vec3 col = vec3(error, is_cached, is_needed);
+    const uint all_states = (SHADOW_PAGE_IS_CACHED | SHADOW_PAGE_IS_FREE | SHADOW_PAGE_IS_USED);
+
+    vec3 col;
+    if (bitCount(page & all_states) != 1) {
+      col = vec3(1, 0, 0);
+      if (do_print) {
+        print("The page can only be in one state.");
+        print(is_cached);
+        print(is_free);
+        print(is_used);
+      }
+    }
+    else if (is_cached && !in_cache_heap) {
+      col = vec3(1, 0, 0);
+      if (do_print) {
+        print("The page is not present in the cache heap but is referenced by a tile.");
+      }
+    }
+    else if (user_count != 1u) {
+      col = vec3(1, 0, 0);
+      if (do_print) {
+        print("The page has multiple owner.");
+        print(user_count);
+      }
+    }
+    else if (is_cached) {
+      col = vec3(1, 1, 0);
+    }
+    else if (is_used) {
+      col = vec3(0, 1, 0);
+    }
+    else if (is_free) {
+      col = vec3(0, 0.2, 1);
+    }
+    else {
+      /* Error: Unknown state. */
+      col = vec3(0);
+    }
 
     out_color_add = vec4(col, 0);
     out_color_mul = vec4(0);
@@ -263,17 +299,14 @@ void main()
   if (IS_DEBUG_MOUSE_FRAGMENT && mouse_tile.z != -1) {
     ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, mouse_tile.xy, 0, mouse_tile.z);
     print(tile_data.lod);
-    if (tile_data.lod != 0) {
-      tile_data = shadow_tile_load(
-          tilemaps_tx, mouse_tile.xy >> mouse_tile.w, mouse_tile.w, mouse_tile.z);
-    }
     print(tile_data.page);
-    print(tile_data.free_page_owner_index);
-    print(tile_data.is_visible);
-    print(tile_data.is_used);
-    print(tile_data.is_allocated);
-    print(tile_data.do_update);
-    print(tile_data.is_cached);
+    print(tile_data.cache_index);
+    if (tile_data.lod != 0) {
+      ShadowTileData lod_data = shadow_tile_load(
+          tilemaps_tx, mouse_tile.xy >> mouse_tile.w, mouse_tile.w, mouse_tile.z);
+      print(lod_data.page);
+      print(lod_data.cache_index);
+    }
   }
 
   if (debug_tilemap(mouse_tile)) {

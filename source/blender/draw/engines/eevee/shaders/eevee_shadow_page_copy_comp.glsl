@@ -15,7 +15,7 @@ bool do_corner_pattern(vec2 uv, float corner_ratio)
 {
   uv = uv * 2.0 - 1.0;
   return (any(greaterThan(abs(uv), vec2(1.0 - corner_ratio))) &&
-          all(greaterThan(abs(uv), vec2(1.0 - corner_ratio * 2.0))));
+          all(greaterThan(abs(uv), vec2(1.0 - corner_ratio * 3.0))));
 }
 
 void main()
@@ -35,19 +35,17 @@ void main()
 
     float depth = texelFetch(render_tx, in_texel, 0).r;
 
-    /* Debugging. */
+#if 0 /* Debugging. */
     uvec2 page_size = gl_NumWorkGroups.xy * gl_WorkGroupSize.xy;
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(page_size);
-    if (do_corner_pattern(uv, 0.05)) {
+    /* Print corners to check tile layout and validity. */
+    if (do_corner_pattern(uv, 0.025)) {
       depth = 0.0;
     }
-    else if (do_corner_pattern(uv, 0.08)) {
+    else if (do_corner_pattern(uv, 0.035)) {
       depth = 1.0;
     }
-
-    // if (do_char()) {
-
-    // }
+#endif
 
     imageStore(out_atlas_img, out_texel, vec4(depth));
   }

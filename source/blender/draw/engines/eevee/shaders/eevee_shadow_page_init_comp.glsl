@@ -12,24 +12,17 @@
 void main()
 {
   if (gl_GlobalInvocationID == uvec3(0)) {
-    pages_infos_buf.page_free_next = SHADOW_MAX_PAGE - 1;
-    pages_infos_buf.page_free_next_prev = 0;
-    pages_infos_buf.page_updated_count = 0;
+    pages_infos_buf.page_free_count = SHADOW_MAX_PAGE;
+    pages_infos_buf.page_alloc_count = 0;
+    pages_infos_buf.page_cached_next = 0u;
+    pages_infos_buf.page_cached_start = 0u;
+    pages_infos_buf.page_cached_end = 0u;
   }
 
   uint page_index = gl_GlobalInvocationID.x;
 
-  ivec2 texel = ivec2(page_index % (SHADOW_TILEMAP_PER_ROW * SHADOW_TILEMAP_RES),
-                      page_index / (SHADOW_TILEMAP_PER_ROW * SHADOW_TILEMAP_RES));
+  ivec2 texel = ivec2(page_index % SHADOW_PAGE_PER_ROW, page_index / SHADOW_PAGE_PER_ROW);
   pages_free_buf[page_index] = packUvec2x16(uvec2(texel));
-
-  /* Start with a blank tile. */
-  ShadowTileData tile = shadow_tile_data_unpack(0u);
-  tile.page = uvec2(page_index % uint(SHADOW_PAGE_PER_ROW),
-                    page_index / uint(SHADOW_PAGE_PER_ROW));
-  tile.free_page_owner_index = page_index;
-  tile.is_allocated = true;
-  tile.is_cached = true;
-  tile.do_update = true;
-  imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
+  pages_cached_buf[page_index * 2 + 0] = uvec2(-1);
+  pages_cached_buf[page_index * 2 + 1] = uvec2(-1);
 }

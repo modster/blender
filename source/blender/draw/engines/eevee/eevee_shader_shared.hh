@@ -473,14 +473,21 @@ struct ShadowTileMapData {
 BLI_STATIC_ASSERT_ALIGN(ShadowTileMapData, 16)
 
 struct ShadowPagesInfoData {
-  /** Index of the next free pages in the free page heap. */
-  int page_free_next;
-  /** Last number of free pages at the begining of the redraw. */
-  int page_free_next_prev;
-  /** Number of pages that needs to be rendered. */
-  int page_updated_count;
+  /** Number of free pages in the free page buffer. */
+  int page_free_count;
+  /** Number of page allocations needed for this cycle. */
+  int page_alloc_count;
+  /** Index of the next cache page in the cached page buffer. */
+  uint page_cached_next;
+  /** Index of the first page in the buffer since the last defrag. */
+  uint page_cached_start;
+  /** Index of the last page in the buffer since the last defrag. */
+  uint page_cached_end;
   /** Number of pages that needs to be rendered in the tilemap LOD being rendered. */
   int page_rendered;
+
+  int _pad0;
+  int _pad1;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowPagesInfoData, 16)
 
@@ -845,6 +852,7 @@ using ShadowDataBuf = draw::StorageArrayBuffer<ShadowData, CULLING_BATCH_SIZE>;
 using ShadowDebugDataBuf = draw::UniformBuffer<ShadowDebugData>;
 using ShadowPagesInfoDataBuf = draw::StorageBuffer<ShadowPagesInfoData, true>;
 using ShadowPageHeapBuf = draw::StorageArrayBuffer<uint, SHADOW_MAX_PAGE, true>;
+using ShadowPageCacheBuf = draw::StorageArrayBuffer<uint2, SHADOW_MAX_PAGE, true>;
 using ShadowTileMapDataBuf = draw::StorageArrayBuffer<ShadowTileMapData, SHADOW_MAX_TILEMAP>;
 using SubsurfaceDataBuf = draw::UniformBuffer<SubsurfaceData>;
 using VelocityObjectBuf = draw::UniformBuffer<VelocityObjectData>;

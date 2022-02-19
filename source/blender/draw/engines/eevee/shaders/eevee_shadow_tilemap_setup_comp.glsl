@@ -6,7 +6,7 @@
  */
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_shadow_page_ops_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
 void main()
@@ -32,9 +32,9 @@ void main()
     tile_data.do_update = true;
   }
 
-  if (grid_shift != ivec2(0) && tile_data.is_cached) {
+  if (grid_shift != ivec2(0) && tile_data.is_cached && !tilemap.is_cubeface) {
     /* Update page location after shift. */
-    pages_free_buf[tile_data.free_page_owner_index] = packUvec2x16(uvec2(texel_out));
+    shadow_page_cache_update_tile_ref(tile_data, texel_out);
   }
 
   imageStore(tilemaps_img, texel_out, uvec4(shadow_tile_data_pack(tile_data)));
@@ -63,8 +63,21 @@ void main()
   }
 
   if (gl_GlobalInvocationID == uvec3(0)) {
-    pages_infos_buf.page_free_next = max(-1, pages_infos_buf.page_free_next);
-    pages_infos_buf.page_free_next_prev = pages_infos_buf.page_free_next;
-    pages_infos_buf.page_updated_count = 0;
+    /* Clamp it as it can underflow if there is too much tile present on screen. */
+    pages_infos_buf.page_free_count = max(pages_infos_buf.page_free_count, 0);
+#if 0
+    if (pages_infos_buf.page_free_next >= SHADOW_MAX_PAGE) {
+      print("Free page heap overflow.");
+    }
+    if (pages_infos_buf.page_free_next < 0) {
+      print("Free page heap underflow.");
+    }
+    if (pages_infos_buf.page_free_next >= SHADOW_MAX_PAGE) {
+      print("Free page heap overflow.");
+    }
+    if (pages_infos_buf.page_free_next < 0) {
+      print("Free page heap underflow.");
+    }
+#endif
   }
 }
