@@ -37,7 +37,7 @@ typedef enum eRemeshBlocksMode {
 
 struct Mesh *GEO_mesh_remesh_blocks(const struct Mesh *mesh,
                                     const char remesh_flag,
-                                    const char remesh_mode,
+                                    const eRemeshBlocksMode remesh_mode,
                                     const float threshold,
                                     const int hermite_num,
                                     const float scale,

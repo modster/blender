@@ -31,9 +31,23 @@ namespace blender::nodes::node_geo_remesh_cc {
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Mesh")).supported_type(GEO_COMPONENT_TYPE_MESH);
-  b.add_input<decl::Int>(N_("Depth")).default_value(4).min(2).max(64);
-  b.add_input<decl::Float>(N_("Scale")).default_value(0.9f).min(0.0f).max(0.99f);
-  b.add_input<decl::Float>(N_("Threshold")).default_value(1.0f).min(0.01f).max(FLT_MAX);
+  b.add_input<decl::Int>(N_("Depth"))
+      .description("Resolution of the octree. Higher values give finer details.")
+      .default_value(4)
+      .min(2)
+      .max(64);
+  b.add_input<decl::Float>(N_("Scale"))
+      .description("The ratio of the largest dimension of the model over the size of the grid")
+      .default_value(0.9f)
+      .min(0.0f)
+      .max(0.99f);
+  b.add_input<decl::Float>(N_("Threshold"))
+      .description(
+          "When removing disconnected pieces, minimum size of components to preserve as a ratio "
+          "of the number of polygons in the largest component")
+      .default_value(1.0f)
+      .min(0.01f)
+      .max(FLT_MAX);
   b.add_output<decl::Geometry>(N_("Mesh"));
 }
 
@@ -51,7 +65,7 @@ static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
   const char flag = 0;
-  const char mode = params.node().custom1;
+  const eRemeshBlocksMode mode = static_cast<eRemeshBlocksMode>(params.node().custom1);
   const int hermite_num = 1;
   const int depth = params.extract_input<int>("Depth");
   const float scale = min_ff(params.extract_input<float>("Scale"), 0.99f);

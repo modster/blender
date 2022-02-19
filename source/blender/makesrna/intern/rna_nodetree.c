@@ -31,6 +31,8 @@
 #include "BKE_node_tree_update.h"
 #include "BKE_texture.h"
 
+#include "GEO_mesh_remesh_blocks.h"
+
 #include "RNA_access.h"
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
@@ -9563,9 +9565,13 @@ static void def_geo_subdivision_surface(StructRNA *srna)
 static void def_geo_remesh_blocks(StructRNA *srna)
 {
   static const EnumPropertyItem remesh_mode_items[] = {
-      {0, "BLOCKS", 0, "Blocks", "Output a blocky surface with no smoothing"},
-      {1, "SMOOTH", 0, "Smooth", "Output a smooth surface with no sharp-features detection"},
-      {2,
+      {REMESH_BLOCKS_CENTROID, "BLOCKS", 0, "Blocks", "Output a blocky surface with no smoothing"},
+      {REMESH_BLOCKS_MASS_POINT,
+       "SMOOTH",
+       0,
+       "Smooth",
+       "Output a smooth surface with no sharp-features detection"},
+      {REMESH_BLOCKS_SHARP_FEATURES,
        "SHARP",
        0,
        "Sharp",

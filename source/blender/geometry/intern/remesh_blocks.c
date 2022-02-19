@@ -57,14 +57,14 @@ static void init_dualcon_mesh(DualConInput *input, const Mesh *mesh)
   BKE_mesh_minmax(mesh, input->min, input->max);
 }
 
-/* simple structure to hold the output: a CDDM and two counters to
- * keep track of the current elements */
+/* Simple structure to hold the output: a CDDM and two counters to
+ * keep track of the current elements. */
 typedef struct {
   Mesh *mesh;
   int curvert, curface;
 } DualConOutput;
 
-/* allocate and initialize a DualConOutput */
+/* Allocate and initialize a DualConOutput. */
 static void *dualcon_alloc_output(int totvert, int totquad)
 {
   DualConOutput *output;
@@ -112,7 +112,7 @@ static void dualcon_add_quad(void *output_v, const int vert_indices[4])
 
 Mesh *GEO_mesh_remesh_blocks(const Mesh *mesh,
                              const char remesh_flag,
-                             const char remesh_mode,
+                             const eRemeshBlocksMode remesh_mode,
                              const float threshold,
                              const int hermite_num,
                              const float scale,
