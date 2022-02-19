@@ -209,8 +209,11 @@ class StorageCommon : public DataBuffer<T, len, false>, NonMovable, NonCopyable 
 #endif
 
  public:
-  StorageCommon()
+  StorageCommon(const char *name = nullptr)
   {
+    if (name) {
+      name_ = name;
+    }
     init(len);
   }
 
@@ -318,7 +321,7 @@ template<
     bool device_only = false>
 class StorageArrayBuffer : public detail::StorageCommon<T, len, device_only> {
  public:
-  StorageArrayBuffer()
+  StorageArrayBuffer(const char *name = nullptr) : detail::StorageCommon<T, len, device_only>(name)
   {
     /* TODO(@fclem): We should map memory instead. */
     this->data_ = (T *)MEM_mallocN_aligned(len * sizeof(T), 16, this->name_);
@@ -336,7 +339,7 @@ template<
     bool device_only = false>
 class StorageBuffer : public T, public detail::StorageCommon<T, 1, device_only> {
  public:
-  StorageBuffer()
+  StorageBuffer(const char *name = nullptr) : detail::StorageCommon<T, 1, device_only>(name)
   {
     /* TODO(@fclem): How could we map this? */
     this->data_ = static_cast<T *>(this);
