@@ -124,18 +124,20 @@ ivec2 shadow_tile_coord_in_atlas(ivec2 tile, int tilemap_index, int lod)
 #define shadow_tile_unset_flag(tilemaps_img, tile_co, lod, tilemap_index, flag) \
   imageAtomicAnd(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), ~(flag))
 
+/* WARNING: behavior different from shadow_tile_load. Will **return no data** if out of bounds. */
 /* Compilers have different requirements about image qualifiers in function arguments. */
 #define shadow_tile_load_img(tilemaps_img, tile_co, lod, tilemap_index) \
   shadow_tile_data_unpack( \
-      in_range_inclusive(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1)) ? \
+      in_range_inclusive(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1) >> lod) ? \
           imageLoad(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod)).x : \
           SHADOW_TILE_NO_DATA);
 
+/* WARNING: behavior different from shadow_tile_load_img. Will **clamp** if out of bounds. */
 ShadowTileData shadow_tile_load(usampler2D tilemaps_tx, ivec2 tile_co, int lod, int tilemap_index)
 {
   /* NOTE(@fclem): This clamp can hide some small imprecision at clipmap transition.
    * Can be disabled to check if the clipmap is well centered. */
-  tile_co = clamp(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1));
+  tile_co = clamp(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1) >> lod);
   uint tile_data =
       texelFetch(tilemaps_tx, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), 0).x;
   return shadow_tile_data_unpack(tile_data);
@@ -147,7 +149,7 @@ int shadow_directional_clipmap_level(ShadowData shadow, float distance_to_camera
   /* Bias to avoid sampling outside of the clipmap level. This leaves some padding between each
    * level because of the rounding of the camera tile position, there might be cases where the
    * camera will see further than the clipmap allows. Tweak if needed. */
-  float bias = 0.175;
+  float bias = 0.18;
   /* Why do we need to bias by 2 here? I don't know... */
   int clipmap_lod = int(ceil(log2(distance_to_camera) + bias)) + 2;
   return clamp(clipmap_lod, shadow.clipmap_lod_min, shadow.clipmap_lod_max);
