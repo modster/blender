@@ -19,10 +19,12 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_page_ops_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
+const uint max_page = SHADOW_MAX_PAGE;
+
 void find_first_valid(inout uint src, uint dst)
 {
   for (; src < dst; src++) {
-    if (pages_cached_buf[src % uint(SHADOW_MAX_PAGE)].x != uint(-1)) {
+    if (pages_cached_buf[src % max_page].x != uint(-1)) {
       return;
     }
   }
@@ -41,7 +43,6 @@ void page_cached_free(uint index)
 
 void main()
 {
-  const uint max_page = SHADOW_MAX_PAGE;
   /* Pages we need to get off the cache for the allocation pass. */
   int additional_pages = pages_infos_buf.page_alloc_count - pages_infos_buf.page_free_count;
 
@@ -63,11 +64,11 @@ void main()
      * Decrement by one to refer to the first slot we can defrag. */
     for (uint dst = end - 1; dst > src; dst--) {
       /* Find hole. */
-      if (pages_cached_buf[dst].x != uint(-1)) {
+      if (pages_cached_buf[dst % max_page].x != uint(-1)) {
         continue;
       }
       /* Update corresponding reference in tile. */
-      shadow_page_cache_update_page_ref(src, dst);
+      shadow_page_cache_update_page_ref(src % max_page, dst % max_page);
       /* Move page. */
       pages_cached_buf[dst % max_page] = pages_cached_buf[src % max_page];
       pages_cached_buf[src % max_page] = uvec2(-1);
@@ -83,7 +84,7 @@ void main()
   }
 
   pages_infos_buf.page_cached_start = src;
-  pages_infos_buf.page_cached_end = pages_infos_buf.page_cached_next;
+  pages_infos_buf.page_cached_end = end;
   pages_infos_buf.page_alloc_count = 0;
 
   /* Wrap the cursor to avoid unsigned overflow. We do not do modulo arithmetic because it would
