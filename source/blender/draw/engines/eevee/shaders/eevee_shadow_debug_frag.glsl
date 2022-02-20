@@ -195,8 +195,40 @@ void debug_tile_state(vec3 P, ivec4 mouse_tile)
 void debug_page_allocation(void)
 {
   ivec2 page = ivec2(gl_FragCoord.xy / pixel_scale) - 3;
+  ivec2 cache = page - ivec2(0, SHADOW_PAGE_PER_ROW + 3);
 
   bool do_print = IS_DEBUG_MOUSE_FRAGMENT;
+
+  if (in_range_inclusive(cache, ivec2(0), ivec2(SHADOW_PAGE_PER_ROW - 1))) {
+    int cache_index = cache.y * SHADOW_PAGE_PER_ROW + cache.x;
+    uint start = pages_infos_buf.page_cached_start % uint(SHADOW_MAX_PAGE);
+    uint end = pages_infos_buf.page_cached_end % uint(SHADOW_MAX_PAGE);
+    /* Allow test when the range is accross boundaries. */
+    bool in_cache_range = (start <= end) ? (cache_index >= start && cache_index < end) :
+                                           (cache_index >= start || cache_index < end);
+
+    vec3 col = vec3(0);
+    if (pages_cached_buf[cache_index].x != uint(-1)) {
+      col = vec3(0.2, 0, 0.5);
+      if (!in_cache_range) {
+        col = vec3(1, 0, 0);
+
+        if (do_print) {
+          print("Page is not in cache range.");
+        }
+      }
+    }
+    else if (in_cache_range) {
+      col = vec3(0.2, 0, 0);
+      if (do_print) {
+        print("Page is not in cache but should.");
+      }
+    }
+    out_color_add = vec4(col, 0);
+    out_color_mul = vec4(0);
+    /* Write depth to overlap overlays. */
+    gl_FragDepth = 0.0;
+  }
 
   if (in_range_inclusive(page, ivec2(0), textureSize(debug_page_tx, 0).xy - 1)) {
     uint page = texelFetch(debug_page_tx, page, 0).x;

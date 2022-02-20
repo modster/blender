@@ -995,6 +995,8 @@ void ShadowModule::debug_end_sync(void)
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_uniform_texture(grp, "atlas_tx", atlas_tx_);
     DRW_shgroup_uniform_block(grp, "debug", debug_data_);
+    DRW_shgroup_storage_block(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_storage_block(grp, "pages_cached_buf", pages_cached_data_);
     if (debug_data_.type == SHADOW_DEBUG_PAGE_ALLOCATION) {
       DRW_shgroup_uniform_texture(grp, "debug_page_tx", debug_page_tx_);
     }
