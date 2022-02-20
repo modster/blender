@@ -27,27 +27,38 @@ vec3 debug_random_color(int v)
   return debug_random_color(ivec2(v, 0));
 }
 
+void debug_tile_print(ShadowTileData tile, ivec4 tile_coord)
+{
+  print("Tile (", tile_coord.x, ",", tile_coord.y, ") in Tilemap ", tile_coord.z, " : ");
+  print(tile.lod);
+  print(tile.page);
+  print(tile.cache_index);
+}
+
 vec3 debug_tile_state_color(ShadowTileData tile)
 {
   if (tile.lod > 0) {
     return vec3(1, 0.5, 0) * float(tile.lod) / float(SHADOW_TILEMAP_LOD);
   }
   if (tile.do_update && tile.is_used && tile.is_visible) {
+    /* Error color because at this point (at the end of the frame), there should be no visible
+     * update remaining. */
     return vec3(1, 0, 0);
   }
   if (tile.is_used && tile.is_visible) {
     return vec3(0, 1, 0);
   }
-  if (tile.is_visible) {
-    return vec3(0, 0.2, 0.8);
-  }
-  if (tile.is_cached && tile.do_update) {
-    return vec3(1, 0, 1);
-  }
+  vec3 col = vec3(0);
   if (tile.is_cached) {
-    return vec3(0.2, 0, 0.5);
+    col += vec3(0.2, 0, 0.5);
+    if (tile.do_update) {
+      col += vec3(0.8, 0, 0);
+    }
   }
-  return vec3(0);
+  if (tile.is_visible) {
+    col += vec3(0, 0.2, 0.5);
+  }
+  return col;
 }
 
 bool debug_tilemap_point_is_inside(vec3 P, int tilemap_index)
@@ -57,16 +68,10 @@ bool debug_tilemap_point_is_inside(vec3 P, int tilemap_index)
   return in_range_inclusive(clipP, vec3(0.0), vec3(SHADOW_TILEMAP_RES));
 }
 
-/** Unlike shadow_directional_tilemap_index, returns the first tilemap overlapping the position. */
 int debug_directional_tilemap_index(vec3 P)
 {
-  for (int tilemap_index = debug.shadow.tilemap_index; tilemap_index <= debug.shadow.tilemap_last;
-       tilemap_index++) {
-    if (debug_tilemap_point_is_inside(P, tilemap_index)) {
-      return tilemap_index;
-    }
-  }
-  return -1;
+  int clipmap = shadow_directional_clipmap_level(debug.shadow, distance(P, cameraPos));
+  return clipmap - debug.shadow.clipmap_lod_min;
 }
 
 int debug_punctual_tilemap_index(vec3 P)
@@ -105,6 +110,7 @@ bool debug_tile_index_from_position(vec3 P, out ivec4 index)
 bool debug_tilemap(ivec4 mouse_tile)
 {
   ivec2 tile = ivec2(gl_FragCoord.xy / pixel_scale);
+  bool debug_tile = tile == drw_view.mouse_pixel / ivec2(pixel_scale);
   int tilemap_lod = tile.y / (SHADOW_TILEMAP_RES + 2);
   int tilemap_index = tile.x / (SHADOW_TILEMAP_RES + 2);
   tile = (tile % (SHADOW_TILEMAP_RES + 2)) - 1;
@@ -121,8 +127,13 @@ bool debug_tilemap(ivec4 mouse_tile)
     gl_FragDepth = 0.0;
     out_color_add = vec4(debug_tile_state_color(tile_data), 0);
     out_color_mul = vec4(0);
-    if (ivec4(mouse_tile.xy >> mouse_tile.w, mouse_tile.z, mouse_tile.w) ==
-        ivec4(tile, tilemap_index, tilemap_lod)) {
+    if (IS_DEBUG_MOUSE_FRAGMENT) {
+      mouse_tile = ivec4(tile << tilemap_lod, tilemap_index, tilemap_lod);
+      debug_tile_print(tile_data, mouse_tile);
+    }
+    if ((ivec4(mouse_tile.xy >> mouse_tile.w, mouse_tile.z, mouse_tile.w) ==
+         ivec4(tile, tilemap_index, tilemap_lod)) ||
+        debug_tile) {
       out_color_add = out_color_add * 0.8 + 0.2;
     }
     return true;
@@ -166,6 +177,9 @@ void debug_tile_state(vec3 P, ivec4 mouse_tile)
   if (debug_tile_index_from_position(P, tile)) {
     ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile.xy >> tile.w, tile.w, tile.z);
     vec3 color = debug_tile_state_color(tile_data);
+    if (IS_DEBUG_MOUSE_FRAGMENT) {
+      debug_tile_print(tile_data, mouse_tile);
+    }
     out_color_add = vec4(color * 0.5, 0);
     out_color_mul = out_color_add * 0.5 + 0.5;
     if (mouse_tile == tile) {
@@ -220,17 +234,17 @@ void debug_page_allocation(void)
       }
     }
     else if (is_cached) {
-      col = vec3(1, 1, 0);
+      col = vec3(0.2, 0, 0.5);
     }
     else if (is_used) {
       col = vec3(0, 1, 0);
     }
     else if (is_free) {
-      col = vec3(0, 0.2, 1);
+      col = vec3(0, 0, 0);
     }
     else {
       /* Error: Unknown state. */
-      col = vec3(0);
+      col = vec3(1, 0, 1);
     }
 
     out_color_add = vec4(col, 0);
@@ -295,19 +309,6 @@ void main()
       vec2(drw_view.mouse_pixel) / vec2(textureSize(depth_tx, 0)), mouse_depth);
   ivec4 mouse_tile;
   debug_tile_index_from_position(mouse_P, mouse_tile);
-
-  if (IS_DEBUG_MOUSE_FRAGMENT && mouse_tile.z != -1) {
-    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, mouse_tile.xy, 0, mouse_tile.z);
-    print(tile_data.lod);
-    print(tile_data.page);
-    print(tile_data.cache_index);
-    if (tile_data.lod != 0) {
-      ShadowTileData lod_data = shadow_tile_load(
-          tilemaps_tx, mouse_tile.xy >> mouse_tile.w, mouse_tile.w, mouse_tile.z);
-      print(lod_data.page);
-      print(lod_data.cache_index);
-    }
-  }
 
   if (debug_tilemap(mouse_tile)) {
     return;

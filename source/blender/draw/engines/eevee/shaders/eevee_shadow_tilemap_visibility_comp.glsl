@@ -87,7 +87,6 @@ void main()
       ivec2 lod_visible = clamp(ivec2(ceil(-log2(footprint_ratio))), 0, SHADOW_TILEMAP_LOD);
       lod_visible_min = min_v2(lod_visible);
       lod_visible_max = max_v2(lod_visible);
-
     }
 
     /* Number of lod0 tiles covered by the current lod level (in one dimension). */
