@@ -10,6 +10,8 @@
 vec2 shadow_page_uv_transform(uvec2 page, uint lod, vec2 unormalized_uv)
 {
   vec2 page_texel = fract(unormalized_uv / float(1u << lod));
+  /* Fix float imprecision that can make some pixel sample the wrong page. */
+  page_texel *= 0.999999;
   /* Assumes atlas is squared. */
   return (vec2(page) + page_texel) / vec2(SHADOW_PAGE_PER_ROW);
 }

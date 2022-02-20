@@ -133,6 +133,8 @@ ivec2 shadow_tile_coord_in_atlas(ivec2 tile, int tilemap_index, int lod)
 
 ShadowTileData shadow_tile_load(usampler2D tilemaps_tx, ivec2 tile_co, int lod, int tilemap_index)
 {
+  /* NOTE(@fclem): This clamp can hide some small imprecision at clipmap transition.
+   * Can be disabled to check if the clipmap is well centered. */
   tile_co = clamp(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1));
   uint tile_data =
       texelFetch(tilemaps_tx, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), 0).x;
@@ -142,8 +144,12 @@ ShadowTileData shadow_tile_load(usampler2D tilemaps_tx, ivec2 tile_co, int lod, 
 /* This function should be the inverse of ShadowTileMap::tilemap_coverage_get. */
 int shadow_directional_clipmap_level(ShadowData shadow, float distance_to_camera)
 {
+  /* Bias to avoid sampling outside of the clipmap level. This leaves some padding between each
+   * level because of the rounding of the camera tile position, there might be cases where the
+   * camera will see further than the clipmap allows. Tweak if needed. */
+  float bias = 0.175;
   /* Why do we need to bias by 2 here? I don't know... */
-  int clipmap_lod = int(ceil(log2(distance_to_camera))) + 2;
+  int clipmap_lod = int(ceil(log2(distance_to_camera) + bias)) + 2;
   return clamp(clipmap_lod, shadow.clipmap_lod_min, shadow.clipmap_lod_max);
 }
 
