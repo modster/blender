@@ -140,7 +140,7 @@ void DRW_debug_sphere(const float center[3], const float radius, const float col
 
 /* Keep in sync with shaders. */
 #define DEBUG_VERT_MAX 16 * 4096
-#define DRW_DEBUG_PRINT_MAX 4096
+#define DRW_DEBUG_PRINT_MAX (4096 * 2)
 
 static GPUVertFormat *debug_buf_format(void)
 {

@@ -33,19 +33,21 @@
 // #  error "Missing draw_debug_print additional create info on shader create info"
 #else
 
-/* Vertex shader discards the first 3 vertex. */
-#  define print_row drw_print_buf[0]
-#  define print_col drw_print_buf[1]
+#  define DRW_DEBUG_PRINT_MAX (4096 * 2)
+
+#  define PRINT_WORD_WRAP_COLUMN 120u
+
+#  define print_row_shared drw_print_buf[0]
 #  define print_cursor drw_print_buf[2]
 
-#  define DRW_DEBUG_PRINT_MAX 4096
-
-#  define PRINT_WORD_WRAP_COLUMN 80u
+/* Set so we will create a new line and get the correct threadsafe row. */
+uint print_col = PRINT_WORD_WRAP_COLUMN;
+uint print_row = 0u;
 
 void print_newline()
 {
-  atomicExchange(print_col, 0u);
-  atomicAdd(print_row, 1u);
+  print_col = 0u;
+  print_row = atomicAdd(print_row_shared, 1u) + 1u;
 }
 
 void print_string_start(uint len)
@@ -69,7 +71,7 @@ void print_char4(uint data)
     if (cursor < DRW_DEBUG_PRINT_MAX) {
       /* For future usage. (i.e: Color) */
       uint flags = 0u;
-      uint col = atomicAdd(print_col, 1u);
+      uint col = print_col++;
       uint print_header = (flags << 24u) | (print_row << 16u) | (col << 8u);
       drw_print_buf[cursor] = print_header | char1;
       /* Break word. */
