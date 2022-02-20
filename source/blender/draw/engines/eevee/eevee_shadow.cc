@@ -932,6 +932,7 @@ void ShadowModule::debug_page_map_call(DRWPass *pass)
 void ShadowModule::debug_end_sync(void)
 {
   debug_draw_ps_ = nullptr;
+  debug_view_ = nullptr;
 
   if (debug_data_.type == SHADOW_DEBUG_NONE) {
     return;
@@ -1063,13 +1064,13 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
   else {
     float4x4 winmat;
     DRW_view_winmat_get(view, winmat.values, false);
-    DRWView *debug_view = DRW_view_create(
+    debug_view_ = DRW_view_create(
         viewmat_freezed.values, winmat.values, nullptr, nullptr, nullptr);
-    DRW_view_set_active(debug_view);
+    DRW_view_set_active(debug_view_);
 
     float4 color(1.0f);
     float4x4 persinv;
-    DRW_view_persmat_get(debug_view, persinv.values, true);
+    DRW_view_persmat_get(debug_view_, persinv.values, true);
     DRW_debug_m4_as_bbox(persinv.values, color, false);
   }
 #endif
@@ -1191,8 +1192,16 @@ void ShadowModule::debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz)
   }
   input_depth_tx_ = hiz.texture_get();
 
+  const DRWView *view = DRW_view_get_active();
+
+  if (debug_view_ != nullptr) {
+    DRW_view_set_active(debug_view_);
+  }
+
   GPU_framebuffer_bind(view_fb);
   DRW_draw_pass(debug_draw_ps_);
+
+  DRW_view_set_active(view);
 }
 
 /** \} */
