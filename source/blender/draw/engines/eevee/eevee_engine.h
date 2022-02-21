@@ -11,7 +11,8 @@
 extern "C" {
 #endif
 
-  extern RenderEngineType DRW_engine_viewport_eevee_type;
+extern DrawEngineType draw_engine_eevee_type;
+extern RenderEngineType DRW_engine_viewport_eevee_type;
 
 #ifdef __cplusplus
 }
