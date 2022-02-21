@@ -328,6 +328,9 @@ bool BKE_paint_ensure_from_paintmode(Scene *sce, ePaintMode mode)
     case PAINT_MODE_WEIGHT_GPENCIL:
       paint_ptr = (Paint **)&ts->gp_weightpaint;
       break;
+    case PAINT_MODE_SCULPT_CURVES:
+      paint_ptr = (Paint **)&ts->curves_sculpt;
+      break;
     case PAINT_MODE_INVALID:
       break;
   }
@@ -363,6 +366,8 @@ Paint *BKE_paint_get_active_from_paintmode(Scene *sce, ePaintMode mode)
         return &ts->gp_sculptpaint->paint;
       case PAINT_MODE_WEIGHT_GPENCIL:
         return &ts->gp_weightpaint->paint;
+      case PAINT_MODE_SCULPT_CURVES:
+        return &ts->curves_sculpt->paint;
       case PAINT_MODE_INVALID:
         return NULL;
       default:
@@ -395,6 +400,8 @@ const EnumPropertyItem *BKE_paint_get_tool_enum_from_paintmode(ePaintMode mode)
       return rna_enum_brush_gpencil_sculpt_types_items;
     case PAINT_MODE_WEIGHT_GPENCIL:
       return rna_enum_brush_gpencil_weight_types_items;
+    case PAINT_MODE_SCULPT_CURVES:
+      return rna_enum_brush_curves_sculpt_tool_items;
     case PAINT_MODE_INVALID:
       break;
   }
@@ -423,6 +430,8 @@ const char *BKE_paint_get_tool_prop_id_from_paintmode(ePaintMode mode)
       return "gpencil_sculpt_tool";
     case PAINT_MODE_WEIGHT_GPENCIL:
       return "gpencil_weight_tool";
+    case PAINT_MODE_SCULPT_CURVES:
+      return "curves_sculpt_tool";
     case PAINT_MODE_INVALID:
       break;
   }
@@ -454,6 +463,8 @@ Paint *BKE_paint_get_active(Scene *sce, ViewLayer *view_layer)
           return &ts->gp_sculptpaint->paint;
         case OB_MODE_WEIGHT_GPENCIL:
           return &ts->gp_weightpaint->paint;
+        case OB_MODE_SCULPT_CURVES:
+          return &ts->curves_sculpt->paint;
         case OB_MODE_EDIT:
           return ts->uvsculpt ? &ts->uvsculpt->paint : NULL;
         default:
@@ -574,6 +585,8 @@ ePaintMode BKE_paintmode_get_from_tool(const struct bToolRef *tref)
         return PAINT_MODE_SCULPT_GPENCIL;
       case CTX_MODE_WEIGHT_GPENCIL:
         return PAINT_MODE_WEIGHT_GPENCIL;
+      case CTX_MODE_SCULPT_CURVES:
+        return PAINT_MODE_SCULPT_CURVES;
     }
   }
   else if (tref->space_type == SPACE_IMAGE) {
@@ -642,6 +655,10 @@ void BKE_paint_runtime_init(const ToolSettings *ts, Paint *paint)
     paint->runtime.tool_offset = offsetof(Brush, gpencil_weight_tool);
     paint->runtime.ob_mode = OB_MODE_WEIGHT_GPENCIL;
   }
+  else if (ts->curves_sculpt && paint == &ts->curves_sculpt->paint) {
+    paint->runtime.tool_offset = offsetof(Brush, curves_sculpt_tool);
+    paint->runtime.ob_mode = OB_MODE_SCULPT_CURVES;
+  }
   else {
     BLI_assert_unreachable();
   }
@@ -669,6 +686,8 @@ uint BKE_paint_get_brush_tool_offset_from_paintmode(const ePaintMode mode)
       return offsetof(Brush, gpencil_sculpt_tool);
     case PAINT_MODE_WEIGHT_GPENCIL:
       return offsetof(Brush, gpencil_weight_tool);
+    case PAINT_MODE_SCULPT_CURVES:
+      return offsetof(Brush, curves_sculpt_tool);
     case PAINT_MODE_INVALID:
       break; /* We don't use these yet. */
   }
@@ -1029,6 +1048,7 @@ bool BKE_paint_ensure(ToolSettings *ts, struct Paint **r_paint)
                       (Paint *)ts->vpaint,
                       (Paint *)ts->wpaint,
                       (Paint *)ts->uvsculpt,
+                      (Paint *)ts->curves_sculpt,
                       (Paint *)&ts->imapaint));
 #ifdef DEBUG
       struct Paint paint_test = **r_paint;
@@ -1074,6 +1094,10 @@ bool BKE_paint_ensure(ToolSettings *ts, struct Paint **r_paint)
   }
   else if ((UvSculpt **)r_paint == &ts->uvsculpt) {
     UvSculpt *data = MEM_callocN(sizeof(*data), __func__);
+    paint = &data->paint;
+  }
+  else if ((CurvesSculpt **)r_paint == &ts->curves_sculpt) {
+    CurvesSculpt *data = MEM_callocN(sizeof(*data), __func__);
     paint = &data->paint;
   }
   else if (*r_paint == &ts->imapaint.paint) {
