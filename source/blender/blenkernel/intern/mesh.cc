@@ -1111,16 +1111,6 @@ Mesh *BKE_mesh_new_nomain_from_template_ex(const Mesh *me_src,
     mesh_tessface_clear_intern(me_dst, false);
   }
 
-  me_dst->runtime.cd_dirty_poly = me_src->runtime.cd_dirty_poly;
-  me_dst->runtime.cd_dirty_vert = me_src->runtime.cd_dirty_vert;
-
-  /* Ensure that when no normal layers exist, they are marked dirty, because
-   * normals might not have been included in the mask of copied layers. */
-  if (!CustomData_has_layer(&me_dst->vdata, CD_NORMAL) ||
-      !CustomData_has_layer(&me_dst->pdata, CD_NORMAL)) {
-    BKE_mesh_normals_tag_dirty(me_dst);
-  }
-
   /* The destination mesh should at least have valid primary CD layers,
    * even in cases where the source mesh does not. */
   mesh_ensure_cdlayers_primary(me_dst, do_tessface);
@@ -1986,7 +1976,6 @@ struct SplitFaceNewVert {
   struct SplitFaceNewVert *next;
   int new_index;
   int orig_index;
-  float *vnor;
 };
 
 struct SplitFaceNewEdge {
@@ -2065,7 +2054,6 @@ static int split_faces_prepare_new_verts(Mesh *mesh,
                                                                             sizeof(*new_vert));
         new_vert->orig_index = vert_idx;
         new_vert->new_index = new_vert_idx;
-        new_vert->vnor = (*lnor_space)->vec_lnor; /* See note above. */
         new_vert->next = *new_verts;
         *new_verts = new_vert;
       }
@@ -2148,7 +2136,6 @@ static void split_faces_split_new_verts(Mesh *mesh,
 {
   const int verts_len = mesh->totvert - num_new_verts;
   MVert *mvert = mesh->mvert;
-  float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(mesh);
 
   /* Remember new_verts is a single linklist, so its items are in reversed order... */
   MVert *new_mv = &mvert[mesh->totvert - 1];
@@ -2156,11 +2143,7 @@ static void split_faces_split_new_verts(Mesh *mesh,
     BLI_assert(new_verts->new_index == i);
     BLI_assert(new_verts->new_index != new_verts->orig_index);
     CustomData_copy_data(&mesh->vdata, &mesh->vdata, new_verts->orig_index, i, 1);
-    if (new_verts->vnor) {
-      copy_v3_v3(vert_normals[i], new_verts->vnor);
-    }
   }
-  BKE_mesh_vertex_normals_clear_dirty(mesh);
 }
 
 /* Perform actual split of edges. */
@@ -2248,7 +2231,8 @@ void BKE_mesh_split_faces(Mesh *mesh, bool free_loop_normals)
   /* Also frees new_verts/edges temp data, since we used its memarena to allocate them. */
   BKE_lnor_spacearr_free(&lnors_spacearr);
 
-  BKE_mesh_assert_normals_dirty_or_calculated(mesh);
+  BKE_mesh_clear_derived_normals(mesh);
+
 #ifdef VALIDATE_MESH
   BKE_mesh_validate(mesh, true, true);
 #endif
