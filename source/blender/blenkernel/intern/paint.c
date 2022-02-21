@@ -1710,6 +1710,10 @@ static void sculpt_update_object(Depsgraph *depsgraph,
   if (need_pmap && ob->type == OB_MESH && !ss->pmap) {
     BKE_mesh_vert_poly_map_create(
         &ss->pmap, &ss->pmap_mem, me->mpoly, me->mloop, me->totvert, me->totpoly, me->totloop);
+
+    if (ss->pbvh) {
+      BKE_pbvh_pmap_set(ss->pbvh, ss->pmap);
+    }
   }
 
   pbvh_show_mask_set(ss->pbvh, ss->show_mask);
@@ -2205,6 +2209,10 @@ PBVH *BKE_sculpt_object_pbvh_ensure(Depsgraph *depsgraph, Object *ob)
         BKE_sculpt_bvh_update_from_ccg(pbvh, subdiv_ccg);
       }
     }
+
+    BKE_pbvh_update_active_vcol(pbvh, BKE_object_get_original_mesh(ob));
+    BKE_pbvh_pmap_set(pbvh, ob->sculpt->pmap);
+
     return pbvh;
   }
 
@@ -2223,6 +2231,8 @@ PBVH *BKE_sculpt_object_pbvh_ensure(Depsgraph *depsgraph, Object *ob)
       pbvh = build_pbvh_from_regular_mesh(ob, me_eval_deform, respect_hide);
     }
   }
+
+  BKE_pbvh_pmap_set(pbvh, ob->sculpt->pmap);
 
   ob->sculpt->pbvh = pbvh;
   return pbvh;

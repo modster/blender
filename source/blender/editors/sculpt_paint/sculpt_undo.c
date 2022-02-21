@@ -338,28 +338,16 @@ static bool sculpt_undo_restore_color(bContext *C, SculptUndoNode *unode)
   ViewLayer *view_layer = CTX_data_view_layer(C);
   Object *ob = OBACT(view_layer);
   SculptSession *ss = ob->sculpt;
+  Mesh *me = BKE_object_get_original_mesh(ob);
 
-  /* ensure pmap exists for SCULPT_vertex_color_get/set */
-  if (!ss->pmap) {
-    Mesh *me = BKE_object_get_original_mesh(ob);
-
-    BKE_mesh_vert_poly_map_create(
-        &ss->pmap, &ss->pmap_mem, me->mpoly, me->mloop, me->totvert, me->totpoly, me->totloop);
+  if (unode->maxvert && !unode->totloop) {
+    BKE_pbvh_load_node_vertex_colors(ss->pbvh, me, unode->node, unode->col);
   }
 
-  if (unode->maxvert) {
-    /* regular mesh restore */
-    int *index = unode->index;
-    for (int i = 0; i < unode->totvert; i++) {
-      float tmp[4];
-
-      SCULPT_vertex_color_get(ss, index[i], tmp);
-      SCULPT_vertex_color_set(ss, index[i], unode->col[i]);
-      copy_v4_v4(unode->col[i], tmp);
-
-      BKE_pbvh_vert_mark_update(ss->pbvh, index[i]);
-    }
+  if (unode->totloop) {
+    BKE_pbvh_load_node_loop_colors(ss->pbvh, me, unode->node, unode->loop_col);
   }
+
   return true;
 }
 
@@ -728,6 +716,8 @@ static void sculpt_undo_restore_list(bContext *C, Depsgraph *depsgraph, ListBase
   char *undo_modified_grids = NULL;
   bool use_multires_undo = false;
 
+  BKE_pbvh_update_active_vcol(ss->pbvh, BKE_object_get_original_mesh(ob));
+
   for (unode = lb->first; unode; unode = unode->next) {
 
     if (!STREQ(unode->idname, ob->id.name)) {
@@ -1079,9 +1069,21 @@ static SculptUndoNode *sculpt_undo_alloc_node(Object *ob, PBVHNode *node, Sculpt
       break;
     }
     case SCULPT_UNDO_COLOR: {
+      /* TODO: We always store vertex domain colors here for original
+       * data lookup, however in the future that will be its own
+       * customdata layer. When that happens we should
+       * only allocate vertex or loop colors here, not both.
+       */
       const size_t alloc_size = sizeof(*unode->col) * (size_t)allvert;
       unode->col = MEM_callocN(alloc_size, "SculptUndoNode.col");
       usculpt->undo_size += alloc_size;
+
+      if (ss->vcol_domain == ATTR_DOMAIN_CORNER) {
+        const int totloop = BKE_pbvh_node_get_num_loops(ss->pbvh, node);
+
+        unode->loop_col = MEM_calloc_arrayN(totloop * 4, sizeof(float), "pbvh node loop colors");
+        unode->totloop = totloop;
+      }
       break;
     }
     case SCULPT_UNDO_DYNTOPO_BEGIN:
@@ -1177,15 +1179,21 @@ static void sculpt_undo_store_mask(Object *ob, SculptUndoNode *unode)
 static void sculpt_undo_store_color(Object *ob, SculptUndoNode *unode)
 {
   SculptSession *ss = ob->sculpt;
-  PBVHVertexIter vd;
+  const Mesh *me = BKE_object_get_original_mesh(ob);
 
-  BKE_pbvh_vertex_iter_begin (ss->pbvh, unode->node, vd, PBVH_ITER_ALL) {
-    float col[4];
-    SCULPT_vertex_color_get(ss, vd.index, col);
+  int allvert;
+  BKE_pbvh_node_num_verts(ss->pbvh, unode->node, NULL, &allvert);
 
-    copy_v4_v4(unode->col[vd.i], col);
+  BLI_assert(BKE_pbvh_type(ss->pbvh) == PBVH_FACES);
+  BLI_assert(unode->totvert == allvert);
+  BLI_assert(!unode->loop_col ||
+                 unode->totloop == BKE_pbvh_node_get_num_loops(pbvh, unode->node));
+
+  BKE_pbvh_save_node_vertex_colors(ss->pbvh, me, unode->node, unode->col);
+
+  if (unode->loop_col) {
+    BKE_pbvh_save_node_loop_colors(ss->pbvh, me, unode->node, unode->loop_col);
   }
-  BKE_pbvh_vertex_iter_end;
 }
 
 static SculptUndoNodeGeometry *sculpt_undo_geometry_get(SculptUndoNode *unode)
@@ -1448,7 +1456,7 @@ void SCULPT_undo_push_begin(Object *ob, const char *name)
   }
 
   /* Set end attribute in case SCULPT_undo_push_end is not called,
-   * so we don't end up with corrupted state. 
+   * so we don't end up with corrupted state.
    */
   if (!us->active_color_end.was_set) {
     sculpt_save_active_attribute(ob, &us->active_color_end);

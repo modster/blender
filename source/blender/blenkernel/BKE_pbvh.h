@@ -35,6 +35,7 @@ struct PBVH;
 struct PBVHNode;
 struct SubdivCCG;
 struct TaskParallelSettings;
+struct MeshElemMap;
 
 typedef struct PBVH PBVH;
 typedef struct PBVHNode PBVHNode;
@@ -525,9 +526,39 @@ void BKE_pbvh_node_color_buffer_free(PBVH *pbvh);
 bool BKE_pbvh_get_color_layer(const struct Mesh *me,
                               CustomDataLayer **cl_out,
                               AttributeDomain *attr_out);
+void BKE_pbvh_load_node_loop_colors(PBVH *pbvh,
+                                    struct Mesh *me,
+                                    PBVHNode *node,
+                                    float (*colors)[4]);
+void BKE_pbvh_swap_node_loop_colors(PBVH *pbvh,
+                                    struct Mesh *me,
+                                    PBVHNode *node,
+                                    float (*colors)[4]);
+void BKE_pbvh_save_node_loop_colors(PBVH *pbvh,
+                                    const struct Mesh *me,
+                                    PBVHNode *node,
+                                    float (*colors)[4]);
 
-bool BKE_pbvh_is_drawing(PBVH *pbvh);
+void BKE_pbvh_load_node_vertex_colors(
+    PBVH *pbvh, struct Mesh *me, PBVHNode *node, float (*colors)[4]);
+void BKE_pbvh_swap_node_vertex_colors(
+    PBVH *pbvh, struct Mesh *me, PBVHNode *node, float (*colors)[4]);
+void BKE_pbvh_save_node_vertex_colors(PBVH *pbvh,
+                                      const struct Mesh *me,
+                                      PBVHNode *node,
+                                      float (*colors)[4]);
+
+bool BKE_pbvh_is_drawing(const PBVH *pbvh);
 void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val);
+
+/* Do not call in PBVH_GRIDS mode */
+int BKE_pbvh_node_get_num_loops(PBVH *pbvh, PBVHNode *node);
+
+void BKE_pbvh_update_active_vcol(PBVH *pbvh, const struct Mesh *mesh);
+void BKE_pbvh_pmap_set(PBVH *pbvh, const struct MeshElemMap *pmap);
+
+void BKE_pbvh_vertex_color_set(PBVH *pbvh, int vertex, float color[4]);
+void BKE_pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4]);
 
 #ifdef __cplusplus
 }

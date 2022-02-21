@@ -20,6 +20,7 @@
 #include "BKE_attribute.h"
 #include "BKE_ccg.h"
 #include "BKE_mesh.h"
+#include "BKE_mesh_mapping.h"
 #include "BKE_paint.h"
 #include "BKE_pbvh.h"
 #include "BKE_subdiv_ccg.h"
@@ -600,6 +601,8 @@ void BKE_pbvh_build_mesh(PBVH *pbvh,
 
   /* Clear the bitmap so it can be used as an update tag later on. */
   BLI_bitmap_set_all(pbvh->vert_bitmap, false, totvert);
+
+  BKE_pbvh_update_active_vcol(pbvh, mesh);
 }
 
 void BKE_pbvh_build_grids(PBVH *pbvh,
@@ -1260,12 +1263,16 @@ bool BKE_pbvh_get_color_layer(const Mesh *me, CustomDataLayer **r_layer, Attribu
   CustomDataLayer *layer = BKE_id_attributes_active_color_get((ID *)me);
 
   if (!layer || !ELEM(layer->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
+    *r_layer = NULL;
+    *r_attr = ATTR_DOMAIN_NUM;
     return false;
   }
 
   AttributeDomain domain = BKE_id_attribute_domain((ID *)me, layer);
 
   if (!ELEM(domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CORNER)) {
+    *r_layer = NULL;
+    *r_attr = ATTR_DOMAIN_NUM;
     return false;
   }
 
@@ -3101,7 +3108,7 @@ void BKE_pbvh_respect_hide_set(PBVH *pbvh, bool respect_hide)
 {
   pbvh->respect_hide = respect_hide;
 }
-bool BKE_pbvh_is_drawing(PBVH *pbvh)
+bool BKE_pbvh_is_drawing(const PBVH *pbvh)
 {
   return pbvh->is_drawing;
 }
@@ -3109,4 +3116,392 @@ bool BKE_pbvh_is_drawing(PBVH *pbvh)
 void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val)
 {
   pbvh->is_drawing = val;
+}
+
+void BKE_pbvh_swap_node_loop_colors(PBVH *pbvh, Mesh *me, PBVHNode *node, float (*colors)[4])
+{
+}
+
+void BKE_pbvh_load_node_loop_colors(PBVH *pbvh, Mesh *me, PBVHNode *node, float (*colors)[4])
+{
+  BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
+  BLI_assert(colors);
+
+  CustomDataLayer *layer;
+  AttributeDomain domain;
+
+  BKE_pbvh_get_color_layer(me, &layer, &domain);
+  MPropCol *pcol = NULL;
+  MLoopCol *mcol = NULL;
+
+  BLI_assert(domain == ATTR_DOMAIN_CORNER);
+  BLI_assert(layer != NULL);
+
+  if (layer->type == CD_PROP_COLOR) {
+    pcol = layer->data;
+  }
+  else {
+    mcol = layer->data;
+  }
+
+  int loop_index = 0;
+
+  if (pcol) {
+    for (int i = 0; i < node->totprim; i++) {
+      const MLoopTri *lt = pbvh->looptri + node->prim_indices[i];
+
+      for (int j = 0; j < 3; j++, loop_index++) {
+        copy_v4_v4(pcol[lt->tri[j]].color, colors[loop_index]);
+      }
+    }
+  }
+  else {
+    for (int i = 0; i < node->totprim; i++) {
+      const MLoopTri *lt = pbvh->looptri + node->prim_indices[i];
+
+      for (int j = 0; j < 3; j++, loop_index++) {
+        float color[4];
+
+        copy_v4_v4(color, colors[loop_index]);
+        linearrgb_to_srgb_v3_v3(color, colors[loop_index]);
+        rgba_float_to_uchar((char *)(mcol + lt->tri[j]), color);
+      }
+    }
+  }
+}
+
+void BKE_pbvh_save_node_loop_colors(PBVH *pbvh, const Mesh *me, PBVHNode *node, float (*colors)[4])
+{
+  BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
+
+  CustomDataLayer *layer;
+  AttributeDomain domain;
+
+  BKE_pbvh_get_color_layer(me, &layer, &domain);
+  MPropCol *pcol = NULL;
+  MLoopCol *mcol = NULL;
+
+  BLI_assert(domain == ATTR_DOMAIN_CORNER);
+  BLI_assert(layer != NULL);
+
+  if (layer->type == CD_PROP_COLOR) {
+    pcol = layer->data;
+  }
+  else {
+    mcol = layer->data;
+  }
+
+  int loop_index = 0;
+
+  if (pcol) {
+    for (int i = 0; i < node->totprim; i++) {
+      const MLoopTri *lt = pbvh->looptri + node->prim_indices[i];
+
+      for (int j = 0; j < 3; j++) {
+        copy_v4_v4(colors[loop_index++], pcol[lt->tri[j]].color);
+      }
+    }
+  }
+  else {
+    for (int i = 0; i < node->totprim; i++) {
+      const MLoopTri *lt = pbvh->looptri + node->prim_indices[i];
+
+      for (int j = 0; j < 3; j++) {
+        float color[4];
+
+        rgba_uchar_to_float(color, (const char *)(mcol + lt->tri[j]));
+        srgb_to_linearrgb_v3_v3(color, color);
+
+        copy_v4_v4(colors[loop_index++], color);
+      }
+    }
+  }
+}
+
+int BKE_pbvh_node_get_num_loops(PBVH *pbvh, PBVHNode *node)
+{
+  BLI_assert(BKE_pbvh_type(pbvh) != PBVH_GRIDS);
+
+  switch (BKE_pbvh_type(pbvh)) {
+    case PBVH_FACES:
+      return node->totprim * 3;
+    case PBVH_BMESH:
+      return BLI_gset_len(node->bm_faces) * 3;
+    case PBVH_GRIDS:
+      return 0;
+  }
+
+  return 0;
+}
+
+static void pbvh_load_node_vertex_colors(
+    PBVH *pbvh, Mesh *me, PBVHNode *node, float (*colors)[4], CustomDataLayer *layer)
+{
+  MPropCol *pcol = NULL;
+  MLoopCol *mcol = NULL;
+
+  BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
+  BLI_assert(layer != NULL);
+
+  if (layer->type == CD_PROP_COLOR) {
+    pcol = layer->data;
+  }
+  else {
+    mcol = layer->data;
+  }
+
+  int allvert;
+  BKE_pbvh_node_num_verts(pbvh, node, NULL, &allvert);
+
+  if (pcol) {
+    for (int i = 0; i < allvert; i++) {
+      copy_v4_v4(pcol[node->vert_indices[i]].color, colors[i]);
+    }
+  }
+  else {
+    for (int i = 0; i < allvert; i++) {
+      float color[4];
+
+      copy_v4_v4(color, colors[i]);
+      linearrgb_to_srgb_v3_v3(color, color);
+      rgba_float_to_uchar((char *)(mcol + node->vert_indices[i]), color);
+    }
+  }
+}
+
+static void pbvh_load_node_loop_vertex_colors(
+    PBVH *pbvh, Mesh *me, PBVHNode *node, float (*colors)[4], CustomDataLayer *layer)
+{
+  BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
+
+  int allvert;
+  BKE_pbvh_node_num_verts(pbvh, node, NULL, &allvert);
+
+  for (int i = 0; i < allvert; i++) {
+    BKE_pbvh_vertex_color_set(pbvh, node->vert_indices[i], colors[i]);
+  }
+}
+
+void BKE_pbvh_load_node_vertex_colors(PBVH *pbvh,
+                                      struct Mesh *me,
+                                      PBVHNode *node,
+                                      float (*colors)[4])
+{
+  CustomDataLayer *layer;
+  AttributeDomain domain;
+
+  BKE_pbvh_get_color_layer(me, &layer, &domain);
+
+  if (domain == ATTR_DOMAIN_CORNER) {
+    pbvh_load_node_loop_vertex_colors(pbvh, me, node, colors, layer);
+  }
+  else {
+    pbvh_load_node_vertex_colors(pbvh, me, node, colors, layer);
+  }
+}
+
+void BKE_pbvh_swap_node_vertex_colors(PBVH *pbvh, Mesh *me, PBVHNode *node, float (*colors)[4])
+{
+}
+
+void pbvh_save_node_vertex_colors(PBVH *pbvh, const Mesh *me, PBVHNode *node, float (*colors)[4])
+{
+  BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
+
+  CustomDataLayer *layer;
+  AttributeDomain domain;
+
+  BKE_pbvh_get_color_layer(me, &layer, &domain);
+  MPropCol *pcol = NULL;
+  MLoopCol *mcol = NULL;
+
+  BLI_assert(domain == ATTR_DOMAIN_CORNER);
+  BLI_assert(layer != NULL);
+
+  if (layer->type == CD_PROP_COLOR) {
+    pcol = layer->data;
+  }
+  else {
+    mcol = layer->data;
+  }
+
+  int allvert;
+  BKE_pbvh_node_num_verts(pbvh, node, NULL, &allvert);
+
+  if (pcol) {
+    for (int i = 0; i < allvert; i++) {
+      copy_v4_v4(colors[i], pcol[node->vert_indices[i]].color);
+    }
+  }
+  else {
+    for (int i = 0; i < allvert; i++) {
+      float color[4];
+
+      rgba_uchar_to_float(color, (const char *)(mcol + node->vert_indices[i]));
+      linearrgb_to_srgb_v3_v3(color, color);
+      copy_v4_v4(colors[i], color);
+    }
+  }
+}
+
+void pbvh_save_node_loop_vertex_colors(PBVH *pbvh,
+                                       const Mesh *me,
+                                       PBVHNode *node,
+                                       float (*colors)[4])
+{
+  BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
+
+  int allvert;
+  BKE_pbvh_node_num_verts(pbvh, node, NULL, &allvert);
+
+  for (int i = 0; i < allvert; i++) {
+    BKE_pbvh_vertex_color_get(pbvh, node->vert_indices[i], colors[i]);
+  }
+}
+
+void BKE_pbvh_save_node_vertex_colors(PBVH *pbvh,
+                                      const Mesh *me,
+                                      PBVHNode *node,
+                                      float (*colors)[4])
+{
+  BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
+
+  CustomDataLayer *layer;
+  AttributeDomain domain;
+
+  BKE_pbvh_get_color_layer(me, &layer, &domain);
+
+  if (domain == ATTR_DOMAIN_POINT) {
+    pbvh_save_node_vertex_colors(pbvh, me, node, colors);
+  }
+  else {
+    pbvh_save_node_loop_vertex_colors(pbvh, me, node, colors);
+  }
+}
+
+void BKE_pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
+{
+  if (pbvh->vcol_domain == ATTR_DOMAIN_CORNER) {
+    int tot = 0;
+    const MeshElemMap *melem = pbvh->pmap + vertex;
+
+    zero_v4(r_color);
+
+    if (pbvh->vcol->type == CD_PROP_COLOR) {
+      MPropCol *pcol = pbvh->vcol->data;
+
+      for (int i = 0; i < melem->count; i++) {
+        const MPoly *mp = pbvh->mpoly + melem->indices[i];
+        const MLoop *ml = pbvh->mloop + mp->loopstart;
+
+        for (int j = 0; j < mp->totloop; j++, ml++) {
+          if (ml->v == vertex) {
+            add_v4_v4(r_color, pcol[mp->loopstart + j].color);
+            tot++;
+          }
+        }
+      }
+    }
+    else if (1) {
+      MLoopCol *mcol = pbvh->vcol->data;
+
+      for (int i = 0; i < melem->count; i++) {
+        const MPoly *mp = pbvh->mpoly + melem->indices[i];
+        const MLoop *ml = pbvh->mloop + mp->loopstart;
+
+        for (int j = 0; j < mp->totloop; j++, ml++) {
+          if (ml->v == vertex) {
+            float color[4];
+
+            rgba_uchar_to_float(color, (const char *)mcol + mp->loopstart + j);
+            srgb_to_linearrgb_v3_v3(color, color);
+            add_v3_v3(r_color, color);
+
+            tot++;
+          }
+        }
+      }
+    }
+
+    if (tot) {
+      mul_v4_fl(r_color, 1.0f / (float)tot);
+    }
+  }
+  else {
+    if (pbvh->vcol->type == CD_PROP_COLOR) {
+      copy_v4_v4(r_color, ((MPropCol *)pbvh->vcol->data)[vertex].color);
+    }
+    else {
+      MLoopCol *mcol = (MLoopCol *)pbvh->vcol->data;
+      mcol += vertex;
+
+      rgba_uchar_to_float(r_color, (const char *)mcol);
+      srgb_to_linearrgb_v3_v3(r_color, r_color);
+    }
+  }
+}
+
+void BKE_pbvh_vertex_color_set(PBVH *pbvh, int vertex, float color[4])
+{
+  if (pbvh->vcol_domain == ATTR_DOMAIN_CORNER) {
+    const MeshElemMap *melem = pbvh->pmap + vertex;
+
+    MPropCol *pcol = pbvh->vcol->data;
+
+    if (pbvh->vcol->type == CD_PROP_COLOR) {
+      for (int i = 0; i < melem->count; i++) {
+        const MPoly *mp = pbvh->mpoly + melem->indices[i];
+        const MLoop *ml = pbvh->mloop + mp->loopstart;
+
+        for (int j = 0; j < mp->totloop; j++, ml++) {
+          if (ml->v == vertex) {
+            copy_v4_v4(pcol[mp->loopstart + j].color, color);
+          }
+        }
+      }
+    }
+    else {
+      MLoopCol *mcol = pbvh->vcol->data;
+
+      for (int i = 0; i < melem->count; i++) {
+        const MPoly *mp = pbvh->mpoly + melem->indices[i];
+        const MLoop *ml = pbvh->mloop + mp->loopstart;
+
+        for (int j = 0; j < mp->totloop; j++, ml++) {
+          if (ml->v == vertex) {
+            float color2[4];
+
+            copy_v4_v4(color2, color);
+            linearrgb_to_srgb_v3_v3(color2, color2);
+            rgba_float_to_uchar((char *)mcol + mp->loopstart + j, color2);
+          }
+        }
+      }
+    }
+  }
+  else {
+    if (pbvh->vcol->type == CD_PROP_COLOR) {
+      copy_v4_v4(((MPropCol *)pbvh->vcol->data)[vertex].color, color);
+    }
+    else {
+      MLoopCol *mcol = (MLoopCol *)pbvh->vcol->data;
+      mcol += vertex;
+
+      float color2[4];
+      copy_v4_v4(color2, color);
+
+      linearrgb_to_srgb_v3_v3(color2, color2);
+      rgba_float_to_uchar((char *)mcol, color2);
+    }
+  }
+}
+
+void BKE_pbvh_update_active_vcol(PBVH *pbvh, const Mesh *mesh)
+{
+  BKE_pbvh_get_color_layer(mesh, &pbvh->vcol, &pbvh->vcol_domain);
+}
+
+void BKE_pbvh_pmap_set(PBVH *pbvh, const MeshElemMap *pmap)
+{
+  pbvh->pmap = pmap;
 }

@@ -139,6 +139,9 @@ typedef struct SculptUndoNode {
   float *mask;
   int totvert;
 
+  float (*loop_col)[4];
+  int totloop;
+
   /* non-multires */
   int maxvert; /* to verify if totvert it still the same */
   int *index;  /* to restore into right location */

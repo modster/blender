@@ -16,6 +16,8 @@ typedef struct {
   float bmin[3], bmax[3], bcentroid[3];
 } BBC;
 
+struct MeshElemMap;
+
 /* NOTE: this structure is getting large, might want to split it into
  * union'd structs */
 struct PBVHNode {
@@ -165,6 +167,11 @@ struct PBVH {
 
   struct BMLog *bm_log;
   struct SubdivCCG *subdiv_ccg;
+
+  const struct MeshElemMap *pmap;
+
+  CustomDataLayer *vcol;
+  AttributeDomain vcol_domain;
 
   bool is_drawing;
 };
