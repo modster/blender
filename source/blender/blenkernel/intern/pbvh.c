@@ -3101,3 +3101,12 @@ void BKE_pbvh_respect_hide_set(PBVH *pbvh, bool respect_hide)
 {
   pbvh->respect_hide = respect_hide;
 }
+bool BKE_pbvh_is_drawing(PBVH *pbvh)
+{
+  return pbvh->is_drawing;
+}
+
+void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val)
+{
+  pbvh->is_drawing = val;
+}

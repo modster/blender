@@ -526,6 +526,9 @@ bool BKE_pbvh_get_color_layer(const struct Mesh *me,
                               CustomDataLayer **cl_out,
                               AttributeDomain *attr_out);
 
+bool BKE_pbvh_is_drawing(PBVH *pbvh);
+void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val);
+
 #ifdef __cplusplus
 }
 #endif

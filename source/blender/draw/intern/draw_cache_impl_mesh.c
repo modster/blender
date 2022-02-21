@@ -870,6 +870,13 @@ static bool mesh_batch_cache_valid(Object *object, Mesh *me)
     return false;
   }
 
+  if (object->sculpt && object->sculpt->pbvh) {
+    if (cache->pbvh_is_drawing != BKE_pbvh_is_drawing(object->sculpt->pbvh)) {
+      printf("PBVH induced mesh cache invalidation!\n");
+      return false;
+    }
+  }
+
   if (cache->is_editmode != (me->edit_mesh != NULL)) {
     return false;
   }
@@ -897,6 +904,10 @@ static void mesh_batch_cache_init(Object *object, Mesh *me)
   }
 
   cache->is_editmode = me->edit_mesh != NULL;
+
+  if (object->sculpt && object->sculpt->pbvh) {
+    cache->pbvh_is_drawing = BKE_pbvh_is_drawing(object->sculpt->pbvh);
+  }
 
   if (cache->is_editmode == false) {
     // cache->edge_len = mesh_render_edges_len_get(me);

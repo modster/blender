@@ -165,6 +165,8 @@ struct PBVH {
 
   struct BMLog *bm_log;
   struct SubdivCCG *subdiv_ccg;
+
+  bool is_drawing;
 };
 
 /* pbvh.c */
