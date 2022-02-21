@@ -565,6 +565,28 @@ struct GPUSource {
         return 0;
       };
 
+      std::string func_args = input_args;
+      /* Workaround to support function call inside prints. We replace commas by a non control
+       * caracter $ in order to use simpler regex later. */
+      bool string_scope = false;
+      int func_scope = 0;
+      for (char &c : func_args) {
+        if (c == '"') {
+          string_scope = !string_scope;
+        }
+        else if (!string_scope) {
+          if (c == '(') {
+            func_scope++;
+          }
+          else if (c == ')') {
+            func_scope--;
+          }
+          else if (c == ',' && func_scope != 0) {
+            c = '$';
+          }
+        }
+      }
+
       const bool print_as_variable = (input_args[0] != '"') && find_token(input_args, ',') == -1;
       if (print_as_variable) {
         /* Variable or expression debuging. */
@@ -580,13 +602,12 @@ struct GPUSource {
       else {
         const std::regex arg_regex(
             /* String args. */
-            "\"([^\\r\\n\\t\\f\\v\"]+)\""
+            "[\\s]*\"([^\r\n\t\f\v\"]*)\""
             /* OR. */
             "|"
             /* value args. */
-            "[\\s]+([^\\r\\n\\t\\f\\v\"]+),");
+            "([^,]+)");
         std::smatch args_match;
-        std::string func_args = input_args;
         std::string::const_iterator args_search_start(func_args.cbegin());
         while (std::regex_search(args_search_start, func_args.cend(), args_match, arg_regex)) {
           args_search_start = args_match.suffix().first;
@@ -594,6 +615,11 @@ struct GPUSource {
           std::string arg_val = args_match[2].str();
 
           if (arg_string.empty()) {
+            for (char &c : arg_val) {
+              if (c == '$') {
+                c = ',';
+              }
+            }
             sub_output << "print_value(" << arg_val << ");";
           }
           else {
