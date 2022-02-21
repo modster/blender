@@ -60,6 +60,17 @@ class Stats : public AbstractStats {
   {
     drawn_fragments += fragments_drawn;
   }
+
+  void reset()
+  {
+    triangles = 0;
+    discarded_triangles = 0;
+    flushes = 0;
+    rasterlines = 0;
+    clamped_rasterlines = 0;
+    discarded_rasterlines = 0;
+    drawn_fragments = 0;
+  }
 };
 
 class NullStats : public AbstractStats {

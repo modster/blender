@@ -40,7 +40,8 @@ class FragmentShader : public AbstractFragmentShader<float4, float4> {
   }
 };
 
-TEST(imbuf_rasterizer, draw_triangle)
+/* Draw 2 triangles that fills the entire image buffer and see if each pixel is touched. */
+TEST(imbuf_rasterizer, draw_triangle_edge_alignment_quality)
 {
   ImBuf image_buffer;
   IMB_initImBuf(&image_buffer, IMBUF_SIZE, IMBUF_SIZE, 32, IB_rectfloat);
@@ -51,13 +52,6 @@ TEST(imbuf_rasterizer, draw_triangle)
   VertexShader &vertex_shader = rasterizer.vertex_shader();
   vertex_shader.image_size = float2(image_buffer.x, image_buffer.y);
 
-  EXPECT_EQ(rasterizer.stats.triangles, 0);
-  EXPECT_EQ(rasterizer.stats.discarded_triangles, 0);
-  EXPECT_EQ(rasterizer.stats.rasterlines, 0);
-  EXPECT_EQ(rasterizer.stats.discarded_rasterlines, 0);
-  EXPECT_EQ(rasterizer.stats.clamped_rasterlines, 0);
-  EXPECT_EQ(rasterizer.stats.drawn_fragments, 0);
-
   float clear_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   char file_name[FILE_MAX];
 
@@ -66,18 +60,33 @@ TEST(imbuf_rasterizer, draw_triangle)
   float3 scale(1.0, 1.0, 1.0);
 
   for (int i = 0; i < 1000; i++) {
+    rasterizer.stats.reset();
+
     BLI_path_sequence_encode(file_name, "/tmp/test_", ".png", 4, i);
 
     IMB_rectfill(&image_buffer, clear_color);
     rotation[2] = (i / 1000.0) * M_PI * 2;
 
     vertex_shader.vp_mat = float4x4::from_loc_eul_scale(location, rotation, scale);
-    rasterizer.draw_triangle(VertexInput(float2(-0.4, -0.4), 0.2),
-                             VertexInput(float2(0.0, 0.4), 0.5),
-                             VertexInput(float2(0.3, 0.0), 1.0));
+    rasterizer.draw_triangle(VertexInput(float2(-1.0, -1.0), 0.2),
+                             VertexInput(float2(-1.0, 1.0), 0.5),
+                             VertexInput(float2(1.0, -1.0), 1.0));
+    rasterizer.draw_triangle(VertexInput(float2(1.0, 1.0), 0.2),
+                             VertexInput(float2(-1.0, 1.0), 0.5),
+                             VertexInput(float2(1.0, -1.0), 1.0));
     rasterizer.flush();
 
+    if (rasterizer.stats.drawn_fragments != IMBUF_SIZE * IMBUF_SIZE) {
+      printf("%s\n", file_name);
+    }
+
+    /* Check if each pixel has been drawn exactly once. */
+    EXPECT_EQ(rasterizer.stats.drawn_fragments, IMBUF_SIZE * IMBUF_SIZE);
+
+#if 1
     IMB_saveiff(&image_buffer, file_name, IB_rectfloat);
+#endif
+
     imb_freerectImBuf(&image_buffer);
   }
 

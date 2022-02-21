@@ -349,11 +349,15 @@ class Rasterizer {
 #endif
     std::array<VertexOutputType *, 3> sorted_vertices = order_triangle_vertices(vertex_out);
 
-    const int min_v = clamping_method.scanline_for(sorted_vertices[0]->coord[1]);
-    const int mid_v =
-        clamping_method.scanline_for(sorted_vertices[1]->coord[1]) -
-        (clamping_method.distance_to_scanline_anchor(sorted_vertices[1]->coord[1]) == 0.5 ? 0 : 1);
-    const int max_v = clamping_method.scanline_for(sorted_vertices[2]->coord[1]) - 1;
+    const int min_rasterline_y = clamping_method.scanline_for(sorted_vertices[0]->coord[1]);
+    const int mid_rasterline_y_correction = clamping_method.distance_to_scanline_anchor(
+                                                sorted_vertices[1]->coord[1]) == 0.0 ?
+                                                0 :
+                                                1;
+    const int mid_rasterline_y = max_ii(
+        clamping_method.scanline_for(sorted_vertices[1]->coord[1]) - mid_rasterline_y_correction,
+        min_rasterline_y);
+    const int max_rasterline_y = clamping_method.scanline_for(sorted_vertices[2]->coord[1]) - 1;
 
     /* left and right branch. */
     VertexOutputType left = *sorted_vertices[0];
@@ -370,8 +374,8 @@ class Rasterizer {
       right_target = sorted_vertices[1];
     }
 
-    VertexOutputType left_add = calc_vertex_output_data(left, *left_target);
-    VertexOutputType right_add = calc_vertex_output_data(right, *right_target);
+    VertexOutputType left_add = calc_branch_delta(left, *left_target);
+    VertexOutputType right_add = calc_branch_delta(right, *right_target);
 
     /* Change winding order to match the steepness of the edges. */
     if (right_add.coord[0] < left_add.coord[0]) {
@@ -381,63 +385,51 @@ class Rasterizer {
 
     /* Calculate the adder for each x pixel. This is constant for the whole triangle. It is
      * calculated at the midline to reduce edge cases. */
-    const InterfaceInnerType fragment_add = calc_fragment_adder(
+    const InterfaceInnerType fragment_add = calc_fragment_delta(
         sorted_vertices, left, right, left_add, right_add, left_target);
 
     /* Perform a substep to make sure that the data of left and right match the data on the anchor
      * point (center of the pixel). */
-    const float distance_to_minline_anchor_point = clamping_method.distance_to_scanline_anchor(
-        sorted_vertices[0]->coord[1]);
-    left += left_add * distance_to_minline_anchor_point;
-    right += right_add * distance_to_minline_anchor_point;
+    update_branches_to_min_anchor_line(*sorted_vertices[0], left, right, left_add, right_add);
 
-    /* Add rasterlines from min_v to mid_v. */
-    int v;
-    for (v = min_v; v < mid_v; v++) {
-      if (v >= 0 && v < image_buffer_->y) {
+    /* Add rasterlines from min_rasterline_y to mid_rasterline_y. */
+    rasterize_loop(
+        min_rasterline_y, mid_rasterline_y, left, right, left_add, right_add, fragment_add);
+
+    /* Special case when mid vertex is on the same rasterline as the min vertex.
+     * In this case we need to split the right/left branches. Comparing the x coordinate to find
+     * the branch that should hold the mid vertex.
+     */
+    if (min_rasterline_y == mid_rasterline_y) {
+      update_branch_for_flat_bottom(*sorted_vertices[0], *sorted_vertices[1], left, right);
+    }
+
+    update_branches_at_mid_anchor_line(
+        *sorted_vertices[1], *sorted_vertices[2], left, right, left_add, right_add);
+
+    /* Add rasterlines from mid_rasterline_y to max_rasterline_y. */
+    rasterize_loop(
+        mid_rasterline_y, max_rasterline_y, left, right, left_add, right_add, fragment_add);
+  }
+
+  /**
+   * Rasterize multiple sequential lines.
+   *
+   * Create and buffer rasterlines between #from_y and #to_y.
+   * The #left and #right branches are incremented for each rasterline.
+   */
+  void rasterize_loop(int32_t from_y,
+                      int32_t to_y,
+                      VertexOutputType &left,
+                      VertexOutputType &right,
+                      const VertexOutputType &left_add,
+                      const VertexOutputType &right_add,
+                      const InterfaceInnerType &fragment_add)
+  {
+    for (int y = from_y; y < to_y; y++) {
+      if (y >= 0 && y < image_buffer_->y) {
         std::optional<RasterlineType> rasterline = clamped_rasterline(
-            v, left.coord[0], right.coord[0], left.data, fragment_add);
-        if (rasterline) {
-          append(*rasterline);
-        }
-      }
-      left += left_add;
-      right += right_add;
-    }
-
-    if (min_v >= mid_v) {
-      if (sorted_vertices[0]->coord[0] > sorted_vertices[1]->coord[0]) {
-        left = *sorted_vertices[1];
-      }
-      else {
-        right = *sorted_vertices[1];
-      }
-    }
-
-    /* When both are the same we should the left/right branches are the same. */
-    const float distance_to_midline_anchor_point = clamping_method.distance_to_scanline_anchor(
-        sorted_vertices[1]->coord[1]);
-    /* Use the x coordinate to identify which branch should be modified. */
-    const float distance_to_left = abs(left.coord[0] - sorted_vertices[1]->coord[0]);
-    const float distance_to_right = abs(right.coord[0] - sorted_vertices[1]->coord[0]);
-    if (distance_to_left < distance_to_right) {
-      left = *sorted_vertices[1];
-      left_target = sorted_vertices[2];
-      left_add = calc_vertex_output_data(left, *left_target);
-      left += left_add * distance_to_midline_anchor_point;
-    }
-    else {
-      right = *sorted_vertices[1];
-      right_target = sorted_vertices[2];
-      right_add = calc_vertex_output_data(right, *right_target);
-      right += right_add * distance_to_midline_anchor_point;
-    }
-
-    /* Add rasterlines from mid_v to max_v. */
-    for (; v < max_v; v++) {
-      if (v >= 0 && v < image_buffer_->y) {
-        std::optional<RasterlineType> rasterline = clamped_rasterline(
-            v, left.coord[0], right.coord[0], left.data, fragment_add);
+            y, left.coord[0], right.coord[0], left.data, fragment_add);
         if (rasterline) {
           append(*rasterline);
         }
@@ -448,16 +440,70 @@ class Rasterizer {
   }
 
   /**
-   * Calculate the delta adder between two fragments.
+   * Update the left or right branch for when the mid vertex is on the same rasterline as the min
+   * vertex.
+   */
+  void update_branch_for_flat_bottom(const VertexOutputType &min_vertex,
+                                     const VertexOutputType &mid_vertex,
+                                     VertexOutputType &r_left,
+                                     VertexOutputType &r_right) const
+  {
+    if (min_vertex.coord[0] > mid_vertex.coord[0]) {
+      r_left = mid_vertex;
+    }
+    else {
+      r_right = mid_vertex;
+    }
+  }
+
+  void update_branches_to_min_anchor_line(const VertexOutputType &min_vertex,
+                                          VertexOutputType &r_left,
+                                          VertexOutputType &r_right,
+                                          const VertexOutputType &left_add,
+                                          const VertexOutputType &right_add)
+  {
+    const float distance_to_minline_anchor_point = clamping_method.distance_to_scanline_anchor(
+        min_vertex.coord[1]);
+    r_left += left_add * distance_to_minline_anchor_point;
+    r_right += right_add * distance_to_minline_anchor_point;
+  }
+
+  void update_branches_at_mid_anchor_line(const VertexOutputType &mid_vertex,
+                                          const VertexOutputType &max_vertex,
+                                          VertexOutputType &r_left,
+                                          VertexOutputType &r_right,
+                                          VertexOutputType &r_left_add,
+                                          VertexOutputType &r_right_add)
+  {
+    /* When both are the same we should the left/right branches are the same. */
+    const float distance_to_midline_anchor_point = clamping_method.distance_to_scanline_anchor(
+        mid_vertex.coord[1]);
+    /* Use the x coordinate to identify which branch should be modified. */
+    const float distance_to_left = abs(r_left.coord[0] - mid_vertex.coord[0]);
+    const float distance_to_right = abs(r_right.coord[0] - mid_vertex.coord[0]);
+    if (distance_to_left < distance_to_right) {
+      r_left = mid_vertex;
+      r_left_add = calc_branch_delta(r_left, max_vertex);
+      r_left += r_left_add * distance_to_midline_anchor_point;
+    }
+    else {
+      r_right = mid_vertex;
+      r_right_add = calc_branch_delta(r_right, max_vertex);
+      r_right += r_right_add * distance_to_midline_anchor_point;
+    }
+  }
+
+  /**
+   * Calculate the delta adder between two sequential fragments in the x-direction.
    *
    * Fragment adder is constant and can be calculated once and reused for each rasterline of
-   * the same triangle. However the calculation requires a distance that might not be known at the
-   * first scanline that is added. Therefore this method uses the mid scanline as there is the max
-   * x_distance.
+   * the same triangle. However the calculation requires a distance that might not be known at
+   * the first scanline that is added. Therefore this method uses the mid scanline as there is
+   * the max x_distance.
    *
    * \returns the adder that can be added the previous fragment data.
    */
-  InterfaceInnerType calc_fragment_adder(const std::array<VertexOutputType *, 3> &sorted_vertices,
+  InterfaceInnerType calc_fragment_delta(const std::array<VertexOutputType *, 3> &sorted_vertices,
                                          const VertexOutputType &left,
                                          const VertexOutputType &right,
                                          const VertexOutputType &left_add,
@@ -486,14 +532,14 @@ class Rasterizer {
            (sorted_vertices[1]->coord[0] - mid_left.coord[0]);
   }
 
-  VertexOutputType calc_vertex_output_data(const VertexOutputType &from,
-                                           const VertexOutputType &to)
+  /**
+   * Calculate the delta adder between two rasterlines for the given edge.
+   */
+  VertexOutputType calc_branch_delta(const VertexOutputType &from, const VertexOutputType &to)
   {
-    const float num_rasterlines = to.coord[1] - from.coord[1];
-    if (num_rasterlines == 0.0) {
-      return (to - from);
-    }
-    return (to - from) / num_rasterlines;
+    const float num_rasterlines = max_ff(to.coord[1] - from.coord[1], 1.0f);
+    VertexOutputType result = (to - from) / num_rasterlines;
+    return result;
   }
 
   std::array<VertexOutputType *, 3> order_triangle_vertices(
@@ -563,7 +609,6 @@ class Rasterizer {
       return std::nullopt;
     }
 
-    // FragmentInputType add_x = (end_data - start_data) / (end_x - start_x);
     /* Is created rasterline clamped and should be added to the statistics. */
     bool is_clamped = false;
 
@@ -607,6 +652,8 @@ class Rasterizer {
 
       data += rasterline.fragment_add;
     }
+
+    stats.increase_drawn_fragments(rasterline.end_x - rasterline.start_x);
   }
 
   void append(const RasterlineType &rasterline)
