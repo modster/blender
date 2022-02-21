@@ -342,7 +342,9 @@ class Rasterizer {
     std::array<VertexOutputType *, 3> sorted_vertices = order_triangle_vertices(vertex_out);
 
     const int min_v = clamping_method.scanline_for(sorted_vertices[0]->coord[1]);
-    const int mid_v = clamping_method.scanline_for(sorted_vertices[1]->coord[1]);
+    const int mid_v =
+        clamping_method.scanline_for(sorted_vertices[1]->coord[1]) -
+        (clamping_method.distance_to_scanline_anchor(sorted_vertices[1]->coord[1]) == 0.5 ? 0 : 1);
     const int max_v = clamping_method.scanline_for(sorted_vertices[2]->coord[1]) - 1;
 
     /* left and right branch. */
@@ -389,7 +391,7 @@ class Rasterizer {
       right += right_add;
     }
 
-    if (min_v == mid_v) {
+    if (min_v >= mid_v) {
       if (sorted_vertices[0]->coord[0] > sorted_vertices[1]->coord[0]) {
         left = *sorted_vertices[1];
       }
