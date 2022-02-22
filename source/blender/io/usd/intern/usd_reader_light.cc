@@ -39,7 +39,11 @@ void USDLightReader::read_object_data(Main *bmain, const double motionSampleTime
     return;
   }
 
+#if PXR_VERSION >= 2111
   pxr::UsdLuxBoundableLightBase light_prim(prim_);
+#else
+  pxr::UsdLuxLight light_prim(prim_);
+#endif
 
   if (!light_prim) {
     return;

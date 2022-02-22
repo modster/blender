@@ -18,7 +18,12 @@
 #include <pxr/usd/usdGeom/nurbsCurves.h>
 #include <pxr/usd/usdGeom/scope.h>
 #include <pxr/usd/usdGeom/xform.h>
-#include <pxr/usd/usdLux/boundableLightBase.h>
+
+#if PXR_VERSION >= 2111
+#  include <pxr/usd/usdLux/boundableLightBase.h>
+#else
+#  include <pxr/usd/usdLux/light.h>
+#endif
 
 #include <iostream>
 
@@ -55,9 +60,15 @@ USDPrimReader *USDStageReader::create_reader_if_allowed(const pxr::UsdPrim &prim
   if (params_.import_meshes && prim.IsA<pxr::UsdGeomMesh>()) {
     return new USDMeshReader(prim, params_, settings_);
   }
+#if PXR_VERSION >= 2111
   if (params_.import_lights && prim.IsA<pxr::UsdLuxBoundableLightBase>()) {
     return new USDLightReader(prim, params_, settings_);
   }
+#else
+  if (params_.import_lights && prim.IsA<pxr::UsdLuxLight>()) {
+    return new USDLightReader(prim, params_, settings_);
+  }
+#endif
   if (params_.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
     return new USDVolumeReader(prim, params_, settings_);
   }
