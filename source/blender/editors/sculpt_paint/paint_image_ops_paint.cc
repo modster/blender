@@ -36,6 +36,8 @@
 
 #include "paint_intern.h"
 
+#include "paint_image_3d.hh"
+
 namespace blender::ed::sculpt_paint::image::ops::paint {
 
 /**
@@ -211,6 +213,57 @@ class ProjectionPaintMode : public AbstractPaintMode {
   }
 };
 
+class PerspectivePaintMode : public AbstractPaintMode {
+
+ public:
+  void *paint_new_stroke(
+      bContext *C, wmOperator *UNUSED(op), Object *ob, const float mouse[2], int mode) override
+  {
+    return image3d::stroke_new(C, ob);
+  }
+
+  void paint_stroke(bContext *C,
+                    void *stroke_handle,
+                    float prev_mouse[2],
+                    float mouse[2],
+                    int eraser,
+                    float pressure,
+                    float distance,
+                    float size) override
+  {
+    image3d::stroke_update(static_cast<image3d::StrokeHandle *>(stroke_handle), prev_mouse, mouse);
+  };
+
+  void paint_stroke_redraw(const bContext *C, void *stroke_handle, bool final) override
+  {
+  }
+
+  void paint_stroke_done(void *stroke_handle) override
+  {
+    image3d::stroke_free(static_cast<image3d::StrokeHandle *>(stroke_handle));
+  }
+
+  void paint_gradient_fill(const bContext *C,
+                           const Scene *scene,
+                           Brush *brush,
+                           struct PaintStroke *stroke,
+                           void *stroke_handle,
+                           float mouse_start[2],
+                           float mouse_end[2]) override
+  {
+  }
+
+  void paint_bucket_fill(const bContext *C,
+                         const Scene *scene,
+                         Brush *brush,
+                         struct PaintStroke *stroke,
+                         void *stroke_handle,
+                         float mouse_start[2],
+                         float mouse_end[2]) override
+  {
+  }
+};
+
 struct PaintOperation {
   AbstractPaintMode *mode = nullptr;
 
@@ -301,7 +354,13 @@ static PaintOperation *texture_paint_init(bContext *C, wmOperator *op, const flo
       WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, nullptr);
       return nullptr;
     }
+
+/* Set to 1 to switch back to original implementation. */
+#if 0
     pop->mode = MEM_new<ProjectionPaintMode>("ProjectionPaintMode");
+#else
+    pop->mode = MEM_new<PerspectivePaintMode>("PerspectivePaintMode");
+#endif
   }
   else {
     pop->mode = MEM_new<ImagePaintMode>("ImagePaintMode");

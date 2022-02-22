@@ -33,6 +33,7 @@ set(SRC
   paint_image_ops_paint.cc
   paint_image_2d.c
   paint_image_2d_curve_mask.cc
+  paint_image_3d.cc
   paint_image_proj.c
   paint_mask.c
   paint_ops.c
