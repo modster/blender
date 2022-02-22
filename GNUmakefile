@@ -57,14 +57,13 @@ Testing Targets
    * test_pep8:
      Checks all python script are pep8
      which are tagged to use the stricter formatting
-   * test_deprecated:
-     Checks for deprecation tags in our code which may need to be removed
 
 Static Source Code Checking
    Not associated with building Blender.
 
    * check_cppcheck:        Run blender source through cppcheck (C & C++).
    * check_clang_array:     Run blender source through clang array checking script (C & C++).
+   * check_deprecated:      Check if there is any deprecated code to remove.
    * check_splint:          Run blenders source through splint (C only).
    * check_sparse:          Run blenders source through sparse (C only).
    * check_smatch:          Run blenders source through smatch (C only).
@@ -410,10 +409,6 @@ test_cmake: .FORCE
 	@$(PYTHON) build_files/cmake/cmake_consistency_check.py > test_cmake_consistency.log 2>&1
 	@echo "written: test_cmake_consistency.log"
 
-# run deprecation tests, see if we have anything to remove.
-test_deprecated: .FORCE
-	@$(PYTHON) tests/check_deprecated.py
-
 
 # -----------------------------------------------------------------------------
 # Project Files
@@ -490,6 +485,11 @@ check_spelling_osl: .FORCE
 check_descriptions: .FORCE
 	@$(BLENDER_BIN) --background -noaudio --factory-startup --python \
 	    "$(BLENDER_DIR)/source/tools/check_source/check_descriptions.py"
+
+# run deprecation tests, see if we have anything to remove.
+check_deprecated: .FORCE
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    source/tools/check_source/check_deprecated.py
 
 check_licenses: .FORCE
 	@PYTHONIOENCODING=utf_8 $(PYTHON) \
