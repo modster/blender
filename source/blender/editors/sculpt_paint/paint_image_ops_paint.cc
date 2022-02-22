@@ -3,7 +3,7 @@
 
 /** \file
  * \ingroup edsculpt
- * \brief Functions to paint images in 2D and 3D.
+ * \brief Painting operator to paint in 2D and 3D.
  */
 
 #include "DNA_brush_types.h"
@@ -38,22 +38,202 @@
 
 namespace blender::ed::sculpt_paint::image::ops::paint {
 
-enum class eTexPaintMode {
-  _2D,
-  _3D_PROJECT,
+/**
+ * Interface to use the same painting operator for 3D and 2D painting. Interface removes the
+ * differences between the actual calls that are being performed.
+ */
+class AbstractPaintMode {
+ public:
+  virtual void *paint_new_stroke(
+      bContext *C, wmOperator *op, Object *ob, const float mouse[2], int mode) = 0;
+  virtual void paint_stroke(bContext *C,
+                            void *stroke_handle,
+                            float prev_mouse[2],
+                            float mouse[2],
+                            int eraser,
+                            float pressure,
+                            float distance,
+                            float size) = 0;
+
+  virtual void paint_stroke_redraw(const bContext *C, void *stroke_handle, bool final) = 0;
+  virtual void paint_stroke_done(void *stroke_handle) = 0;
+  virtual void paint_gradient_fill(const bContext *C,
+                                   const Scene *scene,
+                                   Brush *brush,
+                                   struct PaintStroke *stroke,
+                                   void *stroke_handle,
+                                   float mouse_start[2],
+                                   float mouse_end[2]) = 0;
+  virtual void paint_bucket_fill(const bContext *C,
+                                 const Scene *scene,
+                                 Brush *brush,
+                                 struct PaintStroke *stroke,
+                                 void *stroke_handle,
+                                 float mouse_start[2],
+                                 float mouse_end[2]) = 0;
+};
+
+class ImagePaintMode : public AbstractPaintMode {
+ public:
+  void *paint_new_stroke(bContext *C,
+                         wmOperator *op,
+                         Object *UNUSED(ob),
+                         const float UNUSED(mouse[2]),
+                         int mode) override
+  {
+    return paint_2d_new_stroke(C, op, mode);
+  }
+
+  void paint_stroke(bContext *UNUSED(C),
+                    void *stroke_handle,
+                    float prev_mouse[2],
+                    float mouse[2],
+                    int eraser,
+                    float pressure,
+                    float distance,
+                    float size) override
+  {
+    paint_2d_stroke(stroke_handle, prev_mouse, mouse, eraser, pressure, distance, size);
+  }
+
+  void paint_stroke_redraw(const bContext *C, void *stroke_handle, bool final) override
+  {
+    paint_2d_redraw(C, stroke_handle, final);
+  }
+
+  void paint_stroke_done(void *stroke_handle) override
+  {
+    paint_2d_stroke_done(stroke_handle);
+  }
+
+  void paint_gradient_fill(const bContext *C,
+                           const Scene *UNUSED(scene),
+                           Brush *brush,
+                           struct PaintStroke *UNUSED(stroke),
+                           void *stroke_handle,
+                           float mouse_start[2],
+                           float mouse_end[2]) override
+  {
+    paint_2d_gradient_fill(C, brush, mouse_start, mouse_end, stroke_handle);
+  }
+
+  void paint_bucket_fill(const bContext *C,
+                         const Scene *scene,
+                         Brush *brush,
+                         struct PaintStroke *stroke,
+                         void *stroke_handle,
+                         float mouse_start[2],
+                         float mouse_end[2]) override
+  {
+    float color[3];
+    if (paint_stroke_inverted(stroke)) {
+      srgb_to_linearrgb_v3_v3(color, BKE_brush_secondary_color_get(scene, brush));
+    }
+    else {
+      srgb_to_linearrgb_v3_v3(color, BKE_brush_color_get(scene, brush));
+    }
+    paint_2d_bucket_fill(C, color, brush, mouse_start, mouse_end, stroke_handle);
+  }
+};
+
+class ProjectionPaintMode : public AbstractPaintMode {
+ public:
+  void *paint_new_stroke(
+      bContext *C, wmOperator *UNUSED(op), Object *ob, const float mouse[2], int mode) override
+  {
+    return paint_proj_new_stroke(C, ob, mouse, mode);
+  }
+
+  void paint_stroke(bContext *C,
+                    void *stroke_handle,
+                    float prev_mouse[2],
+                    float mouse[2],
+                    int eraser,
+                    float pressure,
+                    float distance,
+                    float size) override
+  {
+    paint_proj_stroke(C, stroke_handle, prev_mouse, mouse, eraser, pressure, distance, size);
+  };
+
+  void paint_stroke_redraw(const bContext *C, void *stroke_handle, bool final) override
+  {
+    paint_proj_redraw(C, stroke_handle, final);
+  }
+
+  void paint_stroke_done(void *stroke_handle) override
+  {
+    paint_proj_stroke_done(stroke_handle);
+  }
+
+  void paint_gradient_fill(const bContext *C,
+                           const Scene *scene,
+                           Brush *brush,
+                           struct PaintStroke *stroke,
+                           void *stroke_handle,
+                           float mouse_start[2],
+                           float mouse_end[2]) override
+  {
+    paint_fill(C, scene, brush, stroke, stroke_handle, mouse_start, mouse_end);
+  }
+
+  void paint_bucket_fill(const bContext *C,
+                         const Scene *scene,
+                         Brush *brush,
+                         struct PaintStroke *stroke,
+                         void *stroke_handle,
+                         float mouse_start[2],
+                         float mouse_end[2]) override
+  {
+    paint_fill(C, scene, brush, stroke, stroke_handle, mouse_start, mouse_end);
+  }
+
+ private:
+  void paint_fill(const bContext *C,
+                  const Scene *scene,
+                  Brush *brush,
+                  struct PaintStroke *stroke,
+                  void *stroke_handle,
+                  float mouse_start[2],
+                  float mouse_end[2])
+  {
+    paint_proj_stroke(C,
+                      stroke_handle,
+                      mouse_start,
+                      mouse_end,
+                      paint_stroke_flipped(stroke),
+                      1.0,
+                      0.0,
+                      BKE_brush_size_get(scene, brush));
+    /* two redraws, one for GPU update, one for notification */
+    paint_proj_redraw(C, stroke_handle, false);
+    paint_proj_redraw(C, stroke_handle, true);
+  }
 };
 
 struct PaintOperation {
-  eTexPaintMode mode;
+  AbstractPaintMode *mode = nullptr;
 
-  void *stroke_handle;
+  void *stroke_handle = nullptr;
 
-  float prevmouse[2];
-  float startmouse[2];
-  double starttime;
+  float prevmouse[2] = {0.0f, 0.0f};
+  float startmouse[2] = {0.0f, 0.0f};
+  double starttime = 0.0;
 
-  wmPaintCursor *cursor;
-  ViewContext vc;
+  wmPaintCursor *cursor = nullptr;
+  ViewContext vc = {nullptr};
+
+  PaintOperation() = default;
+  ~PaintOperation()
+  {
+    MEM_delete(mode);
+    mode = nullptr;
+
+    if (cursor) {
+      WM_paint_cursor_end(cursor);
+      cursor = nullptr;
+    }
+  }
 };
 
 static void gradient_draw_line(bContext *UNUSED(C), int x, int y, void *customdata)
@@ -101,7 +281,7 @@ static PaintOperation *texture_paint_init(bContext *C, wmOperator *op, const flo
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
   ToolSettings *settings = scene->toolsettings;
-  PaintOperation *pop = MEM_cnew<PaintOperation>("PaintOperation"); /* caller frees */
+  PaintOperation *pop = MEM_new<PaintOperation>("PaintOperation"); /* caller frees */
   Brush *brush = BKE_paint_brush(&settings->imapaint.paint);
   int mode = RNA_enum_get(op->ptr, "mode");
   ED_view3d_viewcontext_init(C, &pop->vc, depsgraph);
@@ -109,10 +289,11 @@ static PaintOperation *texture_paint_init(bContext *C, wmOperator *op, const flo
   copy_v2_v2(pop->prevmouse, mouse);
   copy_v2_v2(pop->startmouse, mouse);
 
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  Object *ob = OBACT(view_layer);
+
   /* initialize from context */
   if (CTX_wm_region_view3d(C)) {
-    ViewLayer *view_layer = CTX_data_view_layer(C);
-    Object *ob = OBACT(view_layer);
     bool uvs, mat, tex, stencil;
     if (!ED_paint_proj_mesh_data_check(scene, ob, &uvs, &mat, &tex, &stencil)) {
       ED_paint_data_warning(op->reports, uvs, mat, tex, stencil);
@@ -120,14 +301,13 @@ static PaintOperation *texture_paint_init(bContext *C, wmOperator *op, const flo
       WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, nullptr);
       return nullptr;
     }
-    pop->mode = eTexPaintMode::_3D_PROJECT;
-    pop->stroke_handle = paint_proj_new_stroke(C, ob, mouse, mode);
+    pop->mode = MEM_new<ProjectionPaintMode>("ProjectionPaintMode");
   }
   else {
-    pop->mode = eTexPaintMode::_2D;
-    pop->stroke_handle = paint_2d_new_stroke(C, op, mode);
+    pop->mode = MEM_new<ImagePaintMode>("ImagePaintMode");
   }
 
+  pop->stroke_handle = pop->mode->paint_new_stroke(C, op, ob, mouse, mode);
   if (!pop->stroke_handle) {
     MEM_delete(pop);
     return nullptr;
@@ -189,16 +369,8 @@ static void paint_stroke_update_step(bContext *C,
     ED_image_undo_restore(ustack->step_init);
   }
 
-  switch (pop->mode) {
-    case eTexPaintMode::_2D:
-      paint_2d_stroke(pop->stroke_handle, pop->prevmouse, mouse, eraser, pressure, distance, size);
-      break;
-
-    case eTexPaintMode::_3D_PROJECT:
-      paint_proj_stroke(
-          C, pop->stroke_handle, pop->prevmouse, mouse, eraser, pressure, distance, size);
-      break;
-  }
+  pop->mode->paint_stroke(
+      C, pop->stroke_handle, pop->prevmouse, mouse, eraser, pressure, distance, size);
 
   copy_v2_v2(pop->prevmouse, mouse);
 
@@ -209,16 +381,7 @@ static void paint_stroke_update_step(bContext *C,
 static void paint_stroke_redraw(const bContext *C, struct PaintStroke *stroke, bool final)
 {
   PaintOperation *pop = static_cast<PaintOperation *>(paint_stroke_mode_data(stroke));
-
-  switch (pop->mode) {
-    case eTexPaintMode::_2D:
-      paint_2d_redraw(C, pop->stroke_handle, final);
-      break;
-
-    case eTexPaintMode::_3D_PROJECT:
-      paint_proj_redraw(C, pop->stroke_handle, final);
-      break;
-  }
+  pop->mode->paint_stroke_redraw(C, pop->stroke_handle, final);
 }
 
 static void paint_stroke_done(const bContext *C, struct PaintStroke *stroke)
@@ -232,75 +395,20 @@ static void paint_stroke_done(const bContext *C, struct PaintStroke *stroke)
 
   if (brush->imagepaint_tool == PAINT_TOOL_FILL) {
     if (brush->flag & BRUSH_USE_GRADIENT) {
-      switch (pop->mode) {
-        case eTexPaintMode::_2D:
-          paint_2d_gradient_fill(C, brush, pop->startmouse, pop->prevmouse, pop->stroke_handle);
-          break;
-
-        case eTexPaintMode::_3D_PROJECT:
-          paint_proj_stroke(C,
-                            pop->stroke_handle,
-                            pop->startmouse,
-                            pop->prevmouse,
-                            paint_stroke_flipped(stroke),
-                            1.0,
-                            0.0,
-                            BKE_brush_size_get(scene, brush));
-          /* two redraws, one for GPU update, one for notification */
-          paint_proj_redraw(C, pop->stroke_handle, false);
-          paint_proj_redraw(C, pop->stroke_handle, true);
-          break;
-      }
+      pop->mode->paint_gradient_fill(
+          C, scene, brush, stroke, pop->stroke_handle, pop->startmouse, pop->prevmouse);
     }
     else {
-      switch (pop->mode) {
-        case eTexPaintMode::_2D: {
-          float color[3];
-          if (paint_stroke_inverted(stroke)) {
-            srgb_to_linearrgb_v3_v3(color, BKE_brush_secondary_color_get(scene, brush));
-          }
-          else {
-            srgb_to_linearrgb_v3_v3(color, BKE_brush_color_get(scene, brush));
-          }
-          paint_2d_bucket_fill(
-              C, color, brush, pop->startmouse, pop->prevmouse, pop->stroke_handle);
-          break;
-        }
-
-        case eTexPaintMode::_3D_PROJECT:
-          paint_proj_stroke(C,
-                            pop->stroke_handle,
-                            pop->startmouse,
-                            pop->prevmouse,
-                            paint_stroke_flipped(stroke),
-                            1.0,
-                            0.0,
-                            BKE_brush_size_get(scene, brush));
-          /* two redraws, one for GPU update, one for notification */
-          paint_proj_redraw(C, pop->stroke_handle, false);
-          paint_proj_redraw(C, pop->stroke_handle, true);
-          break;
-      }
+      pop->mode->paint_bucket_fill(
+          C, scene, brush, stroke, pop->stroke_handle, pop->startmouse, pop->prevmouse);
     }
   }
-
-  switch (pop->mode) {
-    case eTexPaintMode::_2D:
-      paint_2d_stroke_done(pop->stroke_handle);
-      break;
-
-    case eTexPaintMode::_3D_PROJECT:
-      paint_proj_stroke_done(pop->stroke_handle);
-      break;
-  }
-
-  if (pop->cursor) {
-    WM_paint_cursor_end(pop->cursor);
-  }
+  pop->mode->paint_stroke_done(pop->stroke_handle);
+  pop->stroke_handle = nullptr;
 
   ED_image_undo_push_end();
 
-  /* duplicate warning, see texpaint_init */
+/* duplicate warning, see texpaint_init */
 #if 0
   if (pop->s.warnmultifile) {
     BKE_reportf(op->reports,
