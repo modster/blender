@@ -442,9 +442,9 @@ set(USD_HASH 7fe232df5c732fedf466d33ff431ce33)
 set(USD_HASH_TYPE MD5)
 set(USD_FILE usd-v${USD_VERSION}.tar.gz)
 
-set(OIDN_VERSION 1.4.2)
+set(OIDN_VERSION 1.4.3)
 set(OIDN_URI https://github.com/OpenImageDenoise/oidn/releases/download/v${OIDN_VERSION}/oidn-${OIDN_VERSION}.src.tar.gz)
-set(OIDN_HASH 9ee4dd818fd8a828fc145c8df92e145c)
+set(OIDN_HASH 027093eaf5e8b4e45835b991137b38e6)
 set(OIDN_HASH_TYPE MD5)
 set(OIDN_FILE oidn-${OIDN_VERSION}.src.tar.gz)
 
