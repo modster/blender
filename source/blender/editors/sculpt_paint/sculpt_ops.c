@@ -1030,12 +1030,11 @@ static int sculpt_mask_by_color_invoke(bContext *C, wmOperator *op, const wmEven
     return OPERATOR_CANCELLED;
   }
 
-  if (!ss->vcol) {
+  if (!SCULPT_has_colors(ss)) {
     return OPERATOR_CANCELLED;
   }
 
   BKE_pbvh_ensure_node_loops(ss->pbvh, BKE_object_get_original_mesh(ob));
-
   SCULPT_vertex_random_access_ensure(ss);
 
   /* Tools that are not brushes do not have the brush gizmo to update the vertex as the mouse move,
