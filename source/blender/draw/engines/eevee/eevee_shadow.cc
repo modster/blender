@@ -405,7 +405,7 @@ ShadowPunctual::operator ShadowData()
 
 void ShadowDirectional::sync(const float4x4 &object_mat, float bias, float min_resolution)
 {
-  object_mat_ = float4x4(object_mat);
+  object_mat_ = object_mat;
   /* Clear embedded custom data. */
   object_mat_.values[0][3] = object_mat_.values[1][3] = object_mat_.values[2][3] = 0.0f;
   object_mat_.values[3][3] = 1.0f;
@@ -419,7 +419,10 @@ void ShadowDirectional::sync(const float4x4 &object_mat, float bias, float min_r
 void ShadowDirectional::end_sync(int min_level,
                                  int max_level,
                                  const float3 &camera_position,
-                                 const AABB &casters_bounds)
+                                 const AABB &casters_bounds,
+                                 /* Ortho only. */
+                                 const BoundBox &casters_visible,
+                                 const Camera &camera)
 {
   int user_min_level = floorf(log2(min_resolution_));
 
@@ -427,7 +430,7 @@ void ShadowDirectional::end_sync(int min_level,
    * can affect lightprobe shadowing quality. To fix, just change camera position during bake and
    * profit!!! */
 
-  float3 z_axis = float3(object_mat_.values[2]);
+  float3 z_axis = object_mat_[2];
   /* Near & far values used for rendering. Bounds the shadow casters. */
   near_ = 1.0e30f;
   far_ = -1.0e30f;
@@ -439,6 +442,20 @@ void ShadowDirectional::end_sync(int min_level,
   }
   near_ -= 1e-8f;
   far_ += 1e-8f;
+
+  if (camera.is_orthographic()) {
+    /* Compute the unique clipmap level based on the coverage of the visible casters bounds. */
+    float4x4 imat = object_mat_.inverted_affine();
+
+    AABB local_visible;
+    local_visible.init_min_max();
+    for (auto i : IndexRange(8)) {
+      local_visible.merge(imat * float3(casters_visible.vec[i]));
+    }
+    float3 extent = local_visible.extent();
+    max_level = ceil(log2(max_ff(extent.x, extent.y)));
+    min_level = max_level;
+  }
 
   min_level = clamp_i(user_min_level, min_level, max_level);
   int level_count = max_level - min_level + 1;
@@ -625,9 +642,7 @@ void ShadowModule::end_sync(void)
     inst_.sampling.reset();
   }
 
-  /* WARNING: Fragile, use same value as INIT_MINMAX. */
-  bool no_casters = (casters_bounds_.min.x == 1.0e-30f);
-  if (no_casters) {
+  if (casters_bounds_.is_empty()) {
     /* Avoid problems down the road. */
     casters_bounds_ = AABB(1.0f);
   }
@@ -637,46 +652,66 @@ void ShadowModule::end_sync(void)
   directionals.resize();
 
   {
+    struct State {
+      float far_dist;
+      float near_dist;
+      float max_dimension;
+      float min_dimension;
+      float3 cam_position;
+      /* Intersection between shadow casters bounds and the view frustum.
+       * Used by orthographic directional shadows. */
+      BoundBox bbox_visible;
+    } state;
+
+    state.cam_position = inst_.camera.position();
+
     /* Get the farthest point from camera to know what distance to cover. */
-    float3 farthest_point = float3(1.0f, 1.0f, 1.0f);
-    mul_project_m4_v3(inst_.camera.data_get().wininv.ptr(), farthest_point);
-    float far_dist = math::length(farthest_point);
-    float near_dist = fabsf(inst_.camera.data_get().clip_near);
-    float3 cam_position = inst_.camera.position();
+    float left, right, bottom, top;
+    projmat_dimensions(inst_.camera.data_get().winmat.ptr(),
+                       &left,
+                       &right,
+                       &bottom,
+                       &top,
+                       &state.near_dist,
+                       &state.far_dist);
+
+    if (inst_.camera.is_orthographic()) {
+      /* Viewspace AABBs. */
+      AABB aabb_frustum({left, bottom, state.near_dist}, {right, top, state.far_dist});
+      AABB aabb_casters = inst_.camera.data_get().viewmat * casters_bounds_;
+      /* Compute intersection. */
+      /* TODO(@fclem): This could be refined to have tighter bounds. */
+      /* Do intersection in viewspace as this gives us tighter bounds for this approximation. */
+      AABB aabb_isect = AABB::intersect(aabb_frustum, aabb_casters);
+
+      state.bbox_visible = inst_.camera.data_get().viewinv * aabb_isect;
+      state.cam_position = math::midpoint(float3(state.bbox_visible.vec[0]),
+                                          float3(state.bbox_visible.vec[6]));
+    }
 
 #ifdef SHADOW_DEBUG_FREEZE_CAMERA
     static bool valid = false;
-    static float far_dist_freezed;
-    static float near_dist_freezed;
-    static float3 cam_position_freezed;
+    static State state_freeze = {};
     if (G.debug_value < 4 || !valid) {
       valid = true;
-      far_dist_freezed = far_dist;
-      near_dist_freezed = near_dist;
-      cam_position_freezed = cam_position;
-      debug_data_.camera_position = cam_position;
+      state_freeze = state;
     }
     else {
-      far_dist = far_dist_freezed;
-      near_dist = near_dist_freezed;
-      cam_position = cam_position_freezed;
-      debug_data_.camera_position = cam_position_freezed;
+      state = state_freeze;
     }
+    debug_data_.camera_position = state.cam_position;
 #endif
 
-    int min_level, max_level;
-    if (false /* is_ortho_camera */) {
-      /* TODO(fclem): To have the best resolution we need to find the smallest
-       * Clipmap that covers the intersection of the Camera Frustum with casters_bounds_.
-       * cam_position should be the center of this intersection. */
-    }
-    else {
-      max_level = ceil(log2(far_dist));
-      min_level = floor(log2(near_dist));
-    }
+    int max_level = ceil(log2(state.far_dist));
+    int min_level = floor(log2(state.near_dist));
 
     for (ShadowDirectional &directional : directionals) {
-      directional.end_sync(min_level, max_level, cam_position, casters_bounds_);
+      directional.end_sync(min_level,
+                           max_level,
+                           state.cam_position,
+                           casters_bounds_,
+                           state.bbox_visible,
+                           inst_.camera);
     }
   }
 

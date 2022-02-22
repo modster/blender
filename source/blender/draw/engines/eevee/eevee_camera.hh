@@ -124,9 +124,13 @@ class Camera {
   {
     return data_[data_id_].type == CAMERA_ORTHO;
   }
-  float3 position(void) const
+  const float3 &position(void) const
   {
-    return float3(data_[data_id_].viewinv[3]);
+    return *reinterpret_cast<const float3 *>(data_[data_id_].viewinv[3]);
+  }
+  const float3 &forward(void) const
+  {
+    return *reinterpret_cast<const float3 *>(data_[data_id_].viewinv[2]);
   }
 };
 

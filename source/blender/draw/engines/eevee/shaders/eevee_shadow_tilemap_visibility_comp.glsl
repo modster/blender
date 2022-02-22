@@ -18,6 +18,7 @@ void main()
   ShadowTileMapData tilemap = tilemaps_buf[gl_GlobalInvocationID.z];
   ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
 
+  bool is_persp = (ProjectionMatrix[3][3] == 0.0);
   bool is_intersecting;
   int lod_visible_min = 0;
   int lod_visible_max = 0;
@@ -65,7 +66,6 @@ void main()
       float footprint_ratio_max = len_max * (tilemap_pixel_radius * screen_pixel_radius_inv);
       /* Project the radius to the screen. 1 unit away from the camera the same way
        * pixel_world_radius_inv was computed. Not needed in orthographic mode. */
-      bool is_persp = (ProjectionMatrix[3][3] == 0.0);
       if (is_persp) {
         footprint_ratio /= vec2(distance(nearest_receiver, cameraPos),
                                 distance(farthest_receiver, cameraPos));
@@ -127,7 +127,7 @@ void main()
 
     is_intersecting = intersect_view(shape);
 
-    if (is_intersecting) {
+    if (is_intersecting && is_persp) {
       /* Reject tiles not in view distance. */
       float tile_dist = length(vec2(tile_co - (SHADOW_TILEMAP_RES / 2)) + 0.5);
       if (tile_dist > (SHADOW_TILEMAP_RES / 2) + M_SQRT2 * 0.5) {

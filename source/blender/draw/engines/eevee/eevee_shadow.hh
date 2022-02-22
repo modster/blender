@@ -50,6 +50,7 @@ struct AABB {
 
   AABB() = default;
   AABB(float val) : min(-val), max(val){};
+  AABB(float3 min_, float3 max_) : min(min_), max(max_){};
   AABB(Object *ob)
   {
     init_min_max();
@@ -71,7 +72,7 @@ struct AABB {
 
   float3 center(void) const
   {
-    return (min + max) * 0.5;
+    return math::midpoint(min, max);
   }
 
   void init_min_max(void)
@@ -91,9 +92,47 @@ struct AABB {
     DO_MAX(a, max);
   }
 
+  void merge(const BoundBox &bbox)
+  {
+    for (auto i : IndexRange(ARRAY_SIZE(bbox.vec))) {
+      merge(*reinterpret_cast<const float3 *>(bbox.vec[i]));
+    }
+  }
+
+  /* Transform an AABB into another space.
+   * Returns the AABB inside the new space (so equal or bigger). */
+  friend AABB operator*(const float4x4 &m, const AABB &aabb)
+  {
+    BoundBox bbox = aabb;
+    AABB result;
+    result.init_min_max();
+    for (auto i : IndexRange(ARRAY_SIZE(bbox.vec))) {
+      result.merge(m * float3(bbox.vec[i]));
+    }
+    return result;
+  }
+
+  static AABB intersect(const AABB &a, const AABB &b)
+  {
+    AABB result;
+    result.min = math::max(a.min, b.min);
+    result.max = math::min(a.max, b.max);
+    return result;
+  }
+
   float radius(void) const
   {
     return math::length(max - min) / 2.0f;
+  }
+
+  float3 extent() const
+  {
+    return math::max(float3(0.0f), max - min);
+  }
+
+  bool is_empty() const
+  {
+    return (min.x >= max.x) || (min.y >= max.y) || (min.z >= max.z);
   }
 
   operator BoundBox() const
@@ -285,7 +324,7 @@ class ShadowDirectional : public ShadowCommon {
   float near_, far_;
   /** Offset of the lowest clipmap relative to the highest one. */
   int2 base_offset_;
-  /** Copy of object matrix. */
+  /** Copy of object matrix. Normalized. */
   float4x4 object_mat_;
 
  public:
@@ -295,7 +334,9 @@ class ShadowDirectional : public ShadowCommon {
   void end_sync(int min_level,
                 int max_level,
                 const float3 &camera_position,
-                const AABB &casters_bounds);
+                const AABB &casters_bounds,
+                const BoundBox &casters_visible,
+                const Camera &camera);
 
   operator ShadowData();
 };

@@ -434,6 +434,8 @@ BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
 // #define SHADOW_DEBUG_NO_DEPTH_SCAN
 /* Debug: Will freeze the camera used for shadow tagging if G.debug_value is >= 4. */
 // #define SHADOW_DEBUG_FREEZE_CAMERA
+/* Debug: Add markers at page boundaries to check page boudaries, sampling and distribution. */
+// #define SHADOW_DEBUG_PAGE_CORNER
 
 #if defined(SHADOW_DEBUG_FREEZE_CAMERA) && !defined(SHADOW_DEBUG_NO_DEPTH_SCAN)
 #  error Freeze camera debug option is incompatible with depth scanning.

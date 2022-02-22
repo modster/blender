@@ -35,7 +35,7 @@ void main()
 
     float depth = texelFetch(render_tx, in_texel, 0).r;
 
-#if 0 /* Debugging. */
+#ifdef SHADOW_DEBUG_PAGE_CORNER
     uvec2 page_size = gl_NumWorkGroups.xy * gl_WorkGroupSize.xy;
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(page_size);
     /* Print corners to check tile layout and validity. */
