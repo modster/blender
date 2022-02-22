@@ -1668,9 +1668,6 @@ static void sculpt_update_object(Depsgraph *depsgraph,
     CustomDataLayer *cl;
     AttributeDomain domain;
 
-    ss->vcol = NULL;
-    ss->mcol = NULL;
-
     if (BKE_pbvh_get_color_layer(me, &cl, &domain)) {
       if (cl->type == CD_PROP_COLOR) {
         ss->vcol = cl->data;
@@ -1683,7 +1680,11 @@ static void sculpt_update_object(Depsgraph *depsgraph,
       ss->vcol_type = cl->type;
     }
     else {
+      ss->vcol = NULL;
+      ss->mcol = NULL;
+
       ss->vcol_type = -1;
+      ss->vcol_domain = ATTR_DOMAIN_NUM;
     }
   }
 

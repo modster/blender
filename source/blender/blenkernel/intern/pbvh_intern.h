@@ -62,6 +62,13 @@ struct PBVHNode {
   const int *vert_indices;
   unsigned int uniq_verts, face_verts;
 
+  /* Array of indices into the Mesh's MLoop array.
+   * PBVH_FACES only.  The first part of the array
+   * are loops unique to this node, see comment for
+   * vert_indices for more details.*/
+  int *loop_indices;
+  unsigned int uniq_loops, face_loops;
+
   /* An array mapping face corners into the vert_indices
    * array. The array is sized to match 'totprim', and each of
    * the face's corners gets an index into the vert_indices

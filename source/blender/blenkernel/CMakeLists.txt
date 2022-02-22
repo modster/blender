@@ -233,6 +233,7 @@ set(SRC
   intern/particle_child.c
   intern/particle_distribute.c
   intern/particle_system.c
+  intern/pbvh.cc
   intern/pbvh.c
   intern/pbvh_bmesh.c
   intern/pointcache.c

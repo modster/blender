@@ -301,6 +301,10 @@ void BKE_pbvh_node_get_verts(PBVH *pbvh,
                              PBVHNode *node,
                              const int **r_vert_indices,
                              struct MVert **r_verts);
+void BKE_pbvh_node_get_loops(PBVH *pbvh,
+                             PBVHNode *node,
+                             const int **r_loop_indices,
+                             const struct MLoop **r_loops);
 
 void BKE_pbvh_node_get_BB(PBVHNode *node, float bb_min[3], float bb_max[3]);
 void BKE_pbvh_node_get_original_BB(PBVHNode *node, float bb_min[3], float bb_max[3]);
@@ -464,11 +468,11 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
         } \
         else { \
           if (!BLI_gsetIterator_done(&vi.bm_unique_verts)) { \
-            vi.bm_vert = BLI_gsetIterator_getKey(&vi.bm_unique_verts); \
+            vi.bm_vert = (BMVert *)BLI_gsetIterator_getKey(&vi.bm_unique_verts); \
             BLI_gsetIterator_step(&vi.bm_unique_verts); \
           } \
           else { \
-            vi.bm_vert = BLI_gsetIterator_getKey(&vi.bm_other_verts); \
+            vi.bm_vert = (BMVert *)BLI_gsetIterator_getKey(&vi.bm_other_verts); \
             BLI_gsetIterator_step(&vi.bm_other_verts); \
           } \
           vi.visible = !BM_elem_flag_test_bool(vi.bm_vert, BM_ELEM_HIDDEN); \
@@ -526,39 +530,31 @@ void BKE_pbvh_node_color_buffer_free(PBVH *pbvh);
 bool BKE_pbvh_get_color_layer(const struct Mesh *me,
                               CustomDataLayer **cl_out,
                               AttributeDomain *attr_out);
-void BKE_pbvh_load_node_loop_colors(PBVH *pbvh,
-                                    struct Mesh *me,
-                                    PBVHNode *node,
-                                    float (*colors)[4]);
-void BKE_pbvh_swap_node_loop_colors(PBVH *pbvh,
-                                    struct Mesh *me,
-                                    PBVHNode *node,
-                                    float (*colors)[4]);
-void BKE_pbvh_save_node_loop_colors(PBVH *pbvh,
-                                    const struct Mesh *me,
-                                    PBVHNode *node,
-                                    float (*colors)[4]);
 
-void BKE_pbvh_load_node_vertex_colors(
-    PBVH *pbvh, struct Mesh *me, PBVHNode *node, float (*colors)[4]);
-void BKE_pbvh_swap_node_vertex_colors(
-    PBVH *pbvh, struct Mesh *me, PBVHNode *node, float (*colors)[4]);
-void BKE_pbvh_save_node_vertex_colors(PBVH *pbvh,
-                                      const struct Mesh *me,
-                                      PBVHNode *node,
-                                      float (*colors)[4]);
+/* Swaps colors at each element in indices (of domain pbvh->vcol_domain)
+ * with values in colors. */
+void BKE_pbvh_swap_colors(PBVH *pbvh, float (*colors)[4], int *indices, int totelem);
+
+/* Stores colors from the elements in indices (of domain pbvh->vcol_domain)
+ * into colors. */
+void BKE_pbvh_store_colors(PBVH *pbvh, float (*colors)[4], int *indices, int totelem);
+
+/* Like BKE_pbvh_store_colors but handles loop->vert conversion */
+void BKE_pbvh_store_colors_vertex(PBVH *pbvh, float (*colors)[4], int *indices, int totelem);
 
 bool BKE_pbvh_is_drawing(const PBVH *pbvh);
 void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val);
 
 /* Do not call in PBVH_GRIDS mode */
-int BKE_pbvh_node_get_num_loops(PBVH *pbvh, PBVHNode *node);
+void BKE_pbvh_node_num_loops(PBVH *pbvh, PBVHNode *node, int *r_uniqueloop, int *r_totloop);
 
 void BKE_pbvh_update_active_vcol(PBVH *pbvh, const struct Mesh *mesh);
 void BKE_pbvh_pmap_set(PBVH *pbvh, const struct MeshElemMap *pmap);
 
-void BKE_pbvh_vertex_color_set(PBVH *pbvh, int vertex, float color[4]);
+void BKE_pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4]);
 void BKE_pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4]);
+
+void BKE_pbvh_ensure_node_loops(PBVH *pbvh, const struct Mesh *me);
 
 #ifdef __cplusplus
 }

@@ -140,11 +140,15 @@ typedef struct SculptUndoNode {
   int totvert;
 
   float (*loop_col)[4];
+  float (*orig_loop_col)[4];
   int totloop;
 
   /* non-multires */
   int maxvert; /* to verify if totvert it still the same */
-  int *index;  /* to restore into right location */
+  int *index;  /* Unique vertex indices, to restore into right location */
+  int maxloop;
+  int *loop_index;
+
   BLI_bitmap *vert_hidden;
 
   /* multires */
@@ -861,7 +865,7 @@ void SCULPT_vertex_normal_get(SculptSession *ss, int index, float no[3]);
 
 float SCULPT_vertex_mask_get(struct SculptSession *ss, int index);
 void SCULPT_vertex_color_get(SculptSession *ss, int index, float r_color[4]);
-void SCULPT_vertex_color_set(SculptSession *ss, int index, float color[4]);
+void SCULPT_vertex_color_set(SculptSession *ss, int index, const float color[4]);
 bool SCULPT_has_colors(const SculptSession *ss);
 
 const float *SCULPT_vertex_persistent_co_get(SculptSession *ss, int index);

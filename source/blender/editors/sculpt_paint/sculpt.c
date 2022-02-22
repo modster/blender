@@ -149,120 +149,14 @@ bool SCULPT_has_colors(const SculptSession *ss)
   return ss->vcol || ss->mcol;
 }
 
-void SCULPT_vertex_color_get(SculptSession *ss, int index, float out[4])
+void SCULPT_vertex_color_get(SculptSession *ss, int index, float r_color[4])
 {
-  switch (BKE_pbvh_type(ss->pbvh)) {
-    case PBVH_FACES:
-      if (ss->vcol_domain == ATTR_DOMAIN_CORNER) {
-        zero_v4(out);
-
-        int count = ss->pmap[index].count;
-        for (int i = 0; i < count; i++) {
-          MPoly *mp = ss->mpoly + ss->pmap[index].indices[i];
-          MLoop *ml = ss->mloop + mp->loopstart;
-          int li = mp->loopstart;
-
-          for (int j = 0; j < mp->totloop; j++, li++, ml++) {
-            if (ml->v != index) {
-              continue;
-            }
-
-            if (ss->vcol_type == CD_MLOOPCOL) {
-              MLoopCol *col = ss->mcol + li;
-
-              float temp[4];
-
-              rgba_uchar_to_float(temp, (const char *)col);
-              srgb_to_linearrgb_v3_v3(temp, temp);
-
-              add_v4_v4(out, temp);
-            }
-            else if (ss->vcol_type == CD_PROP_COLOR) {
-              add_v4_v4(out, ss->vcol[li].color);
-            }
-          }
-        }
-
-        if (count) {
-          mul_v4_fl(out, 1.0f / (float)count);
-        }
-      }
-      else {
-        if (ss->vcol_type == CD_MLOOPCOL) {
-          MLoopCol *col = ss->mcol + index;
-
-          float temp[4];
-          rgba_uchar_to_float(temp, (const char *)col);
-          srgb_to_linearrgb_v3_v3(temp, temp);
-
-          copy_v4_v4(out, temp);
-        }
-        if (ss->vcol_type == CD_PROP_COLOR) {
-          copy_v4_v4(out, ss->vcol[index].color);
-        }
-      }
-
-      break;
-    case PBVH_BMESH:
-    case PBVH_GRIDS:
-      break;
-  }
-
-  return;
+  BKE_pbvh_vertex_color_get(ss->pbvh, index, r_color);
 }
 
-void SCULPT_vertex_color_set(SculptSession *ss, int index, float color[4])
+void SCULPT_vertex_color_set(SculptSession *ss, int index, const float color[4])
 {
-  switch (BKE_pbvh_type(ss->pbvh)) {
-    case PBVH_FACES:
-      if (ss->vcol_domain == ATTR_DOMAIN_CORNER) {
-        int count = ss->pmap[index].count;
-        for (int i = 0; i < count; i++) {
-          MPoly *mp = ss->mpoly + ss->pmap[index].indices[i];
-          MLoop *ml = ss->mloop + mp->loopstart;
-          int li = mp->loopstart;
-
-          for (int j = 0; j < mp->totloop; j++, li++, ml++) {
-            if (ml->v != index) {
-              continue;
-            }
-
-            if (ss->vcol_type == CD_MLOOPCOL) {
-              float temp[4];
-
-              MLoopCol *col = ss->mcol + li;
-
-              linearrgb_to_srgb_v3_v3(temp, color);
-              temp[3] = color[3];
-
-              rgba_float_to_uchar((char *)col, temp);
-            }
-            else if (ss->vcol_type == CD_PROP_COLOR) {
-              copy_v4_v4(ss->vcol[li].color, color);
-            }
-          }
-        }
-      }
-      else {
-        if (ss->vcol_type == CD_MLOOPCOL) {
-          MLoopCol *col = ss->mcol + index;
-          float temp[4];
-
-          linearrgb_to_srgb_v3_v3(temp, color);
-          temp[3] = color[3];
-
-          rgba_float_to_uchar((char *)col, temp);
-        }
-        if (ss->vcol_type == CD_PROP_COLOR) {
-          copy_v4_v4(ss->vcol[index].color, color);
-        }
-      }
-
-      break;
-    case PBVH_BMESH:
-    case PBVH_GRIDS:
-      break;
-  }
+  BKE_pbvh_vertex_color_set(ss->pbvh, index, color);
 }
 
 void SCULPT_vertex_normal_get(SculptSession *ss, int index, float no[3])
@@ -1152,6 +1046,7 @@ void SCULPT_tag_update_overlays(bContext *C)
   WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
 
   DEG_id_tag_update(&ob->id, ID_RECALC_SHADING);
+
   View3D *v3d = CTX_wm_view3d(C);
   if (!BKE_sculptsession_use_pbvh_draw(ob, v3d)) {
     DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
@@ -1485,10 +1380,7 @@ static void paint_mesh_restore_co_task_cb(void *__restrict userdata,
       *vd.mask = orig_data.mask;
     }
     else if (orig_data.unode->type == SCULPT_UNDO_COLOR) {
-      float col[4];
-      SCULPT_vertex_color_get(ss, vd.index, col);
-
-      copy_v4_v4(col, orig_data.col);
+      SCULPT_vertex_color_set(ss, vd.index, orig_data.col);
     }
 
     if (vd.mvert) {
@@ -3255,7 +3147,7 @@ static void do_brush_action_task_cb(void *__restrict userdata,
     SCULPT_undo_push_node(data->ob, data->nodes[n], SCULPT_UNDO_MASK);
     BKE_pbvh_node_mark_update_mask(data->nodes[n]);
   }
-  else if (ELEM(data->brush->sculpt_tool, SCULPT_TOOL_PAINT, SCULPT_TOOL_SMEAR)) {
+  else if (SCULPT_TOOL_NEEDS_COLOR(data->brush->sculpt_tool)) {
     SCULPT_undo_push_node(data->ob, data->nodes[n], SCULPT_UNDO_COLOR);
     BKE_pbvh_node_mark_update_color(data->nodes[n]);
   }
@@ -3273,12 +3165,12 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
 
   /* Check for unsupported features. */
   PBVHType type = BKE_pbvh_type(ss->pbvh);
-  if (brush->sculpt_tool == SCULPT_TOOL_PAINT && type != PBVH_FACES) {
-    return;
-  }
+  if (SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool)) {
+    if (type != PBVH_FACES) {
+      return;
+    }
 
-  if (brush->sculpt_tool == SCULPT_TOOL_SMEAR && type != PBVH_FACES) {
-    return;
+    BKE_pbvh_ensure_node_loops(ss->pbvh, BKE_object_get_original_mesh(ob));
   }
 
   /* Build a list of all nodes that are potentially within the brush's area of influence */
@@ -3294,6 +3186,7 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
     const bool use_original = sculpt_tool_needs_original(brush->sculpt_tool) ? true :
                                                                                ss->cache->original;
     float radius_scale = 1.0f;
+
     /* With these options enabled not all required nodes are inside the original brush radius, so
      * the brush can produce artifacts in some situations. */
     if (brush->sculpt_tool == SCULPT_TOOL_DRAW && brush->flag & BRUSH_ORIGINAL_NORMAL) {
