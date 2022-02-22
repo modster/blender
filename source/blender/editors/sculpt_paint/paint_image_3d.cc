@@ -33,26 +33,30 @@ static CLG_LogRef LOG = {"ed.sculpt_paint.image3d"};
 namespace blender::ed::sculpt_paint::image3d {
 
 struct StrokeHandle {
-  PBVH *pbvh = nullptr;
-  bool owns_pbvh = false;
+  Object *ob = nullptr;
+  Image *image = nullptr;
 
   virtual ~StrokeHandle()
   {
-    if (pbvh && owns_pbvh) {
-      BKE_pbvh_free(pbvh);
-    }
-    pbvh = nullptr;
-    owns_pbvh = false;
+    image = nullptr;
+    ob = nullptr;
+  }
+
+  PBVH *get_pbvh()
+  {
+    BLI_assert(ob != nullptr);
+    BLI_assert(ob->sculpt != nullptr);
+    BLI_assert(ob->sculpt->pbvh != nullptr);
+    return ob->sculpt->pbvh;
   }
 };
 
 struct StrokeHandle *stroke_new(bContext *C, Object *ob)
 {
   CLOG_INFO(&LOG, 2, "create new stroke");
-  const Scene *scene = CTX_data_scene(C);
   Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
 
-  ToolSettings *ts = scene->toolsettings;
+  ToolSettings *ts = CTX_data_tool_settings(C);
   BLI_assert_msg(ts->imapaint.mode == IMAGEPAINT_MODE_IMAGE, "Only Image mode implemented");
   Image *image = ts->imapaint.canvas;
   CLOG_INFO(&LOG, 2, " paint target image: %s", image->id.name);
@@ -64,8 +68,8 @@ struct StrokeHandle *stroke_new(bContext *C, Object *ob)
   BLI_assert_msg(pbvh != nullptr, "Unable to retrieve PBVH from sculptsession");
 
   StrokeHandle *stroke_handle = MEM_new<StrokeHandle>("StrokeHandle");
-  stroke_handle->pbvh = pbvh;
-  stroke_handle->owns_pbvh = false;
+  stroke_handle->image = image;
+  stroke_handle->ob = ob;
 
   return stroke_handle;
 }
@@ -73,6 +77,7 @@ struct StrokeHandle *stroke_new(bContext *C, Object *ob)
 void stroke_update(struct StrokeHandle *stroke_handle, float2 prev_mouse, float2 mouse)
 {
   CLOG_INFO(&LOG, 2, "new stroke step");
+  // See SCULPT_do_paint_brush?
 }
 
 void stroke_free(struct StrokeHandle *stroke_handle)
