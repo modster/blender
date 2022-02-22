@@ -154,6 +154,9 @@ void ED_editors_init(bContext *C)
         else if (mode == OB_MODE_WEIGHT_PAINT) {
           ED_object_wpaintmode_enter_ex(bmain, depsgraph, scene, ob);
         }
+        else if (mode == OB_MODE_TEXTURE_PAINT) {
+          ED_object_texture_paint_mode_enter_ex(bmain, scene, ob);
+        }
         else {
           BLI_assert_unreachable();
         }
