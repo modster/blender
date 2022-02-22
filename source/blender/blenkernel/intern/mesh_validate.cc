@@ -41,25 +41,25 @@ static CLG_LogRef LOG = {"bke.mesh"};
 /** \name Internal functions
  * \{ */
 
-typedef union {
+union EdgeUUID {
   uint32_t verts[2];
   int64_t edval;
-} EdgeUUID;
+};
 
-typedef struct SortFace {
+struct SortFace {
   EdgeUUID es[4];
   uint index;
-} SortFace;
+};
 
 /* Used to detect polys (faces) using exactly the same vertices. */
 /* Used to detect loops used by no (disjoint) or more than one (intersect) polys. */
-typedef struct SortPoly {
+struct SortPoly {
   int *verts;
   int numverts;
   int loopstart;
   uint index;
   bool invalid; /* Poly index. */
-} SortPoly;
+};
 
 static void edge_store_assign(uint32_t verts[2], const uint32_t v1, const uint32_t v2)
 {
@@ -106,7 +106,8 @@ static int int64_cmp(const void *v1, const void *v2)
 
 static int search_face_cmp(const void *v1, const void *v2)
 {
-  const SortFace *sfa = v1, *sfb = v2;
+  const SortFace *sfa = static_cast<const SortFace *>(v1);
+  const SortFace *sfb = static_cast<const SortFace *>(v2);
 
   if (sfa->es[0].edval > sfb->es[0].edval) {
     return 1;
@@ -147,8 +148,8 @@ static int int_cmp(const void *v1, const void *v2)
 
 static int search_poly_cmp(const void *v1, const void *v2)
 {
-  const SortPoly *sp1 = v1;
-  const SortPoly *sp2 = v2;
+  const SortPoly *sp1 = static_cast<const SortPoly *>(v1);
+  const SortPoly *sp2 = static_cast<const SortPoly *>(v2);
 
   /* Reject all invalid polys at end of list! */
   if (sp1->invalid || sp2->invalid) {
@@ -168,8 +169,8 @@ static int search_poly_cmp(const void *v1, const void *v2)
 
 static int search_polyloop_cmp(const void *v1, const void *v2)
 {
-  const SortPoly *sp1 = v1;
-  const SortPoly *sp2 = v2;
+  const SortPoly *sp1 = static_cast<const SortPoly *>(v1);
+  const SortPoly *sp2 = static_cast<const SortPoly *>(v2);
 
   /* Reject all invalid polys at end of list! */
   if (sp1->invalid || sp2->invalid) {
@@ -394,7 +395,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
     MFace *mf;
     MFace *mf_prev;
 
-    SortFace *sort_faces = MEM_callocN(sizeof(SortFace) * totface, "search faces");
+    SortFace *sort_faces = (SortFace *)MEM_callocN(sizeof(SortFace) * totface, "search faces");
     SortFace *sf;
     SortFace *sf_prev;
     uint totsortface = 0;
@@ -547,7 +548,8 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
   {
     BLI_bitmap *vert_tag = BLI_BITMAP_NEW(mesh->totvert, __func__);
 
-    SortPoly *sort_polys = MEM_callocN(sizeof(SortPoly) * totpoly, "mesh validate's sort_polys");
+    SortPoly *sort_polys = (SortPoly *)MEM_callocN(sizeof(SortPoly) * totpoly,
+                                                   "mesh validate's sort_polys");
     SortPoly *prev_sp, *sp = sort_polys;
     int prev_end;
 
@@ -586,7 +588,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
         /* Poly itself is valid, for now. */
         int v1, v2; /* v1 is prev loop vert idx, v2 is current loop one. */
         sp->invalid = false;
-        sp->verts = v = MEM_mallocN(sizeof(int) * mp->totloop, "Vert idx of SortPoly");
+        sp->verts = v = (int *)MEM_mallocN(sizeof(int) * mp->totloop, "Vert idx of SortPoly");
         sp->numverts = mp->totloop;
         sp->loopstart = mp->loopstart;
 
@@ -1192,7 +1194,7 @@ void BKE_mesh_strip_loose_polysloops(Mesh *me)
   MLoop *l;
   int a, b;
   /* New loops idx! */
-  int *new_idx = MEM_mallocN(sizeof(int) * me->totloop, __func__);
+  int *new_idx = (int *)MEM_mallocN(sizeof(int) * me->totloop, __func__);
 
   for (a = b = 0, p = me->mpoly; a < me->totpoly; a++, p++) {
     bool invalid = false;
@@ -1262,7 +1264,7 @@ void BKE_mesh_strip_loose_edges(Mesh *me)
   MEdge *e;
   MLoop *l;
   int a, b;
-  uint *new_idx = MEM_mallocN(sizeof(int) * me->totedge, __func__);
+  uint *new_idx = (uint *)MEM_mallocN(sizeof(int) * me->totedge, __func__);
 
   for (a = b = 0, e = me->medge; a < me->totedge; a++, e++) {
     if (e->v1 != e->v2) {
@@ -1322,7 +1324,8 @@ static void to_edgesort(struct EdgeSort *ed, uint v1, uint v2, char is_loose, sh
 
 static int vergedgesort(const void *v1, const void *v2)
 {
-  const struct EdgeSort *x1 = v1, *x2 = v2;
+  const struct EdgeSort *x1 = static_cast<const struct EdgeSort *>(v1);
+  const struct EdgeSort *x2 = static_cast<const struct EdgeSort *>(v2);
 
   if (x1->v1 > x2->v1) {
     return 1;
@@ -1380,12 +1383,12 @@ static void mesh_calc_edges_mdata(MVert *UNUSED(allvert),
 
   if (totedge == 0) {
     /* flag that mesh has edges */
-    (*r_medge) = MEM_callocN(0, __func__);
+    (*r_medge) = (MEdge *)MEM_callocN(0, __func__);
     (*r_totedge) = 0;
     return;
   }
 
-  ed = edsort = MEM_mallocN(totedge * sizeof(struct EdgeSort), "EdgeSort");
+  ed = edsort = (EdgeSort *)MEM_mallocN(totedge * sizeof(struct EdgeSort), "EdgeSort");
 
   for (a = totface, mface = allface; a > 0; a--, mface++) {
     to_edgesort(ed++, mface->v1, mface->v2, !mface->v3, mface->edcode & ME_V1V2);
@@ -1411,7 +1414,7 @@ static void mesh_calc_edges_mdata(MVert *UNUSED(allvert),
   }
   totedge_final++;
 
-  medge = MEM_callocN(sizeof(MEdge) * totedge_final, __func__);
+  medge = (MEdge *)MEM_callocN(sizeof(MEdge) * totedge_final, __func__);
 
   for (a = totedge, med = medge, ed = edsort; a > 1; a--, ed++) {
     /* edge is unique when it differs from next edge, or is last */
@@ -1499,7 +1502,7 @@ void BKE_mesh_calc_edges_legacy(Mesh *me, const bool use_old)
     return;
   }
 
-  medge = CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, medge, totedge);
+  medge = (MEdge *)CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, medge, totedge);
   me->medge = medge;
   me->totedge = totedge;
 
@@ -1551,8 +1554,8 @@ void BKE_mesh_calc_edges_tessface(Mesh *mesh)
   CustomData_add_layer(&edgeData, CD_MEDGE, CD_CALLOC, NULL, numEdges);
   CustomData_add_layer(&edgeData, CD_ORIGINDEX, CD_CALLOC, NULL, numEdges);
 
-  MEdge *med = CustomData_get_layer(&edgeData, CD_MEDGE);
-  int *index = CustomData_get_layer(&edgeData, CD_ORIGINDEX);
+  MEdge *med = (MEdge *)CustomData_get_layer(&edgeData, CD_MEDGE);
+  int *index = (int *)CustomData_get_layer(&edgeData, CD_ORIGINDEX);
 
   EdgeSetIterator *ehi = BLI_edgesetIterator_new(eh);
   for (int i = 0; BLI_edgesetIterator_isDone(ehi) == false;
@@ -1569,7 +1572,7 @@ void BKE_mesh_calc_edges_tessface(Mesh *mesh)
   mesh->edata = edgeData;
   mesh->totedge = numEdges;
 
-  mesh->medge = CustomData_get_layer(&mesh->edata, CD_MEDGE);
+  mesh->medge = (MEdge *)CustomData_get_layer(&mesh->edata, CD_MEDGE);
 
   BLI_edgeset_free(eh);
 }
