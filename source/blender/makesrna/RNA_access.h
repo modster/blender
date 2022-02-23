@@ -997,7 +997,7 @@ bool RNA_property_editable_info(PointerRNA *ptr, PropertyRNA *prop, const char *
 /**
  * Same as RNA_property_editable(), except this checks individual items in an array.
  */
-bool RNA_property_editable_index(PointerRNA *ptr, PropertyRNA *prop, int index);
+bool RNA_property_editable_index(PointerRNA *ptr, PropertyRNA *prop, const int index);
 
 /**
  * Without lib check, only checks the flag.
@@ -1117,6 +1117,11 @@ void RNA_property_collection_next(CollectionPropertyIterator *iter);
 void RNA_property_collection_skip(CollectionPropertyIterator *iter, int num);
 void RNA_property_collection_end(CollectionPropertyIterator *iter);
 int RNA_property_collection_length(PointerRNA *ptr, PropertyRNA *prop);
+/**
+ * Return true when `RNA_property_collection_length(ptr, prop) == 0`,
+ * without having to iterate over items in the collection (needed for some kinds of collections).
+ */
+bool RNA_property_collection_is_empty(PointerRNA *ptr, PropertyRNA *prop);
 int RNA_property_collection_lookup_index(PointerRNA *ptr, PropertyRNA *prop, PointerRNA *t_ptr);
 int RNA_property_collection_lookup_int(PointerRNA *ptr,
                                        PropertyRNA *prop,
@@ -1445,6 +1450,7 @@ void RNA_pointer_add(PointerRNA *ptr, const char *name);
 
 void RNA_collection_begin(PointerRNA *ptr, const char *name, CollectionPropertyIterator *iter);
 int RNA_collection_length(PointerRNA *ptr, const char *name);
+bool RNA_collection_is_empty(PointerRNA *ptr, const char *name);
 void RNA_collection_add(PointerRNA *ptr, const char *name, PointerRNA *r_value);
 void RNA_collection_clear(PointerRNA *ptr, const char *name);
 

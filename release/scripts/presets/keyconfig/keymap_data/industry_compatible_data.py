@@ -1109,7 +1109,8 @@ def km_node_editor(params):
          {"properties": [("replace", False)]}),
         ("node.link_make", {"type": 'L', "value": 'PRESS', "shift": True},
          {"properties": [("replace", True)]}),
-        ("node.duplicate_move", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
+        ("node.duplicate_move", {"type": 'D', "value": 'PRESS', "ctrl": True},
+         {"properties": [("NODE_OT_translate_attach", [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])])]}),
         ("node.parent_set", {"type": 'P', "value": 'PRESS'}, None),
         ("node.join", {"type": 'J', "value": 'PRESS', "ctrl": True}, None),
         ("node.hide_toggle", {"type": 'H', "value": 'PRESS', "ctrl": True}, None),
@@ -3405,9 +3406,6 @@ def km_sculpt(params):
         ("sculpt.dynamic_topology_toggle", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
         ("sculpt.dyntopo_detail_size_edit", {"type": 'D', "value": 'PRESS', "shift": True}, None),
         ("sculpt.set_detail_size", {"type": 'D', "value": 'PRESS', "shift": True, "alt": True}, None),
-        # Remesh
-        ("object.voxel_remesh", {"type": 'R', "value": 'PRESS', "ctrl": True}, None),
-        ("object.quadriflow_remesh", {"type": 'R', "value": 'PRESS', "ctrl": True, "alt": True}, None),
         # Remesh
         ("object.voxel_remesh", {"type": 'R', "value": 'PRESS', "ctrl": True}, None),
         ("object.voxel_size_edit", {"type": 'R', "value": 'PRESS', "shift": True}, None),

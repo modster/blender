@@ -731,7 +731,7 @@ static const char *template_id_browse_tip(const StructRNA *type)
         return N_("Browse Object to be linked");
       case ID_ME:
         return N_("Browse Mesh Data to be linked");
-      case ID_CU:
+      case ID_CU_LEGACY:
         return N_("Browse Curve Data to be linked");
       case ID_MB:
         return N_("Browse Metaball Data to be linked");
@@ -844,7 +844,7 @@ static uiBut *template_id_def_new_but(uiBlock *block,
                             BLT_I18NCONTEXT_ID_SCENE,
                             BLT_I18NCONTEXT_ID_OBJECT,
                             BLT_I18NCONTEXT_ID_MESH,
-                            BLT_I18NCONTEXT_ID_CURVE,
+                            BLT_I18NCONTEXT_ID_CURVE_LEGACY,
                             BLT_I18NCONTEXT_ID_METABALL,
                             BLT_I18NCONTEXT_ID_MATERIAL,
                             BLT_I18NCONTEXT_ID_TEXTURE,
@@ -6329,6 +6329,10 @@ void uiTemplateNodeSocket(uiLayout *layout, bContext *UNUSED(C), float color[4])
 
 void uiTemplateCacheFileVelocity(uiLayout *layout, PointerRNA *fileptr)
 {
+  if (RNA_pointer_is_null(fileptr)) {
+    return;
+  }
+
   /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
   uiLayoutSetContextPointer(layout, "edit_cachefile", fileptr);
 
@@ -6338,6 +6342,10 @@ void uiTemplateCacheFileVelocity(uiLayout *layout, PointerRNA *fileptr)
 
 void uiTemplateCacheFileProcedural(uiLayout *layout, const bContext *C, PointerRNA *fileptr)
 {
+  if (RNA_pointer_is_null(fileptr)) {
+    return;
+  }
+
   /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
   uiLayoutSetContextPointer(layout, "edit_cachefile", fileptr);
 
@@ -6384,6 +6392,10 @@ void uiTemplateCacheFileProcedural(uiLayout *layout, const bContext *C, PointerR
 
 void uiTemplateCacheFileTimeSettings(uiLayout *layout, PointerRNA *fileptr)
 {
+  if (RNA_pointer_is_null(fileptr)) {
+    return;
+  }
+
   /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
   uiLayoutSetContextPointer(layout, "edit_cachefile", fileptr);
 
@@ -6434,6 +6446,10 @@ uiListType *UI_UL_cache_file_layers()
 
 void uiTemplateCacheFileLayers(uiLayout *layout, const bContext *C, PointerRNA *fileptr)
 {
+  if (RNA_pointer_is_null(fileptr)) {
+    return;
+  }
+
   /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
   uiLayoutSetContextPointer(layout, "edit_cachefile", fileptr);
 
