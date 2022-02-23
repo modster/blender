@@ -5,10 +5,10 @@
  * \ingroup bke
  */
 
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <climits>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include "CLG_log.h"
 
@@ -276,7 +276,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
 
   EdgeHash *edge_hash = BLI_edgehash_new_ex(__func__, totedge);
 
-  BLI_assert(!(do_fixes && mesh == NULL));
+  BLI_assert(!(do_fixes && mesh == nullptr));
 
   fix_flag.as_flag = 0;
   free_flag.as_flag = 0;
@@ -289,7 +289,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
     recalc_flag.edges = do_fixes;
   }
 
-  const float(*vert_normals)[3] = NULL;
+  const float(*vert_normals)[3] = nullptr;
   BKE_mesh_assert_normals_dirty_or_calculated(mesh);
   if (!BKE_mesh_vertex_normals_are_dirty(mesh)) {
     vert_normals = BKE_mesh_vertex_normals_ensure(mesh);
@@ -727,7 +727,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
     /* Third check pass, testing loops used by none or more than one poly. */
     qsort(sort_polys, totpoly, sizeof(SortPoly), search_polyloop_cmp);
     sp = sort_polys;
-    prev_sp = NULL;
+    prev_sp = nullptr;
     prev_end = 0;
     for (i = 0; i < totpoly; i++, sp++) {
       /* Free this now, we don't need it anymore, and avoid us another loop! */
@@ -735,7 +735,8 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
         MEM_freeN(sp->verts);
       }
 
-      /* Note above prev_sp: in following code, we make sure it is always valid poly (or NULL). */
+      /* Note above prev_sp: in following code, we make sure it is always valid poly (or nullptr).
+       */
       if (sp->invalid) {
         if (do_fixes) {
           REMOVE_POLY_TAG((&mpolys[sp->index]));
@@ -794,7 +795,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
     MEM_freeN(sort_polys);
   }
 
-  BLI_edgehash_free(edge_hash, NULL);
+  BLI_edgehash_free(edge_hash, nullptr);
 
   /* fix deform verts */
   if (dverts) {
@@ -909,7 +910,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
 
     if (free_flag.mselect) {
       MEM_freeN(mesh->mselect);
-      mesh->mselect = NULL;
+      mesh->mselect = nullptr;
       mesh->totselect = 0;
     }
   }
@@ -1472,7 +1473,7 @@ static void mesh_calc_edges_mdata(MVert *UNUSED(allvert),
     }
   }
 
-  BLI_edgehash_free(hash, NULL);
+  BLI_edgehash_free(hash, nullptr);
 
   *r_medge = medge;
   *r_totedge = totedge_final;
@@ -1551,8 +1552,8 @@ void BKE_mesh_calc_edges_tessface(Mesh *mesh)
   /* write new edges into a temporary CustomData */
   CustomData edgeData;
   CustomData_reset(&edgeData);
-  CustomData_add_layer(&edgeData, CD_MEDGE, CD_CALLOC, NULL, numEdges);
-  CustomData_add_layer(&edgeData, CD_ORIGINDEX, CD_CALLOC, NULL, numEdges);
+  CustomData_add_layer(&edgeData, CD_MEDGE, CD_CALLOC, nullptr, numEdges);
+  CustomData_add_layer(&edgeData, CD_ORIGINDEX, CD_CALLOC, nullptr, numEdges);
 
   MEdge *med = (MEdge *)CustomData_get_layer(&edgeData, CD_MEDGE);
   int *index = (int *)CustomData_get_layer(&edgeData, CD_ORIGINDEX);
