@@ -482,7 +482,7 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
           vi.co = vi.bm_vert->co; \
           vi.fno = vi.bm_vert->no; \
           vi.index = BM_elem_index_get(vi.bm_vert); \
-          vi.mask = BM_ELEM_CD_GET_VOID_P(vi.bm_vert, vi.cd_vert_mask_offset); \
+          vi.mask = (float*)BM_ELEM_CD_GET_VOID_P(vi.bm_vert, vi.cd_vert_mask_offset); \
         }
 
 #define BKE_pbvh_vertex_iter_end \

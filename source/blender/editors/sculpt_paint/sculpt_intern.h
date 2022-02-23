@@ -20,6 +20,10 @@
 #include "BLI_gsqueue.h"
 #include "BLI_threads.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct AutomaskingCache;
 struct KeyBlock;
 struct Object;
@@ -1730,3 +1734,7 @@ void SCULPT_OT_brush_stroke(struct wmOperatorType *ot);
 /* end sculpt_ops.c */
 
 #define SCULPT_TOOL_NEEDS_COLOR(tool) ELEM(tool, SCULPT_TOOL_PAINT, SCULPT_TOOL_SMEAR)
+
+#ifdef __cplusplus
+}
+#endif
