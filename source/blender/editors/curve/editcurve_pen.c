@@ -104,6 +104,8 @@ typedef struct CurvePenData {
   bool multi_point;
   /* Whether a point has already been selected. */
   bool selection_made;
+  /* Whether shift-click was pressed. */
+  bool select_multi;
 
   /* Whether shortcut for toggling free handles was pressed. */
   bool free_toggle_pressed;
@@ -1451,13 +1453,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   int ret = OPERATOR_RUNNING_MODAL;
 
-  CurvePenData *cpd;
-  if (op->customdata == NULL) {
-    op->customdata = cpd = MEM_callocN(sizeof(CurvePenData), __func__);
-  }
-  else {
-    cpd = (CurvePenData *)(op->customdata);
-  }
   /* Distance threshold for mouse clicks to affect the spline or its points */
   const float sel_dist_mul = RNA_float_get(op->ptr, "sel_dist_mul");
   const float mval_fl[2] = {UNPACK2(event->mval)};
@@ -1467,7 +1462,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool insert_point = RNA_boolean_get(op->ptr, "insert_point");
   const bool move_seg = RNA_boolean_get(op->ptr, "move_segment");
   const bool select_point = RNA_boolean_get(op->ptr, "select_point");
-  const bool select_multi = RNA_boolean_get(op->ptr, "select_multi");
   const bool move_point = RNA_boolean_get(op->ptr, "move_point");
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
   const bool toggle_vector = RNA_boolean_get(op->ptr, "toggle_vector");
@@ -1479,6 +1473,15 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const int move_entire = RNA_enum_get(op->ptr, "move_entire");
   const int link_handles = RNA_enum_get(op->ptr, "link_handles");
   const int lock_angle = RNA_enum_get(op->ptr, "lock_angle");
+
+  CurvePenData *cpd;
+  if (op->customdata == NULL) {
+    op->customdata = cpd = MEM_callocN(sizeof(CurvePenData), __func__);
+  }
+  else {
+    cpd = (CurvePenData *)(op->customdata);
+    cpd->select_multi = event->modifier == KM_SHIFT;
+  }
 
   if (!cpd->free_toggle_pressed && is_extra_key_pressed(event, free_toggle)) {
     toggle_bezt_free_align_handles(nurbs);
@@ -1646,7 +1649,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
 
       if (!cpd->selection_made && !cpd->acted) {
-        if (select_multi) {
+        if (cpd->select_multi) {
           short bezt_idx;
           get_closest_vertex_to_point_in_nurbs(
               nurbs, &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
@@ -1769,8 +1772,6 @@ void CURVE_OT_pen(wmOperatorType *ot)
       ot->srna, "move_segment", false, "Move Segment", "Delete an existing point");
   prop = RNA_def_boolean(
       ot->srna, "select_point", false, "Select Point", "Select a point or its handles");
-  prop = RNA_def_boolean(
-      ot->srna, "select_multi", false, "Select Multiple", "Select multiple points");
   prop = RNA_def_boolean(
       ot->srna, "move_point", false, "Move Point", "Move a point or its handles");
   prop = RNA_def_boolean(ot->srna,
