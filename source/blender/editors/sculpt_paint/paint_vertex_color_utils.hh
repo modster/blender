@@ -18,10 +18,10 @@ struct ByteTraits {
   using ValueType = uchar;
   using BlendType = int;
 
-  inline static const uchar range = 255;
-  inline static const float frange = 255.0f;
+  inline static const uchar range = 255; /* Zero-based maximum value. */
+  inline static const float frange = 255.0f; /* Convienent floating-point version of range. */
   inline static const int cmpRange = 254;
-  inline static const int expandedRange = 256;
+  inline static const int expandedRange = 256; /* One-based maxium value. */ 
 
   inline static const int bytes = 1;
   inline static const float unit = 255.0f;
