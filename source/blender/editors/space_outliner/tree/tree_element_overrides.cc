@@ -52,7 +52,7 @@ void TreeElementOverridesBase::expand(SpaceOutliner &space_outliner) const
   PropertyRNA *override_rna_prop;
   short index = 0;
 
-  for (auto *override_prop :
+  for (IDOverrideLibraryProperty *override_prop :
        ListBaseWrapper<IDOverrideLibraryProperty>(id_.override_library->properties)) {
     const bool is_rna_path_valid = BKE_lib_override_rna_property_find(
         &idpoin, override_prop, &override_rna_ptr, &override_rna_prop);
@@ -60,7 +60,7 @@ void TreeElementOverridesBase::expand(SpaceOutliner &space_outliner) const
         ELEM(override_prop->rna_prop_type, PROP_POINTER, PROP_COLLECTION) &&
         RNA_struct_is_ID(RNA_property_pointer_type(&override_rna_ptr, override_rna_prop))) {
       bool do_continue = true;
-      for (auto *override_prop_op :
+      for (IDOverrideLibraryPropertyOperation *override_prop_op :
            ListBaseWrapper<IDOverrideLibraryPropertyOperation>(override_prop->operations)) {
         if ((override_prop_op->flag & IDOVERRIDE_LIBRARY_FLAG_IDPOINTER_MATCH_REFERENCE) == 0) {
           do_continue = false;
@@ -73,7 +73,8 @@ void TreeElementOverridesBase::expand(SpaceOutliner &space_outliner) const
       }
     }
 
-    TreeElementOverridesData data = {id_, *override_prop, is_rna_path_valid};
+    TreeElementOverridesData data = {
+        id_, *override_prop, override_rna_ptr, *override_rna_prop, is_rna_path_valid};
     outliner_add_element(
         &space_outliner, &legacy_te_.subtree, &data, &legacy_te_, TSE_LIBRARY_OVERRIDE, index++);
   }
@@ -81,7 +82,10 @@ void TreeElementOverridesBase::expand(SpaceOutliner &space_outliner) const
 
 TreeElementOverridesProperty::TreeElementOverridesProperty(TreeElement &legacy_te,
                                                            TreeElementOverridesData &override_data)
-    : AbstractTreeElement(legacy_te), override_prop_(override_data.override_property)
+    : AbstractTreeElement(legacy_te),
+      override_prop_(override_data.override_property),
+      override_rna_ptr(override_data.override_rna_ptr),
+      override_rna_prop(override_data.override_rna_prop)
 {
   BLI_assert(legacy_te.store_elem->type == TSE_LIBRARY_OVERRIDE);
 
