@@ -217,7 +217,6 @@ typedef struct SculptThreadedTaskData {
   int totnode;
 
   struct VPaint *vp;
-  struct VPaintData *vpd;
   struct WPaintData *wpd;
   struct WeightPaintInfo *wpi;
   unsigned int *lcol;

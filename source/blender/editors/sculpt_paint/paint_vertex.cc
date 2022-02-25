@@ -73,6 +73,8 @@
 using blender::IndexRange;
 using namespace blender::paint;
 
+static ViewContext *vpaint_get_viewcontext(Object *ob, void *vpd);
+
 /*
 WM_msg_publish_rna_prop declares externs locally,
 however that doesn't work in C++ since we need
@@ -126,9 +128,9 @@ template<typename Color = Color4f> static Color fromFloat(const Color4f &c)
 }
 
 /* Use for 'blur' brush, align with PBVH nodes, created and freed on each update. */
-struct VPaintAverageAccum {
-  uint len;
-  uint value[3];
+template<typename BlendType> struct VPaintAverageAccum {
+  BlendType len;
+  BlendType value[3];
 };
 
 struct WPaintAverageAccum {
@@ -148,10 +150,15 @@ struct NormalAnglePrecalc {
   float angle_range;
 };
 
-static int get_vcol_elements(Mesh *me)
+/* Returns number of elements. */
+static int get_vcol_elements(Mesh *me, size_t *r_elem_size)
 {
   CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
   AttributeDomain domain = BKE_id_attribute_domain(&me->id, layer);
+
+  if (r_elem_size) {
+    *r_elem_size = layer->type == CD_PROP_COLOR ? sizeof(float) * 4ULL : 4ULL;
+  }
 
   switch (domain) {
     case ATTR_DOMAIN_POINT:
@@ -325,19 +332,29 @@ bool weight_paint_poll_ignore_tool(bContext *C)
   return weight_paint_poll_ex(C, false);
 }
 
-uint vpaint_get_current_col(Scene *scene, VPaint *vp, bool secondary, float floatcolor[4])
+template<typename Color, typename Traits, AttributeDomain domain>
+Color vpaint_get_current_col(Scene *scene, VPaint *vp, bool secondary)
 {
   Brush *brush = BKE_paint_brush(&vp->paint);
-  uchar col[4];
+  const float *color = secondary ? BKE_brush_secondary_color_get(scene, brush) :
+                                   BKE_brush_color_get(scene, brush);
+  Color4f col(color);
 
-  copy_v4_v4(floatcolor,
-             secondary ? BKE_brush_secondary_color_get(scene, brush) :
-                         BKE_brush_color_get(scene, brush));
+  col[3] = 1.0f; /* alpha isn't used, could even be removed to speedup paint a little */
 
-  rgb_float_to_uchar(col, floatcolor);
+  if constexpr (std::is_same_v<Color, Color4b>) {
+    return col.encode();
+  }
+  else {
+    return col;
+  }
+}
 
-  col[3] = 255; /* alpha isn't used, could even be removed to speedup paint a little */
-  return *(uint *)col;
+extern "C" uint vpaint_get_current_color(Scene *scene, VPaint *vp, bool secondary)
+{
+  Color4b col = vpaint_get_current_col<Color4b, ByteTraits, ATTR_DOMAIN_CORNER>(scene, vp, secondary);
+
+  return *(reinterpret_cast<uint *>(&col.r));
 }
 
 /* wpaint has 'wpaint_blend' */
@@ -1199,12 +1216,12 @@ static void vertex_paint_init_session(Depsgraph *depsgraph,
   BLI_assert(ob->sculpt == NULL);
   ob->sculpt = (SculptSession *)MEM_callocN(sizeof(SculptSession), "sculpt session");
   ob->sculpt->mode_type = object_mode;
-  BKE_sculpt_update_object_for_edit(depsgraph, ob, false, false, false);
+  BKE_sculpt_update_object_for_edit(depsgraph, ob, true, false, false);
 }
 
 static void vertex_paint_init_stroke(Depsgraph *depsgraph, Object *ob)
 {
-  BKE_sculpt_update_object_for_edit(depsgraph, ob, false, false, false);
+  BKE_sculpt_update_object_for_edit(depsgraph, ob, true, false, false);
 }
 
 static void vertex_paint_init_session_data(const ToolSettings *ts, Object *ob)
@@ -1226,7 +1243,9 @@ static void vertex_paint_init_session_data(const ToolSettings *ts, Object *ob)
   }
 
   Mesh *me = (Mesh *)ob->data;
-  int totelem = get_vcol_elements(me);
+  size_t elemSize;
+
+  int totelem = get_vcol_elements(me, &elemSize);
 
   if (gmap->vert_to_loop == NULL) {
     gmap->vert_map_mem = NULL;
@@ -1251,9 +1270,6 @@ static void vertex_paint_init_session_data(const ToolSettings *ts, Object *ob)
 
   /* Create average brush arrays */
   if (ob->mode == OB_MODE_VERTEX_PAINT) {
-    CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
-    size_t elemSize = layer && layer->type == CD_PROP_COLOR ? sizeof(float) * 4 : 4;
-
     if (!brush_use_accumulate(ts->vpaint)) {
       if (ob->sculpt->mode.vpaint.previous_color == NULL) {
         ob->sculpt->mode.vpaint.previous_color = (uint *)MEM_callocN(totelem * elemSize, __func__);
@@ -2814,12 +2830,17 @@ void PAINT_OT_vertex_paint_toggle(wmOperatorType *ot)
  * - revise whether op->customdata should be added in object, in set_vpaint.
  */
 
-struct VPaintData {
+struct VPaintDataHeader {
   ViewContext vc;
+  AttributeDomain domain;
+  CustomDataType type;
+};
+
+template<typename Color, typename Traits, AttributeDomain domain> struct VPaintData {
+  VPaintDataHeader head;
   struct NormalAnglePrecalc normal_angle_precalc;
 
-  uint paintcol;
-  float floatcolor[4];
+  Color paintcol;
 
   struct VertProjHandle *vp_handle;
   struct CoNo *vertexcosnos;
@@ -2838,52 +2859,44 @@ struct VPaintData {
 
   /* Special storage for smear brush, avoid feedback loop - update each step. */
   struct {
-    uint *color_prev;
-    uint *color_curr;
+    void *color_prev;
+    void *color_curr;
   } smear;
 };
 
-extern "C" static bool vpaint_stroke_test_start(bContext *C,
-                                                struct wmOperator *op,
-                                                const float mouse[2])
+template<typename Color, typename Traits, AttributeDomain domain>
+static void *vpaint_init_vpaint(bContext *C,
+                                struct wmOperator *op,
+                                Scene *scene,
+                                Depsgraph *depsgraph,
+                                VPaint *vp,
+                                Object *ob,
+                                Mesh *me,
+                                const Brush *brush)
 {
-  Scene *scene = CTX_data_scene(C);
-  ToolSettings *ts = scene->toolsettings;
-  struct PaintStroke *stroke = (PaintStroke *)op->customdata;
-  VPaint *vp = ts->vpaint;
-  Brush *brush = BKE_paint_brush(&vp->paint);
-  struct VPaintData *vpd;
-  Object *ob = CTX_data_active_object(C);
-  Mesh *me;
-  SculptSession *ss = ob->sculpt;
-  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  VPaintData<Color, Traits, domain> *vpd;
 
-  /* context checks could be a poll() */
-  me = BKE_mesh_from_object(ob);
-  if (me == NULL || me->totpoly == 0) {
-    return false;
-  }
-
-  ED_mesh_color_ensure(me, NULL);
-
-  CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
-  if (!layer) {
-    return false;
-  }
-
-  const size_t elemSize = layer->type == CD_PROP_COLOR ? sizeof(float) * 4 : 4;
-  int totelem = get_vcol_elements(me);
-
+  size_t elemSize;
+  int totelem = get_vcol_elements(me, &elemSize);
   /* make mode data storage */
-  vpd = (VPaintData *)MEM_callocN(sizeof(*vpd), "VPaintData");
-  paint_stroke_set_mode_data(stroke, vpd);
-  ED_view3d_viewcontext_init(C, &vpd->vc, depsgraph);
+  vpd = MEM_new<VPaintData<Color, Traits, domain>>("VPaintData");
+
+  if constexpr (std::is_same_v<Color, Color4f>) {
+    vpd->head.type = CD_PROP_COLOR;
+  }
+  else {
+    vpd->head.type = CD_MLOOPCOL;
+  }
+
+  vpd->head.domain = domain;
+
+  ED_view3d_viewcontext_init(C, &vpd->head.vc, depsgraph);
   view_angle_limits_init(&vpd->normal_angle_precalc,
                          vp->paint.brush->falloff_angle,
                          (vp->paint.brush->flag & BRUSH_FRONTFACE_FALLOFF) != 0);
 
-  vpd->paintcol = vpaint_get_current_col(
-      scene, vp, (RNA_enum_get(op->ptr, "mode") == BRUSH_STROKE_INVERT), vpd->floatcolor);
+  vpd->paintcol = vpaint_get_current_col<Color, Traits, domain>(
+      scene, vp, (RNA_enum_get(op->ptr, "mode") == BRUSH_STROKE_INVERT));
 
   vpd->is_texbrush = !(brush->vertexpaint_tool == VPAINT_TOOL_BLUR) && brush->mtex.tex;
 
@@ -2904,8 +2917,11 @@ extern "C" static bool vpaint_stroke_test_start(bContext *C,
   }
 
   if (brush->vertexpaint_tool == VPAINT_TOOL_SMEAR) {
-    vpd->smear.color_prev = (uint *)MEM_mallocN(elemSize * totelem, __func__);
-    memcpy(vpd->smear.color_prev, me->mloopcol, elemSize * totelem);
+    CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
+
+    vpd->smear.color_prev = MEM_malloc_arrayN(totelem, elemSize, __func__);
+    memcpy(vpd->smear.color_prev, layer->data, elemSize * totelem);
+
     vpd->smear.color_curr = (uint *)MEM_dupallocN(vpd->smear.color_prev);
   }
 
@@ -2916,184 +2932,81 @@ extern "C" static bool vpaint_stroke_test_start(bContext *C,
     ob->sculpt->building_vp_handle = false;
   }
 
+  if (ob->sculpt->mode.vpaint.previous_color != NULL) {
+    memset(ob->sculpt->mode.vpaint.previous_color, 0, elemSize * totelem);
+  }
+
+  return static_cast<void *>(vpd);
+}
+
+extern "C" static bool vpaint_stroke_test_start(bContext *C,
+                                                struct wmOperator *op,
+                                                const float mouse[2])
+{
+  Scene *scene = CTX_data_scene(C);
+  ToolSettings *ts = scene->toolsettings;
+  struct PaintStroke *stroke = (PaintStroke *)op->customdata;
+  VPaint *vp = ts->vpaint;
+  Brush *brush = BKE_paint_brush(&vp->paint);
+  Object *ob = CTX_data_active_object(C);
+  Mesh *me;
+  SculptSession *ss = ob->sculpt;
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+
+  /* context checks could be a poll() */
+  me = BKE_mesh_from_object(ob);
+  if (me == NULL || me->totpoly == 0) {
+    return false;
+  }
+
+  ED_mesh_color_ensure(me, NULL);
+
+  CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
+  if (!layer) {
+    return false;
+  }
+
+  AttributeDomain domain = BKE_id_attribute_domain(&me->id, layer);
+  void *vpd = nullptr;
+
+  if (domain == ATTR_DOMAIN_POINT) {
+    if (layer->type == CD_PROP_COLOR) {
+      vpd = vpaint_init_vpaint<Color4f, FloatTraits, ATTR_DOMAIN_POINT>(
+          C, op, scene, depsgraph, vp, ob, me, brush);
+    }
+    else if (layer->type == CD_MLOOPCOL) {
+      vpd = vpaint_init_vpaint<Color4b, ByteTraits, ATTR_DOMAIN_POINT>(
+          C, op, scene, depsgraph, vp, ob, me, brush);
+    }
+  }
+  else if (domain == ATTR_DOMAIN_CORNER) {
+    if (layer->type == CD_PROP_COLOR) {
+      vpd = vpaint_init_vpaint<Color4f, FloatTraits, ATTR_DOMAIN_CORNER>(
+          C, op, scene, depsgraph, vp, ob, me, brush);
+    }
+    else if (layer->type == CD_MLOOPCOL) {
+      vpd = vpaint_init_vpaint<Color4b, ByteTraits, ATTR_DOMAIN_CORNER>(
+          C, op, scene, depsgraph, vp, ob, me, brush);
+    }
+  }
+
+  BLI_assert(vpd != nullptr);
+
+  paint_stroke_set_mode_data(stroke, vpd);
+
   /* If not previously created, create vertex/weight paint mode session data */
   vertex_paint_init_stroke(depsgraph, ob);
   vwpaint_update_cache_invariants(C, vp, ss, op, mouse);
   vertex_paint_init_session_data(ts, ob);
 
-  if (ob->sculpt->mode.vpaint.previous_color != NULL) {
-    memset(ob->sculpt->mode.vpaint.previous_color, 0, elemSize * totelem);
-  }
-
   return true;
-}
-
-extern "C" static void do_vpaint_brush_calc_average_color_cb_ex(
-    void *__restrict userdata, const int n, const TaskParallelTLS *__restrict UNUSED(tls))
-{
-  SculptThreadedTaskData *data = (SculptThreadedTaskData *)userdata;
-  SculptSession *ss = data->ob->sculpt;
-  const PBVHType pbvh_type = BKE_pbvh_type(ss->pbvh);
-  const bool has_grids = (pbvh_type == PBVH_GRIDS);
-  const struct SculptVertexPaintGeomMap *gmap = &ss->mode.vpaint.gmap;
-
-  StrokeCache *cache = ss->cache;
-  uint *lcol = data->lcol;
-  char *col;
-  const bool use_vert_sel = (data->me->editflag &
-                             (ME_EDIT_PAINT_FACE_SEL | ME_EDIT_PAINT_VERT_SEL)) != 0;
-
-  struct VPaintAverageAccum *accum = (struct VPaintAverageAccum *)data->custom_data + n;
-  accum->len = 0;
-  memset(accum->value, 0, sizeof(accum->value));
-
-  SculptBrushTest test;
-  SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
-      ss, &test, data->brush->falloff_shape);
-
-  /* For each vertex */
-  PBVHVertexIter vd;
-  BKE_pbvh_vertex_iter_begin (ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE) {
-    /* Test to see if the vertex coordinates are within the spherical brush region. */
-    if (sculpt_brush_test_sq_fn(&test, vd.co)) {
-      const int v_index = has_grids ? data->me->mloop[vd.grid_indices[vd.g]].v :
-                                      vd.vert_indices[vd.i];
-      if (BKE_brush_curve_strength(data->brush, 0.0, cache->radius) > 0.0) {
-        /* If the vertex is selected for painting. */
-        const MVert *mv = &data->me->mvert[v_index];
-        if (!use_vert_sel || mv->flag & SELECT) {
-          accum->len += gmap->vert_to_loop[v_index].count;
-          /* if a vertex is within the brush region, then add its color to the blend. */
-          for (int j = 0; j < gmap->vert_to_loop[v_index].count; j++) {
-            const int l_index = gmap->vert_to_loop[v_index].indices[j];
-            col = (char *)(&lcol[l_index]);
-            /* Color is squared to compensate the sqrt color encoding. */
-            accum->value[0] += col[0] * col[0];
-            accum->value[1] += col[1] * col[1];
-            accum->value[2] += col[2] * col[2];
-          }
-        }
-      }
-    }
-  }
-  BKE_pbvh_vertex_iter_end;
-}
-
-static float tex_color_alpha_ubyte(SculptThreadedTaskData *data,
-                                   const float v_co[3],
-                                   uint *r_color)
-{
-  float rgba[4];
-  float rgba_br[3];
-  tex_color_alpha(data->vp, &data->vpd->vc, v_co, rgba);
-  rgb_uchar_to_float(rgba_br, (const uchar *)&data->vpd->paintcol);
-  mul_v3_v3(rgba_br, rgba);
-  rgb_float_to_uchar((uchar *)r_color, rgba_br);
-  return rgba[3];
-}
-
-static void do_vpaint_brush_draw_task_cb_ex(void *__restrict userdata,
-                                            const int n,
-                                            const TaskParallelTLS *__restrict UNUSED(tls))
-{
-  SculptThreadedTaskData *data = (SculptThreadedTaskData *)userdata;
-  SculptSession *ss = data->ob->sculpt;
-  const PBVHType pbvh_type = BKE_pbvh_type(ss->pbvh);
-  const bool has_grids = (pbvh_type == PBVH_GRIDS);
-  const struct SculptVertexPaintGeomMap *gmap = &ss->mode.vpaint.gmap;
-
-  const Brush *brush = data->brush;
-  const StrokeCache *cache = ss->cache;
-  uint *lcol = data->lcol;
-  const Scene *scene = CTX_data_scene(data->C);
-  float brush_size_pressure, brush_alpha_value, brush_alpha_pressure;
-  get_brush_alpha_data(
-      scene, ss, brush, &brush_size_pressure, &brush_alpha_value, &brush_alpha_pressure);
-  const bool use_normal = vwpaint_use_normal(data->vp);
-  const bool use_vert_sel = (data->me->editflag &
-                             (ME_EDIT_PAINT_FACE_SEL | ME_EDIT_PAINT_VERT_SEL)) != 0;
-  const bool use_face_sel = (data->me->editflag & ME_EDIT_PAINT_FACE_SEL) != 0;
-
-  SculptBrushTest test;
-  SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
-      ss, &test, data->brush->falloff_shape);
-  const float *sculpt_normal_frontface = SCULPT_brush_frontface_normal_from_falloff_shape(
-      ss, data->brush->falloff_shape);
-
-  /* For each vertex */
-  PBVHVertexIter vd;
-  BKE_pbvh_vertex_iter_begin (ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE) {
-    /* Test to see if the vertex coordinates are within the spherical brush region. */
-    if (sculpt_brush_test_sq_fn(&test, vd.co)) {
-      /* NOTE: Grids are 1:1 with corners (aka loops).
-       * For grid based pbvh, take the vert whose loop corresponds to the current grid.
-       * Otherwise, take the current vert. */
-      const int v_index = has_grids ? data->me->mloop[vd.grid_indices[vd.g]].v :
-                                      vd.vert_indices[vd.i];
-      const float grid_alpha = has_grids ? 1.0f / vd.gridsize : 1.0f;
-      const MVert *mv = &data->me->mvert[v_index];
-
-      /* If the vertex is selected for painting. */
-      if (!use_vert_sel || mv->flag & SELECT) {
-        /* Calc the dot prod. between ray norm on surf and current vert
-         * (ie splash prevention factor), and only paint front facing verts. */
-        float brush_strength = cache->bstrength;
-        const float angle_cos = (use_normal && vd.no) ? dot_v3v3(sculpt_normal_frontface, vd.no) :
-                                                        1.0f;
-        if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
-            ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
-             view_angle_limits_apply_falloff(
-                 &data->vpd->normal_angle_precalc, angle_cos, &brush_strength))) {
-          const float brush_fade = BKE_brush_curve_strength(
-              brush, sqrtf(test.dist), cache->radius);
-          uint color_final = data->vpd->paintcol;
-
-          /* If we're painting with a texture, sample the texture color and alpha. */
-          float tex_alpha = 1.0;
-          if (data->vpd->is_texbrush) {
-            /* NOTE: we may want to paint alpha as vertex color alpha. */
-            tex_alpha = tex_color_alpha_ubyte(
-                data, data->vpd->vertexcosnos[v_index].co, &color_final);
-          }
-          /* For each poly owning this vert, paint each loop belonging to this vert. */
-          for (int j = 0; j < gmap->vert_to_poly[v_index].count; j++) {
-            const int p_index = gmap->vert_to_poly[v_index].indices[j];
-            const int l_index = gmap->vert_to_loop[v_index].indices[j];
-            BLI_assert(data->me->mloop[l_index].v == v_index);
-            const MPoly *mp = &data->me->mpoly[p_index];
-            if (!use_face_sel || mp->flag & ME_FACE_SEL) {
-              uint color_orig = 0; /* unused when array is NULL */
-              if (ss->mode.vpaint.previous_color != NULL) {
-                /* Get the previous loop color */
-                if (ss->mode.vpaint.previous_color[l_index] == 0) {
-                  ss->mode.vpaint.previous_color[l_index] = lcol[l_index];
-                }
-                color_orig = ss->mode.vpaint.previous_color[l_index];
-              }
-              const float final_alpha = 255 * brush_fade * brush_strength * tex_alpha *
-                                        brush_alpha_pressure * grid_alpha;
-
-              /* Mix the new color with the original based on final_alpha. */
-              lcol[l_index] = vpaint_blend(data->vp,
-                                           lcol[l_index],
-                                           color_orig,
-                                           color_final,
-                                           final_alpha,
-                                           255 * brush_strength);
-            }
-          }
-        }
-      }
-    }
-  }
-  BKE_pbvh_vertex_iter_end;
 }
 
 template<class Color = Color4b, typename Traits = ByteTraits>
 static void do_vpaint_brush_blur_loops(bContext *C,
                                        Sculpt *sd,
                                        VPaint *vp,
-                                       struct VPaintData *vpd,
+                                       VPaintData<Color, Traits, ATTR_DOMAIN_CORNER> *vpd,
                                        Object *ob,
                                        Mesh *me,
                                        PBVHNode **nodes,
@@ -3237,7 +3150,7 @@ template<class Color = Color4b, typename Traits = ByteTraits>
 static void do_vpaint_brush_blur_verts(bContext *C,
                                        Sculpt *sd,
                                        VPaint *vp,
-                                       struct VPaintData *vpd,
+                                       VPaintData<Color, Traits, ATTR_DOMAIN_POINT> *vpd,
                                        Object *ob,
                                        Mesh *me,
                                        PBVHNode **nodes,
@@ -3378,279 +3291,265 @@ static void do_vpaint_brush_blur_verts(bContext *C,
     };
   });
 }
-extern "C" static void do_vpaint_brush_blur_task_cb_ex(
-    void *__restrict userdata, const int n, const TaskParallelTLS *__restrict UNUSED(tls))
+
+template<typename Color = Color4b, typename Traits, AttributeDomain domain>
+static void do_vpaint_brush_smear(bContext *C,
+                                  Sculpt *sd,
+                                  VPaint *vp,
+                                  VPaintData<Color, Traits, domain> *vpd,
+                                  Object *ob,
+                                  Mesh *me,
+                                  PBVHNode **nodes,
+                                  int totnode,
+                                  Color *lcol)
 {
-  SculptThreadedTaskData *data = (SculptThreadedTaskData *)userdata;
-  SculptSession *ss = data->ob->sculpt;
+  using Value = Traits::ValueType;
+  using Blend = Traits::BlendType;
+
+  SculptSession *ss = ob->sculpt;
+
+  const struct SculptVertexPaintGeomMap *gmap = &ss->mode.vpaint.gmap;
+  const StrokeCache *cache = ss->cache;
   const PBVHType pbvh_type = BKE_pbvh_type(ss->pbvh);
   const bool has_grids = (pbvh_type == PBVH_GRIDS);
 
-  Scene *scene = CTX_data_scene(data->C);
-  const struct SculptVertexPaintGeomMap *gmap = &ss->mode.vpaint.gmap;
-  const Brush *brush = data->brush;
-  const StrokeCache *cache = ss->cache;
-  uint *lcol = data->lcol;
-  float brush_size_pressure, brush_alpha_value, brush_alpha_pressure;
-  get_brush_alpha_data(
-      scene, ss, brush, &brush_size_pressure, &brush_alpha_value, &brush_alpha_pressure);
-  const bool use_normal = vwpaint_use_normal(data->vp);
-  const bool use_vert_sel = (data->me->editflag &
-                             (ME_EDIT_PAINT_FACE_SEL | ME_EDIT_PAINT_VERT_SEL)) != 0;
-  const bool use_face_sel = (data->me->editflag & ME_EDIT_PAINT_FACE_SEL) != 0;
+  const Brush *brush = ob->sculpt->cache->brush;
+  const Scene *scene = CTX_data_scene(C);
+  Color *color_curr = static_cast<Color *>(vpd->smear.color_curr);
+  Color *color_prev_smear = static_cast<Color *>(vpd->smear.color_prev);
+  Color *color_prev = reinterpret_cast<Color *>(ss->mode.vpaint.previous_color);
 
-  SculptBrushTest test;
-  SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
-      ss, &test, data->brush->falloff_shape);
-  const float *sculpt_normal_frontface = SCULPT_brush_frontface_normal_from_falloff_shape(
-      ss, data->brush->falloff_shape);
+  blender::threading::parallel_for(IndexRange(totnode), 1LL, [&](IndexRange range) {
+    for (int n : range) {
+      float brush_size_pressure, brush_alpha_value, brush_alpha_pressure;
 
-  /* For each vertex */
-  PBVHVertexIter vd;
-  BKE_pbvh_vertex_iter_begin (ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE) {
-    /* Test to see if the vertex coordinates are within the spherical brush region. */
-    if (sculpt_brush_test_sq_fn(&test, vd.co)) {
-      /* For grid based pbvh, take the vert whose loop corresponds to the current grid.
-       * Otherwise, take the current vert. */
-      const int v_index = has_grids ? data->me->mloop[vd.grid_indices[vd.g]].v :
-                                      vd.vert_indices[vd.i];
-      const float grid_alpha = has_grids ? 1.0f / vd.gridsize : 1.0f;
-      const MVert *mv = &data->me->mvert[v_index];
+      get_brush_alpha_data(
+          scene, ss, brush, &brush_size_pressure, &brush_alpha_value, &brush_alpha_pressure);
+      float brush_dir[3];
+      const bool use_normal = vwpaint_use_normal(vp);
+      const bool use_vert_sel = (me->editflag &
+                                 (ME_EDIT_PAINT_FACE_SEL | ME_EDIT_PAINT_VERT_SEL)) != 0;
+      const bool use_face_sel = (me->editflag & ME_EDIT_PAINT_FACE_SEL) != 0;
 
-      /* If the vertex is selected for painting. */
-      if (!use_vert_sel || mv->flag & SELECT) {
-        float brush_strength = cache->bstrength;
-        const float angle_cos = (use_normal && vd.no) ? dot_v3v3(sculpt_normal_frontface, vd.no) :
-                                                        1.0f;
-        if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
-            ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
-             view_angle_limits_apply_falloff(
-                 &data->vpd->normal_angle_precalc, angle_cos, &brush_strength))) {
-          const float brush_fade = BKE_brush_curve_strength(
-              brush, sqrtf(test.dist), cache->radius);
+      sub_v3_v3v3(brush_dir, cache->location, cache->last_location);
+      project_plane_v3_v3v3(brush_dir, brush_dir, cache->view_normal);
 
-          /* Get the average poly color */
-          uint color_final = 0;
-          int total_hit_loops = 0;
-          uint blend[4] = {0};
-          for (int j = 0; j < gmap->vert_to_poly[v_index].count; j++) {
-            int p_index = gmap->vert_to_poly[v_index].indices[j];
-            const MPoly *mp = &data->me->mpoly[p_index];
-            if (!use_face_sel || mp->flag & ME_FACE_SEL) {
-              total_hit_loops += mp->totloop;
-              for (int k = 0; k < mp->totloop; k++) {
-                const uint l_index = mp->loopstart + k;
-                const char *col = (const char *)(&lcol[l_index]);
-                /* Color is squared to compensate the sqrt color encoding. */
-                blend[0] += (uint)col[0] * (uint)col[0];
-                blend[1] += (uint)col[1] * (uint)col[1];
-                blend[2] += (uint)col[2] * (uint)col[2];
-                blend[3] += (uint)col[3] * (uint)col[3];
-              }
-            }
-          }
-          if (total_hit_loops != 0) {
-            /* Use rgb^2 color averaging. */
-            char *col = (char *)(&color_final);
-            col[0] = round_fl_to_uchar(sqrtf(divide_round_i(blend[0], total_hit_loops)));
-            col[1] = round_fl_to_uchar(sqrtf(divide_round_i(blend[1], total_hit_loops)));
-            col[2] = round_fl_to_uchar(sqrtf(divide_round_i(blend[2], total_hit_loops)));
-            col[3] = round_fl_to_uchar(sqrtf(divide_round_i(blend[3], total_hit_loops)));
+      if (cache->is_last_valid && (normalize_v3(brush_dir) != 0.0f)) {
 
-            /* For each poly owning this vert,
-             * paint each loop belonging to this vert. */
-            for (int j = 0; j < gmap->vert_to_poly[v_index].count; j++) {
-              const int p_index = gmap->vert_to_poly[v_index].indices[j];
-              const int l_index = gmap->vert_to_loop[v_index].indices[j];
-              BLI_assert(data->me->mloop[l_index].v == v_index);
-              const MPoly *mp = &data->me->mpoly[p_index];
-              if (!use_face_sel || mp->flag & ME_FACE_SEL) {
-                uint color_orig = 0; /* unused when array is NULL */
-                if (ss->mode.vpaint.previous_color != NULL) {
-                  /* Get the previous loop color */
-                  if (ss->mode.vpaint.previous_color[l_index] == 0) {
-                    ss->mode.vpaint.previous_color[l_index] = lcol[l_index];
+        SculptBrushTest test;
+        SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
+            ss, &test, brush->falloff_shape);
+        const float *sculpt_normal_frontface = SCULPT_brush_frontface_normal_from_falloff_shape(
+            ss, brush->falloff_shape);
+
+        /* For each vertex */
+        PBVHVertexIter vd;
+        BKE_pbvh_vertex_iter_begin (ss->pbvh, nodes[n], vd, PBVH_ITER_UNIQUE) {
+          /* Test to see if the vertex coordinates are within the spherical brush region. */
+          if (sculpt_brush_test_sq_fn(&test, vd.co)) {
+            /* For grid based pbvh, take the vert whose loop corresponds to the current grid.
+             * Otherwise, take the current vert. */
+            const int v_index = has_grids ? me->mloop[vd.grid_indices[vd.g]].v :
+                                            vd.vert_indices[vd.i];
+            const float grid_alpha = has_grids ? 1.0f / vd.gridsize : 1.0f;
+            const MVert *mv_curr = &me->mvert[v_index];
+
+            /* if the vertex is selected for painting. */
+            if (!use_vert_sel || mv_curr->flag & SELECT) {
+              /* Calc the dot prod. between ray norm on surf and current vert
+               * (ie splash prevention factor), and only paint front facing verts. */
+              float brush_strength = cache->bstrength;
+              const float angle_cos = (use_normal && vd.no) ?
+                                          dot_v3v3(sculpt_normal_frontface, vd.no) :
+                                          1.0f;
+              if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
+                  ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
+                   view_angle_limits_apply_falloff(
+                       &vpd->normal_angle_precalc, angle_cos, &brush_strength))) {
+                const float brush_fade = BKE_brush_curve_strength(
+                    brush, sqrtf(test.dist), cache->radius);
+
+                bool do_color = false;
+                /* Minimum dot product between brush direction and current
+                 * to neighbor direction is 0.0, meaning orthogonal. */
+                float stroke_dot_max = 0.0f;
+
+                /* Get the color of the loop in the opposite
+                 * direction of the brush movement */
+                Color color_final(0, 0, 0, 0);
+
+                for (int j = 0; j < gmap->vert_to_poly[v_index].count; j++) {
+                  const int p_index = gmap->vert_to_poly[v_index].indices[j];
+                  const int l_index = gmap->vert_to_loop[v_index].indices[j];
+                  BLI_assert(me->mloop[l_index].v == v_index);
+                  UNUSED_VARS_NDEBUG(l_index);
+                  const MPoly *mp = &me->mpoly[p_index];
+                  if (!use_face_sel || mp->flag & ME_FACE_SEL) {
+                    const MLoop *ml_other = &me->mloop[mp->loopstart];
+                    for (int k = 0; k < mp->totloop; k++, ml_other++) {
+                      const uint v_other_index = ml_other->v;
+                      if (v_other_index != v_index) {
+                        const MVert *mv_other = &me->mvert[v_other_index];
+
+                        /* Get the direction from the
+                         * selected vert to the neighbor. */
+                        float other_dir[3];
+                        sub_v3_v3v3(other_dir, mv_curr->co, mv_other->co);
+                        project_plane_v3_v3v3(other_dir, other_dir, cache->view_normal);
+
+                        normalize_v3(other_dir);
+
+                        const float stroke_dot = dot_v3v3(other_dir, brush_dir);
+                        int elem_index;
+
+                        if constexpr (domain == ATTR_DOMAIN_POINT) {
+                          elem_index = ml_other->v;
+                        }
+                        else {
+                          elem_index = mp->loopstart + k;
+                        }
+
+                        if (stroke_dot > stroke_dot_max) {
+                          stroke_dot_max = stroke_dot;
+                          color_final = color_prev_smear[elem_index];
+                          do_color = true;
+                        }
+                      }
+                    }
                   }
-                  color_orig = ss->mode.vpaint.previous_color[l_index];
                 }
-                const float final_alpha = 255 * brush_fade * brush_strength *
-                                          brush_alpha_pressure * grid_alpha;
-                /* Mix the new color with the original
-                 * based on the brush strength and the curve. */
-                lcol[l_index] = vpaint_blend(data->vp,
-                                             lcol[l_index],
-                                             color_orig,
-                                             *((uint *)col),
-                                             final_alpha,
-                                             255 * brush_strength);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  BKE_pbvh_vertex_iter_end;
-}
 
-extern "C" static void do_vpaint_brush_smear_task_cb_ex(
-    void *__restrict userdata, const int n, const TaskParallelTLS *__restrict UNUSED(tls))
-{
-  SculptThreadedTaskData *data = (SculptThreadedTaskData *)userdata;
-  SculptSession *ss = data->ob->sculpt;
-  const PBVHType pbvh_type = BKE_pbvh_type(ss->pbvh);
-  const bool has_grids = (pbvh_type == PBVH_GRIDS);
+                if (do_color) {
+                  const float final_alpha = Traits::range * brush_fade * brush_strength *
+                                            brush_alpha_pressure * grid_alpha;
 
-  Scene *scene = CTX_data_scene(data->C);
-  const struct SculptVertexPaintGeomMap *gmap = &ss->mode.vpaint.gmap;
-  const Brush *brush = data->brush;
-  const StrokeCache *cache = ss->cache;
-  uint *lcol = data->lcol;
-  float brush_size_pressure, brush_alpha_value, brush_alpha_pressure;
-  get_brush_alpha_data(
-      scene, ss, brush, &brush_size_pressure, &brush_alpha_value, &brush_alpha_pressure);
-  float brush_dir[3];
-  const bool use_normal = vwpaint_use_normal(data->vp);
-  const bool use_vert_sel = (data->me->editflag &
-                             (ME_EDIT_PAINT_FACE_SEL | ME_EDIT_PAINT_VERT_SEL)) != 0;
-  const bool use_face_sel = (data->me->editflag & ME_EDIT_PAINT_FACE_SEL) != 0;
+                  /* For each poly owning this vert,
+                   * paint each loop belonging to this vert. */
+                  for (int j = 0; j < gmap->vert_to_poly[v_index].count; j++) {
+                    const int p_index = gmap->vert_to_poly[v_index].indices[j];
+                    const int l_index = gmap->vert_to_loop[v_index].indices[j];
 
-  sub_v3_v3v3(brush_dir, cache->location, cache->last_location);
-  project_plane_v3_v3v3(brush_dir, brush_dir, cache->view_normal);
+                    int elem_index;
+                    if constexpr (domain == ATTR_DOMAIN_POINT) {
+                      elem_index = v_index;
+                    }
+                    else {
+                      elem_index = l_index;
+                    }
 
-  if (cache->is_last_valid && (normalize_v3(brush_dir) != 0.0f)) {
+                    BLI_assert(me->mloop[l_index].v == v_index);
 
-    SculptBrushTest test;
-    SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
-        ss, &test, data->brush->falloff_shape);
-    const float *sculpt_normal_frontface = SCULPT_brush_frontface_normal_from_falloff_shape(
-        ss, data->brush->falloff_shape);
+                    const MPoly *mp = &me->mpoly[p_index];
+                    if (!use_face_sel || mp->flag & ME_FACE_SEL) {
+                      /* Get the previous element color */
+                      Color color_orig(0, 0, 0, 0); /* unused when array is NULL */
 
-    /* For each vertex */
-    PBVHVertexIter vd;
-    BKE_pbvh_vertex_iter_begin (ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE) {
-      /* Test to see if the vertex coordinates are within the spherical brush region. */
-      if (sculpt_brush_test_sq_fn(&test, vd.co)) {
-        /* For grid based pbvh, take the vert whose loop corresponds to the current grid.
-         * Otherwise, take the current vert. */
-        const int v_index = has_grids ? data->me->mloop[vd.grid_indices[vd.g]].v :
-                                        vd.vert_indices[vd.i];
-        const float grid_alpha = has_grids ? 1.0f / vd.gridsize : 1.0f;
-        const MVert *mv_curr = &data->me->mvert[v_index];
+                      if (color_prev != NULL) {
+                        /* Get the previous element color */
+                        if (isZero(color_prev[elem_index])) {
+                          color_prev[elem_index] = lcol[elem_index];
+                        }
+                        color_orig = color_prev[elem_index];
+                      }
+                      /* Mix the new color with the original
+                       * based on the brush strength and the curve. */
+                      lcol[elem_index] = vpaint_blend_cpp<Color, Traits>(vp,
+                                                                         lcol[elem_index],
+                                                                         color_orig,
+                                                                         color_final,
+                                                                         final_alpha,
+                                                                         Traits::range *
+                                                                             brush_strength);
 
-        /* if the vertex is selected for painting. */
-        if (!use_vert_sel || mv_curr->flag & SELECT) {
-          /* Calc the dot prod. between ray norm on surf and current vert
-           * (ie splash prevention factor), and only paint front facing verts. */
-          float brush_strength = cache->bstrength;
-          const float angle_cos = (use_normal && vd.no) ?
-                                      dot_v3v3(sculpt_normal_frontface, vd.no) :
-                                      1.0f;
-          if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
-              ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
-               view_angle_limits_apply_falloff(
-                   &data->vpd->normal_angle_precalc, angle_cos, &brush_strength))) {
-            const float brush_fade = BKE_brush_curve_strength(
-                brush, sqrtf(test.dist), cache->radius);
-
-            bool do_color = false;
-            /* Minimum dot product between brush direction and current
-             * to neighbor direction is 0.0, meaning orthogonal. */
-            float stroke_dot_max = 0.0f;
-
-            /* Get the color of the loop in the opposite
-             * direction of the brush movement */
-            uint color_final = 0;
-            for (int j = 0; j < gmap->vert_to_poly[v_index].count; j++) {
-              const int p_index = gmap->vert_to_poly[v_index].indices[j];
-              const int l_index = gmap->vert_to_loop[v_index].indices[j];
-              BLI_assert(data->me->mloop[l_index].v == v_index);
-              UNUSED_VARS_NDEBUG(l_index);
-              const MPoly *mp = &data->me->mpoly[p_index];
-              if (!use_face_sel || mp->flag & ME_FACE_SEL) {
-                const MLoop *ml_other = &data->me->mloop[mp->loopstart];
-                for (int k = 0; k < mp->totloop; k++, ml_other++) {
-                  const uint v_other_index = ml_other->v;
-                  if (v_other_index != v_index) {
-                    const MVert *mv_other = &data->me->mvert[v_other_index];
-
-                    /* Get the direction from the
-                     * selected vert to the neighbor. */
-                    float other_dir[3];
-                    sub_v3_v3v3(other_dir, mv_curr->co, mv_other->co);
-                    project_plane_v3_v3v3(other_dir, other_dir, cache->view_normal);
-
-                    normalize_v3(other_dir);
-
-                    const float stroke_dot = dot_v3v3(other_dir, brush_dir);
-
-                    if (stroke_dot > stroke_dot_max) {
-                      stroke_dot_max = stroke_dot;
-                      color_final = data->vpd->smear.color_prev[mp->loopstart + k];
-                      do_color = true;
+                      color_curr[elem_index] = lcol[elem_index];
                     }
                   }
                 }
               }
             }
-
-            if (do_color) {
-              const float final_alpha = 255 * brush_fade * brush_strength * brush_alpha_pressure *
-                                        grid_alpha;
-
-              /* For each poly owning this vert,
-               * paint each loop belonging to this vert. */
-              for (int j = 0; j < gmap->vert_to_poly[v_index].count; j++) {
-                const int p_index = gmap->vert_to_poly[v_index].indices[j];
-                const int l_index = gmap->vert_to_loop[v_index].indices[j];
-                BLI_assert(data->me->mloop[l_index].v == v_index);
-                const MPoly *mp = &data->me->mpoly[p_index];
-                if (!use_face_sel || mp->flag & ME_FACE_SEL) {
-                  /* Get the previous loop color */
-                  uint color_orig = 0; /* unused when array is NULL */
-                  if (ss->mode.vpaint.previous_color != NULL) {
-                    /* Get the previous loop color */
-                    if (ss->mode.vpaint.previous_color[l_index] == 0) {
-                      ss->mode.vpaint.previous_color[l_index] = lcol[l_index];
-                    }
-                    color_orig = ss->mode.vpaint.previous_color[l_index];
-                  }
-                  /* Mix the new color with the original
-                   * based on the brush strength and the curve. */
-                  lcol[l_index] = vpaint_blend(data->vp,
-                                               lcol[l_index],
-                                               color_orig,
-                                               color_final,
-                                               final_alpha,
-                                               255 * brush_strength);
-
-                  data->vpd->smear.color_curr[l_index] = lcol[l_index];
-                }
-              }
-            }
           }
         }
+        BKE_pbvh_vertex_iter_end;
       }
     }
-    BKE_pbvh_vertex_iter_end;
-  }
+  });
 }
 
-static void calculate_average_color(SculptThreadedTaskData *data,
-                                    PBVHNode **UNUSED(nodes),
+template<typename Color, typename Traits, AttributeDomain domain>
+static void calculate_average_color(VPaintData<Color, Traits, domain> *vpd,
+                                    Object *ob,
+                                    Mesh *me,
+                                    const Brush *brush,
+                                    Color *lcol,
+                                    PBVHNode **nodes,
                                     int totnode)
 {
-  struct VPaintAverageAccum *accum = (VPaintAverageAccum *)MEM_mallocN(sizeof(*accum) * totnode,
-                                                                       __func__);
-  data->custom_data = accum;
+  using Blend = Traits::BlendType;
+  using Value = Traits::ValueType;
 
-  TaskParallelSettings settings;
-  BKE_pbvh_parallel_range_settings(&settings, true, totnode);
-  BLI_task_parallel_range(0, totnode, data, do_vpaint_brush_calc_average_color_cb_ex, &settings);
+  struct VPaintAverageAccum<Blend> *accum = (VPaintAverageAccum<Blend> *)MEM_mallocN(
+      sizeof(*accum) * totnode, __func__);
+  blender::threading::parallel_for(IndexRange(totnode), 1LL, [&](IndexRange range) {
+    for (int n : range) {
+      SculptSession *ss = ob->sculpt;
+      const PBVHType pbvh_type = BKE_pbvh_type(ss->pbvh);
+      const bool has_grids = (pbvh_type == PBVH_GRIDS);
+      const struct SculptVertexPaintGeomMap *gmap = &ss->mode.vpaint.gmap;
 
-  uint accum_len = 0;
-  uint accum_value[3] = {0};
-  uchar blend[4] = {0};
+      StrokeCache *cache = ss->cache;
+      const bool use_vert_sel = (me->editflag &
+                                 (ME_EDIT_PAINT_FACE_SEL | ME_EDIT_PAINT_VERT_SEL)) != 0;
+
+      struct VPaintAverageAccum<Blend> *accum2 = accum + n;
+      accum2->len = 0;
+      memset(accum2->value, 0, sizeof(accum2->value));
+
+      SculptBrushTest test;
+      SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
+          ss, &test, brush->falloff_shape);
+
+      /* For each vertex */
+      PBVHVertexIter vd;
+      BKE_pbvh_vertex_iter_begin (ss->pbvh, nodes[n], vd, PBVH_ITER_UNIQUE) {
+        /* Test to see if the vertex coordinates are within the spherical brush region. */
+        if (sculpt_brush_test_sq_fn(&test, vd.co)) {
+          const int v_index = has_grids ? me->mloop[vd.grid_indices[vd.g]].v :
+                                          vd.vert_indices[vd.i];
+          if (BKE_brush_curve_strength(brush, 0.0, cache->radius) > 0.0) {
+            /* If the vertex is selected for painting. */
+            const MVert *mv = &me->mvert[v_index];
+            if (!use_vert_sel || mv->flag & SELECT) {
+              accum2->len += gmap->vert_to_loop[v_index].count;
+              /* if a vertex is within the brush region, then add its color to the blend. */
+              for (int j = 0; j < gmap->vert_to_loop[v_index].count; j++) {
+                int elem_index;
+
+                if constexpr (domain == ATTR_DOMAIN_CORNER) {
+                  elem_index = gmap->vert_to_loop[v_index].indices[j];
+                }
+                else {
+                  elem_index = v_index;
+                }
+
+                Color *col = lcol + elem_index;
+
+                /* Color is squared to compensate the sqrt color encoding. */
+                accum2->value[0] += col->r * col->r;
+                accum2->value[1] += col->g * col->g;
+                accum2->value[2] += col->b * col->b;
+              }
+            }
+          }
+        }
+      }
+      BKE_pbvh_vertex_iter_end;
+    }
+  });
+
+  Blend accum_len = 0;
+  Blend accum_value[3] = {0};
+  Color blend(0, 0, 0, 0);
+
   for (int i = 0; i < totnode; i++) {
     accum_len += accum[i].len;
     accum_value[0] += accum[i].value[0];
@@ -3658,26 +3557,27 @@ static void calculate_average_color(SculptThreadedTaskData *data,
     accum_value[2] += accum[i].value[2];
   }
   if (accum_len != 0) {
-    blend[0] = round_fl_to_uchar(sqrtf(divide_round_i(accum_value[0], accum_len)));
-    blend[1] = round_fl_to_uchar(sqrtf(divide_round_i(accum_value[1], accum_len)));
-    blend[2] = round_fl_to_uchar(sqrtf(divide_round_i(accum_value[2], accum_len)));
-    blend[3] = 255;
-    data->vpd->paintcol = *((uint *)blend);
-  }
+    blend.r = Traits::round(sqrtf(Traits::divide_round(accum_value[0], accum_len)));
+    blend.g = Traits::round(sqrtf(Traits::divide_round(accum_value[1], accum_len)));
+    blend.b = Traits::round(sqrtf(Traits::divide_round(accum_value[2], accum_len)));
+    blend.a = Traits::range;
 
-  MEM_SAFE_FREE(data->custom_data); /* 'accum' */
+    vpd->paintcol = blend;
+  }
 }
 
-template<class Color, typename Value = decltype(Color::r)>
+template<typename Color, typename Traits, AttributeDomain domain>
 static float tex_color_alpha_ubyte_2(VPaint *vp,
-                                     struct VPaintData *vpd,
+                                     VPaintData<Color, Traits, domain> *vpd,
                                      const float v_co[3],
                                      Color *r_color)
 {
+  using Value = Traits::ValueType;
+
   Color4f rgba;
   Color4f rgba_br = toFloat(*r_color);
 
-  tex_color_alpha(vp, &vpd->vc, v_co, &rgba.r);
+  tex_color_alpha(vp, &vpd->head.vc, v_co, &rgba.r);
 
   rgb_uchar_to_float(&rgba_br.r, (const uchar *)&vpd->paintcol);
   mul_v3_v3(rgba_br, rgba);
@@ -3687,17 +3587,17 @@ static float tex_color_alpha_ubyte_2(VPaint *vp,
   return rgba[3];
 }
 
-template<class Color> struct VPaintModeData {
+template<typename Color> struct VPaintModeData {
   SculptVertexPaintGeomMap gmap;
 
   Color *previous_color;
 };
 
-template<class Color, typename Traits, bool is_verts>
+template<typename Color, typename Traits, AttributeDomain domain>
 static void vpaint_do_draw_intern(bContext *C,
                                   Sculpt *sd,
                                   VPaint *vp,
-                                  struct VPaintData *vpd,
+                                  VPaintData<Color, Traits, domain> *vpd,
                                   Object *ob,
                                   Mesh *me,
                                   PBVHNode **nodes,
@@ -3734,15 +3634,7 @@ static void vpaint_do_draw_intern(bContext *C,
       const float *sculpt_normal_frontface = SCULPT_brush_frontface_normal_from_falloff_shape(
           ss, brush->falloff_shape);
 
-      Color4b paintcol_b = uint2color(vpd->paintcol);
-      Color paintcol;
-
-      if constexpr (std::is_same_v<Color, Color4f>) {
-        paintcol = paintcol_b.decode();
-      }
-      else {
-        paintcol = paintcol_b;
-      }
+      Color paintcol = vpd->paintcol;
 
       /* For each vertex */
       PBVHVertexIter vd;
@@ -3778,13 +3670,13 @@ static void vpaint_do_draw_intern(bContext *C,
               float tex_alpha = 1.0;
               if (vpd->is_texbrush) {
                 /* NOTE: we may want to paint alpha as vertex color alpha. */
-                tex_alpha = tex_color_alpha_ubyte_2<Color>(
+                tex_alpha = tex_color_alpha_ubyte_2<Color, Traits, domain>(
                     vp, vpd, vpd->vertexcosnos[v_index].co, &color_final);
               }
 
               Color color_orig(0, 0, 0, 0);
 
-              if constexpr (is_verts) {
+              if constexpr (domain == ATTR_DOMAIN_POINT) {
                 int v_index = vd.index;
 
                 if (mode_vpaint->previous_color != NULL) {
@@ -3844,58 +3736,49 @@ static void vpaint_do_draw_intern(bContext *C,
   });
 }
 
-template<class Color, typename Traits>
+template<typename Color, typename Traits, AttributeDomain domain>
 static void vpaint_do_draw(bContext *C,
                            Sculpt *sd,
                            VPaint *vp,
-                           struct VPaintData *vpd,
+                           VPaintData<Color, Traits, domain> *vpd,
                            Object *ob,
                            Mesh *me,
                            PBVHNode **nodes,
                            int totnode,
                            Color *lcol)
 {
-  CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
-  AttributeDomain domain = BKE_id_attribute_domain(&me->id, layer);
-
-  if (domain == ATTR_DOMAIN_CORNER) {
-    vpaint_do_draw_intern<Color, Traits, false>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
-  }
-  else if (domain == ATTR_DOMAIN_POINT) {
-    vpaint_do_draw_intern<Color, Traits, true>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
-  }
+  vpaint_do_draw_intern<Color, Traits, domain>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
 }
 
-template<class Color, typename Traits>
+template<typename Color, typename Traits, AttributeDomain domain>
 static void vpaint_do_blur(bContext *C,
                            Sculpt *sd,
                            VPaint *vp,
-                           struct VPaintData *vpd,
+                           VPaintData<Color, Traits, domain> *vpd,
                            Object *ob,
                            Mesh *me,
                            PBVHNode **nodes,
                            int totnode,
                            Color *lcol)
 {
-  CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
-  AttributeDomain domain = BKE_id_attribute_domain(&me->id, layer);
-
-  if (domain == ATTR_DOMAIN_CORNER) {
-    do_vpaint_brush_blur_loops<Color, Traits>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
-  }
-  else if (domain == ATTR_DOMAIN_POINT) {
+  if constexpr (domain == ATTR_DOMAIN_POINT) {
     do_vpaint_brush_blur_verts<Color, Traits>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
+  }
+  else {
+    do_vpaint_brush_blur_loops<Color, Traits>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
   }
 }
 
-static void vpaint_paint_leaves(bContext *C,
-                                Sculpt *sd,
-                                VPaint *vp,
-                                struct VPaintData *vpd,
-                                Object *ob,
-                                Mesh *me,
-                                PBVHNode **nodes,
-                                int totnode)
+template<typename Color, typename Traits, AttributeDomain domain>
+static void vpaint_paint_leaves_intern(bContext *C,
+                                       Sculpt *sd,
+                                       VPaint *vp,
+                                       VPaintData<Color, Traits, domain> *vpd,
+                                       Object *ob,
+                                       Mesh *me,
+                                       Color *lcol,
+                                       PBVHNode **nodes,
+                                       int totnode)
 {
 
   for (int i : IndexRange(totnode)) {
@@ -3904,67 +3787,44 @@ static void vpaint_paint_leaves(bContext *C,
 
   const Brush *brush = ob->sculpt->cache->brush;
 
-  CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
-
-  switch ((eBrushVertexPaintTool)brush->vertexpaint_tool) {
-    case VPAINT_TOOL_DRAW:
-      if (layer->type == CD_MLOOPCOL) {
-        Color4b *lcol = reinterpret_cast<Color4b *>(layer->data);
-        vpaint_do_draw<Color4b, ByteTraits>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
-      }
-      else if (layer->type == CD_PROP_COLOR) {
-        Color4f *lcol = reinterpret_cast<Color4f *>(layer->data);
-        vpaint_do_draw<Color4f, FloatTraits>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
-      }
-      return;
-    case VPAINT_TOOL_BLUR:
-      if (layer->type == CD_MLOOPCOL) {
-        Color4b *lcol = reinterpret_cast<Color4b *>(layer->data);
-        vpaint_do_blur<Color4b, ByteTraits>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
-      }
-      else if (layer->type == CD_PROP_COLOR) {
-        Color4f *lcol = reinterpret_cast<Color4f *>(layer->data);
-        vpaint_do_blur<Color4f, FloatTraits>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
-      }
-      return;
-    default:
-      break;
-  }
-
-  SculptThreadedTaskData data = {0};
-  data.C = C;
-  data.sd = sd;
-  data.ob = ob;
-  data.brush = brush;
-  data.nodes = nodes;
-  data.vp = vp;
-  data.vpd = vpd;
-  data.lcol = (uint *)me->mloopcol;
-  data.me = me;
-
-  TaskParallelSettings settings;
-  BKE_pbvh_parallel_range_settings(&settings, true, totnode);
   switch ((eBrushVertexPaintTool)brush->vertexpaint_tool) {
     case VPAINT_TOOL_AVERAGE:
-      calculate_average_color(&data, nodes, totnode);
-      BLI_task_parallel_range(0, totnode, &data, do_vpaint_brush_draw_task_cb_ex, &settings);
+      calculate_average_color<Color, Traits, domain>(vpd, ob, me, brush, lcol, nodes, totnode);
+    case VPAINT_TOOL_DRAW:
+      vpaint_do_draw<Color, Traits, domain>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
       break;
     case VPAINT_TOOL_BLUR:
-      BLI_task_parallel_range(0, totnode, &data, do_vpaint_brush_blur_task_cb_ex, &settings);
+      vpaint_do_blur<Color, Traits, domain>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
       break;
     case VPAINT_TOOL_SMEAR:
-      BLI_task_parallel_range(0, totnode, &data, do_vpaint_brush_smear_task_cb_ex, &settings);
+      do_vpaint_brush_smear<Color, Traits, domain>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
       break;
-    case VPAINT_TOOL_DRAW:
-      BLI_task_parallel_range(0, totnode, &data, do_vpaint_brush_draw_task_cb_ex, &settings);
+    default:
       break;
   }
 }
 
+template<typename Color, typename Traits, AttributeDomain domain>
+static void vpaint_paint_leaves(bContext *C,
+                                Sculpt *sd,
+                                VPaint *vp,
+                                VPaintData<Color, Traits, domain> *vpd,
+                                Object *ob,
+                                Mesh *me,
+                                PBVHNode **nodes,
+                                int totnode)
+{
+  CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
+
+  vpaint_paint_leaves_intern<Color, Traits, domain>(
+      C, sd, vp, vpd, ob, me, static_cast<Color *>(layer->data), nodes, totnode);
+}
+
+template<typename Color, typename Traits, AttributeDomain domain>
 static void vpaint_do_paint(bContext *C,
                             Sculpt *sd,
                             VPaint *vp,
-                            struct VPaintData *vpd,
+                            VPaintData<Color, Traits, domain> *vpd,
                             Object *ob,
                             Mesh *me,
                             Brush *brush,
@@ -3981,17 +3841,18 @@ static void vpaint_do_paint(bContext *C,
   PBVHNode **nodes = vwpaint_pbvh_gather_generic(ob, vp, sd, brush, &totnode);
 
   /* Paint those leaves. */
-  vpaint_paint_leaves(C, sd, vp, vpd, ob, me, nodes, totnode);
+  vpaint_paint_leaves<Color, Traits, domain>(C, sd, vp, vpd, ob, me, nodes, totnode);
 
   if (nodes) {
     MEM_freeN(nodes);
   }
 }
 
+template<typename Color, typename Traits, AttributeDomain domain>
 static void vpaint_do_radial_symmetry(bContext *C,
                                       Sculpt *sd,
                                       VPaint *vp,
-                                      struct VPaintData *vpd,
+                                      VPaintData<Color, Traits, domain> *vpd,
                                       Object *ob,
                                       Mesh *me,
                                       Brush *brush,
@@ -4000,14 +3861,15 @@ static void vpaint_do_radial_symmetry(bContext *C,
 {
   for (int i = 1; i < vp->radial_symm[axis - 'X']; i++) {
     const float angle = (2.0 * M_PI) * i / vp->radial_symm[axis - 'X'];
-    vpaint_do_paint(C, sd, vp, vpd, ob, me, brush, symm, axis, i, angle);
+    vpaint_do_paint<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, symm, axis, i, angle);
   }
 }
 
 /* near duplicate of: sculpt.c's,
  * 'do_symmetrical_brush_actions' and 'wpaint_do_symmetrical_brush_actions'. */
+template<typename Color, typename Traits, AttributeDomain domain>
 static void vpaint_do_symmetrical_brush_actions(
-    bContext *C, Sculpt *sd, VPaint *vp, struct VPaintData *vpd, Object *ob)
+    bContext *C, Sculpt *sd, VPaint *vp, VPaintData<Color, Traits, domain> *vpd, Object *ob)
 {
   Brush *brush = BKE_paint_brush(&vp->paint);
   Mesh *me = (Mesh *)ob->data;
@@ -4018,10 +3880,10 @@ static void vpaint_do_symmetrical_brush_actions(
 
   /* initial stroke */
   cache->mirror_symmetry_pass = 0;
-  vpaint_do_paint(C, sd, vp, vpd, ob, me, brush, i, 'X', 0, 0);
-  vpaint_do_radial_symmetry(C, sd, vp, vpd, ob, me, brush, i, 'X');
-  vpaint_do_radial_symmetry(C, sd, vp, vpd, ob, me, brush, i, 'Y');
-  vpaint_do_radial_symmetry(C, sd, vp, vpd, ob, me, brush, i, 'Z');
+  vpaint_do_paint<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'X', 0, 0);
+  vpaint_do_radial_symmetry<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'X');
+  vpaint_do_radial_symmetry<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'Y');
+  vpaint_do_radial_symmetry<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'Z');
 
   cache->symmetry = symm;
 
@@ -4034,16 +3896,16 @@ static void vpaint_do_symmetrical_brush_actions(
       SCULPT_cache_calc_brushdata_symm(cache, i, 0, 0);
 
       if (i & (1 << 0)) {
-        vpaint_do_paint(C, sd, vp, vpd, ob, me, brush, i, 'X', 0, 0);
-        vpaint_do_radial_symmetry(C, sd, vp, vpd, ob, me, brush, i, 'X');
+        vpaint_do_paint<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'X', 0, 0);
+        vpaint_do_radial_symmetry<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'X');
       }
       if (i & (1 << 1)) {
-        vpaint_do_paint(C, sd, vp, vpd, ob, me, brush, i, 'Y', 0, 0);
-        vpaint_do_radial_symmetry(C, sd, vp, vpd, ob, me, brush, i, 'Y');
+        vpaint_do_paint<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'Y', 0, 0);
+        vpaint_do_radial_symmetry<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'Y');
       }
       if (i & (1 << 2)) {
-        vpaint_do_paint(C, sd, vp, vpd, ob, me, brush, i, 'Z', 0, 0);
-        vpaint_do_radial_symmetry(C, sd, vp, vpd, ob, me, brush, i, 'Z');
+        vpaint_do_paint<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'Z', 0, 0);
+        vpaint_do_radial_symmetry<Color, Traits, domain>(C, sd, vp, vpd, ob, me, brush, i, 'Z');
       }
     }
   }
@@ -4052,16 +3914,17 @@ static void vpaint_do_symmetrical_brush_actions(
   cache->is_last_valid = true;
 }
 
-static void vpaint_stroke_update_step(bContext *C,
-                                      wmOperator *UNUSED(op),
-                                      struct PaintStroke *stroke,
-                                      PointerRNA *itemptr)
+template<typename Color, typename Traits, AttributeDomain domain>
+static void vpaint_stroke_update_step_intern(bContext *C,
+                                             struct PaintStroke *stroke,
+                                             PointerRNA *itemptr)
 {
   Scene *scene = CTX_data_scene(C);
   ToolSettings *ts = CTX_data_tool_settings(C);
-  struct VPaintData *vpd = (struct VPaintData *)paint_stroke_mode_data(stroke);
+  VPaintData<Color, Traits, domain> *vpd = static_cast<VPaintData<Color, Traits, domain> *>(
+      paint_stroke_mode_data(stroke));
   VPaint *vp = ts->vpaint;
-  ViewContext *vc = &vpd->vc;
+  ViewContext *vc = &vpd->head.vc;
   Object *ob = vc->obact;
   SculptSession *ss = ob->sculpt;
   Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
@@ -4077,15 +3940,24 @@ static void vpaint_stroke_update_step(bContext *C,
 
   swap_m4m4(vc->rv3d->persmat, mat);
 
-  vpaint_do_symmetrical_brush_actions(C, sd, vp, vpd, ob);
+  vpaint_do_symmetrical_brush_actions<Color, Traits, domain>(C, sd, vp, vpd, ob);
 
   swap_m4m4(vc->rv3d->persmat, mat);
 
   BKE_mesh_batch_cache_dirty_tag((Mesh *)ob->data, BKE_MESH_BATCH_DIRTY_ALL);
 
   if (vp->paint.brush->vertexpaint_tool == VPAINT_TOOL_SMEAR) {
-    memcpy(
-        vpd->smear.color_prev, vpd->smear.color_curr, sizeof(uint) * ((Mesh *)ob->data)->totloop);
+    Mesh *me = BKE_object_get_original_mesh(ob);
+
+    CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
+
+    if (layer) {
+      size_t elemSize;
+      int totElem;
+
+      totElem = get_vcol_elements(me, &elemSize);
+      memcpy(vpd->smear.color_prev, vpd->smear.color_curr, elemSize * totElem);
+    }
   }
 
   /* Calculate pivot for rotation around selection if needed.
@@ -4107,11 +3979,38 @@ static void vpaint_stroke_update_step(bContext *C,
   }
 }
 
-static void vpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
+static void vpaint_stroke_update_step(bContext *C,
+                                      wmOperator *UNUSED(op),
+                                      struct PaintStroke *stroke,
+                                      PointerRNA *itemptr)
 {
-  struct VPaintData *vpd = (struct VPaintData *)paint_stroke_mode_data(stroke);
-  ViewContext *vc = &vpd->vc;
-  Object *ob = vc->obact;
+  VPaintDataHeader *header = static_cast<VPaintDataHeader *>(paint_stroke_mode_data(stroke));
+
+  if (header->domain == ATTR_DOMAIN_POINT) {
+    if (header->type == CD_PROP_COLOR) {
+      vpaint_stroke_update_step_intern<Color4f, FloatTraits, ATTR_DOMAIN_POINT>(
+          C, stroke, itemptr);
+    }
+    else if (header->type == CD_MLOOPCOL) {
+      vpaint_stroke_update_step_intern<Color4b, ByteTraits, ATTR_DOMAIN_POINT>(C, stroke, itemptr);
+    }
+  }
+  else if (header->domain == ATTR_DOMAIN_CORNER) {
+    if (header->type == CD_PROP_COLOR) {
+      vpaint_stroke_update_step_intern<Color4f, FloatTraits, ATTR_DOMAIN_CORNER>(
+          C, stroke, itemptr);
+    }
+    else if (header->type == CD_MLOOPCOL) {
+      vpaint_stroke_update_step_intern<Color4b, ByteTraits, ATTR_DOMAIN_CORNER>(
+          C, stroke, itemptr);
+    }
+  }
+}
+
+template<typename Color, typename Traits, AttributeDomain domain>
+static void vpaint_free_vpaintdata(Object *ob, void *_vpd)
+{
+  VPaintData<Color, Traits, domain> *vpd = static_cast<VPaintData<Color, Traits, domain> *>(_vpd);
 
   if (vpd->is_texbrush) {
     ED_vpaint_proj_handle_free(vpd->vp_handle);
@@ -4127,6 +4026,40 @@ static void vpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
     MEM_freeN(vpd->smear.color_curr);
   }
 
+  MEM_delete<VPaintData<Color, Traits, domain>>(vpd);
+}
+
+static ViewContext *vpaint_get_viewcontext(Object *ob, void *vpd)
+{
+  VPaintDataHeader *header = static_cast<VPaintDataHeader *>(vpd);
+
+  return &header->vc;
+}
+
+static void vpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
+{
+  void *vpd = paint_stroke_mode_data(stroke);
+  ViewContext *vc = vpaint_get_viewcontext(CTX_data_active_object(C), vpd);
+  Object *ob = vc->obact;
+
+  VPaintDataHeader *header = static_cast<VPaintDataHeader *>(vpd);
+  if (header->domain == ATTR_DOMAIN_POINT) {
+    if (header->type == CD_PROP_COLOR) {
+      vpaint_free_vpaintdata<Color4f, FloatTraits, ATTR_DOMAIN_POINT>(ob, vpd);
+    }
+    else if (header->type == CD_MLOOPCOL) {
+      vpaint_free_vpaintdata<Color4b, ByteTraits, ATTR_DOMAIN_POINT>(ob, vpd);
+    }
+  }
+  else if (header->domain == ATTR_DOMAIN_CORNER) {
+    if (header->type == CD_PROP_COLOR) {
+      vpaint_free_vpaintdata<Color4f, FloatTraits, ATTR_DOMAIN_CORNER>(ob, vpd);
+    }
+    else if (header->type == CD_MLOOPCOL) {
+      vpaint_free_vpaintdata<Color4b, ByteTraits, ATTR_DOMAIN_CORNER>(ob, vpd);
+    }
+  }
+
   SculptSession *ss = ob->sculpt;
 
   if (ss->cache->alt_smooth) {
@@ -4136,8 +4069,6 @@ static void vpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
   }
 
   WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
-
-  MEM_freeN(vpd);
 
   SCULPT_undo_push_end(ob);
 
