@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2006 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2006 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup render
@@ -27,6 +11,7 @@
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
 
+struct ImBuf;
 struct Image;
 struct ImageFormatData;
 struct Main;
@@ -209,7 +194,7 @@ void RE_FreeAllPersistentData(void);
 /**
  * Free persistent render data, optionally only for the given scene.
  */
-void RE_FreePersistentData(const Scene *scene);
+void RE_FreePersistentData(const struct Scene *scene);
 
 /**
  * Get results and statistics.
@@ -310,7 +295,7 @@ void RE_SetOverrideCamera(struct Render *re, struct Object *cam_ob);
  *
  * \note call this after #RE_InitState().
  */
-void RE_SetCamera(struct Render *re, struct Object *cam_ob);
+void RE_SetCamera(struct Render *re, const struct Object *cam_ob);
 
 /**
  * Get current view and window transform.
@@ -454,12 +439,14 @@ struct RenderPass *RE_pass_find_by_type(volatile struct RenderLayer *rl,
 #define RE_BAKE_DISPLACEMENT 1
 #define RE_BAKE_AO 2
 
-void RE_GetCameraWindow(struct Render *re, struct Object *camera, float mat[4][4]);
+void RE_GetCameraWindow(struct Render *re, const struct Object *camera, float mat[4][4]);
 /**
  * Must be called after #RE_GetCameraWindow(), does not change `re->winmat`.
  */
-void RE_GetCameraWindowWithOverscan(struct Render *re, float overscan, float r_winmat[4][4]);
-void RE_GetCameraModelMatrix(struct Render *re, struct Object *camera, float r_modelmat[4][4]);
+void RE_GetCameraWindowWithOverscan(const struct Render *re, float overscan, float r_winmat[4][4]);
+void RE_GetCameraModelMatrix(const struct Render *re,
+                             const struct Object *camera,
+                             float r_modelmat[4][4]);
 
 struct Scene *RE_GetScene(struct Render *re);
 void RE_SetScene(struct Render *re, struct Scene *sce);

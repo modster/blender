@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spoutliner
@@ -26,6 +10,9 @@
 #include <memory>
 
 #include "RNA_types.h"
+
+/* Needed for `tree_element_cast()`. */
+#include "tree/tree_element.hh"
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,10 +41,12 @@ class AbstractTreeDisplay;
 class AbstractTreeElement;
 }  // namespace blender::ed::outliner
 
+namespace outliner = blender::ed::outliner;
+
 struct SpaceOutliner_Runtime {
   /** Object to create and manage the tree for a specific display type (View Layers, Scenes,
    * Blender File, etc.). */
-  std::unique_ptr<blender::ed::outliner::AbstractTreeDisplay> tree_display;
+  std::unique_ptr<outliner::AbstractTreeDisplay> tree_display;
 
   /** Pointers to tree-store elements, grouped by `(id, type, nr)`
    *  in hash-table for faster searching. */
@@ -90,11 +79,12 @@ typedef struct TreeElement {
   struct TreeElement *next, *prev, *parent;
 
   /**
-   * Handle to the new C++ object (a derived type of base #AbstractTreeElement) that should replace
-   * #TreeElement. Step by step, data should be moved to it and operations based on the type should
-   * become virtual methods of the class hierarchy.
+   * The new inheritance based representation of the element (a derived type of base
+   * #AbstractTreeElement) that should eventually replace #TreeElement. Step by step, data should
+   * be moved to it and operations based on the type should become virtual methods of the class
+   * hierarchy.
    */
-  std::unique_ptr<blender::ed::outliner::AbstractTreeElement> type;
+  std::unique_ptr<outliner::AbstractTreeElement> abstract_element;
 
   ListBase subtree;
   int xs, ys;                /* Do selection. */
@@ -104,8 +94,7 @@ typedef struct TreeElement {
   short idcode;              /* From TreeStore id. */
   short xend;                /* Width of item display, for select. */
   const char *name;
-  void *directdata;  /* Armature Bones, Base, Sequence, Strip... */
-  PointerRNA rnaptr; /* RNA Pointer. */
+  void *directdata; /* Armature Bones, Base, ... */
 } TreeElement;
 
 typedef struct TreeElementIcon {
@@ -119,7 +108,7 @@ typedef struct TreeElementIcon {
         ID_LI, \
         ID_OB, \
         ID_ME, \
-        ID_CU, \
+        ID_CU_LEGACY, \
         ID_MB, \
         ID_NT, \
         ID_MA, \
@@ -140,7 +129,7 @@ typedef struct TreeElementIcon {
         ID_GD, \
         ID_LS, \
         ID_LP, \
-        ID_HA, \
+        ID_CV, \
         ID_PT, \
         ID_VO, \
         ID_SIM) || /* Only in 'blendfile' mode ... :/ */ \
@@ -225,7 +214,7 @@ typedef enum {
  * - not searching into RNA items helps but isn't the complete solution
  */
 
-#define SEARCHING_OUTLINER(sov) (sov->search_flags & SO_SEARCH_RECURSIVE)
+#define SEARCHING_OUTLINER(sov) ((sov)->search_flags & SO_SEARCH_RECURSIVE)
 
 /* is the current element open? if so we also show children */
 #define TSELEM_OPEN(telm, sv) \
@@ -686,3 +675,19 @@ int outliner_context(const struct bContext *C,
 #ifdef __cplusplus
 }
 #endif
+
+namespace blender::ed::outliner {
+
+/**
+ * Helper to safely "cast" a #TreeElement to its new C++ #AbstractTreeElement, if possible.
+ * \return nullptr if the tree-element doesn't match the requested type \a TreeElementT or the
+ *         element doesn't hold a C++ #AbstractTreeElement pendant yet.
+ */
+template<typename TreeElementT> TreeElementT *tree_element_cast(const TreeElement *te)
+{
+  static_assert(std::is_base_of_v<AbstractTreeElement, TreeElementT>,
+                "Requested tree-element type must be an AbstractTreeElement");
+  return dynamic_cast<TreeElementT *>(te->abstract_element.get());
+}
+
+}  // namespace blender::ed::outliner

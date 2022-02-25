@@ -1,22 +1,5 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2021, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2021 Blender Foundation. All rights reserved.
 
 set(INC
   .
@@ -54,9 +37,9 @@ set(SRC
   nodes/node_composite_color_spill.cc
   nodes/node_composite_colorbalance.cc
   nodes/node_composite_colorcorrection.cc
-  nodes/node_composite_convert_color_space.cc
   nodes/node_composite_common.cc
   nodes/node_composite_composite.cc
+  nodes/node_composite_convert_color_space.cc
   nodes/node_composite_cornerpin.cc
   nodes/node_composite_crop.cc
   nodes/node_composite_cryptomatte.cc
@@ -105,10 +88,12 @@ set(SRC
   nodes/node_composite_rgb.cc
   nodes/node_composite_rotate.cc
   nodes/node_composite_scale.cc
+  nodes/node_composite_scene_time.cc
   nodes/node_composite_sepcomb_hsva.cc
   nodes/node_composite_sepcomb_rgba.cc
   nodes/node_composite_sepcomb_ycca.cc
   nodes/node_composite_sepcomb_yuva.cc
+  nodes/node_composite_sepcomb_xyz.cc
   nodes/node_composite_setalpha.cc
   nodes/node_composite_split_viewer.cc
   nodes/node_composite_stabilize2d.cc
@@ -125,17 +110,12 @@ set(SRC
   nodes/node_composite_vec_blur.cc
   nodes/node_composite_viewer.cc
   nodes/node_composite_zcombine.cc
-  nodes/node_composite_scene_time.cc
 
   node_composite_tree.cc
   node_composite_util.cc
 
   node_composite_util.hh
 )
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
 
 if(WITH_IMAGE_OPENEXR)
   add_definitions(-DWITH_OPENEXR)

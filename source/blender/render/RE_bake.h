@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2010 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2010 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup render
@@ -25,6 +9,7 @@
 
 struct Depsgraph;
 struct ImBuf;
+struct MLoopUV;
 struct Mesh;
 struct Render;
 
@@ -112,7 +97,12 @@ void RE_bake_pixels_populate(struct Mesh *me,
 
 void RE_bake_mask_fill(const BakePixel pixel_array[], size_t num_pixels, char *mask);
 
-void RE_bake_margin(struct ImBuf *ibuf, char *mask, int margin);
+void RE_bake_margin(struct ImBuf *ibuf,
+                    char *mask,
+                    int margin,
+                    char margin_type,
+                    struct Mesh const *me,
+                    char const *uv_layer);
 
 void RE_bake_normal_world_to_object(const BakePixel pixel_array[],
                                     size_t num_pixels,

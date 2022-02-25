@@ -1,23 +1,5 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2006 Blender Foundation. All rights reserved.
 
 #-----------------------------------------------------------------------------
 # We don't allow in-source builds. This causes no end of troubles because
@@ -157,8 +139,9 @@ option(WITH_BLENDER "Build blender (disable to build only the blender player)" O
 mark_as_advanced(WITH_BLENDER)
 
 if(APPLE)
-  # Currently this causes a build error linking, disable.
-  set(WITH_BLENDER_THUMBNAILER OFF)
+  # In future, can be used with `quicklookthumbnailing/qlthumbnailreply` to create file
+  # thumbnails for say Finder. Turn it off for now.
+  option(WITH_BLENDER_THUMBNAILER "Build \"blender-thumbnailer\" thumbnail extraction utility" OFF)
 elseif(WIN32)
   option(WITH_BLENDER_THUMBNAILER "Build \"BlendThumb.dll\" helper for Windows explorer integration" ON)
 else()
@@ -273,11 +256,13 @@ endif()
 
 if(UNIX AND NOT APPLE)
   option(WITH_SYSTEM_GLEW "Use GLEW OpenGL wrapper library provided by the operating system" OFF)
-  option(WITH_SYSTEM_GLES "Use OpenGL ES library provided by the operating system"           ON)
+  option(WITH_SYSTEM_GLEW "Use GLEW OpenGL wrapper library provided by the operating system" OFF)
+  option(WITH_SYSTEM_FREETYPE "Use the freetype library provided by the operating system" OFF)
 else()
   # not an option for other OS's
   set(WITH_SYSTEM_GLEW OFF)
   set(WITH_SYSTEM_GLES OFF)
+  set(WITH_SYSTEM_FREETYPE OFF)
 endif()
 
 
@@ -536,12 +521,14 @@ option(WITH_OPENGL              "When off limits visibility of the opengl header
 option(WITH_GLEW_ES             "Switches to experimental copy of GLEW that has support for OpenGL ES. (temporary option for development purposes)" OFF)
 option(WITH_GL_EGL              "Use the EGL OpenGL system library instead of the platform specific OpenGL system library (CGL, glX, or WGL)"       OFF)
 option(WITH_GL_PROFILE_ES20     "Support using OpenGL ES 2.0. (through either EGL or the AGL/WGL/XGL 'es20' profile)"                               OFF)
+option(WITH_GPU_SHADER_BUILDER  "Shader builder is a developer option enabling linting on GLSL during compilation"                                  OFF)
 
 mark_as_advanced(
   WITH_OPENGL
   WITH_GLEW_ES
   WITH_GL_EGL
   WITH_GL_PROFILE_ES20
+  WITH_GPU_SHADER_BUILDER
 )
 
 if(WIN32)
@@ -681,7 +668,7 @@ if(WIN32 OR XCODE)
   option(IDE_GROUP_PROJECTS_IN_FOLDERS "Organize the projects according to source folder structure." ON)
   mark_as_advanced(IDE_GROUP_PROJECTS_IN_FOLDERS)
 
-  if (IDE_GROUP_PROJECTS_IN_FOLDERS)
+  if(IDE_GROUP_PROJECTS_IN_FOLDERS)
     set_property(GLOBAL PROPERTY USE_FOLDERS ON)
   endif()
 endif()
@@ -706,8 +693,11 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # Installation process.
-option(POSTINSTALL_SCRIPT "Run given CMake script after installation process" OFF)
+set(POSTINSTALL_SCRIPT "" CACHE FILEPATH "Run given CMake script after installation process")
 mark_as_advanced(POSTINSTALL_SCRIPT)
+
+set(POSTCONFIGURE_SCRIPT "" CACHE FILEPATH "Run given CMake script as the last step of CMake configuration")
+mark_as_advanced(POSTCONFIGURE_SCRIPT)
 
 # end option(...)
 
@@ -876,7 +866,7 @@ if(WITH_CYCLES_DEVICE_HIP)
 endif()
 
 #-----------------------------------------------------------------------------
-# Check check if submodules are cloned
+# Check if submodules are cloned.
 
 if(WITH_INTERNATIONAL)
   file(GLOB RESULT "${CMAKE_SOURCE_DIR}/release/datafiles/locale")
@@ -899,8 +889,8 @@ if(WITH_PYTHON)
   # Do this before main 'platform_*' checks,
   # because UNIX will search for the old Python paths which may not exist.
   # giving errors about missing paths before this case is met.
-  if(DEFINED PYTHON_VERSION AND "${PYTHON_VERSION}" VERSION_LESS "3.9")
-    message(FATAL_ERROR "At least Python 3.9 is required to build, but found Python ${PYTHON_VERSION}")
+  if(DEFINED PYTHON_VERSION AND "${PYTHON_VERSION}" VERSION_LESS "3.10")
+    message(FATAL_ERROR "At least Python 3.10 is required to build, but found Python ${PYTHON_VERSION}")
   endif()
 
   file(GLOB RESULT "${CMAKE_SOURCE_DIR}/release/scripts/addons")
@@ -1896,7 +1886,6 @@ elseif(WITH_CYCLES_STANDALONE)
   add_subdirectory(intern/glew-mx)
   add_subdirectory(intern/guardedalloc)
   add_subdirectory(intern/libc_compat)
-  add_subdirectory(intern/numaapi)
   add_subdirectory(intern/sky)
 
   add_subdirectory(intern/cycles)
@@ -2071,4 +2060,9 @@ endif()
 
 if(0)
   print_all_vars()
+endif()
+
+# Should be the last step of configuration.
+if(POSTCONFIGURE_SCRIPT)
+  include(${POSTCONFIGURE_SCRIPT})
 endif()

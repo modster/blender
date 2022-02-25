@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2020 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup gpu
@@ -27,6 +11,7 @@
 
 #include "glew-mx.h"
 
+#include "gpu_shader_create_info.hh"
 #include "gpu_shader_private.hh"
 
 namespace blender {
@@ -36,6 +21,9 @@ namespace gpu {
  * Implementation of shader compilation and uniforms handling using OpenGL.
  */
 class GLShader : public Shader {
+  friend shader::ShaderCreateInfo;
+  friend shader::StageInterfaceInfo;
+
  private:
   /** Handle for full program (links shader stages below). */
   GLuint shader_program_ = 0;
@@ -58,7 +46,14 @@ class GLShader : public Shader {
   void geometry_shader_from_glsl(MutableSpan<const char *> sources) override;
   void fragment_shader_from_glsl(MutableSpan<const char *> sources) override;
   void compute_shader_from_glsl(MutableSpan<const char *> sources) override;
-  bool finalize() override;
+  bool finalize(const shader::ShaderCreateInfo *info = nullptr) override;
+
+  std::string resources_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string vertex_interface_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string fragment_interface_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string geometry_interface_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string geometry_layout_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string compute_layout_declare(const shader::ShaderCreateInfo &info) const override;
 
   /** Should be called before linking. */
   void transform_feedback_names_set(Span<const char *> name_list,
@@ -82,6 +77,14 @@ class GLShader : public Shader {
 
   /** Create, compile and attach the shader stage to the shader program. */
   GLuint create_shader_stage(GLenum gl_stage, MutableSpan<const char *> sources);
+
+  /**
+   * \brief features available on newer implementation such as native barycentric coordinates
+   * and layered rendering, necessitate a geometry shader to work on older hardware.
+   */
+  std::string workaround_geometry_shader_source_create(const shader::ShaderCreateInfo &info);
+
+  bool do_geometry_shader_injection(const shader::ShaderCreateInfo *info);
 
   MEM_CXX_CLASS_ALLOC_FUNCS("GLShader");
 };

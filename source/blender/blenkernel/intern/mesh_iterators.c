@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -34,13 +20,23 @@
 
 #include "MEM_guardedalloc.h"
 
+/* General note on iterating verts/loops/edges/polys and end mode.
+ *
+ * The edit mesh pointer is set for both final and cage meshes in both cases when there are
+ * modifiers applied and not. This helps consistency of checks in the draw manager, where the
+ * existence of the edit mesh pointer does not depend on object configuration.
+ *
+ * For the iterating, however, we need to follow the `CD_ORIGINDEX` code paths when there are
+ * modifiers applied on the cage. In the code terms it means that the check for the edit mode code
+ * path needs to consist of both edit mesh and edit data checks. */
+
 void BKE_mesh_foreach_mapped_vert(
     Mesh *mesh,
     void (*func)(void *userData, int index, const float co[3], const float no[3]),
     void *userData,
     MeshForeachFlag flag)
 {
-  if (mesh->edit_mesh != NULL) {
+  if (mesh->edit_mesh != NULL && mesh->runtime.edit_data != NULL) {
     BMEditMesh *em = mesh->edit_mesh;
     BMesh *bm = em->bm;
     BMIter iter;
@@ -100,7 +96,7 @@ void BKE_mesh_foreach_mapped_edge(
     void (*func)(void *userData, int index, const float v0co[3], const float v1co[3]),
     void *userData)
 {
-  if (mesh->edit_mesh != NULL) {
+  if (mesh->edit_mesh != NULL && mesh->runtime.edit_data) {
     BMEditMesh *em = mesh->edit_mesh;
     BMesh *bm = em->bm;
     BMIter iter;
@@ -158,7 +154,7 @@ void BKE_mesh_foreach_mapped_loop(Mesh *mesh,
   /* We can't use dm->getLoopDataLayout(dm) here,
    * we want to always access dm->loopData, EditDerivedBMesh would
    * return loop data from bmesh itself. */
-  if (mesh->edit_mesh != NULL) {
+  if (mesh->edit_mesh != NULL && mesh->runtime.edit_data) {
     BMEditMesh *em = mesh->edit_mesh;
     BMesh *bm = em->bm;
     BMIter iter;
@@ -231,7 +227,7 @@ void BKE_mesh_foreach_mapped_face_center(
     void *userData,
     MeshForeachFlag flag)
 {
-  if (mesh->edit_mesh != NULL) {
+  if (mesh->edit_mesh != NULL && mesh->runtime.edit_data != NULL) {
     BMEditMesh *em = mesh->edit_mesh;
     BMesh *bm = em->bm;
     const float(*polyCos)[3];

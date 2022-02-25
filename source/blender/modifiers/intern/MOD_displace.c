@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 by the Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2005 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup modifiers
@@ -262,9 +246,9 @@ static void displaceModifier_do_task(void *__restrict userdata,
       }
       break;
     case MOD_DISP_DIR_RGB_XYZ:
-      local_vec[0] = texres.tr - dmd->midlevel;
-      local_vec[1] = texres.tg - dmd->midlevel;
-      local_vec[2] = texres.tb - dmd->midlevel;
+      local_vec[0] = texres.trgba[0] - dmd->midlevel;
+      local_vec[1] = texres.trgba[1] - dmd->midlevel;
+      local_vec[2] = texres.trgba[2] - dmd->midlevel;
       if (use_global_direction) {
         mul_transposed_mat3_m4_v3(data->local_mat, local_vec);
       }
@@ -329,8 +313,7 @@ static void displaceModifier_do(DisplaceModifierData *dmd,
     if (CustomData_has_layer(ldata, CD_CUSTOMLOOPNORMAL)) {
       float(*clnors)[3] = NULL;
 
-      if ((mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL) ||
-          !CustomData_has_layer(ldata, CD_NORMAL)) {
+      if (!CustomData_has_layer(ldata, CD_NORMAL)) {
         BKE_mesh_calc_normals_split(mesh);
       }
 
@@ -508,7 +491,6 @@ ModifierTypeInfo modifierType_Displace = {
     /* deformVertsEM */ deformVertsEM,
     /* deformMatricesEM */ NULL,
     /* modifyMesh */ NULL,
-    /* modifyHair */ NULL,
     /* modifyGeometrySet */ NULL,
 
     /* initData */ initData,

@@ -1,19 +1,6 @@
-/*
+/* SPDX-License-Identifier: Apache-2.0
  * Copyright 2019, NVIDIA Corporation.
- * Copyright 2019, Blender Foundation.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ * Copyright 2019-2022 Blender Foundation. */
 
 #ifdef WITH_OPTIX
 
@@ -226,7 +213,7 @@ bool OptiXDevice::load_kernels(const uint kernel_features)
   pipeline_options.usesMotionBlur = false;
   pipeline_options.traversableGraphFlags =
       OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
-  pipeline_options.numPayloadValues = 6;
+  pipeline_options.numPayloadValues = 8;
   pipeline_options.numAttributeValues = 2; /* u, v */
   pipeline_options.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_options.pipelineLaunchParamsVariableName = "__params"; /* See globals.h */
@@ -1586,7 +1573,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
         if (ob->is_traceable() && ob->use_motion()) {
           total_motion_transform_size = align_up(total_motion_transform_size,
                                                  OPTIX_TRANSFORM_BYTE_ALIGNMENT);
-          const size_t motion_keys = max(ob->get_motion().size(), 2) - 2;
+          const size_t motion_keys = max(ob->get_motion().size(), (size_t)2) - 2;
           total_motion_transform_size = total_motion_transform_size +
                                         sizeof(OptixSRTMotionTransform) +
                                         motion_keys * sizeof(OptixSRTData);
@@ -1660,7 +1647,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
 
       /* Insert motion traversable if object has motion. */
       if (motion_blur && ob->use_motion()) {
-        size_t motion_keys = max(ob->get_motion().size(), 2) - 2;
+        size_t motion_keys = max(ob->get_motion().size(), (size_t)2) - 2;
         size_t motion_transform_size = sizeof(OptixSRTMotionTransform) +
                                        motion_keys * sizeof(OptixSRTData);
 

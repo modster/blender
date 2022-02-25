@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 by Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2021 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup draw
@@ -438,7 +422,8 @@ void mesh_render_data_update_normals(MeshRenderData *mr, const eMRDataType data_
   }
 }
 
-MeshRenderData *mesh_render_data_create(Mesh *me,
+MeshRenderData *mesh_render_data_create(Object *object,
+                                        Mesh *me,
                                         const bool is_editmode,
                                         const bool is_paint_mode,
                                         const bool is_mode_active,
@@ -449,15 +434,18 @@ MeshRenderData *mesh_render_data_create(Mesh *me,
 {
   MeshRenderData *mr = MEM_callocN(sizeof(*mr), __func__);
   mr->toolsettings = ts;
-  mr->mat_len = mesh_render_mat_len_get(me);
+  mr->mat_len = mesh_render_mat_len_get(object, me);
 
   copy_m4_m4(mr->obmat, obmat);
 
   if (is_editmode) {
-    BLI_assert(me->edit_mesh->mesh_eval_cage && me->edit_mesh->mesh_eval_final);
+    Mesh *editmesh_eval_final = BKE_object_get_editmesh_eval_final(object);
+    Mesh *editmesh_eval_cage = BKE_object_get_editmesh_eval_cage(object);
+
+    BLI_assert(editmesh_eval_cage && editmesh_eval_final);
     mr->bm = me->edit_mesh->bm;
     mr->edit_bmesh = me->edit_mesh;
-    mr->me = (do_final) ? me->edit_mesh->mesh_eval_final : me->edit_mesh->mesh_eval_cage;
+    mr->me = (do_final) ? editmesh_eval_final : editmesh_eval_cage;
     mr->edit_data = is_mode_active ? mr->me->runtime.edit_data : NULL;
 
     if (mr->edit_data) {
@@ -487,7 +475,8 @@ MeshRenderData *mesh_render_data_create(Mesh *me,
     mr->eed_act = BM_mesh_active_edge_get(mr->bm);
     mr->eve_act = BM_mesh_active_vert_get(mr->bm);
 
-    mr->crease_ofs = CustomData_get_offset(&mr->bm->edata, CD_CREASE);
+    mr->vert_crease_ofs = CustomData_get_offset(&mr->bm->vdata, CD_CREASE);
+    mr->edge_crease_ofs = CustomData_get_offset(&mr->bm->edata, CD_CREASE);
     mr->bweight_ofs = CustomData_get_offset(&mr->bm->edata, CD_BWEIGHT);
 #ifdef WITH_FREESTYLE
     mr->freestyle_edge_ofs = CustomData_get_offset(&mr->bm->edata, CD_FREESTYLE_EDGE);
@@ -506,7 +495,7 @@ MeshRenderData *mesh_render_data_create(Mesh *me,
 
     /* Seems like the mesh_eval_final do not have the right origin indices.
      * Force not mapped in this case. */
-    if (has_mdata && do_final && me->edit_mesh->mesh_eval_final != me->edit_mesh->mesh_eval_cage) {
+    if (has_mdata && do_final && editmesh_eval_final != editmesh_eval_cage) {
       // mr->edit_bmesh = NULL;
       mr->extract_type = MR_EXTRACT_MESH;
     }

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup blenloader
@@ -336,15 +320,22 @@ static void oldnewmap_increase_size(OldNewMap *onm)
 
 /* Public OldNewMap API */
 
-static OldNewMap *oldnewmap_new(void)
+static void oldnewmap_init_data(OldNewMap *onm, const int capacity_exp)
 {
-  OldNewMap *onm = MEM_callocN(sizeof(*onm), "OldNewMap");
+  memset(onm, 0x0, sizeof(*onm));
 
-  onm->capacity_exp = DEFAULT_SIZE_EXP;
+  onm->capacity_exp = capacity_exp;
   onm->entries = MEM_malloc_arrayN(
       ENTRIES_CAPACITY(onm), sizeof(*onm->entries), "OldNewMap.entries");
   onm->map = MEM_malloc_arrayN(MAP_CAPACITY(onm), sizeof(*onm->map), "OldNewMap.map");
   oldnewmap_clear_map(onm);
+}
+
+static OldNewMap *oldnewmap_new(void)
+{
+  OldNewMap *onm = MEM_mallocN(sizeof(*onm), "OldNewMap");
+
+  oldnewmap_init_data(onm, DEFAULT_SIZE_EXP);
 
   return onm;
 }
@@ -411,9 +402,10 @@ static void oldnewmap_clear(OldNewMap *onm)
     }
   }
 
-  onm->capacity_exp = DEFAULT_SIZE_EXP;
-  oldnewmap_clear_map(onm);
-  onm->nentries = 0;
+  MEM_freeN(onm->entries);
+  MEM_freeN(onm->map);
+
+  oldnewmap_init_data(onm, DEFAULT_SIZE_EXP);
 }
 
 static void oldnewmap_free(OldNewMap *onm)
@@ -1580,15 +1572,6 @@ static void change_link_placeholder_to_real_ID_pointer(ListBase *mainlist,
   }
 }
 
-void blo_clear_proxy_pointers_from_lib(Main *oldmain)
-{
-  LISTBASE_FOREACH (Object *, ob, &oldmain->objects) {
-    if (ID_IS_LINKED(ob) && ob->proxy_from != NULL && !ID_IS_LINKED(ob->proxy_from)) {
-      ob->proxy_from = NULL;
-    }
-  }
-}
-
 /* XXX disabled this feature - packed files also belong in temp saves and quit.blend,
  * to make restore work. */
 
@@ -2008,6 +1991,7 @@ static void lib_link_id(BlendLibReader *reader, ID *id)
   if (id->override_library) {
     BLO_read_id_address(reader, id->lib, &id->override_library->reference);
     BLO_read_id_address(reader, id->lib, &id->override_library->storage);
+    BLO_read_id_address(reader, id->lib, &id->override_library->hierarchy_root);
   }
 
   lib_link_id_embedded_id(reader, id);
@@ -2544,7 +2528,6 @@ static void lib_link_workspace_layout_restore(struct IDNameLib_Map *id_map,
         else if (sl->spacetype == SPACE_FILE) {
           SpaceFile *sfile = (SpaceFile *)sl;
           sfile->op = NULL;
-          sfile->previews_timer = NULL;
           sfile->tags = FILE_TAG_REBUILD_MAIN_FILES;
         }
         else if (sl->spacetype == SPACE_ACTION) {
@@ -2938,7 +2921,7 @@ static const char *dataname(short id_code)
       return "Data from MA";
     case ID_TE:
       return "Data from TE";
-    case ID_CU:
+    case ID_CU_LEGACY:
       return "Data from CU";
     case ID_GR:
       return "Data from GR";
@@ -2998,7 +2981,7 @@ static const char *dataname(short id_code)
       return "Data from CF";
     case ID_WS:
       return "Data from WS";
-    case ID_HA:
+    case ID_CV:
       return "Data from HA";
     case ID_PT:
       return "Data from PT";
@@ -3208,18 +3191,8 @@ static void read_libblock_undo_restore_identical(
   id_old->recalc |= direct_link_id_restore_recalc_exceptions(id_old);
   id_old->recalc_after_undo_push = 0;
 
-  /* As usual, proxies require some special love...
-   * In `blo_clear_proxy_pointers_from_lib()` we clear all `proxy_from` pointers to local IDs, for
-   * undo. This is required since we do not re-read linked data in that case, so we also do not
-   * re-'lib_link' their pointers.
-   * Those `proxy_from` pointers are then re-defined properly when lib_linking the newly read local
-   * object. However, in case of re-used data 'as-is', we never lib_link it again, so we have to
-   * fix those backward pointers here. */
   if (GS(id_old->name) == ID_OB) {
     Object *ob = (Object *)id_old;
-    if (ob->proxy != NULL) {
-      ob->proxy->proxy_from = ob;
-    }
     /* For undo we stay in object mode during undo presses, so keep editmode disabled for re-used
      * data-blocks too. */
     ob->mode &= ~OB_MODE_EDIT;

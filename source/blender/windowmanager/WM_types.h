@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2007 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2007 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup wm
@@ -486,6 +470,7 @@ typedef struct wmNotifier {
 #define NS_EDITMODE_ARMATURE (8 << 8)
 #define NS_MODE_POSE (9 << 8)
 #define NS_MODE_PARTICLE (10 << 8)
+#define NS_EDITMODE_CURVES (11 << 8)
 
 /* subtype 3d view editing */
 #define NS_VIEW3D_GPU (16 << 8)
@@ -1047,6 +1032,10 @@ typedef struct wmDragActiveDropState {
   /** If `active_dropbox` is set, the region it successfully polled in. To restore the context of
    * it as needed. */
   struct ARegion *region_from;
+
+  /** If `active_dropbox` is set, additional context provided by the active (i.e. hovered) button.
+   * Activated before context sensitive operations (polling, drawing, dropping). */
+  struct bContextStore *ui_context;
 
   /** Text to show when a dropbox poll succeeds (so the dropbox itself is available) but the
    * operator poll fails. Typically the message the operator set with

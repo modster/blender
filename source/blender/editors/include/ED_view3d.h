@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup editors
@@ -41,6 +25,7 @@ struct Camera;
 struct CustomData_MeshMasks;
 struct Depsgraph;
 struct EditBone;
+struct GPUSelectResult;
 struct ID;
 struct MVert;
 struct Main;
@@ -871,9 +856,14 @@ bool ED_view3d_autodist_simple(struct ARegion *region,
 bool ED_view3d_depth_read_cached_seg(
     const ViewDepths *vd, const int mval_sta[2], const int mval_end[2], int margin, float *depth);
 
-/* select */
+/**
+ * The default value for the maximum number of elements that can be selected at once
+ * using view-port selection.
+ *
+ * \note in many cases this defines the size of fixed-size stack buffers,
+ * so take care increasing this value.
+ */
 #define MAXPICKELEMS 2500
-#define MAXPICKBUF (4 * MAXPICKELEMS)
 
 typedef enum {
   /* all elements in the region, ignore depth */
@@ -912,21 +902,21 @@ void view3d_opengl_select_cache_end(void);
  * \note (vc->obedit == NULL) can be set to explicitly skip edit-object selection.
  */
 int view3d_opengl_select_ex(struct ViewContext *vc,
-                            unsigned int *buffer,
-                            unsigned int bufsize,
+                            struct GPUSelectResult *buffer,
+                            unsigned int buffer_len,
                             const struct rcti *input,
                             eV3DSelectMode select_mode,
                             eV3DSelectObjectFilter select_filter,
                             bool do_material_slot_selection);
 int view3d_opengl_select(struct ViewContext *vc,
-                         unsigned int *buffer,
-                         unsigned int bufsize,
+                         struct GPUSelectResult *buffer,
+                         unsigned int buffer_len,
                          const struct rcti *input,
                          eV3DSelectMode select_mode,
                          eV3DSelectObjectFilter select_filter);
 int view3d_opengl_select_with_id_filter(struct ViewContext *vc,
-                                        unsigned int *buffer,
-                                        unsigned int bufsize,
+                                        struct GPUSelectResult *buffer,
+                                        unsigned int buffer_len,
                                         const struct rcti *input,
                                         eV3DSelectMode select_mode,
                                         eV3DSelectObjectFilter select_filter,
@@ -1087,6 +1077,20 @@ void ED_view3d_persp_switch_from_camera(const struct Depsgraph *depsgraph,
 bool ED_view3d_persp_ensure(const struct Depsgraph *depsgraph,
                             struct View3D *v3d,
                             struct ARegion *region);
+
+/* Camera view functions. */
+
+/**
+ * Utility to scale zoom level when in camera-view #RegionView3D.camzoom and apply limits.
+ * \return true a change was made.
+ */
+bool ED_view3d_camera_view_zoom_scale(struct RegionView3D *rv3d, const float scale);
+/**
+ * Utility to pan when in camera view.
+ * \param event_ofs: The offset the pan in screen (pixel) coordinates.
+ * \return true when a change was made.
+ */
+bool ED_view3d_camera_view_pan(struct ARegion *region, const float event_ofs[2]);
 
 /* Camera lock functions */
 

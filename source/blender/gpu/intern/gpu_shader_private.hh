@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -24,8 +10,11 @@
 #include "BLI_string_ref.hh"
 
 #include "GPU_shader.h"
+#include "gpu_shader_create_info.hh"
 #include "gpu_shader_interface.hh"
 #include "gpu_vertex_buffer_private.hh"
+
+#include <string>
 
 namespace blender {
 namespace gpu {
@@ -53,7 +42,7 @@ class Shader {
   virtual void geometry_shader_from_glsl(MutableSpan<const char *> sources) = 0;
   virtual void fragment_shader_from_glsl(MutableSpan<const char *> sources) = 0;
   virtual void compute_shader_from_glsl(MutableSpan<const char *> sources) = 0;
-  virtual bool finalize() = 0;
+  virtual bool finalize(const shader::ShaderCreateInfo *info = nullptr) = 0;
 
   virtual void transform_feedback_names_set(Span<const char *> name_list,
                                             eGPUShaderTFBType geom_type) = 0;
@@ -67,6 +56,14 @@ class Shader {
   virtual void uniform_int(int location, int comp_len, int array_size, const int *data) = 0;
 
   virtual void vertformat_from_shader(GPUVertFormat *) const = 0;
+
+  std::string defines_declare(const shader::ShaderCreateInfo &info) const;
+  virtual std::string resources_declare(const shader::ShaderCreateInfo &info) const = 0;
+  virtual std::string vertex_interface_declare(const shader::ShaderCreateInfo &info) const = 0;
+  virtual std::string fragment_interface_declare(const shader::ShaderCreateInfo &info) const = 0;
+  virtual std::string geometry_interface_declare(const shader::ShaderCreateInfo &info) const = 0;
+  virtual std::string geometry_layout_declare(const shader::ShaderCreateInfo &info) const = 0;
+  virtual std::string compute_layout_declare(const shader::ShaderCreateInfo &info) const = 0;
 
   /* DEPRECATED: Kept only because of BGL API. */
   virtual int program_handle_get() const = 0;
@@ -109,6 +106,7 @@ struct LogCursor {
 
 struct GPULogItem {
   LogCursor cursor;
+  bool source_base_row = false;
   Severity severity = Severity::Unknown;
 };
 

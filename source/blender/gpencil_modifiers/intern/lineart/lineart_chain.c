@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2019 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup editors
@@ -571,11 +555,11 @@ static void lineart_bounding_area_link_chain(LineartRenderBuffer *rb, LineartEdg
   }
 }
 
-static bool lineart_chain_try_skip_noise(LineartEdgeChain *ec,
-                                         LineartEdgeChainItem *last_matching_eci,
-                                         float distance_threshold,
-                                         bool preserve_details,
-                                         LineartEdgeChainItem **r_next_eci)
+static bool lineart_chain_fix_ambiguous_segments(LineartEdgeChain *ec,
+                                                 LineartEdgeChainItem *last_matching_eci,
+                                                 float distance_threshold,
+                                                 bool preserve_details,
+                                                 LineartEdgeChainItem **r_next_eci)
 {
   float dist_accum = 0;
 
@@ -653,11 +637,11 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
           if (lineart_point_overlapping(next_eci, eci->pos[0], eci->pos[1], 1e-5)) {
             continue;
           }
-          if (lineart_chain_try_skip_noise(ec,
-                                           eci->prev,
-                                           rb->chaining_image_threshold,
-                                           rb->chain_preserve_details,
-                                           &next_eci)) {
+          if (lineart_chain_fix_ambiguous_segments(ec,
+                                                   eci->prev,
+                                                   rb->chaining_image_threshold,
+                                                   rb->chain_preserve_details,
+                                                   &next_eci)) {
             continue;
           }
         }
