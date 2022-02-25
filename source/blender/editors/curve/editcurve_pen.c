@@ -1145,12 +1145,12 @@ static bool is_spline_nearby(ViewContext *vc,
 
 static bool is_extra_key_pressed(const wmEvent *event, int key)
 {
-  return (key == SHIFT && event->shift && !event->ctrl && !event->alt) ||
-         (key == CTRL && !event->shift && event->ctrl && !event->alt) ||
-         (key == ALT && !event->shift && !event->ctrl && event->alt) ||
-         (key == CTRL_SHIFT && event->shift && event->ctrl && !event->alt) ||
-         (key == CTRL_ALT && !event->shift && event->ctrl && event->alt) ||
-         (key == SHIFT_ALT && event->shift && !event->ctrl && event->alt);
+  const bool shift = event->modifier == KM_SHIFT;
+  const bool ctrl = event->modifier == KM_CTRL;
+  const bool alt = event->modifier == KM_ALT;
+  return (key == SHIFT && shift && !ctrl && !alt) || (key == CTRL && !shift && ctrl && !alt) ||
+         (key == ALT && !shift && !ctrl && alt) || (key == CTRL_SHIFT && shift && ctrl && !alt) ||
+         (key == CTRL_ALT && !shift && ctrl && alt) || (key == SHIFT_ALT && shift && !ctrl && alt);
 }
 
 /* Move segment to mouse pointer. */
