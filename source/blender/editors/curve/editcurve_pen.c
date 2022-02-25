@@ -326,8 +326,8 @@ static void move_bp_to_location(BPoint *bp, const float mval[2], const ViewConte
 }
 
 /* Get the average position of selected points.
- * `mid_only`: Use only the middle point of the three points on a BezTriple.
- * `bezt_only`: Use only points of Bezier splines. */
+ * \param mid_only: Use only the middle point of the three points on a BezTriple.
+ * \param bezt_only: Use only points of Bezier splines. */
 static bool get_selected_center(const ListBase *nurbs,
                                 float r_center[3],
                                 const bool mid_only,
@@ -335,10 +335,10 @@ static bool get_selected_center(const ListBase *nurbs,
 {
   int end_count = 0;
   zero_v3(r_center);
-  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
-    if (nu1->type == CU_BEZIER) {
-      for (int i = 0; i < nu1->pntsu; i++) {
-        BezTriple *bezt = nu1->bezt + i;
+  LISTBASE_FOREACH (Nurb *, nu, nurbs) {
+    if (nu->type == CU_BEZIER) {
+      for (int i = 0; i < nu->pntsu; i++) {
+        BezTriple *bezt = nu->bezt + i;
         if (mid_only) {
           if (BEZT_ISSEL_ANY(bezt)) {
             add_v3_v3(r_center, bezt->vec[1]);
@@ -362,9 +362,9 @@ static bool get_selected_center(const ListBase *nurbs,
       }
     }
     else if (!bezt_only) {
-      for (int i = 0; i < nu1->pntsu; i++) {
-        if ((nu1->bp + i)->f1 & SELECT) {
-          add_v3_v3(r_center, (nu1->bp + i)->vec);
+      for (int i = 0; i < nu->pntsu; i++) {
+        if ((nu->bp + i)->f1 & SELECT) {
+          add_v3_v3(r_center, (nu->bp + i)->vec);
           end_count++;
         }
       }
@@ -439,15 +439,7 @@ static void move_all_selected_points(ListBase *nurbs,
 
 static int get_nurb_index(const ListBase *nurbs, const Nurb *nurb)
 {
-  int index = 0;
-  LISTBASE_FOREACH (Nurb *, nu, nurbs) {
-    if (nu == nurb) {
-      return index;
-    }
-    index++;
-  }
-
-  return -1;
+  return BLI_findindex(nurbs, nurb);
 }
 
 static void delete_nurb(Curve *cu, Nurb *nu)
@@ -461,7 +453,6 @@ static void delete_nurb(Curve *cu, Nurb *nu)
 
   BLI_remlink(nurbs, nu);
   BKE_nurb_free(nu);
-  nu = NULL;
 }
 
 static void delete_bezt_from_nurb(const BezTriple *bezt, Nurb *nu)
@@ -604,16 +595,17 @@ static bool is_cyclic(const Nurb *nu)
   return nu->flagu & CU_NURB_CYCLIC;
 }
 
-/* Insert a #BezTriple to a nurb at the location specified by `op_data`. */
+/* Insert a #BezTriple to a nurb at the location specified by `data`. */
 static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
 
-  BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple), __func__);
+  BezTriple *new_bezt_array = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple),
+                                                       __func__);
   const int index = data->bezt_index + 1;
   /* Copy all control points before the cut to the new memory. */
-  ED_curve_beztcpy(editnurb, bezt1, nu->bezt, index);
-  BezTriple *new_bezt = bezt1 + index;
+  ED_curve_beztcpy(editnurb, new_bezt_array, nu->bezt, index);
+  BezTriple *new_bezt = new_bezt_array + index;
 
   /* Duplicate control point after the cut. */
   ED_curve_beztcpy(editnurb, new_bezt, new_bezt - 1, 1);
@@ -621,7 +613,7 @@ static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 
   if (index < nu->pntsu) {
     /* Copy all control points after the cut to the new memory. */
-    ED_curve_beztcpy(editnurb, bezt1 + index + 1, nu->bezt + index, nu->pntsu - index);
+    ED_curve_beztcpy(editnurb, new_bezt_array + index + 1, nu->bezt + index, nu->pntsu - index);
   }
 
   nu->pntsu += 1;
@@ -630,7 +622,7 @@ static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 
   BezTriple *next_bezt;
   if (is_cyclic(nu) && (index == nu->pntsu - 1)) {
-    next_bezt = bezt1;
+    next_bezt = new_bezt_array;
   }
   else {
     next_bezt = new_bezt + 1;
@@ -652,7 +644,7 @@ static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
                              data->parameter);
 
   MEM_freeN(nu->bezt);
-  nu->bezt = bezt1;
+  nu->bezt = new_bezt_array;
   ED_curve_deselect_all(editnurb);
   BKE_nurb_handles_calc(nu);
   BEZT_SEL_ALL(new_bezt);
@@ -663,11 +655,11 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
 
-  BPoint *bp1 = (BPoint *)MEM_mallocN((nu->pntsu + 1) * sizeof(BPoint), __func__);
+  BPoint *new_bp_array = (BPoint *)MEM_mallocN((nu->pntsu + 1) * sizeof(BPoint), __func__);
   const int index = data->bp_index + 1;
   /* Copy all control points before the cut to the new memory. */
-  ED_curve_bpcpy(editnurb, bp1, nu->bp, index);
-  BPoint *new_bp = bp1 + index;
+  ED_curve_bpcpy(editnurb, new_bp_array, nu->bp, index);
+  BPoint *new_bp = new_bp_array + index;
 
   /* Duplicate control point after the cut. */
   ED_curve_bpcpy(editnurb, new_bp, new_bp - 1, 1);
@@ -675,7 +667,7 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 
   if (index < nu->pntsu) {
     /* Copy all control points after the cut to the new memory. */
-    ED_curve_bpcpy(editnurb, bp1 + index + 1, nu->bp + index, (nu->pntsu - index));
+    ED_curve_bpcpy(editnurb, new_bp_array + index + 1, nu->bp + index, (nu->pntsu - index));
   }
 
   nu->pntsu += 1;
@@ -684,7 +676,7 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 
   BPoint *next_bp;
   if (is_cyclic(nu) && (index == nu->pntsu - 1)) {
-    next_bp = bp1;
+    next_bp = new_bp_array;
   }
   else {
     next_bp = new_bp + 1;
@@ -696,19 +688,21 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   new_bp->weight = interpf(next_bp->weight, (new_bp - 1)->weight, data->parameter);
 
   MEM_freeN(nu->bp);
-  nu->bp = bp1;
+  nu->bp = new_bp_array;
   ED_curve_deselect_all(editnurb);
   BKE_nurb_knot_calc_u(nu);
   new_bp->f1 |= SELECT;
 }
 
-/* Update r_min_dist (minimum distance from point to edge), r_min_i (index of closest point on
- * Nurb), and r_param (the fraction along the edge at which the closest point lies) based on the
- * edge and the external point.
- * `point`: External point
- * `point1` & `point2`: The two ends of the edge
- * `point_idx`: Index of the control point out of the points on the Nurb
- * `resolu_idx`: Index of the edge on a Bezier segment (zero for non-Bezier edges) */
+/* Update r_min_dist, r_min_i, and r_param based on the edge and the external point.
+ * \param point: External point
+ * \param point1: One end of the edge
+ * \param point2: The other end of the edge
+ * \param point_idx: Index of the control point out of the points on the Nurb
+ * \param resolu_idx: Index of the edge on a Bezier segment (zero for non-Bezier edges)
+ * \param r_min_dist: minimum distance from point to edge
+ * \param r_min_i: index of closest point on Nurb
+ * \param r_param: the fraction along the edge at which the closest point lies */
 static void get_updated_data_for_edge(const float point[2],
                                       const float point1[2],
                                       const float point2[2],
@@ -887,45 +881,45 @@ static void get_selected_points(
     Curve *cu, View3D *v3d, Nurb **r_nu, BezTriple **r_bezt, BPoint **r_bp)
 {
   ListBase *nurbs = &cu->editnurb->nurbs;
-  BezTriple *bezt1;
-  BPoint *bp1;
+  BezTriple *bezt;
+  BPoint *bp;
   int a;
 
   *r_nu = NULL;
   *r_bezt = NULL;
   *r_bp = NULL;
 
-  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
-    if (nu1->type == CU_BEZIER) {
-      bezt1 = nu1->bezt;
-      a = nu1->pntsu;
+  LISTBASE_FOREACH (Nurb *, nu, nurbs) {
+    if (nu->type == CU_BEZIER) {
+      bezt = nu->bezt;
+      a = nu->pntsu;
       while (a--) {
-        if (BEZT_ISSEL_ANY_HIDDENHANDLES(v3d, bezt1)) {
+        if (BEZT_ISSEL_ANY_HIDDENHANDLES(v3d, bezt)) {
           if (*r_bezt || *r_bp) {
             *r_bp = NULL;
             *r_bezt = NULL;
             return;
           }
-          *r_bezt = bezt1;
-          *r_nu = nu1;
+          *r_bezt = bezt;
+          *r_nu = nu;
         }
-        bezt1++;
+        bezt++;
       }
     }
     else {
-      bp1 = nu1->bp;
-      a = nu1->pntsu * nu1->pntsv;
+      bp = nu->bp;
+      a = nu->pntsu * nu->pntsv;
       while (a--) {
-        if (bp1->f1 & SELECT) {
+        if (bp->f1 & SELECT) {
           if (*r_bezt || *r_bp) {
             *r_bp = NULL;
             *r_bezt = NULL;
             return;
           }
-          *r_bp = bp1;
-          *r_nu = nu1;
+          *r_bp = bp;
+          *r_nu = nu;
         }
-        bp1++;
+        bp++;
       }
     }
   }
