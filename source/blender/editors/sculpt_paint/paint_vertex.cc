@@ -13,6 +13,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_array_utils.h"
+#include "BLI_color.hh"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_rect.h"
@@ -67,7 +68,10 @@
 #include "paint_intern.h" /* own include */
 #include "sculpt_intern.h"
 
+#include "paint_vertex_color_utils.hh"
+
 using blender::IndexRange;
+using namespace blender::paint;
 
 /*
 WM_msg_publish_rna_prop declares externs locally,
@@ -80,208 +84,46 @@ extern "C" PropertyRNA rna_Object_mode;
 /** \name Internal Utilities
  * \{ */
 
-struct ByteColor {
-  using ValueType = uchar;
-  static const size_t ValueRange = 255;
-  static const size_t ValueSize = 1;
+static Color4b uint2color(uint c)
+{
+  uchar *rgba = (uchar *)&c;
+  return Color4b(rgba[0], rgba[1], rgba[2], rgba[3]);
+}
 
-  ByteColor()
-  {
+static uint color2uint(Color4b c)
+{
+  return *(reinterpret_cast<uint *>(&c));
+}
+
+static bool isZero(Color4f c)
+{
+  return c.r == 0.0f && c.g == 0.0f && c.b == 0.0f && c.a == 0.0f;
+}
+
+static bool isZero(Color4b c)
+{
+  return c.r == 0 && c.g == 0 && c.b == 0 && c.a == 0;
+}
+
+template<typename Color = Color4f> static Color4f toFloat(const Color &c)
+{
+  if constexpr (std::is_same_v<Color, Color4b>) {
+    return c.decode();
   }
-
-  ByteColor(uint col)
-  {
-    data.i = col;
-  }
-
-  ByteColor(ValueType r, ValueType g, ValueType b, ValueType a)
-  {
-    data.rgba[0] = r;
-    data.rgba[1] = g;
-    data.rgba[2] = b;
-    data.rgba[3] = a;
-  }
-
-  static ByteColor zero()
-  {
-    ByteColor c;
-
-    c.data.i = 0;
+  else {
     return c;
   }
+}
 
-  static ByteColor one()
-  {
-    ByteColor c;
-    memset(reinterpret_cast<void *>(&c.data), 255, sizeof(c.data));
+template<typename Color = Color4f> static Color fromFloat(const Color4f &c)
+{
+  if constexpr (std::is_same_v<Color, Color4b>) {
+    return c.encode();
+  }
+  else {
     return c;
   }
-
-  static ByteColor fromFloat(float r, float g, float b, float a)
-  {
-    float col[4] = {r, g, b, a};
-    ByteColor c;
-
-    linearrgb_to_srgb_v3_v3(col, col);
-
-    c.data.rgba[0] = (ValueType)(col[0] * 255.0f);
-    c.data.rgba[1] = (ValueType)(col[1] * 255.0f);
-    c.data.rgba[2] = (ValueType)(col[2] * 255.0f);
-    c.data.rgba[3] = (ValueType)(col[3] * 255.0f);
-
-    return c;
-  }
-
-  bool isZero() const
-  {
-    return data.i == 0;
-  }
-
-  ByteColor &operator=(uint c)
-  {
-    data.i = c;
-    return *this;
-  }
-
-  ValueType &r()
-  {
-    return data.rgba[0];
-  }
-  ValueType &g()
-  {
-    return data.rgba[1];
-  }
-  ValueType &b()
-  {
-    return data.rgba[2];
-  }
-  ValueType &a()
-  {
-    return data.rgba[3];
-  }
-
-  void toFloat(float r_color[4]) const
-  {
-    rgba_uchar_to_float(r_color, this->data.rgba);
-    srgb_to_linearrgb_v3_v3(r_color, r_color);
-  }
-
-  static ByteColor blendTool(const int tool,
-                             const ByteColor &col,
-                             const ByteColor &paintcol,
-                             const ValueType alpha)
-  {
-    uint res = ED_vpaint_blend_tool(tool, col.data.i, paintcol.data.i, alpha);
-    return ByteColor(res);
-  }
-
-  void fromFloat(float color[4])
-  {
-    float temp[4];
-    copy_v4_v4(temp, color);
-
-    linearrgb_to_srgb_v3_v3(temp, temp);
-    rgba_float_to_uchar(this->data.rgba, color);
-  }
-  union {
-    uint i;
-    ValueType rgba[4];
-  } data;
-};
-
-
-struct FloatColor {
-  using ValueType = float;
-  static const size_t ValueRange = 1;
-  static const size_t ValueSize = sizeof(float);
-
-  FloatColor()
-  {
-  }
-
-  FloatColor(uint c)
-  {
-    uchar *rgba = reinterpret_cast<uchar *>(&c);
-
-    rgba_uchar_to_float(data, rgba);
-    srgb_to_linearrgb_v3_v3(data, data);
-  }
-
-  FloatColor(const FloatColor &b)
-  {
-    data[0] = b.data[0];
-    data[1] = b.data[1];
-    data[2] = b.data[2];
-    data[3] = b.data[3];
-  }
-
-  FloatColor(ValueType r, ValueType g, ValueType b, ValueType a)
-  {
-    data[0] = r;
-    data[1] = g;
-    data[2] = b;
-    data[3] = a;
-  }
-
-  static FloatColor zero()
-  {
-    return FloatColor(0.0f, 0.0f, 0.0f, 0.0f);
-  }
-
-  static FloatColor one()
-  {
-    return FloatColor(1.0f, 1.0f, 1.0f, 1.0f);
-  }
-
-  static FloatColor fromFloat(float r, float g, float b, float a)
-  {
-    return FloatColor(r, g, b, a);
-  }
-
-  bool isZero() const
-  {
-    return data[0] == 0.0f && data[1] == 0.0f && data[2] == 0.0f && data[3] == 0.0f;
-  }
-
-  ValueType &r()
-  {
-    return data[0];
-  }
-  ValueType &g()
-  {
-    return data[1];
-  }
-  ValueType &b()
-  {
-    return data[2];
-  }
-  ValueType &a()
-  {
-    return data[3];
-  }
-
-  void toFloat(float r_color[4]) const
-  {
-    copy_v4_v4(r_color, data);
-  }
-
-  static FloatColor blendTool(const int tool,
-                             const FloatColor &col,
-                             const FloatColor &paintcol,
-                             const ValueType alpha)
-  {
-    FloatColor result;
-    IMB_blend_color_float(result.data, col.data, paintcol.data, (IMB_BlendMode)tool);
-    return result;
-  }
-
-  void fromFloat(float color[4])
-  {
-    copy_v4_v4(data, color);
-  }
-
-  float data[4];
-};
+}
 
 /* Use for 'blur' brush, align with PBVH nodes, created and freed on each update. */
 struct VPaintAverageAccum {
@@ -480,18 +322,22 @@ uint vpaint_get_current_col(Scene *scene, VPaint *vp, bool secondary)
 }
 
 /* wpaint has 'wpaint_blend' */
-template<class Color, typename Value = typename Color::ValueType>
+template<typename Color, typename Traits>
 static Color vpaint_blend_cpp(const VPaint *vp,
                               Color color_curr,
                               Color color_orig,
                               Color color_paint,
-                              const Value alpha_i,
-                              const Value brush_alpha_value_i)
+                              const typename Traits::ValueType alpha_i,
+                              const typename Traits::BlendType brush_alpha_value_i)
 {
+  using Value = Traits::ValueType;
+
   const Brush *brush = vp->paint.brush;
   const IMB_BlendMode blend = (IMB_BlendMode)brush->blend;
 
-  Color color_blend = Color::blendTool(blend, color_curr, color_paint, alpha_i);
+  Color color_blend = ED_vpaint_blend_tool2<Color, Traits>(
+      blend, color_curr, color_paint, alpha_i);
+  // = Color::blendTool(blend, color_curr, color_paint, alpha_i);
 
   /* If no accumulate, clip color adding with `color_orig` & `color_test`. */
   if (!brush_use_accumulate(vp)) {
@@ -499,7 +345,7 @@ static Color vpaint_blend_cpp(const VPaint *vp,
     Color color_test;
     Value *cp, *ct, *co;
 
-    color_test = Color::blendTool(blend, color_orig, color_paint, brush_alpha_value_i);
+    color_test = ED_vpaint_blend_tool2<Color,Traits>(blend, color_orig, color_paint, brush_alpha_value_i);
 
     cp = (Value *)&color_blend;
     ct = (Value *)&color_test;
@@ -544,9 +390,12 @@ static uint vpaint_blend(const VPaint *vp,
                          /* pre scaled from [0-1] --> [0-255] */
                          const int brush_alpha_value_i)
 {
-  return vpaint_blend_cpp<ByteColor>(
-             vp, color_curr, color_orig, color_paint, (uint)alpha_i, (uint)brush_alpha_value_i)
-      .data.i;
+  return color2uint(vpaint_blend_cpp<Color4b, ByteTraits>(vp,
+                                              uint2color(color_curr),
+                                              uint2color(color_orig),
+                                              uint2color(color_paint),
+                                              alpha_i,
+                                              brush_alpha_value_i));
 }
 
 /* vpaint has 'vpaint_blend' */
@@ -1382,7 +1231,7 @@ static void vertex_paint_init_session_data(const ToolSettings *ts, Object *ob)
   /* Create average brush arrays */
   if (ob->mode == OB_MODE_VERTEX_PAINT) {
     CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
-    size_t elemSize = layer && layer->type == CD_PROP_COLOR ? sizeof(float)*4 : 4;
+    size_t elemSize = layer && layer->type == CD_PROP_COLOR ? sizeof(float) * 4 : 4;
 
     if (!brush_use_accumulate(ts->vpaint)) {
       if (ob->sculpt->mode.vpaint.previous_color == NULL) {
@@ -3002,10 +2851,10 @@ extern "C" static bool vpaint_stroke_test_start(bContext *C,
     return false;
   }
 
-  const size_t elemSize = layer->type == CD_PROP_COLOR ? sizeof(float)*4 : 4;
+  const size_t elemSize = layer->type == CD_PROP_COLOR ? sizeof(float) * 4 : 4;
 
-  //XXX
-  //if (me->mloopcol == NULL) {
+  // XXX
+  // if (me->mloopcol == NULL) {
   //  return false;
   //}
 
@@ -3514,23 +3363,21 @@ static void calculate_average_color(SculptThreadedTaskData *data,
   MEM_SAFE_FREE(data->custom_data); /* 'accum' */
 }
 
-template<class Color, typename Value = Color::ValueType>
+template<class Color, typename Value = decltype(Color::r)>
 static float tex_color_alpha_ubyte_2(VPaint *vp,
                                      struct VPaintData *vpd,
                                      const float v_co[3],
                                      Color *r_color)
 {
-  float rgba[4];
-  float rgba_br[4];
+  Color4f rgba;
+  Color4f rgba_br = toFloat(*r_color);
 
-  r_color->toFloat(rgba_br);
+  tex_color_alpha(vp, &vpd->vc, v_co, &rgba.r);
 
-  tex_color_alpha(vp, &vpd->vc, v_co, rgba);
-
-  rgb_uchar_to_float(rgba_br, (const uchar *)vpd->paintcol);
+  rgb_uchar_to_float(&rgba_br.r, (const uchar *)&vpd->paintcol);
   mul_v3_v3(rgba_br, rgba);
 
-  r_color->fromFloat(rgba_br);
+  *r_color = fromFloat<Color>(rgba_br);
   // rgb_float_to_uchar((uchar *)r_color, rgba_br);
   return rgba[3];
 }
@@ -3541,7 +3388,7 @@ template<class Color> struct VPaintModeData {
   Color *previous_color;
 };
 
-template<class Color, typename Value = typename Color::ValueType>
+template<class Color, typename Traits>
 static void vpaint_do_draw(bContext *C,
                            Sculpt *sd,
                            VPaint *vp,
@@ -3552,6 +3399,8 @@ static void vpaint_do_draw(bContext *C,
                            int totnode,
                            Color *lcol)
 {
+  using Value = Traits::ValueType;
+
   SculptSession *ss = ob->sculpt;
   const PBVHType pbvh_type = BKE_pbvh_type(ss->pbvh);
 
@@ -3581,6 +3430,16 @@ static void vpaint_do_draw(bContext *C,
       const float *sculpt_normal_frontface = SCULPT_brush_frontface_normal_from_falloff_shape(
           ss, brush->falloff_shape);
 
+      Color4b paintcol_b = uint2color(vpd->paintcol);
+      Color paintcol;
+
+      if constexpr (std::is_same_v<Color, Color4f>) {
+        paintcol = paintcol_b.decode();
+      }
+      else {
+        paintcol = paintcol_b;
+      }
+
       /* For each vertex */
       PBVHVertexIter vd;
       BKE_pbvh_vertex_iter_begin (ss->pbvh, nodes[n], vd, PBVH_ITER_UNIQUE) {
@@ -3608,7 +3467,8 @@ static void vpaint_do_draw(bContext *C,
                      &vpd->normal_angle_precalc, angle_cos, &brush_strength))) {
               const float brush_fade = BKE_brush_curve_strength(
                   brush, sqrtf(test.dist), cache->radius);
-              Color color_final = vpd->paintcol;
+
+              Color color_final = paintcol;
 
               /* If we're painting with a texture, sample the texture color and alpha. */
               float tex_alpha = 1.0;
@@ -3624,11 +3484,11 @@ static void vpaint_do_draw(bContext *C,
                 BLI_assert(me->mloop[l_index].v == v_index);
                 const MPoly *mp = &me->mpoly[p_index];
                 if (!use_face_sel || mp->flag & ME_FACE_SEL) {
-                  Color color_orig = Color::zero(); /* unused when array is NULL */
+                  Color color_orig = Color(0, 0, 0, 0); /* unused when array is NULL */
 
                   if (mode_vpaint->previous_color != NULL) {
                     /* Get the previous loop color */
-                    if (mode_vpaint->previous_color[l_index].isZero()) {
+                    if (isZero(mode_vpaint->previous_color[l_index])) {
                       mode_vpaint->previous_color[l_index] = lcol[l_index];
                     }
                     color_orig = mode_vpaint->previous_color[l_index];
@@ -3637,12 +3497,12 @@ static void vpaint_do_draw(bContext *C,
                                             brush_alpha_pressure * grid_alpha;
 
                   /* Mix the new color with the original based on final_alpha. */
-                  lcol[l_index] = vpaint_blend_cpp<Color>(vp,
+                  lcol[l_index] = vpaint_blend_cpp<Color, Traits>(vp,
                                                           lcol[l_index],
                                                           color_orig,
                                                           color_final,
                                                           final_alpha,
-                                                          255 * brush_strength);
+                                                          Traits::range * brush_strength);
                 }
               }
             }
@@ -3674,12 +3534,12 @@ static void vpaint_paint_leaves(bContext *C,
     }
 
     if (layer->type == CD_MLOOPCOL) {
-      ByteColor *lcol = reinterpret_cast<ByteColor *>(layer->data);
-      vpaint_do_draw<ByteColor>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
+      Color4b *lcol = reinterpret_cast<Color4b *>(layer->data);
+      vpaint_do_draw<Color4b, ByteTraits>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
     }
     else if (layer->type == CD_PROP_COLOR) {
-      FloatColor *lcol = reinterpret_cast<FloatColor *>(layer->data);
-      vpaint_do_draw<FloatColor>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
+      Color4f *lcol = reinterpret_cast<Color4f *>(layer->data);
+      vpaint_do_draw<Color4f, FloatTraits>(C, sd, vp, vpd, ob, me, nodes, totnode, lcol);
     }
     return;
   }

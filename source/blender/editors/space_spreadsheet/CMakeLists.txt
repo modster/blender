@@ -10,6 +10,7 @@ set(INC
   ../../depsgraph
   ../../functions
   ../../gpu
+  ../../imbuf
   ../../makesdna
   ../../makesrna
   ../../nodes
