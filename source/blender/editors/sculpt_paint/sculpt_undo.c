@@ -1688,7 +1688,7 @@ static void sculpt_undosys_step_decode(
     ViewLayer *view_layer = CTX_data_view_layer(C);
     Object *ob = OBACT(view_layer);
     if (ob && (ob->type == OB_MESH)) {
-      if (ob->mode & OB_MODE_SCULPT) {
+      if (ob->mode & (OB_MODE_SCULPT | OB_MODE_VERTEX_PAINT)) {
         /* Pass. */
       }
       else {

@@ -92,7 +92,9 @@ static int vertex_color_set_exec(bContext *C, wmOperator *UNUSED(op))
 {
   Scene *scene = CTX_data_scene(C);
   Object *obact = CTX_data_active_object(C);
-  uint paintcol = vpaint_get_current_col(scene, scene->toolsettings->vpaint, false);
+  float color[4];
+
+  uint paintcol = vpaint_get_current_col(scene, scene->toolsettings->vpaint, false, color);
 
   if (vertex_color_set(obact, paintcol)) {
     WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obact);

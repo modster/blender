@@ -204,7 +204,7 @@ static Color mcol_mul(Color col_src, Color col_dst, typename Traits::BlendType f
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -237,7 +237,7 @@ static Color mcol_lighten(Color col_src, Color col_dst, typename Traits::BlendTy
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -274,7 +274,7 @@ static Color mcol_darken(Color col_src, Color col_dst, typename Traits::BlendTyp
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -310,7 +310,7 @@ static Color mcol_colordodge(Color col_src, Color col_dst, typename Traits::Blen
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac, temp;
+  Blend mfac, temp;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -351,7 +351,7 @@ static Color mcol_difference(Color col_src, Color col_dst, typename Traits::Blen
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac, temp;
+  Blend mfac, temp;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -382,7 +382,7 @@ static Color mcol_screen(Color col_src, Color col_dst, typename Traits::BlendTyp
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac, temp;
+  Blend mfac, temp;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -421,7 +421,7 @@ static Color mcol_hardlight(Color col_src, Color col_dst, typename Traits::Blend
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac, temp;
+  Blend mfac, temp;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -456,7 +456,7 @@ static Color mcol_overlay(Color col_src, Color col_dst, typename Traits::BlendTy
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac, temp;
+  Blend mfac, temp;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -491,7 +491,7 @@ static Color mcol_softlight(Color col_src, Color col_dst, typename Traits::Blend
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac, temp;
+  Blend mfac, temp;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -527,7 +527,7 @@ static Color mcol_exclusion(Color col_src, Color col_dst, typename Traits::Blend
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac, temp;
+  Blend mfac, temp;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -558,7 +558,7 @@ static Color mcol_luminosity(Color col_src, Color col_dst, typename Traits::Blen
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -605,7 +605,7 @@ static Color mcol_saturation(Color col_src, Color col_dst, typename Traits::Blen
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -653,7 +653,7 @@ static Color mcol_hue(Color col_src, Color col_dst, typename Traits::BlendType f
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -746,7 +746,7 @@ static Color mcol_pinlight(Color col_src, Color col_dst, typename Traits::BlendT
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -786,7 +786,7 @@ static Color mcol_linearlight(Color col_src, Color col_dst, typename Traits::Ble
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -803,7 +803,7 @@ static Color mcol_linearlight(Color col_src, Color col_dst, typename Traits::Ble
 
   int i = 3;
   while (i--) {
-    int temp;
+    Blend temp;
 
     if (cp_dst[i] > cmp) {
       temp = Traits::min(cp_src[i] + 2 * (cp_dst[i] - cmp), Traits::range);
@@ -826,7 +826,7 @@ static Color mcol_vividlight(Color col_src, Color col_dst, typename Traits::Blen
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -844,7 +844,7 @@ static Color mcol_vividlight(Color col_src, Color col_dst, typename Traits::Blen
   int i = 3;
 
   while (i--) {
-    int temp;
+    Blend temp;
 
     if (cp_dst[i] == Traits::range) {
       temp = (cp_src[i] == 0) ? cmp : Traits::range;
@@ -874,7 +874,7 @@ static Color mcol_color(Color col_src, Color col_dst, typename Traits::BlendType
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -924,7 +924,7 @@ static Color mcol_colorburn(Color col_src, Color col_dst, typename Traits::Blend
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {
@@ -959,7 +959,7 @@ static Color mcol_linearburn(Color col_src, Color col_dst, typename Traits::Blen
   using Blend = typename Traits::BlendType;
 
   Value *cp_src, *cp_dst, *cp_mix;
-  int mfac;
+  Blend mfac;
   Color col_mix(0, 0, 0, 0);
 
   if (fac == 0) {

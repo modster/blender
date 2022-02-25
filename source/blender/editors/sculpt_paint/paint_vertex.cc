@@ -325,13 +325,17 @@ bool weight_paint_poll_ignore_tool(bContext *C)
   return weight_paint_poll_ex(C, false);
 }
 
-uint vpaint_get_current_col(Scene *scene, VPaint *vp, bool secondary)
+uint vpaint_get_current_col(Scene *scene, VPaint *vp, bool secondary, float floatcolor[4])
 {
   Brush *brush = BKE_paint_brush(&vp->paint);
   uchar col[4];
-  rgb_float_to_uchar(col,
-                     secondary ? BKE_brush_secondary_color_get(scene, brush) :
-                                 BKE_brush_color_get(scene, brush));
+
+  copy_v4_v4(floatcolor,
+             secondary ? BKE_brush_secondary_color_get(scene, brush) :
+                         BKE_brush_color_get(scene, brush));
+
+  rgb_float_to_uchar(col, floatcolor);
+
   col[3] = 255; /* alpha isn't used, could even be removed to speedup paint a little */
   return *(uint *)col;
 }
@@ -2815,6 +2819,7 @@ struct VPaintData {
   struct NormalAnglePrecalc normal_angle_precalc;
 
   uint paintcol;
+  float floatcolor[4];
 
   struct VertProjHandle *vp_handle;
   struct CoNo *vertexcosnos;
@@ -2878,7 +2883,7 @@ extern "C" static bool vpaint_stroke_test_start(bContext *C,
                          (vp->paint.brush->flag & BRUSH_FRONTFACE_FALLOFF) != 0);
 
   vpd->paintcol = vpaint_get_current_col(
-      scene, vp, (RNA_enum_get(op->ptr, "mode") == BRUSH_STROKE_INVERT));
+      scene, vp, (RNA_enum_get(op->ptr, "mode") == BRUSH_STROKE_INVERT), vpd->floatcolor);
 
   vpd->is_texbrush = !(brush->vertexpaint_tool == VPAINT_TOOL_BLUR) && brush->mtex.tex;
 
@@ -3690,14 +3695,14 @@ template<class Color> struct VPaintModeData {
 
 template<class Color, typename Traits, bool is_verts>
 static void vpaint_do_draw_intern(bContext *C,
-                                 Sculpt *sd,
-                                 VPaint *vp,
-                                 struct VPaintData *vpd,
-                                 Object *ob,
-                                 Mesh *me,
-                                 PBVHNode **nodes,
-                                 int totnode,
-                                 Color *lcol)
+                                  Sculpt *sd,
+                                  VPaint *vp,
+                                  struct VPaintData *vpd,
+                                  Object *ob,
+                                  Mesh *me,
+                                  PBVHNode **nodes,
+                                  int totnode,
+                                  Color *lcol)
 {
   using Value = Traits::ValueType;
 
@@ -3892,6 +3897,11 @@ static void vpaint_paint_leaves(bContext *C,
                                 PBVHNode **nodes,
                                 int totnode)
 {
+
+  for (int i : IndexRange(totnode)) {
+    SCULPT_undo_push_node(ob, nodes[i], SCULPT_UNDO_COLOR);
+  }
+
   const Brush *brush = ob->sculpt->cache->brush;
 
   CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
@@ -4129,6 +4139,8 @@ static void vpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
 
   MEM_freeN(vpd);
 
+  SCULPT_undo_push_end(ob);
+
   SCULPT_cache_free(ob->sculpt->cache);
   ob->sculpt->cache = NULL;
 }
@@ -4145,6 +4157,8 @@ extern "C" static int vpaint_invoke(bContext *C, wmOperator *op, const wmEvent *
                                     NULL,
                                     vpaint_stroke_done,
                                     event->type);
+
+  SCULPT_undo_push_begin(CTX_data_active_object(C), "Vertex Paint");
 
   if ((retval = op->type->modal(C, op, event)) == OPERATOR_FINISHED) {
     paint_stroke_free(C, op, (PaintStroke *)op->customdata);
