@@ -1062,15 +1062,12 @@ static bool is_last_bezt(const Nurb *nu, const BezTriple *bezt)
 static void extrude_points_from_selected_vertices(const ViewContext *vc,
                                                   Object *obedit,
                                                   const wmEvent *event,
-                                                  const bool extrude_center,
                                                   const int extrude_handle)
 {
   Curve *cu = vc->obedit->data;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
   float center[3] = {0.0f, 0.0f, 0.0f};
-  if (!extrude_center) {
-    deselect_all_center_vertices(nurbs);
-  }
+  deselect_all_center_vertices(nurbs);
   bool sel_exists = get_selected_center(nurbs, center, true, false);
 
   float location[3];
@@ -1086,7 +1083,7 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
   update_location_for_2d_curve(vc, location);
   EditNurb *editnurb = cu->editnurb;
 
-  if (!extrude_center && sel_exists) {
+  if (sel_exists) {
     float disp_3d[3];
     sub_v3_v3v3(disp_3d, location, center);
     /* Reimplemenented due to unexpected behavior for extrusion of 2-point spline. */
@@ -1466,7 +1463,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const float mval_fl[2] = {UNPACK2(event->mval)};
 
   const bool extrude_point = RNA_boolean_get(op->ptr, "extrude_point");
-  const bool extrude_center = RNA_boolean_get(op->ptr, "extrude_center");
   const bool delete_point = RNA_boolean_get(op->ptr, "delete_point");
   const bool insert_point = RNA_boolean_get(op->ptr, "insert_point");
   const bool move_seg = RNA_boolean_get(op->ptr, "move_segment");
@@ -1596,8 +1592,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           }
         }
         else if (extrude_point) {
-          extrude_points_from_selected_vertices(
-              &vc, obedit, event, extrude_center, extrude_handle);
+          extrude_points_from_selected_vertices(&vc, obedit, event, extrude_handle);
           cpd->new_point = cpd->acted = cpd->link_handles = true;
         }
       }
@@ -1626,8 +1621,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           cpd->acted = true;
         }
         else if (extrude_point) {
-          extrude_points_from_selected_vertices(
-              &vc, obedit, event, extrude_center, extrude_handle);
+          extrude_points_from_selected_vertices(&vc, obedit, event, extrude_handle);
           cpd->acted = true;
         }
       }
@@ -1761,11 +1755,6 @@ void CURVE_OT_pen(wmOperatorType *ot)
                          false,
                          "Extrude Point",
                          "Add a point connected to the last selected point");
-  prop = RNA_def_boolean(ot->srna,
-                         "extrude_center",
-                         false,
-                         "Extrude Internal",
-                         "Allow extruding points from internal points");
   prop = RNA_def_enum(ot->srna,
                       "extrude_handle",
                       prop_handle_types,

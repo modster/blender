@@ -1211,7 +1211,6 @@ class _defs_edit_curve:
             layout.prop(props, "sel_dist_mul")
             layout.prop(props, "close_spline")
             layout.prop(props, "extrude_handle")
-            layout.prop(props, "extrude_center")
         return dict(
             idname="builtin.pen",
             label="Curve Pen",
