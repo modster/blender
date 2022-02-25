@@ -31,3 +31,7 @@
 #define SHADOW_MAX_TILEMAP 4096
 #define SHADOW_MAX_PAGE 4096
 #define SHADOW_PAGE_PER_ROW 64
+
+#define HIZ_MIP_COUNT 6u
+/* Group size is 2x smaller because we simply copy the level 0. */
+#define HIZ_GROUP_SIZE 1u << (HIZ_MIP_COUNT - 2u)

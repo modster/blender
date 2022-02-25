@@ -115,7 +115,6 @@ void Instance::begin_sync()
   main_view.sync();
   world.sync();
   raytracing.sync();
-  hiz.sync();
 
   lookdev.sync_background();
   lookdev.sync_overlay();

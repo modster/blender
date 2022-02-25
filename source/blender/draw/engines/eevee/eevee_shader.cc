@@ -107,10 +107,8 @@ const char *ShaderModule::static_shader_create_info_name_get(eShaderType shader_
     case DEFERRED_VOLUME:
       return "eevee_volume_deferred";
 
-    case HIZ_COPY:
-      return "eevee_hiz_copy";
-    case HIZ_DOWNSAMPLE:
-      return "eevee_hiz_downsample";
+    case HIZ_UPDATE:
+      return "eevee_hiz_update";
 
     case DOF_BOKEH_LUT:
       return "eevee_depth_of_field_bokeh_lut";

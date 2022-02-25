@@ -27,19 +27,31 @@ class Instance;
 class HiZBuffer {
  private:
   Instance &inst_;
-  /** Framebuffer use for recursive downsampling. */
-  /* TODO(fclem) Remove this and use a compute shader instead. */
-  Framebuffer hiz_fb_ = draw::Framebuffer("DepthHiz");
   /** Max mip to downsample to. We ensure the hiz has enough padding to never
    * have to compensate the mipmap alignments. */
-  constexpr static int mip_count_ = 6;
-  /** TODO/OPTI(fclem): Share it between similar views. */
+  constexpr static int mip_count_ = HIZ_MIP_COUNT;
+  /* Kernel size is bigger than the local group size because we simply copy the level 0. */
+  constexpr static int kernel_size_ = HIZ_GROUP_SIZE << 1;
+  /** Aggregate of all views extent. The hiz is large enough to fit any view and is shared. */
+  int2 extent_;
+  /** The texture containing the hiz mip chain. */
   Texture hiz_tx_ = {"hiz_tx_"};
+  /** Update dispatch size from the given depth buffer size. */
+  int3 dispatch_size_;
+  /** Single pass recursive downsample. */
+  DRWPass *hiz_update_ps_;
+  /** References only. */
+  GPUTexture *input_depth_tx_ = nullptr;
 
  public:
   HiZBuffer(Instance &inst) : inst_(inst){};
 
-  void prepare(GPUTexture *depth_src);
+  void begin_sync();
+  void view_sync(int2 extent);
+  void end_sync();
+
+  void prepare(GPUTexture *depth_src_tx);
+
   void update(GPUTexture *depth_src);
 
   GPUTexture *texture_get(void) const
@@ -64,19 +76,9 @@ class HiZBufferModule {
   Instance &inst_;
 
   HiZDataBuf data_;
-  /** Copy input depth to hiz-buffer with border padding. */
-  DRWPass *hiz_copy_ps_;
-  /** Downsample one mipmap level. */
-  DRWPass *hiz_downsample_ps_;
-  /** References only. */
-  GPUTexture *input_depth_tx_ = nullptr;
-  /** Pixel size of the render target during hiz downsampling. */
-  float2 texel_size_;
 
  public:
   HiZBufferModule(Instance &inst) : inst_(inst){};
-
-  void sync(void);
 
   const GPUUniformBuf *ubo_get(void) const
   {

@@ -10,6 +10,8 @@
  * The size of the texture is padded to avoid messing with the mipmap pixels alignments.
  */
 
+#include "BKE_global.h"
+
 #include "eevee_instance.hh"
 
 #include "eevee_hizbuffer.hh"
@@ -21,66 +23,75 @@ namespace blender::eevee {
  *
  * \{ */
 
-void HiZBufferModule::sync(void)
+void HiZBuffer::begin_sync()
 {
+  extent_ = int2(-1);
+}
+
+void HiZBuffer::view_sync(int2 view_extent)
+{
+  extent_ = math::max(extent_, view_extent);
+}
+
+void HiZBuffer::end_sync()
+{
+  extent_.x = ceil_multiple_u(extent_.x, kernel_size_);
+  extent_.y = ceil_multiple_u(extent_.y, kernel_size_);
+
+  hiz_tx_.ensure_2d(GPU_R32F, extent_, nullptr, mip_count_);
+  hiz_tx_.ensure_mip_views();
+  GPU_texture_mipmap_mode(hiz_tx_, true, false);
+
   {
-    hiz_copy_ps_ = DRW_pass_create("HizCopy", DRW_STATE_WRITE_COLOR);
-    GPUShader *sh = inst_.shaders.static_shader_get(HIZ_COPY);
-    DRWShadingGroup *grp = DRW_shgroup_create(sh, hiz_copy_ps_);
-    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
-    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
-  }
-  {
-    hiz_downsample_ps_ = DRW_pass_create("HizDownsample", DRW_STATE_WRITE_COLOR);
-    GPUShader *sh = inst_.shaders.static_shader_get(HIZ_DOWNSAMPLE);
-    DRWShadingGroup *grp = DRW_shgroup_create(sh, hiz_downsample_ps_);
-    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
-    DRW_shgroup_uniform_vec2(grp, "texel_size", texel_size_, 1);
-    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+    hiz_update_ps_ = DRW_pass_create("HizUpdate", (DRWState)0);
+    GPUShader *sh = inst_.shaders.static_shader_get(HIZ_UPDATE);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, hiz_update_ps_);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "depth_tx", &input_depth_tx_, GPU_SAMPLER_FILTER);
+    DRW_shgroup_uniform_image(grp, "out_lvl0", hiz_tx_.mip_view(0));
+    DRW_shgroup_uniform_image(grp, "out_lvl1", hiz_tx_.mip_view(1));
+    DRW_shgroup_uniform_image(grp, "out_lvl2", hiz_tx_.mip_view(2));
+    DRW_shgroup_uniform_image(grp, "out_lvl3", hiz_tx_.mip_view(3));
+    DRW_shgroup_uniform_image(grp, "out_lvl4", hiz_tx_.mip_view(4));
+    DRW_shgroup_uniform_image(grp, "out_lvl5", hiz_tx_.mip_view(5));
+    DRW_shgroup_call_compute_ref(grp, dispatch_size_);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
   }
 }
 
 void HiZBuffer::prepare(GPUTexture *depth_src_tx)
 {
-  int div = 1 << mip_count_;
-  float2 extent_src(GPU_texture_width(depth_src_tx), GPU_texture_height(depth_src_tx));
-  int2 extent_hiz(divide_ceil_u(extent_src.x, div) * div, divide_ceil_u(extent_src.y, div) * div);
-
-  inst_.hiz.data_.pixel_to_ndc = 2.0f / extent_src;
-  inst_.hiz.texel_size_ = 1.0f / float2(extent_hiz);
-  inst_.hiz.data_.uv_scale = extent_src / float2(extent_hiz);
-
-  inst_.hiz.data_.push_update();
-
-  /* TODO/OPTI(fclem): Share it between similar views.
-   * Not possible right now because request_tmp does not support mipmaps. */
-  hiz_tx_.ensure_2d(GPU_R32F, extent_hiz, nullptr, mip_count_);
-  hiz_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(hiz_tx_));
-
-  GPU_texture_mipmap_mode(hiz_tx_, true, false);
-}
-
-void HiZBuffer::recursive_downsample(void *thunk, int UNUSED(lvl))
-{
-  HiZBufferModule &hiz = *reinterpret_cast<HiZBufferModule *>(thunk);
-  hiz.texel_size_ *= 2.0f;
-  DRW_draw_pass(hiz.hiz_downsample_ps_);
+  /* TODO(fclem) Remove. */
+  begin_sync();
+  view_sync({GPU_texture_width(depth_src_tx), GPU_texture_height(depth_src_tx)});
+  end_sync();
 }
 
 void HiZBuffer::update(GPUTexture *depth_src_tx)
 {
-  DRW_stats_group_start("Hiz");
+  int2 extent_src = {GPU_texture_width(depth_src_tx), GPU_texture_height(depth_src_tx)};
 
-  inst_.hiz.texel_size_ = 1.0f / float2(GPU_texture_width(hiz_tx_), GPU_texture_height(hiz_tx_));
+  dispatch_size_.x = divide_ceil_u(extent_src.x, kernel_size_);
+  dispatch_size_.y = divide_ceil_u(extent_src.y, kernel_size_);
+  dispatch_size_.z = 1;
 
-  inst_.hiz.input_depth_tx_ = depth_src_tx;
-  GPU_framebuffer_bind(hiz_fb_);
-  DRW_draw_pass(inst_.hiz.hiz_copy_ps_);
+  inst_.hiz.data_.uv_scale = float2(extent_src) / float2(extent_);
+  inst_.hiz.data_.push_update();
 
-  inst_.hiz.input_depth_tx_ = hiz_tx_;
-  GPU_framebuffer_recursive_downsample(hiz_fb_, mip_count_, &recursive_downsample, &inst_.hiz);
+  input_depth_tx_ = depth_src_tx;
 
-  DRW_stats_group_end();
+  /* Bind another framebuffer in order to avoid triggering the feedback loop check.
+   * This is safe because we only use compute shaders in this section of the code.
+   * Ideally the check should be smarter. */
+  GPUFrameBuffer *fb = GPU_framebuffer_active_get();
+  if (G.debug & G_DEBUG_GPU) {
+    GPU_framebuffer_restore();
+  }
+
+  DRW_draw_pass(hiz_update_ps_);
+
+  if (G.debug & G_DEBUG_GPU) {
+    GPU_framebuffer_bind(fb);
+  }
 }
 
 /** \} */
