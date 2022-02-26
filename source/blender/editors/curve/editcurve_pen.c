@@ -107,18 +107,16 @@ typedef struct CurvePenData {
   /* Whether shift-click was pressed. */
   bool select_multi;
 
-  /* Whether shortcut for toggling free handles was pressed. */
-  bool free_toggle_pressed;
   /* Whether the current handle type of the moved handle is free. */
   bool free_toggle;
-  /* Whether shortcut for linking handles was pressed. */
-  bool link_handles_pressed;
+  /* Whether the shortcut for moving the adjacent handle is pressed. */
+  bool move_adjacent;
   /* Whether the current state of the moved handle is linked. */
   bool link_handles;
   /* Whether the current state of the handle angle is locked. */
   bool lock_angle;
   /* Whether the shortcut for moving the entire point is pressed. */
-  bool move_entire_pressed;
+  bool move_entire;
 
   /* Data about found point. Used for closing splines. */
   Nurb *nu;
@@ -393,7 +391,7 @@ static void move_all_selected_points(ListBase *nurbs,
 
   const bool link_handles = cpd->link_handles && !cpd->free_toggle;
   const bool lock_angle = cpd->lock_angle;
-  const bool move_entire = cpd->move_entire_pressed;
+  const bool move_entire = cpd->move_entire;
 
   float distance = 0.0f;
   if (lock_angle) {
@@ -1437,6 +1435,59 @@ static void cycle_handles(BezTriple *bezt)
   }
 }
 
+enum {
+  PEN_MODAL_FREE_ALIGN_TOGGLE = 1,
+  PEN_MODAL_MOVE_ADJACENT,
+  PEN_MODAL_MOVE_ENTIRE,
+  PEN_MODAL_LINK_HANDLES,
+  PEN_MODAL_LOCK_ANGLE
+};
+
+wmKeyMap *curve_pen_modal_keymap(wmKeyConfig *keyconf)
+{
+  static const EnumPropertyItem modal_items[] = {
+      {PEN_MODAL_FREE_ALIGN_TOGGLE,
+       "FREE_ALIGN_TOGGLE",
+       0,
+       "Free Move handle",
+       "Move handle of newly added point freely"},
+      {PEN_MODAL_MOVE_ADJACENT,
+       "MOVE_ADJACENT",
+       0,
+       "Move Adjacent Handle",
+       "Move the closer handle of the adjacent vertex"},
+      {PEN_MODAL_MOVE_ENTIRE,
+       "MOVE_ENTIRE",
+       0,
+       "Move Entire",
+       "Move the closer handle of the adjacent vertex"},
+      {PEN_MODAL_LINK_HANDLES,
+       "LINK_HANDLES",
+       0,
+       "Link Handles",
+       "Mirror the movement of one handle onto the other"},
+      {PEN_MODAL_LOCK_ANGLE,
+       "LOCK_ANGLE",
+       0,
+       "Lock Angle",
+       "Move the handle along its current angle"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  wmKeyMap *keymap = WM_modalkeymap_find(keyconf, "Curve Pen Modal Map");
+
+  /* This function is called for each spacetype, only needs to add map once */
+  if (keymap && keymap->modal_items) {
+    return NULL;
+  }
+
+  keymap = WM_modalkeymap_ensure(keyconf, "Curve Pen Modal Map", modal_items);
+
+  WM_modalkeymap_assign(keymap, "CURVE_OT_pen");
+
+  return keymap;
+}
+
 static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
@@ -1468,11 +1519,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool cycle_handle_type = RNA_boolean_get(op->ptr, "cycle_handle_type");
   const int close_spline_opts = RNA_enum_get(op->ptr, "close_spline_opts");
   const int extrude_handle = RNA_enum_get(op->ptr, "extrude_handle");
-  const int free_toggle = RNA_enum_get(op->ptr, "free_toggle");
-  const int adj_handle = RNA_enum_get(op->ptr, "adj_handle");
-  const int move_entire = RNA_enum_get(op->ptr, "move_entire");
-  const int link_handles = RNA_enum_get(op->ptr, "link_handles");
-  const int lock_angle = RNA_enum_get(op->ptr, "lock_angle");
 
   CurvePenData *cpd;
   if (op->customdata == NULL) {
@@ -1483,21 +1529,27 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     cpd->select_multi = event->modifier == KM_SHIFT;
   }
 
-  if (!cpd->free_toggle_pressed && is_extra_key_pressed(event, free_toggle)) {
-    toggle_bezt_free_align_handles(nurbs);
-    cpd->free_toggle = !cpd->free_toggle;
-    cpd->dragging = true;
-  }
-  cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
-  if (!cpd->link_handles_pressed && is_extra_key_pressed(event, link_handles)) {
-    cpd->link_handles = !cpd->link_handles;
-    if (cpd->link_handles && !cpd->free_toggle_pressed) {
-      move_all_selected_points(nurbs, false, cpd, event, &vc);
+  if (event->type == EVT_MODAL_MAP) {
+    if (event->val == PEN_MODAL_FREE_ALIGN_TOGGLE) {
+      toggle_bezt_free_align_handles(nurbs);
+      cpd->free_toggle = !cpd->free_toggle;
+    }
+    else if (event->val == PEN_MODAL_LINK_HANDLES) {
+      cpd->link_handles = !cpd->link_handles;
+      if (cpd->link_handles) {
+        move_all_selected_points(nurbs, false, cpd, event, &vc);
+      }
+    }
+    else if (event->val == PEN_MODAL_MOVE_ENTIRE) {
+      cpd->move_entire = !cpd->move_entire;
+    }
+    else if (event->val == PEN_MODAL_MOVE_ADJACENT) {
+      cpd->move_adjacent = !cpd->move_adjacent;
+    }
+    else if (event->val == PEN_MODAL_LOCK_ANGLE) {
+      cpd->lock_angle = !cpd->lock_angle;
     }
   }
-  cpd->link_handles_pressed = is_extra_key_pressed(event, link_handles);
-  cpd->move_entire_pressed = is_extra_key_pressed(event, move_entire);
-  cpd->lock_angle = is_extra_key_pressed(event, lock_angle);
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     /* Check if dragging */
@@ -1526,7 +1578,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           BKE_nurb_handles_calc(seg_data->nu);
         }
       }
-      else if (is_extra_key_pressed(event, adj_handle)) {
+      else if (cpd->move_adjacent) {
         move_adjacent_handle(&vc, event, nurbs);
         cpd->acted = true;
       }
@@ -1723,36 +1775,6 @@ void CURVE_OT_pen(wmOperatorType *ot)
                        "A multiplier on the default click distance",
                        0.1f,
                        1.5f);
-  prop = RNA_def_enum(ot->srna,
-                      "free_toggle",
-                      prop_extra_key_types,
-                      NONE,
-                      "Free-Align Toggle",
-                      "Toggle between free and align handles");
-  prop = RNA_def_enum(ot->srna,
-                      "adj_handle",
-                      prop_extra_key_types,
-                      NONE,
-                      "Move Adjacent Handle",
-                      "Move the closer handle of the adjacent vertex");
-  prop = RNA_def_enum(ot->srna,
-                      "move_entire",
-                      prop_extra_key_types,
-                      NONE,
-                      "Move Entire",
-                      "Move the entire point using handles");
-  prop = RNA_def_enum(ot->srna,
-                      "link_handles",
-                      prop_extra_key_types,
-                      NONE,
-                      "Link Handles",
-                      "Mirror the movement of one handle onto the other");
-  prop = RNA_def_enum(ot->srna,
-                      "lock_angle",
-                      prop_extra_key_types,
-                      NONE,
-                      "Lock Handle Angle",
-                      "Move the handle along its current angle");
   prop = RNA_def_boolean(ot->srna,
                          "extrude_point",
                          false,
