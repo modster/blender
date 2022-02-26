@@ -48,8 +48,13 @@ CurvesGeometry::CurvesGeometry(const int point_size, const int curve_size)
   this->runtime = MEM_new<CurvesGeometryRuntime>(__func__);
 }
 
+/**
+ * \note Expects `dst` to be initialized, since the original attributes must be freed.
+ */
 static void copy_curves_geometry(CurvesGeometry &dst, const CurvesGeometry &src)
 {
+  CustomData_free(&dst.point_data, dst.point_size);
+  CustomData_free(&dst.curve_data, dst.curve_size);
   dst.point_size = src.point_size;
   dst.curve_size = src.curve_size;
   CustomData_copy(&src.point_data, &dst.point_data, CD_MASK_ALL, CD_DUPLICATE, dst.point_size);
@@ -101,6 +106,15 @@ int CurvesGeometry::curves_size() const
 {
   return this->curve_size;
 }
+IndexRange CurvesGeometry::points_range() const
+{
+  return IndexRange(this->points_size());
+}
+IndexRange CurvesGeometry::curves_range() const
+{
+  return IndexRange(this->curves_size());
+}
+
 int CurvesGeometry::evaluated_points_size() const
 {
   /* TODO: Implement when there are evaluated points. */
@@ -137,8 +151,8 @@ MutableSpan<int8_t> CurvesGeometry::curve_types()
 
 MutableSpan<float3> CurvesGeometry::positions()
 {
-  CustomData_duplicate_referenced_layer(&this->point_data, CD_PROP_FLOAT3, this->point_size);
-  this->update_customdata_pointers();
+  this->position = (float(*)[3])CustomData_duplicate_referenced_layer_named(
+      &this->point_data, CD_PROP_FLOAT3, ATTR_POSITION.c_str(), this->point_size);
   return {(float3 *)this->position, this->point_size};
 }
 Span<float3> CurvesGeometry::positions() const

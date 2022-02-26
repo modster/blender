@@ -1247,6 +1247,8 @@ enum {
   WM_JOB_TYPE_COMPOSITE,
   WM_JOB_TYPE_RENDER,
   WM_JOB_TYPE_RENDER_PREVIEW, /* UI preview */
+  /** Job for the UI to load previews from the file system (uses OS thumbnail cache). */
+  WM_JOB_TYPE_LOAD_PREVIEW, /* UI preview */
   WM_JOB_TYPE_OBJECT_SIM_OCEAN,
   WM_JOB_TYPE_OBJECT_SIM_FLUID,
   WM_JOB_TYPE_OBJECT_BAKE_TEXTURE,
@@ -1424,8 +1426,6 @@ bool WM_window_modal_keymap_status_draw(struct bContext *C,
  * For debugging only, getting inspecting events manually is tedious.
  */
 void WM_event_print(const struct wmEvent *event);
-
-int WM_event_modifier_flag(const struct wmEvent *event);
 
 /**
  * For modal callbacks, check configuration for how to interpret exit with tweaks.

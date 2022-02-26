@@ -470,6 +470,7 @@ typedef struct wmNotifier {
 #define NS_EDITMODE_ARMATURE (8 << 8)
 #define NS_MODE_POSE (9 << 8)
 #define NS_MODE_PARTICLE (10 << 8)
+#define NS_EDITMODE_CURVES (11 << 8)
 
 /* subtype 3d view editing */
 #define NS_VIEW3D_GPU (16 << 8)
@@ -634,9 +635,12 @@ typedef struct wmEvent {
    */
   int prev_xy[2];
 
-  /** Modifier states. */
-  /** 'oskey' is apple or windows-key, value denotes order of pressed. */
-  short shift, ctrl, alt, oskey;
+  /**
+   * Modifier states.
+   * #KM_SHIFT, #KM_CTRL, #KM_ALT & #KM_OSKEY is apple or windows-key.
+   */
+  uint8_t modifier;
+
   /** Raw-key modifier (allow using any key as a modifier). */
   short keymodifier;
 
