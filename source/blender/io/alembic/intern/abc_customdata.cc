@@ -313,6 +313,347 @@ void write_custom_data(const OCompoundProperty &prop,
   }
 }
 
+static Alembic::AbcGeom::GeometryScope get_scope_for_attibute_domain(AttributeDomain domain)
+{
+  switch (domain) {
+    case ATTR_DOMAIN_AUTO:
+    case ATTR_DOMAIN_NUM: {
+      BLI_assert_unreachable();
+      break;
+    }
+    case ATTR_DOMAIN_INSTANCE:
+    case ATTR_DOMAIN_EDGE: {
+      /* Not supported */
+      break;
+    }
+    case ATTR_DOMAIN_POINT: {
+      return Alembic::AbcGeom::kVertexScope;
+    }
+    case ATTR_DOMAIN_CURVE:
+    case ATTR_DOMAIN_FACE: {
+      return Alembic::AbcGeom::kUniformScope;
+    }
+    case ATTR_DOMAIN_CORNER: {
+      return Alembic::AbcGeom::kFacevaryingScope;
+    }
+  }
+
+  return Alembic::AbcGeom::kUnknownScope;
+}
+
+template<typename BlenderDataType> struct type_trait_converter;
+
+template<> struct type_trait_converter<bool> {
+  using AbcTraitType = Alembic::Abc::BooleanTPTraits;
+
+  static bool_t convert(bool v)
+  {
+    return v;
+  }
+};
+
+template<> struct type_trait_converter<char> {
+  using AbcTraitType = Alembic::Abc::Int8TPTraits;
+
+  static int8_t convert(char v)
+  {
+    return static_cast<int8_t>(v);
+  }
+};
+
+template<> struct type_trait_converter<int> {
+  using AbcTraitType = Alembic::Abc::Int32TPTraits;
+
+  static int convert(int v)
+  {
+    return v;
+  }
+};
+
+template<> struct type_trait_converter<float> {
+  using AbcTraitType = Alembic::Abc::Float32TPTraits;
+
+  static float convert(float v)
+  {
+    return v;
+  }
+};
+
+template<> struct type_trait_converter<float2> {
+  using AbcTraitType = Alembic::Abc::V2fTPTraits;
+
+  static Imath::V2f convert(float2 v)
+  {
+    return {v.x, v.y};
+  }
+};
+
+template<> struct type_trait_converter<float3> {
+  using AbcTraitType = Alembic::Abc::V3fTPTraits;
+
+  static Imath::V3f convert(float3 v)
+  {
+    copy_yup_from_zup(v, v);
+    return {v.x, v.y, v.z};
+  }
+};
+
+template<> struct type_trait_converter<ColorGeometry4f> {
+  using AbcTraitType = Alembic::Abc::C4fTPTraits;
+
+  static Imath::C4f convert(ColorGeometry4f v)
+  {
+    return {v.r, v.g, v.b, v.a};
+  }
+};
+
+class GenericAttributeExporter {
+ public:
+  void export_attributes(ID *id)
+  {
+    DomainInfo domain_info[ATTR_DOMAIN_NUM];
+    BKE_id_attribute_get_domains(id, domain_info);
+
+    export_attribute_for_domain(domain_info[ATTR_DOMAIN_POINT], ATTR_DOMAIN_POINT);
+    export_attribute_for_domain(domain_info[ATTR_DOMAIN_FACE], ATTR_DOMAIN_FACE);
+    export_attribute_for_domain(domain_info[ATTR_DOMAIN_CORNER], ATTR_DOMAIN_CORNER);
+    export_attribute_for_domain(domain_info[ATTR_DOMAIN_CURVE], ATTR_DOMAIN_CURVE);
+  }
+
+ protected:
+  virtual void export_attribute(blender::Span<bool> span,
+                                const char *name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<char> span,
+                                const char *name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<int> span,
+                                const char *name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<float> span,
+                                const char *name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<float2> span,
+                                const char *name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<float3> span,
+                                const char *name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<ColorGeometry4f> span,
+                                const char *name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<MLoopUV> span,
+                                const char *name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<MCol> span,
+                                const char *name,
+                                AttributeDomain domain) = 0;
+
+  template<typename BlenderDataType>
+  void export_customdata_layer(CustomDataLayer *layer, DomainInfo info, AttributeDomain domain)
+  {
+    BlenderDataType *data = static_cast<BlenderDataType *>(layer->data);
+    int64_t size = static_cast<int64_t>(info.length);
+    blender::Span<BlenderDataType> data_span(data, size);
+    this->export_attribute(data_span, layer->name, domain);
+  }
+
+  void export_attribute_for_domain(DomainInfo info, AttributeDomain domain)
+  {
+    if (info.length == 0 || info.customdata == nullptr || info.customdata->layers == nullptr ||
+        info.customdata->totlayer == 0) {
+      return;
+    }
+
+    CustomData *customdata = info.customdata;
+    for (int i = 0; i < customdata->totlayer; i++) {
+      CustomDataLayer *layer = &customdata->layers[i];
+
+      if (layer->type == CD_PROP_BOOL) {
+        export_customdata_layer<bool>(layer, info, domain);
+      }
+      else if (layer->type == CD_PROP_INT8) {
+        export_customdata_layer<char>(layer, info, domain);
+      }
+      else if (layer->type == CD_PROP_INT32) {
+        export_customdata_layer<int>(layer, info, domain);
+      }
+      else if (layer->type == CD_PROP_COLOR) {
+        export_customdata_layer<ColorGeometry4f>(layer, info, domain);
+      }
+      else if (layer->type == CD_PROP_FLOAT) {
+        export_customdata_layer<float>(layer, info, domain);
+      }
+      else if (layer->type == CD_PROP_FLOAT2) {
+        export_customdata_layer<float2>(layer, info, domain);
+      }
+      else if (layer->type == CD_PROP_FLOAT3) {
+        // todo: velocities
+        export_customdata_layer<float3>(layer, info, domain);
+      }
+      else if (layer->type == CD_MLOOPUV) {
+        BLI_assert_msg(domain == ATTR_DOMAIN_CORNER, "MLoopUVs found on non-corner domain!");
+        export_customdata_layer<MLoopUV>(layer, info, domain);
+      }
+      else if (layer->type == CD_MCOL) {
+        BLI_assert_msg(domain == ATTR_DOMAIN_CORNER, "MCol found on non-corner domain!");
+        export_customdata_layer<MCol>(layer, info, domain);
+      }
+      else if (layer->type == CD_ORCO) {
+        // todo CD_ORCO
+      }
+    }
+  }
+};
+
+class AlembicAttributeExporter final : public GenericAttributeExporter {
+  const OCompoundProperty &prop;
+
+  std::map<std::string, OBoolGeomParam> bool_params;
+  std::map<std::string, OCharGeomParam> int8_params;
+  std::map<std::string, OInt32GeomParam> int32_params;
+  std::map<std::string, OFloatGeomParam> float_params;
+  std::map<std::string, OV2fGeomParam> float2_params;
+  std::map<std::string, OV3fGeomParam> float3_params;
+  std::map<std::string, OC4fGeomParam> color_params;
+  std::map<std::string, OV2fGeomParam> uvs_params;
+  std::map<std::string, OC4fGeomParam> mcol_params;
+
+ public:
+  AlembicAttributeExporter(const OCompoundProperty &prop_) : prop(prop_)
+  {
+  }
+
+ private:
+#define INIT_PARAM_FUNC(ParamType, map) \
+  void init_param(ParamType &param, const std::string &name, GeometryScope scope) \
+  { \
+    param = map[name]; \
+    if (!param.valid()) { \
+      param = ParamType(prop, name, false, scope, 1); \
+      map[name] = param; \
+    } \
+  }
+
+  INIT_PARAM_FUNC(OBoolGeomParam, bool_params)
+  INIT_PARAM_FUNC(OCharGeomParam, int8_params)
+  INIT_PARAM_FUNC(OInt32GeomParam, int32_params)
+  INIT_PARAM_FUNC(OFloatGeomParam, float_params)
+  INIT_PARAM_FUNC(OV2fGeomParam, float2_params)
+  INIT_PARAM_FUNC(OV3fGeomParam, float3_params)
+  INIT_PARAM_FUNC(OC4fGeomParam, color_params)
+
+#undef INIT_PARAM_FUNC
+
+  template<typename BlenderDataType>
+  void create_attribute_for_data(blender::Span<BlenderDataType> span,
+                                 const char *name,
+                                 AttributeDomain domain)
+  {
+    const Alembic::AbcGeom::GeometryScope scope = get_scope_for_attibute_domain(domain);
+    if (scope == Alembic::AbcGeom::kUnknownScope) {
+      return;
+    }
+
+    using TypeConverter = type_trait_converter<BlenderDataType>;
+    using AlembicTraitType = typename TypeConverter::AbcTraitType;
+    using AlembicType = typename AlembicTraitType::value_type;
+
+    /* TODO: loops */
+    std::vector<AlembicType> values(static_cast<size_t>(span.size()));
+    AlembicType *values_ptr = values.data();
+    for (BlenderDataType value : span) {
+      *values_ptr++ = TypeConverter::convert(value);
+    }
+
+    using ParamType = OTypedGeomParam<AlembicTraitType>;
+    using SampleType = typename ParamType::Sample;
+
+    ParamType param;
+    init_param(param, name, scope);
+    // todo: param.setTimeSampling(config.timesample_index);
+
+    SampleType sample(values, scope);
+    param.set(sample);
+  }
+
+  void export_attribute(blender::Span<bool> span,
+                        const char *name,
+                        AttributeDomain domain) override
+  {
+    create_attribute_for_data(span, name, domain);
+  }
+
+  void export_attribute(blender::Span<char> span,
+                        const char *name,
+                        AttributeDomain domain) override
+  {
+    create_attribute_for_data(span, name, domain);
+  }
+
+  void export_attribute(blender::Span<int> span, const char *name, AttributeDomain domain) override
+  {
+    create_attribute_for_data(span, name, domain);
+  }
+
+  void export_attribute(blender::Span<float> span,
+                        const char *name,
+                        AttributeDomain domain) override
+  {
+    create_attribute_for_data(span, name, domain);
+  }
+
+  void export_attribute(blender::Span<float2> span,
+                        const char *name,
+                        AttributeDomain domain) override
+  {
+    create_attribute_for_data(span, name, domain);
+  }
+
+  void export_attribute(blender::Span<float3> span,
+                        const char *name,
+                        AttributeDomain domain) override
+  {
+    create_attribute_for_data(span, name, domain);
+  }
+
+  void export_attribute(blender::Span<ColorGeometry4f> span,
+                        const char *name,
+                        AttributeDomain domain) override
+  {
+    create_attribute_for_data(span, name, domain);
+  }
+
+  void export_attribute(blender::Span<MLoopUV> span,
+                        const char *name,
+                        AttributeDomain domain) override
+  {
+    // todo
+    // if active layer, set_uvs
+  }
+
+  void export_attribute(blender::Span<MCol> span,
+                        const char *name,
+                        AttributeDomain domain) override
+  {
+    // todo
+  }
+};
+
+static void write_arbitrary_attributes(ID *id, const OCompoundProperty &arb_geom_params)
+{
+  AlembicAttributeExporter exporter{arb_geom_params};
+  exporter.export_attributes(id);
+}
+
 /* ************************************************************************** */
 
 using Alembic::Abc::C3fArraySamplePtr;
@@ -536,6 +877,11 @@ template<typename T> struct value_type_converter {
   static bool map_to_bool(const T *value)
   {
     return static_cast<bool>(value[0]);
+  }
+
+  static int8_t map_to_int8(const T *value)
+  {
+    return static_cast<int8_t>(value[0]);
   }
 
   static int32_t map_to_int32(const T *value)
@@ -951,7 +1297,9 @@ static CustomDataType custom_data_type_for_pod(PlainOldDataType pod_type, uint e
       return CD_PROP_BOOL;
     }
     case kUint8POD:
-    case kInt8POD:
+    case kInt8POD: {
+      return CD_PROP_INT8;
+    }
     case kUint16POD:
     case kInt16POD:
     case kUint32POD:
@@ -1122,6 +1470,13 @@ static AbcAttributeReadError process_typed_attribute(const CDStreamConfig &confi
       create_layer_for_domain<bool>(config, domain, CD_PROP_BOOL, param.getName(), [&](size_t i) {
         return value_type_converter<abc_scalar_type>::map_to_bool(&input_data[i]);
       });
+      return AbcAttributeReadError::READ_SUCCESS;
+    }
+    case CD_PROP_INT8: {
+      create_layer_for_domain<int8_t>(
+          config, domain, CD_PROP_INT8, param.getName(), [&](size_t i) {
+            return value_type_converter<abc_scalar_type>::map_to_int8(&input_data[i]);
+          });
       return AbcAttributeReadError::READ_SUCCESS;
     }
     case CD_PROP_INT32: {
