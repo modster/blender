@@ -359,8 +359,7 @@ set(PYSTRING_VERSION v1.1.3)
 set(PYSTRING_URI https://codeload.github.com/imageworks/pystring/tar.gz/refs/tags/${PYSTRING_VERSION})
 set(PYSTRING_HASH f2c68786b359f5e4e62bed53bc4fb86d)
 set(PYSTRING_HASH_TYPE MD5)
-set(PYSTRING_FILE pystring-${YAMLCPP_VERSION}.tar.gz)
-
+set(PYSTRING_FILE pystring-${PYSTRING_VERSION}.tar.gz)
 
 set(EXPAT_VERSION 2_4_4)
 set(EXPAT_URI https://github.com/libexpat/libexpat/archive/R_${EXPAT_VERSION}.tar.gz)
