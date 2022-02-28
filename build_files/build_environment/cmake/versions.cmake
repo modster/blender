@@ -18,9 +18,9 @@ set(PNG_HASH 505e70834d35383537b6491e7ae8641f1a4bed1876dbfe361201fc80868d88ca)
 set(PNG_HASH_TYPE SHA256)
 set(PNG_FILE libpng-${PNG_VERSION}.tar.xz)
 
-set(JPEG_VERSION 2.1.2)
+set(JPEG_VERSION 2.1.3)
 set(JPEG_URI https://github.com/libjpeg-turbo/libjpeg-turbo/archive/${JPEG_VERSION}.tar.gz)
-set(JPEG_HASH f02d78311298468c5c1d278507ad42f2)
+set(JPEG_HASH 627b980fad0573e08e4c3b80b290fc91)
 set(JPEG_HASH_TYPE MD5)
 set(JPEG_FILE libjpeg-turbo-${JPEG_VERSION}.tar.gz)
 
