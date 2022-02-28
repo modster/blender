@@ -33,10 +33,9 @@ set(BOOST_HASH c2f6428ac52b0e5a3c9b2e1d8cc832b5)
 set(BOOST_HASH_TYPE MD5)
 set(BOOST_FILE boost_${BOOST_VERSION_NODOTS}.tar.gz)
 
-# Using old version as recommended by OpenVDB build documentation.
-set(BLOSC_VERSION 1.5.0)
+set(BLOSC_VERSION 1.21.1)
 set(BLOSC_URI https://github.com/Blosc/c-blosc/archive/v${BLOSC_VERSION}.tar.gz)
-set(BLOSC_HASH 6e4a49c8c06f05aa543f3312cfce3d55)
+set(BLOSC_HASH 134b55813b1dca57019d2a2dc1f7a923)
 set(BLOSC_HASH_TYPE MD5)
 set(BLOSC_FILE blosc-${BLOSC_VERSION}.tar.gz)
 
@@ -436,9 +435,9 @@ set(EMBREE_HASH f62766ba54e48a2f327c3a22596e7133)
 set(EMBREE_HASH_TYPE MD5)
 set(EMBREE_FILE embree-v${EMBREE_VERSION}.zip)
 
-set(USD_VERSION 21.11)
+set(USD_VERSION 22.03)
 set(USD_URI https://github.com/PixarAnimationStudios/USD/archive/v${USD_VERSION}.tar.gz)
-set(USD_HASH 7fe232df5c732fedf466d33ff431ce33)
+set(USD_HASH e0e441a05057692a83124a1195b09eed)
 set(USD_HASH_TYPE MD5)
 set(USD_FILE usd-v${USD_VERSION}.tar.gz)
 
