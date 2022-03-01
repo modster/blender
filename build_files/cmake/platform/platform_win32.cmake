@@ -417,7 +417,7 @@ if(WITH_IMAGE_OPENEXR)
       optimized ${IMATH_LIBPATH}/Imath-3_1.lib
       debug ${IMATH_LIBPATH}/Imath-3_1_d.lib
     )
-
+  endif()
   set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
   set(OPENEXR_VERSION "3.14")
   windows_find_package(OPENEXR REQUIRED)
