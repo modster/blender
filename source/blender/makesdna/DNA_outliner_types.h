@@ -114,6 +114,10 @@ typedef enum eTreeStoreElemType {
   TSE_GPENCIL_EFFECT = 43,
   TSE_LIBRARY_OVERRIDE_BASE = 44,
   TSE_LIBRARY_OVERRIDE = 45,
+  /** Base item to add when the overridden property is within a nested struct or collection
+     property. */
+  TSE_LIBRARY_OVERRIDE_RNA_CONTAINER = 46,
+  TSE_LIBRARY_OVERRIDE_RNA_COLLECTION_ITEM = 47,
 } eTreeStoreElemType;
 
 /** Check whether given #TreeStoreElem should have a real ID in #TreeStoreElem.id member. */

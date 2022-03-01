@@ -53,6 +53,8 @@ class AbstractTreeElement {
     return true;
   }
 
+  TreeElement &getLegacyElement() const;
+
   friend void tree_element_expand(const AbstractTreeElement &tree_element,
                                   SpaceOutliner &space_outliner);
 

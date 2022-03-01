@@ -2405,6 +2405,12 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
       case TSE_LIBRARY_OVERRIDE:
         data.icon = ICON_LIBRARY_DATA_OVERRIDE;
         break;
+      case TSE_LIBRARY_OVERRIDE_RNA_COLLECTION_ITEM: {
+        const auto &override_col_item = tree_element_cast<TreeElementOverrideRNACollectionItem>(
+            te);
+        data.icon = override_col_item->getIcon();
+        break;
+      }
       case TSE_LINKED_OB:
         data.icon = ICON_OBJECT_DATA;
         break;
@@ -3337,7 +3343,11 @@ static void outliner_draw_tree_element(bContext *C,
     offsx += UI_UNIT_X;
 
     /* Data-type icon. */
-    if (!(ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM, TSE_ID_BASE))) {
+    if (!(ELEM(tselem->type,
+               TSE_RNA_PROPERTY,
+               TSE_RNA_ARRAY_ELEM,
+               TSE_ID_BASE,
+               TSE_LIBRARY_OVERRIDE_RNA_CONTAINER))) {
       tselem_draw_icon(block,
                        xmax,
                        (float)startx + offsx,

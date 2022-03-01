@@ -44,4 +44,30 @@ class TreeElementOverridesProperty final : public AbstractTreeElement {
   TreeElementOverridesProperty(TreeElement &legacy_te, TreeElementOverridesData &override_data);
 };
 
+/**
+ * If the override is within some collection or pointer property, the collection/pointer gets its
+ * own parent item with items inside.
+ */
+class TreeElementOverrideRNAContainer final : public AbstractTreeElement {
+ public:
+  PointerRNA container_ptr;
+  PropertyRNA &container_prop;
+
+ public:
+  TreeElementOverrideRNAContainer(TreeElement &legacy_te,
+                                  PropertyPointerRNA &container_prop_and_ptr);
+
+  void expand(SpaceOutliner &) const override;
+};
+
+class TreeElementOverrideRNACollectionItem final : public AbstractTreeElement {
+ public:
+  PointerRNA item_ptr;
+
+ public:
+  TreeElementOverrideRNACollectionItem(TreeElement &legacy_te, const PointerRNA &item_ptr);
+
+  int getIcon() const;
+};
+
 }  // namespace blender::ed::outliner
