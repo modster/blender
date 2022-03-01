@@ -75,7 +75,7 @@
 
 #include <optional>
 
-//#define DEBUG_PRINT
+#define DEBUG_PRINT
 
 namespace blender::imbuf::rasterizer {
 
@@ -206,6 +206,8 @@ template<typename Rasterline, int64_t BufferSize> class Rasterlines {
   {
   }
 
+  virtual ~Rasterlines() = default;
+
   void append(const Rasterline &value)
   {
     buffer.append(value);
@@ -275,10 +277,7 @@ class Rasterizer {
   {
   }
 
-  virtual ~Rasterizer()
-  {
-    flush();
-  }
+  virtual ~Rasterizer() = default;
 
   VertexShader &vertex_shader()
   {
@@ -350,13 +349,7 @@ class Rasterizer {
     std::array<VertexOutputType *, 3> sorted_vertices = order_triangle_vertices(vertex_out);
 
     const int min_rasterline_y = clamping_method.scanline_for(sorted_vertices[0]->coord[1]);
-    const int mid_rasterline_y_correction = clamping_method.distance_to_scanline_anchor(
-                                                sorted_vertices[1]->coord[1]) == 0.0 ?
-                                                0 :
-                                                1;
-    const int mid_rasterline_y = max_ii(
-        clamping_method.scanline_for(sorted_vertices[1]->coord[1]) - mid_rasterline_y_correction,
-        min_rasterline_y);
+    const int mid_rasterline_y = clamping_method.scanline_for(sorted_vertices[1]->coord[1]);
     const int max_rasterline_y = clamping_method.scanline_for(sorted_vertices[2]->coord[1]) - 1;
 
     /* left and right branch. */
@@ -642,6 +635,7 @@ class Rasterizer {
   void render_rasterline(const RasterlineType &rasterline)
   {
     FragmentInputType data = rasterline.start_data;
+    printf("%u, %u\n", rasterline.start_x, rasterline.end_x);
     for (uint32_t x = rasterline.start_x; x < rasterline.end_x; x++) {
       uint32_t pixel_index = (rasterline.y * image_buffer_->x + x);
       float *pixel_ptr = &image_buffer_->rect_float[pixel_index * 4];

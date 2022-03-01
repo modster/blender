@@ -28,7 +28,7 @@ class VertexShader : public AbstractVertexShader<VertexInput, float4> {
   {
     float2 coord = float2(vp_mat * float3(input.uv[0], input.uv[1], 0.0));
     r_output->coord = coord * image_size;
-    r_output->data = float4(coord[0], coord[1], input.value, 1.0);
+    r_output->data = float4(input.value, input.value, input.value, 1.0);
   }
 };
 
@@ -76,14 +76,13 @@ TEST(imbuf_rasterizer, draw_triangle_edge_alignment_quality)
                              VertexInput(float2(1.0, -1.0), 1.0));
     rasterizer.flush();
 
+    /* Check if each pixel has been drawn exactly once. */
     if (rasterizer.stats.drawn_fragments != IMBUF_SIZE * IMBUF_SIZE) {
       printf("%s\n", file_name);
     }
-
-    /* Check if each pixel has been drawn exactly once. */
     EXPECT_EQ(rasterizer.stats.drawn_fragments, IMBUF_SIZE * IMBUF_SIZE);
 
-#if 1
+#if 0
     IMB_saveiff(&image_buffer, file_name, IB_rectfloat);
 #endif
 
@@ -91,6 +90,94 @@ TEST(imbuf_rasterizer, draw_triangle_edge_alignment_quality)
   }
 
   imb_freerectImbuf_all(&image_buffer);
+}
+/**
+ * This test case renders 3 images that should have the same coverage. But using a different edge.
+ *
+ * The results should be identical.
+ */
+TEST(imbuf_rasterizer, edge_pixel_clamping)
+{
+  using RasterizerType =
+      Rasterizer<VertexShader, FragmentShader, DefaultRasterlinesBufferSize, Stats>;
+  float clear_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+  ImBuf image_buffer_a;
+  ImBuf image_buffer_b;
+  ImBuf image_buffer_c;
+  int fragments_drawn_a;
+  int fragments_drawn_b;
+  int fragments_drawn_c;
+
+  {
+    printf("a\n");
+    IMB_initImBuf(&image_buffer_a, IMBUF_SIZE, IMBUF_SIZE, 32, IB_rectfloat);
+
+    RasterizerType rasterizer_a(&image_buffer_a);
+    VertexShader &vertex_shader = rasterizer_a.vertex_shader();
+    vertex_shader.image_size = float2(image_buffer_a.x, image_buffer_a.y);
+    vertex_shader.vp_mat = float4x4::identity();
+    IMB_rectfill(&image_buffer_a, clear_color);
+    rasterizer_a.draw_triangle(VertexInput(float2(0.2, -0.2), 1.0),
+                               VertexInput(float2(1.2, 1.2), 1.0),
+                               VertexInput(float2(1.5, -0.3), 1.0));
+    rasterizer_a.flush();
+    fragments_drawn_a = rasterizer_a.stats.drawn_fragments;
+  }
+  {
+    printf("b\n");
+    IMB_initImBuf(&image_buffer_b, IMBUF_SIZE, IMBUF_SIZE, 32, IB_rectfloat);
+
+    RasterizerType rasterizer_b(&image_buffer_b);
+    VertexShader &vertex_shader = rasterizer_b.vertex_shader();
+    vertex_shader.image_size = float2(image_buffer_b.x, image_buffer_b.y);
+    vertex_shader.vp_mat = float4x4::identity();
+    IMB_rectfill(&image_buffer_b, clear_color);
+    rasterizer_b.draw_triangle(VertexInput(float2(0.2, -0.2), 1.0),
+                               VertexInput(float2(1.2, 1.2), 1.0),
+                               VertexInput(float2(1.5, -0.3), 1.0));
+    rasterizer_b.flush();
+    fragments_drawn_b = rasterizer_b.stats.drawn_fragments;
+  }
+
+  {
+    printf("c\n");
+    IMB_initImBuf(&image_buffer_c, IMBUF_SIZE, IMBUF_SIZE, 32, IB_rectfloat);
+
+    RasterizerType rasterizer_c(&image_buffer_c);
+    VertexShader &vertex_shader = rasterizer_c.vertex_shader();
+    vertex_shader.image_size = float2(image_buffer_c.x, image_buffer_c.y);
+    vertex_shader.vp_mat = float4x4::identity();
+    IMB_rectfill(&image_buffer_c, clear_color);
+    rasterizer_c.draw_triangle(VertexInput(float2(0.2, -0.2), 1.0),
+                               VertexInput(float2(1.2, 1.2), 1.0),
+                               VertexInput(float2(10.0, 1.3), 1.0));
+    rasterizer_c.flush();
+    fragments_drawn_c = rasterizer_c.stats.drawn_fragments;
+  }
+
+  printf("ab\n");
+  EXPECT_EQ(fragments_drawn_a, fragments_drawn_b);
+  EXPECT_EQ(memcmp(image_buffer_a.rect_float,
+                   image_buffer_b.rect_float,
+                   sizeof(float) * 4 * IMBUF_SIZE * IMBUF_SIZE),
+            0);
+  printf("ac\n");
+  EXPECT_EQ(fragments_drawn_a, fragments_drawn_c);
+  EXPECT_EQ(memcmp(image_buffer_a.rect_float,
+                   image_buffer_c.rect_float,
+                   sizeof(float) * 4 * IMBUF_SIZE * IMBUF_SIZE),
+            0);
+  printf("bc\n");
+  EXPECT_EQ(fragments_drawn_b, fragments_drawn_c);
+  EXPECT_EQ(memcmp(image_buffer_b.rect_float,
+                   image_buffer_c.rect_float,
+                   sizeof(float) * 4 * IMBUF_SIZE * IMBUF_SIZE),
+            0);
+
+  imb_freerectImbuf_all(&image_buffer_a);
+  imb_freerectImbuf_all(&image_buffer_b);
+  imb_freerectImbuf_all(&image_buffer_c);
 }
 
 TEST(imbuf_rasterizer, center_pixel_clamper_scanline_for)
