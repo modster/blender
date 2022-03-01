@@ -24,6 +24,7 @@ struct View3D;
 struct bContext;
 struct rcti;
 struct wmEvent;
+struct wmKeyMapItem;
 struct wmOperator;
 
 enum eV3D_OpPropFlag {
@@ -63,6 +64,15 @@ enum eViewOpsFlag {
   /** When set, ignore any options that depend on initial cursor location. */
   VIEWOPS_FLAG_USE_MOUSE_INIT = (1 << 3),
 };
+
+typedef enum eNavType {
+  V3D_ZOOM = 0,
+  V3D_ROTATE,
+  V3D_MOVE,
+  V3D_VIEW_PAN,
+} eNavType;
+
+extern const char *op_idnames[];
 
 /** Generic View Operator Custom-Data */
 typedef struct ViewOpsData {
@@ -130,6 +140,11 @@ typedef struct ViewOpsData {
   /** Use for orbit selection and auto-dist. */
   float dyn_ofs[3];
   bool use_dyn_ofs;
+
+  /** Used for navigation on non view3d operators. */
+  int modal;
+  int kmi_len;
+  struct wmKeyMapItem *kmi[0];
 } ViewOpsData;
 
 /* view3d_navigate.c */
@@ -181,6 +196,8 @@ void view3d_keymap(struct wmKeyConfig *keyconf);
 void VIEW3D_OT_fly(struct wmOperatorType *ot);
 
 /* view3d_navigate_move.c */
+int viewmove_modal_impl(struct bContext *C, ViewOpsData *vod, const struct wmEvent *event);
+int viewmove_invoke_impl(ViewOpsData *vod, const struct wmEvent *event);
 void viewmove_modal_keymap(struct wmKeyConfig *keyconf);
 void VIEW3D_OT_move(struct wmOperatorType *ot);
 
@@ -208,6 +225,8 @@ void VIEW3D_OT_ndof_all(struct wmOperatorType *ot);
 void VIEW3D_OT_view_roll(struct wmOperatorType *ot);
 
 /* view3d_navigate_rotate.c */
+int viewrotate_modal_impl(struct bContext *C, ViewOpsData *vod, const wmEvent *event);
+int viewrotate_invoke_impl(ViewOpsData *vod, const struct wmEvent *event);
 void viewrotate_modal_keymap(struct wmKeyConfig *keyconf);
 void VIEW3D_OT_rotate(struct wmOperatorType *ot);
 
@@ -259,6 +278,16 @@ void walk_modal_keymap(struct wmKeyConfig *keyconf);
 void VIEW3D_OT_walk(struct wmOperatorType *ot);
 
 /* view3d_navigate_zoom.c */
+int viewzoom_modal_impl(struct bContext *C,
+                        ViewOpsData *vod,
+                        const struct wmEvent *event,
+                        const bool use_cursor_init);
+int viewzoom_invoke_impl(struct bContext *C,
+                         ViewOpsData *vod,
+                         const int delta,
+                         const struct wmEvent *event,
+                         const int zoom_xy[2],
+                         const bool use_cursor_init);
 void viewzoom_modal_keymap(struct wmKeyConfig *keyconf);
 void VIEW3D_OT_zoom(struct wmOperatorType *ot);
 

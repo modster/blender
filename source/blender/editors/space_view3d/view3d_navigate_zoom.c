@@ -349,9 +349,11 @@ static void viewzoom_apply(ViewOpsData *vod,
   }
 }
 
-static int viewzoom_modal(bContext *C, wmOperator *op, const wmEvent *event)
+int viewzoom_modal_impl(bContext *C,
+                        ViewOpsData *vod,
+                        const wmEvent *event,
+                        const bool use_cursor_init)
 {
-  ViewOpsData *vod = op->customdata;
   short event_code = VIEW_PASS;
   bool use_autokey = false;
   int ret = OPERATOR_RUNNING_MODAL;
@@ -384,7 +386,6 @@ static int viewzoom_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   if (event_code == VIEW_APPLY) {
-    const bool use_cursor_init = RNA_boolean_get(op->ptr, "use_cursor_init");
     viewzoom_apply(vod,
                    event->xy,
                    (eViewZoom_Style)U.viewzoom,
@@ -403,6 +404,15 @@ static int viewzoom_modal(bContext *C, wmOperator *op, const wmEvent *event)
     ED_view3d_camera_lock_autokey(vod->v3d, vod->rv3d, C, false, true);
   }
 
+  return ret;
+}
+
+static int viewzoom_modal(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  ViewOpsData *vod = op->customdata;
+  const bool use_cursor_init = RNA_boolean_get(op->ptr, "use_cursor_init");
+  int ret = viewzoom_modal_impl(C, vod, event, use_cursor_init);
+
   if (ret & OPERATOR_FINISHED) {
     viewops_data_free(C, op->customdata);
     op->customdata = NULL;
@@ -411,46 +421,21 @@ static int viewzoom_modal(bContext *C, wmOperator *op, const wmEvent *event)
   return ret;
 }
 
-static int viewzoom_exec(bContext *C, wmOperator *op)
+static void view_zoom_apply_step(bContext *C,
+                                 Depsgraph *depsgraph,
+                                 Scene *scene,
+                                 ScrArea *area,
+                                 ARegion *region,
+                                 const int delta,
+                                 const int zoom_xy[2])
 {
-  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
-  Scene *scene = CTX_data_scene(C);
-  View3D *v3d;
-  RegionView3D *rv3d;
-  ScrArea *area;
-  ARegion *region;
+  View3D *v3d = area->spacedata.first;
+  RegionView3D *rv3d = region->regiondata;
   bool use_cam_zoom;
   float dist_range[2];
 
-  const int delta = RNA_int_get(op->ptr, "delta");
-  const bool use_cursor_init = RNA_boolean_get(op->ptr, "use_cursor_init");
-
-  if (op->customdata) {
-    ViewOpsData *vod = op->customdata;
-
-    area = vod->area;
-    region = vod->region;
-  }
-  else {
-    area = CTX_wm_area(C);
-    region = CTX_wm_region(C);
-  }
-
-  v3d = area->spacedata.first;
-  rv3d = region->regiondata;
-
   use_cam_zoom = (rv3d->persp == RV3D_CAMOB) &&
                  !(rv3d->is_persp && ED_view3d_camera_lock_check(v3d, rv3d));
-
-  int zoom_xy_buf[2];
-  const int *zoom_xy = NULL;
-  if (use_cursor_init && (U.uiflag & USER_ZOOM_TO_MOUSEPOS)) {
-    zoom_xy_buf[0] = RNA_struct_property_is_set(op->ptr, "mx") ? RNA_int_get(op->ptr, "mx") :
-                                                                 region->winx / 2;
-    zoom_xy_buf[1] = RNA_struct_property_is_set(op->ptr, "my") ? RNA_int_get(op->ptr, "my") :
-                                                                 region->winy / 2;
-    zoom_xy = zoom_xy_buf;
-  }
 
   ED_view3d_dist_range_get(v3d, dist_range);
 
@@ -485,11 +470,84 @@ static int viewzoom_exec(bContext *C, wmOperator *op)
   ED_view3d_camera_lock_autokey(v3d, rv3d, C, false, true);
 
   ED_region_tag_redraw(region);
+}
 
-  viewops_data_free(C, op->customdata);
-  op->customdata = NULL;
+static int viewzoom_exec(bContext *C, wmOperator *op)
+{
+  BLI_assert(op->customdata == NULL);
+
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  Scene *scene = CTX_data_scene(C);
+  ScrArea *area = CTX_wm_area(C);
+  ARegion *region = CTX_wm_region(C);
+
+  const int delta = RNA_int_get(op->ptr, "delta");
+  const bool use_cursor_init = RNA_boolean_get(op->ptr, "use_cursor_init");
+
+  int zoom_xy_buf[2];
+  const int *zoom_xy = NULL;
+  const bool do_zoom_to_mouse_pos = (use_cursor_init && (U.uiflag & USER_ZOOM_TO_MOUSEPOS));
+  if (do_zoom_to_mouse_pos) {
+    zoom_xy_buf[0] = RNA_struct_property_is_set(op->ptr, "mx") ? RNA_int_get(op->ptr, "mx") :
+                                                                 region->winx / 2;
+    zoom_xy_buf[1] = RNA_struct_property_is_set(op->ptr, "my") ? RNA_int_get(op->ptr, "my") :
+                                                                 region->winy / 2;
+    zoom_xy = zoom_xy_buf;
+  }
+
+  view_zoom_apply_step(C, depsgraph, scene, area, region, delta, zoom_xy);
 
   return OPERATOR_FINISHED;
+}
+
+int viewzoom_invoke_impl(bContext *C,
+                         ViewOpsData *vod,
+                         const int delta,
+                         const wmEvent *event,
+                         const int zoom_xy[2],
+                         const bool use_cursor_init)
+{
+  const bool do_zoom_to_mouse_pos = (use_cursor_init && (U.uiflag & USER_ZOOM_TO_MOUSEPOS));
+
+  if (delta) {
+    view_zoom_apply_step(C,
+                         vod->depsgraph,
+                         vod->scene,
+                         vod->area,
+                         vod->region,
+                         delta,
+                         do_zoom_to_mouse_pos ? zoom_xy : NULL);
+
+    return OPERATOR_FINISHED;
+  }
+
+  if (ELEM(event->type, MOUSEZOOM, MOUSEPAN)) {
+
+    if (U.uiflag & USER_ZOOM_HORIZ) {
+      vod->init.event_xy[0] = vod->prev.event_xy[0] = event->xy[0];
+    }
+    else {
+      /* Set y move = x move as MOUSEZOOM uses only x axis to pass magnification value */
+      vod->init.event_xy[1] = vod->prev.event_xy[1] = vod->init.event_xy[1] + event->xy[0] -
+                                                      event->prev_xy[0];
+    }
+    viewzoom_apply(vod,
+                   event->prev_xy,
+                   USER_ZOOM_DOLLY,
+                   (U.uiflag & USER_ZOOM_INVERT) != 0,
+                   do_zoom_to_mouse_pos);
+    ED_view3d_camera_lock_autokey(vod->v3d, vod->rv3d, C, false, true);
+
+    return OPERATOR_FINISHED;
+  }
+
+  if (U.viewzoom == USER_ZOOM_CONTINUE) {
+    /* needs a timer to continue redrawing */
+    vod->timer = WM_event_add_timer(CTX_wm_manager(C), CTX_wm_window(C), TIMER, 0.01f);
+    vod->prev.time = PIL_check_seconds_timer();
+  }
+
+  return OPERATOR_RUNNING_MODAL;
 }
 
 /* viewdolly_invoke() copied this function, changes here may apply there */
@@ -507,50 +565,23 @@ static int viewzoom_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   ED_view3d_smooth_view_force_finish(C, vod->v3d, vod->region);
 
-  /* if one or the other zoom position aren't set, set from event */
-  if (!RNA_struct_property_is_set(op->ptr, "mx") || !RNA_struct_property_is_set(op->ptr, "my")) {
-    RNA_int_set(op->ptr, "mx", event->xy[0]);
-    RNA_int_set(op->ptr, "my", event->xy[1]);
-  }
+  int xy[2];
+  xy[0] = RNA_struct_property_is_set(op->ptr, "mx") ? RNA_int_get(op->ptr, "mx") : event->xy[0];
+  xy[1] = RNA_struct_property_is_set(op->ptr, "my") ? RNA_int_get(op->ptr, "my") : event->xy[1];
 
-  if (RNA_struct_property_is_set(op->ptr, "delta")) {
-    viewzoom_exec(C, op);
-  }
-  else {
-    if (ELEM(event->type, MOUSEZOOM, MOUSEPAN)) {
+  int delta = RNA_struct_property_is_set(op->ptr, "delta") ? RNA_int_get(op->ptr, "delta") : 0;
 
-      if (U.uiflag & USER_ZOOM_HORIZ) {
-        vod->init.event_xy[0] = vod->prev.event_xy[0] = event->xy[0];
-      }
-      else {
-        /* Set y move = x move as MOUSEZOOM uses only x axis to pass magnification value */
-        vod->init.event_xy[1] = vod->prev.event_xy[1] = vod->init.event_xy[1] + event->xy[0] -
-                                                        event->prev_xy[0];
-      }
-      viewzoom_apply(vod,
-                     event->prev_xy,
-                     USER_ZOOM_DOLLY,
-                     (U.uiflag & USER_ZOOM_INVERT) != 0,
-                     (use_cursor_init && (U.uiflag & USER_ZOOM_TO_MOUSEPOS)));
-      ED_view3d_camera_lock_autokey(vod->v3d, vod->rv3d, C, false, true);
+  int ret = viewzoom_invoke_impl(C, vod, delta, event, xy, use_cursor_init);
 
-      viewops_data_free(C, op->customdata);
-      op->customdata = NULL;
-      return OPERATOR_FINISHED;
-    }
-
-    if (U.viewzoom == USER_ZOOM_CONTINUE) {
-      /* needs a timer to continue redrawing */
-      vod->timer = WM_event_add_timer(CTX_wm_manager(C), CTX_wm_window(C), TIMER, 0.01f);
-      vod->prev.time = PIL_check_seconds_timer();
-    }
-
+  if (ret == OPERATOR_RUNNING_MODAL) {
     /* add temp handler */
     WM_event_add_modal_handler(C, op);
-
     return OPERATOR_RUNNING_MODAL;
   }
-  return OPERATOR_FINISHED;
+
+  viewops_data_free(C, op->customdata);
+  op->customdata = NULL;
+  return ret;
 }
 
 static void viewzoom_cancel(bContext *C, wmOperator *op)
@@ -564,7 +595,7 @@ void VIEW3D_OT_zoom(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Zoom View";
   ot->description = "Zoom in/out in the view";
-  ot->idname = "VIEW3D_OT_zoom";
+  ot->idname = op_idnames[V3D_ZOOM];
 
   /* api callbacks */
   ot->invoke = viewzoom_invoke;

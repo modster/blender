@@ -9,7 +9,10 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
+#include "BLI_alloca.h"
+#include "BLI_listbase.h"
 #include "BLI_math.h"
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
@@ -411,6 +414,26 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
     return OPERATOR_PASS_THROUGH;
   }
 #endif
+
+  if (event->type == MOUSEMOVE) {
+    /* Call before #tranformViewUpdate. */
+    copy_v2_v2_int(t->mval, event->mval);
+  }
+
+  /* Allow navigation while transforming */
+  if (!(t->flag & T_RELEASE_CONFIRM) && ED_view3d_navigation_do(C, t->vod, event)) {
+    RegionView3D *rv3d = t->region->regiondata;
+    if (event->type == EVT_MODAL_MAP) {
+      /* Pass. These events can cancel modifiers. */
+    }
+    else if (rv3d->rflag & RV3D_NAVIGATING) {
+      /* Do not update transform while navigating. This can be distracting. */
+      return OPERATOR_RUNNING_MODAL;
+    }
+
+    /* Call before #applyMouseInput. */
+    tranformViewUpdate(t);
+  }
 
   /* XXX insert keys are called here, and require context */
   t->context = C;
@@ -1365,6 +1388,361 @@ static void TRANSFORM_OT_from_gizmo(struct wmOperatorType *ot)
   ot->invoke = transform_from_gizmo_invoke;
 }
 
+/* -------------------------------------------------------------------- */
+/** \name Experimental: #TRANSFORM_OT_modalkeymap_update and #TRANSFORM_OT_modalkeymap_restore
+ *
+ * Operators that detect conflicts in navigation key items and propose changes to the keymap.
+ * \{ */
+
+static wmKeyMapItem **navigation_keyitems(bContext *C, int *r_kmi_len)
+{
+  wmKeyMapItem *km_items[80];
+  int kmi_len;
+  ed_view3d_kmi_navigation_fill_array(C, ARRAY_SIZE(km_items), km_items, &kmi_len);
+
+  size_t km_items_size = sizeof(void *) * kmi_len;
+  wmKeyMapItem **r_km_items = MEM_mallocN(km_items_size, __func__);
+  memcpy(r_km_items, km_items, km_items_size);
+
+  *r_kmi_len = kmi_len;
+  return r_km_items;
+}
+
+static bool kmi_cmp(const wmKeyMapItem *kmi_a, const wmKeyMapItem *kmi_b)
+{
+  if (kmi_a->shift != kmi_b->shift) {
+    return false;
+  }
+  if (kmi_a->ctrl != kmi_b->ctrl) {
+    return false;
+  }
+  if (kmi_a->alt != kmi_b->alt) {
+    return false;
+  }
+  if (kmi_a->oskey != kmi_b->oskey) {
+    return false;
+  }
+  if (!ELEM(kmi_b->type, kmi_a->type, KM_ANY)) {
+    bool is_wheelin_modal = ELEM(kmi_b->type, WHEELUPMOUSE, WHEELINMOUSE);
+    bool is_wheelout_modal = ELEM(kmi_b->type, WHEELDOWNMOUSE, WHEELOUTMOUSE);
+    bool is_wheelin = ELEM(kmi_a->type, WHEELUPMOUSE, WHEELINMOUSE);
+    bool is_wheelout = ELEM(kmi_a->type, WHEELDOWNMOUSE, WHEELOUTMOUSE);
+    if (!(is_wheelin_modal || is_wheelout_modal) ||
+        ((is_wheelin_modal != is_wheelin) || (is_wheelout_modal != is_wheelout))) {
+      return false;
+    }
+  }
+  if (!ELEM(kmi_b->val, kmi_a->val, KM_ANY)) {
+    return false;
+  }
+  if (kmi_a->keymodifier != kmi_b->keymodifier) {
+    return false;
+  }
+  return true;
+}
+
+static const wmKeyMapItem *modalmap_is_conflicting(wmKeyMapItem **km_items,
+                                                   const int km_items_len,
+                                                   const wmKeyMapItem *kmi_modal)
+{
+  for (int i = 0; i < km_items_len; i++) {
+    const wmKeyMapItem *kmi = km_items[i];
+    if (kmi_cmp(kmi, kmi_modal)) {
+      return kmi;
+    }
+  }
+  return NULL;
+}
+
+#define LABEL_LINE_SIZE 140
+#define CONFLICT_MAX_LEN 20
+struct KMConflict {
+  wmKeyMapItem *kmi;
+  wmKeyMapItem kmi_new;
+  char descr[LABEL_LINE_SIZE];
+};
+
+struct KMConflictOPData {
+  int conflicts_len;
+  struct KMConflict conflicts[0];
+};
+
+static void modalkeymap_conflict_free(wmOperator *op)
+{
+  struct KMConflictOPData *data = op->customdata;
+  MEM_freeN(data);
+}
+
+static int modalkeymap_update_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmKeyConfig *keyconf = wm->userconf;
+  wmKeyMap *modalmap = WM_keymap_active(wm, WM_modalkeymap_find(keyconf, "Transform Modal Map"));
+
+  int kmi_navigate_len, kmi_modals_len, kmi_modals_new_len;
+  wmKeyMapItem **kmi_navigate, **kmi_modals, **kmi_modals_new;
+  kmi_navigate = navigation_keyitems(C, &kmi_navigate_len);
+
+  /* Ignore #TFM_MODAL_AXIS_X, #TFM_MODAL_AXIS_Y and #TFM_MODAL_AXIS_Z. */
+  kmi_modals_len = BLI_listbase_count(&modalmap->items) - 3;
+  kmi_modals = BLI_array_alloca(kmi_modals, kmi_modals_len);
+  kmi_modals_new = BLI_array_alloca(kmi_modals_new, kmi_modals_len);
+  kmi_modals_new_len = 0;
+
+  kmi_modals_len = 0;
+  LISTBASE_FOREACH (wmKeyMapItem *, kmi_modal, &modalmap->items) {
+    if (ELEM(kmi_modal->propvalue, TFM_MODAL_AXIS_X, TFM_MODAL_AXIS_Y, TFM_MODAL_AXIS_Z)) {
+      /* Do not change these keyitems. */
+      continue;
+    }
+    if (kmi_modal->flag & KMI_INACTIVE) {
+      continue;
+    }
+    kmi_modals[kmi_modals_len++] = kmi_modal;
+  }
+
+  struct KMConflict conflicts[CONFLICT_MAX_LEN];
+  int conflicts_len = 0;
+
+  for (int i = 0; i < kmi_modals_len; i++) {
+    wmKeyMapItem *kmi_modal = kmi_modals[i];
+    const wmKeyMapItem *kmi = modalmap_is_conflicting(kmi_navigate, kmi_navigate_len, kmi_modal);
+    if (kmi) {
+      struct KMConflict *conflict = &conflicts[conflicts_len++];
+      conflict->kmi = kmi_modal;
+      conflict->kmi_new = *kmi_modal;
+      wmKeyMapItem *kmi_new = &conflict->kmi_new;
+      int alt_tries = 0;
+      int shift_tries = 0;
+      int ctrl_tries = 0;
+      int oskey_tries = 0;
+      do {
+        if (!kmi_new->alt && alt_tries < 3) {
+          kmi_new->alt = true;
+          alt_tries++;
+          continue;
+        }
+        else if (alt_tries == 1) {
+          kmi_new->alt = false;
+          alt_tries++;
+        }
+
+        if (!kmi_new->shift && shift_tries < 3) {
+          kmi_new->shift = true;
+          shift_tries++;
+          continue;
+        }
+        else if (shift_tries == 1) {
+          kmi_new->shift = false;
+          shift_tries++;
+        }
+
+        if (!kmi_new->ctrl && ctrl_tries < 3) {
+          kmi_new->ctrl = true;
+          ctrl_tries++;
+          continue;
+        }
+        else if (ctrl_tries == 1) {
+          kmi_new->ctrl = false;
+          ctrl_tries++;
+        }
+
+        if (!kmi_new->oskey && oskey_tries < 3) {
+          kmi_new->oskey = true;
+          oskey_tries++;
+          continue;
+        }
+        else if (oskey_tries == 1) {
+          kmi_new->oskey = false;
+          oskey_tries++;
+        }
+        else {
+          BLI_assert(false);
+          break;
+        }
+      } while (modalmap_is_conflicting(kmi_navigate, kmi_navigate_len, kmi_new) ||
+               (!modalmap_is_conflicting(kmi_modals, i, kmi) &&
+                modalmap_is_conflicting(kmi_modals_new, kmi_modals_new_len, kmi_new)));
+
+      const char *name;
+      char descriptor[LABEL_LINE_SIZE], descriptor_new[LABEL_LINE_SIZE];
+      WM_keymap_item_to_string(kmi_modal, false, descriptor, LABEL_LINE_SIZE);
+      WM_keymap_item_to_string(kmi_new, false, descriptor_new, LABEL_LINE_SIZE);
+      RNA_enum_name(modalmap->modal_items, kmi_modal->propvalue, &name);
+
+      BLI_snprintf(conflict->descr,
+                   LABEL_LINE_SIZE,
+                   "\"%s\" will change from '%s' to '%s' (as it conflicts with \"%s\")",
+                   IFACE_(name),
+                   descriptor,
+                   descriptor_new,
+                   kmi->idname);
+
+#if DEBUG
+      printf("%s\n", conflict->descr);
+#endif
+
+      if (conflicts_len == CONFLICT_MAX_LEN) {
+        BLI_assert(false);
+        break;
+      }
+      /* Used for next conflict detection. */
+      kmi_modals_new[kmi_modals_new_len++] = kmi_new;
+    }
+  }
+  MEM_freeN(kmi_navigate);
+
+  if (!conflicts_len) {
+    return OPERATOR_CANCELLED;
+  }
+
+  struct KMConflictOPData *data;
+  size_t conflicts_size = sizeof(struct KMConflict) * conflicts_len;
+  data = MEM_mallocN(sizeof(struct KMConflictOPData) + conflicts_size, __func__);
+  data->conflicts_len = conflicts_len;
+  memcpy(data->conflicts, conflicts, conflicts_size);
+
+  op->customdata = data;
+  return WM_operator_props_dialog_popup(C, op, 750);
+}
+
+static int modalkeymap_exec(bContext *UNUSED(C), wmOperator *op)
+{
+  struct KMConflictOPData *data = op->customdata;
+  if (!data) {
+    return OPERATOR_CANCELLED;
+  }
+  struct KMConflict *conflicts = data->conflicts;
+  for (int i = 0; i < data->conflicts_len; i++) {
+    struct KMConflict *conflict = &conflicts[i];
+    *conflict->kmi = conflict->kmi_new;
+    WM_keyconfig_update_tag(NULL, conflict->kmi);
+  }
+
+  modalkeymap_conflict_free(op);
+  if (U.runtime.is_dirty == false) {
+    U.runtime.is_dirty = true;
+    WM_main_add_notifier(NC_WINDOW, NULL);
+  }
+  return OPERATOR_FINISHED;
+}
+
+static void modalkeymap_cancel(bContext *UNUSED(C), wmOperator *op)
+{
+  modalkeymap_conflict_free(op);
+}
+
+static void modalkeymap_draw(bContext *UNUSED(C), wmOperator *op)
+{
+  struct KMConflictOPData *data = op->customdata;
+  struct KMConflict *conflicts = data->conflicts;
+  for (int i = 0; i < data->conflicts_len; i++) {
+    struct KMConflict *conflict = &conflicts[i];
+    uiItemL(op->layout, conflict->descr, ICON_DOT);
+  }
+}
+
+static void TRANSFORM_OT_modalkeymap_update(struct wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Update Transform Modal Map";
+  ot->description = "Edit the Transform Modal Map to avoid conflicts with navigation shortcuts";
+  ot->idname = "TRANSFORM_OT_modalkeymap_update";
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  /* api callbacks */
+  ot->invoke = modalkeymap_update_invoke;
+  ot->exec = modalkeymap_exec;
+  ot->cancel = modalkeymap_cancel;
+  ot->ui = modalkeymap_draw;
+}
+
+static int modalkeymap_restore_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+  struct KMConflict conflicts[CONFLICT_MAX_LEN];
+  int conflicts_len = 0;
+
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmKeyMap *modalmap = WM_modalkeymap_find(wm->defaultconf, "Transform Modal Map");
+  wmKeyMap *modalmap_act = WM_keymap_active(
+      wm, WM_modalkeymap_find(wm->userconf, "Transform Modal Map"));
+
+  wmKeyMapItem *kmi_orig = modalmap->items.first, *kmi = modalmap_act->items.first;
+  while (kmi_orig && kmi) {
+    if (!kmi_cmp(kmi_orig, kmi)) {
+      struct KMConflict *conflict = &conflicts[conflicts_len++];
+      conflict->kmi = kmi;
+      conflict->kmi_new = *kmi_orig;
+      wmKeyMapItem *kmi_new = &conflict->kmi_new;
+
+      const char *name;
+      char descriptor[LABEL_LINE_SIZE], descriptor_new[LABEL_LINE_SIZE];
+      WM_keymap_item_to_string(kmi, false, descriptor, LABEL_LINE_SIZE);
+      WM_keymap_item_to_string(kmi_new, false, descriptor_new, LABEL_LINE_SIZE);
+      RNA_enum_name(modalmap->modal_items, kmi->propvalue, &name);
+
+      BLI_snprintf(conflict->descr,
+                   LABEL_LINE_SIZE,
+                   "\"%s\" will be restored from '%s' to '%s'",
+                   IFACE_(name),
+                   descriptor,
+                   descriptor_new);
+
+      if (conflicts_len == CONFLICT_MAX_LEN) {
+        BLI_assert(false);
+        break;
+      }
+    }
+    kmi_orig = kmi_orig->next;
+    kmi = kmi->next;
+  }
+
+  if (!conflicts_len) {
+    return OPERATOR_CANCELLED;
+  }
+
+  struct KMConflictOPData *data;
+  size_t conflicts_size = sizeof(struct KMConflict) * conflicts_len;
+  data = MEM_mallocN(sizeof(struct KMConflictOPData) + conflicts_size, __func__);
+  data->conflicts_len = conflicts_len;
+  memcpy(data->conflicts, conflicts, conflicts_size);
+
+  op->customdata = data;
+  return WM_operator_props_dialog_popup(C, op, 600);
+}
+
+static int modalkeymap_restore_exec(bContext *C, wmOperator *op)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmKeyConfig *keyconf = wm->userconf;
+  wmKeyMap *modalmap = WM_modalkeymap_find(keyconf, "Transform Modal Map");
+  WM_keymap_restore_to_default(modalmap, wm);
+
+  modalkeymap_conflict_free(op);
+  if (U.runtime.is_dirty == false) {
+    U.runtime.is_dirty = true;
+    WM_main_add_notifier(NC_WINDOW, NULL);
+  }
+  return OPERATOR_FINISHED;
+}
+
+static void TRANSFORM_OT_modalkeymap_restore(struct wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Restore Transform Modal Map";
+  ot->description = "Restore Transform Modal Map to Default";
+  ot->idname = "TRANSFORM_OT_modalkeymap_restore";
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  /* api callbacks */
+  ot->invoke = modalkeymap_restore_invoke;
+  ot->exec = modalkeymap_restore_exec;
+  ot->cancel = modalkeymap_cancel;
+  ot->ui = modalkeymap_draw;
+}
+
+/** \} */
+
 void transform_operatortypes(void)
 {
   TransformModeItem *tmode;
@@ -1380,6 +1758,9 @@ void transform_operatortypes(void)
   WM_operatortype_append(TRANSFORM_OT_delete_orientation);
 
   WM_operatortype_append(TRANSFORM_OT_from_gizmo);
+
+  WM_operatortype_append(TRANSFORM_OT_modalkeymap_update);
+  WM_operatortype_append(TRANSFORM_OT_modalkeymap_restore);
 }
 
 void ED_keymap_transform(wmKeyConfig *keyconf)

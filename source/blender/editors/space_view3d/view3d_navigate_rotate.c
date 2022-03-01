@@ -301,9 +301,8 @@ static void viewrotate_apply(ViewOpsData *vod, const int event_xy[2])
   ED_region_tag_redraw(vod->region);
 }
 
-static int viewrotate_modal(bContext *C, wmOperator *op, const wmEvent *event)
+int viewrotate_modal_impl(bContext *C, ViewOpsData *vod, const wmEvent *event)
 {
-  ViewOpsData *vod = op->customdata;
   short event_code = VIEW_PASS;
   bool use_autokey = false;
   int ret = OPERATOR_RUNNING_MODAL;
@@ -355,6 +354,15 @@ static int viewrotate_modal(bContext *C, wmOperator *op, const wmEvent *event)
     ED_view3d_camera_lock_autokey(vod->v3d, vod->rv3d, C, true, true);
   }
 
+  return ret;
+}
+
+static int viewrotate_modal(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  ViewOpsData *vod = op->customdata;
+
+  int ret = viewrotate_modal_impl(C, vod, event);
+
   if (ret & OPERATOR_FINISHED) {
     viewops_data_free(C, op->customdata);
     op->customdata = NULL;
@@ -363,21 +371,8 @@ static int viewrotate_modal(bContext *C, wmOperator *op, const wmEvent *event)
   return ret;
 }
 
-static int viewrotate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+int viewrotate_invoke_impl(ViewOpsData *vod, const wmEvent *event)
 {
-  ViewOpsData *vod;
-
-  const bool use_cursor_init = RNA_boolean_get(op->ptr, "use_cursor_init");
-
-  /* makes op->customdata */
-  vod = op->customdata = viewops_data_create(
-      C,
-      event,
-      viewops_flag_from_prefs() | VIEWOPS_FLAG_PERSP_ENSURE |
-          (use_cursor_init ? VIEWOPS_FLAG_USE_MOUSE_INIT : 0));
-
-  ED_view3d_smooth_view_force_finish(C, vod->v3d, vod->region);
-
   if (ELEM(event->type, MOUSEPAN, MOUSEROTATE)) {
     /* Rotate direction we keep always same */
     int event_xy[2];
@@ -398,16 +393,40 @@ static int viewrotate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
     viewrotate_apply(vod, event_xy);
 
-    viewops_data_free(C, op->customdata);
-    op->customdata = NULL;
-
     return OPERATOR_FINISHED;
   }
 
-  /* add temp handler */
-  WM_event_add_modal_handler(C, op);
-
   return OPERATOR_RUNNING_MODAL;
+}
+
+static int viewrotate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  ViewOpsData *vod;
+
+  const bool use_cursor_init = RNA_boolean_get(op->ptr, "use_cursor_init");
+
+  /* makes op->customdata */
+  vod = op->customdata = viewops_data_create(
+      C,
+      event,
+      viewops_flag_from_prefs() | VIEWOPS_FLAG_PERSP_ENSURE |
+          (use_cursor_init ? VIEWOPS_FLAG_USE_MOUSE_INIT : 0));
+
+  ED_view3d_smooth_view_force_finish(C, vod->v3d, vod->region);
+
+  int ret = viewrotate_invoke_impl(vod, event);
+
+  if (ret == OPERATOR_RUNNING_MODAL) {
+    /* add temp handler */
+    WM_event_add_modal_handler(C, op);
+
+    return OPERATOR_RUNNING_MODAL;
+  }
+
+  viewops_data_free(C, op->customdata);
+  op->customdata = NULL;
+
+  return ret;
 }
 
 static void viewrotate_cancel(bContext *C, wmOperator *op)
@@ -421,7 +440,7 @@ void VIEW3D_OT_rotate(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Rotate View";
   ot->description = "Rotate the view";
-  ot->idname = "VIEW3D_OT_rotate";
+  ot->idname = op_idnames[V3D_ROTATE];
 
   /* api callbacks */
   ot->invoke = viewrotate_invoke;

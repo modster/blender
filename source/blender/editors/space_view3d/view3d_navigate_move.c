@@ -58,10 +58,8 @@ void viewmove_modal_keymap(wmKeyConfig *keyconf)
   WM_modalkeymap_assign(keymap, "VIEW3D_OT_move");
 }
 
-static int viewmove_modal(bContext *C, wmOperator *op, const wmEvent *event)
+int viewmove_modal_impl(bContext *C, ViewOpsData *vod, const wmEvent *event)
 {
-
-  ViewOpsData *vod = op->customdata;
   short event_code = VIEW_PASS;
   bool use_autokey = false;
   int ret = OPERATOR_RUNNING_MODAL;
@@ -104,12 +102,33 @@ static int viewmove_modal(bContext *C, wmOperator *op, const wmEvent *event)
     ED_view3d_camera_lock_autokey(vod->v3d, vod->rv3d, C, false, true);
   }
 
+  return ret;
+}
+
+static int viewmove_modal(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  ViewOpsData *vod = op->customdata;
+  int ret = viewmove_modal_impl(C, vod, event);
+
   if (ret & OPERATOR_FINISHED) {
     viewops_data_free(C, op->customdata);
     op->customdata = NULL;
   }
 
   return ret;
+}
+
+int viewmove_invoke_impl(ViewOpsData *vod, const wmEvent *event)
+{
+  if (event->type == MOUSEPAN) {
+    /* invert it, trackpad scroll follows same principle as 2d windows this way */
+    viewmove_apply(
+        vod, 2 * event->xy[0] - event->prev_xy[0], 2 * event->xy[1] - event->prev_xy[1]);
+
+    return OPERATOR_FINISHED;
+  }
+
+  return OPERATOR_RUNNING_MODAL;
 }
 
 static int viewmove_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -127,21 +146,19 @@ static int viewmove_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   ED_view3d_smooth_view_force_finish(C, vod->v3d, vod->region);
 
-  if (event->type == MOUSEPAN) {
-    /* invert it, trackpad scroll follows same principle as 2d windows this way */
-    viewmove_apply(
-        vod, 2 * event->xy[0] - event->prev_xy[0], 2 * event->xy[1] - event->prev_xy[1]);
+  int ret = viewmove_invoke_impl(vod, event);
 
-    viewops_data_free(C, op->customdata);
-    op->customdata = NULL;
+  if (ret == OPERATOR_RUNNING_MODAL) {
+    /* add temp handler */
+    WM_event_add_modal_handler(C, op);
 
-    return OPERATOR_FINISHED;
+    return OPERATOR_RUNNING_MODAL;
   }
 
-  /* add temp handler */
-  WM_event_add_modal_handler(C, op);
+  viewops_data_free(C, op->customdata);
+  op->customdata = NULL;
 
-  return OPERATOR_RUNNING_MODAL;
+  return ret;
 }
 
 static void viewmove_cancel(bContext *C, wmOperator *op)
@@ -156,7 +173,7 @@ void VIEW3D_OT_move(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Pan View";
   ot->description = "Move the view";
-  ot->idname = "VIEW3D_OT_move";
+  ot->idname = op_idnames[V3D_MOVE];
 
   /* api callbacks */
   ot->invoke = viewmove_invoke;

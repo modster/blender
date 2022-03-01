@@ -41,12 +41,15 @@ struct SnapObjectContext;
 struct View3D;
 struct ViewContext;
 struct ViewLayer;
+struct ViewOpsData;
 struct bContext;
 struct bPoseChannel;
 struct bScreen;
 struct rctf;
 struct rcti;
+struct wmEvent;
 struct wmGizmo;
+struct wmKeyMapItem;
 struct wmWindow;
 struct wmWindowManager;
 
@@ -200,6 +203,18 @@ bool ED_view3d_depth_unproject_v3(const struct ARegion *region,
                                   const int mval[2],
                                   double depth,
                                   float r_location_world[3]);
+
+/* Temporary function that will last as long as the navigation feature during transform is
+ * experimental. */
+void ed_view3d_kmi_navigation_fill_array(struct bContext *C,
+                                         const int array_len_max,
+                                         struct wmKeyMapItem **r_km_items,
+                                         int *r_kmi_len);
+struct ViewOpsData *ED_view3d_navigation_init(struct bContext *C);
+bool ED_view3d_navigation_do(struct bContext *C,
+                             struct ViewOpsData *vod,
+                             const struct wmEvent *event);
+void ED_view3d_navigation_free(struct bContext *C, struct ViewOpsData *vod);
 
 /* Projection */
 #define IS_CLIPPED 12000

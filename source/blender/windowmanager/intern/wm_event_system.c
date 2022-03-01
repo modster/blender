@@ -1976,7 +1976,7 @@ void WM_event_remove_handlers(bContext *C, ListBase *handlers)
   }
 }
 
-static bool wm_eventmatch(const wmEvent *winevent, const wmKeyMapItem *kmi)
+BLI_INLINE bool wm_eventmatch(const wmEvent *winevent, const wmKeyMapItem *kmi)
 {
   if (kmi->flag & KMI_INACTIVE) {
     return false;
@@ -5342,6 +5342,11 @@ wmKeyMapItem *WM_event_match_keymap_item_from_handlers(
     }
   }
   return NULL;
+}
+
+bool WM_event_match(const wmEvent *winevent, const wmKeyMapItem *kmi)
+{
+  return wm_eventmatch(winevent, kmi);
 }
 
 /** \} */
