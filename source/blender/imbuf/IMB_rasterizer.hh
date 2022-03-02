@@ -71,6 +71,7 @@
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
+#include "intern/rasterizer_blending.hh"
 #include "intern/rasterizer_clamping.hh"
 #include "intern/rasterizer_stats.hh"
 #include "intern/rasterizer_target.hh"
@@ -241,6 +242,10 @@ template<typename Rasterline, int64_t BufferSize> class Rasterlines {
 
 template<typename VertexShader,
          typename FragmentShader,
+         /**
+          * A blend mode integrates the result of the fragment shader with the drawing target.
+          */
+         typename BlendMode = CopyBlendMode,
          typename DrawingTarget = ImageBufferDrawingTarget,
 
          /**
@@ -268,15 +273,16 @@ class Rasterizer {
 
   /** Check if the vertex shader and the fragment shader can be linked together. */
   static_assert(std::is_same_v<InterfaceInnerType, FragmentInputType>);
+  /** Check if the output of the fragment shader can be used as source of the Blend Mode. */
+  static_assert(std::is_same_v<FragmentOutputType, typename BlendMode::SourceType>);
 
  private:
   VertexShader vertex_shader_;
   FragmentShader fragment_shader_;
   Rasterlines<RasterlineType, RasterlinesSize> rasterlines_;
-  /** Active image buffer that is used as drawing target. */
-
   const CenterPixelClampingMethod clamping_method;
-  ImageBufferDrawingTarget drawing_target_;
+  const BlendMode blending_mode_;
+  DrawingTarget drawing_target_;
 
  public:
   Statistics stats;
@@ -683,7 +689,7 @@ class Rasterizer {
 
       FragmentOutputType fragment_out;
       fragment_shader_.fragment(data, &fragment_out);
-      copy_v4_v4(pixel_ptr, &fragment_out[0]);
+      blending_mode_.blend(pixel_ptr, fragment_out);
 
       data += rasterline.fragment_add;
       pixel_ptr += drawing_target_.get_pixel_stride();

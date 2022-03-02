@@ -42,6 +42,7 @@ class FragmentShader : public AbstractFragmentShader<float4, float4> {
 
 using RasterizerType = Rasterizer<VertexShader,
                                   FragmentShader,
+                                  CopyBlendMode,
                                   ImageBufferDrawingTarget,
                                   DefaultRasterlinesBufferSize,
                                   Stats>;
