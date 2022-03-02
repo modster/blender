@@ -51,6 +51,7 @@
  *
  * \code{.cc}
  * Rasterizer<MyVertexShader, MyFragmentShader> rasterizer(&image_buffer);
+ * rasterizer.activate_drawing_target(&image_buffer);
  * rasterizer.get_vertex_shader().mat = float4x4::identity();
  * rasterizer.draw_triangle(
  *   VertexInput{float2(0.0, 1.0)},
@@ -72,6 +73,7 @@
 
 #include "intern/rasterizer_clamping.hh"
 #include "intern/rasterizer_stats.hh"
+#include "intern/rasterizer_target.hh"
 
 #include <optional>
 
@@ -177,11 +179,11 @@ template<typename FragmentInput, typename FragmentOutput> class AbstractFragment
 template<typename FragmentInput> class Rasterline {
  public:
   /** Row where this rasterline will be rendered. */
-  uint32_t y ;
+  uint32_t y;
   /** Starting X coordinate of the rasterline. */
-  uint32_t start_x ;
+  uint32_t start_x;
   /** Ending X coordinate of the rasterline. */
-  uint32_t end_x ;
+  uint32_t end_x;
   /** Input data for the fragment shader on (start_x, y). */
   FragmentInput start_data;
   /** Delta to add to the start_input to create the data for the next fragment. */
@@ -201,7 +203,7 @@ template<typename Rasterline, int64_t BufferSize> class Rasterlines {
  public:
   Vector<Rasterline, BufferSize> buffer;
 
-  explicit Rasterlines() 
+  explicit Rasterlines()
   {
     buffer.reserve(BufferSize);
   }
@@ -239,6 +241,7 @@ template<typename Rasterline, int64_t BufferSize> class Rasterlines {
 
 template<typename VertexShader,
          typename FragmentShader,
+         typename DrawingTarget = ImageBufferDrawingTarget,
 
          /**
           * To improve branching performance the rasterlines are buffered and flushed when this
@@ -261,6 +264,7 @@ class Rasterizer {
   using VertexOutputType = typename VertexShader::VertexOutputType;
   using FragmentInputType = typename FragmentShader::FragmentInputType;
   using FragmentOutputType = typename FragmentShader::FragmentOutputType;
+  using TargetBufferType = typename DrawingTarget::InnerType;
 
   /** Check if the vertex shader and the fragment shader can be linked together. */
   static_assert(std::is_same_v<InterfaceInnerType, FragmentInputType>);
@@ -269,15 +273,42 @@ class Rasterizer {
   VertexShader vertex_shader_;
   FragmentShader fragment_shader_;
   Rasterlines<RasterlineType, RasterlinesSize> rasterlines_;
-  ImBuf *image_buffer_;
+  /** Active image buffer that is used as drawing target. */
 
   const CenterPixelClampingMethod clamping_method;
+  ImageBufferDrawingTarget drawing_target_;
 
  public:
   Statistics stats;
 
-  explicit Rasterizer(ImBuf *image_buffer) : image_buffer_(image_buffer)
+  explicit Rasterizer()
   {
+  }
+
+  /** Activate the giver image buffer to be used as the active drawing target. */
+  void activate_drawing_target(TargetBufferType *new_drawing_target)
+  {
+    deactivate_drawing_target();
+    drawing_target_.activate(new_drawing_target);
+  }
+
+  /**
+   * Deactivate active drawing target.
+   *
+   * Will flush any rasterlines before deactivating.
+   */
+  void deactivate_drawing_target()
+  {
+    if (has_active_drawing_target()) {
+      flush();
+    }
+    drawing_target_.deactivate();
+    BLI_assert(!has_active_drawing_target());
+  }
+
+  bool has_active_drawing_target() const
+  {
+    return drawing_target_.has_active_target();
   }
 
   virtual ~Rasterizer() = default;
@@ -295,6 +326,9 @@ class Rasterizer {
                      const VertexInputType &p2,
                      const VertexInputType &p3)
   {
+    BLI_assert_msg(has_active_drawing_target(),
+                   "Drawing requires an active drawing target. Use `activate_drawing_target` to "
+                   "activate a drawing target.");
     stats.increase_triangles();
 
     std::array<VertexOutputType, 3> vertex_out;
@@ -308,13 +342,16 @@ class Rasterizer {
     const VertexOutputType &p1_out = vertex_out[0];
     const VertexOutputType &p2_out = vertex_out[1];
     const VertexOutputType &p3_out = vertex_out[2];
-    const bool triangle_not_visible =
-        (p1_out.coord[0] < 0.0 && p2_out.coord[0] < 0.0 && p3_out.coord[0] < 0.0) ||
-        (p1_out.coord[1] < 0.0 && p2_out.coord[1] < 0.0 && p3_out.coord[1] < 0.0) ||
-        (p1_out.coord[0] >= image_buffer_->x && p2_out.coord[0] >= image_buffer_->x &&
-         p3_out.coord[0] >= image_buffer_->x) ||
-        (p1_out.coord[1] >= image_buffer_->y && p2_out.coord[1] >= image_buffer_->y &&
-         p3_out.coord[1] >= image_buffer_->y);
+    const bool triangle_not_visible = (p1_out.coord[0] < 0.0 && p2_out.coord[0] < 0.0 &&
+                                       p3_out.coord[0] < 0.0) ||
+                                      (p1_out.coord[1] < 0.0 && p2_out.coord[1] < 0.0 &&
+                                       p3_out.coord[1] < 0.0) ||
+                                      (p1_out.coord[0] >= drawing_target_.get_width() &&
+                                       p2_out.coord[0] >= drawing_target_.get_width() &&
+                                       p3_out.coord[0] >= drawing_target_.get_width()) ||
+                                      (p1_out.coord[1] >= drawing_target_.get_height() &&
+                                       p2_out.coord[1] >= drawing_target_.get_height() &&
+                                       p3_out.coord[1] >= drawing_target_.get_height());
     if (triangle_not_visible) {
       stats.increase_discarded_triangles();
       return;
@@ -323,6 +360,9 @@ class Rasterizer {
     rasterize_triangle(vertex_out);
   }
 
+  /**
+   * Flush any not drawn rasterlines onto the active drawing target.
+   */
   void flush()
   {
     if (rasterlines_.is_empty()) {
@@ -423,7 +463,7 @@ class Rasterizer {
                       const InterfaceInnerType &fragment_add)
   {
     for (int y = from_y; y < to_y; y++) {
-      if (y >= 0 && y < image_buffer_->y) {
+      if (y >= 0 && y < drawing_target_.get_height()) {
         std::optional<RasterlineType> rasterline = clamped_rasterline(
             y, left.coord[0], right.coord[0], left.data, fragment_add);
         if (rasterline) {
@@ -589,7 +629,7 @@ class Rasterizer {
                                                    InterfaceInnerType start_data,
                                                    const InterfaceInnerType fragment_add)
   {
-    BLI_assert(y >= 0 && y < image_buffer_->y);
+    BLI_assert(y >= 0 && y < drawing_target_.get_height());
 
     stats.increase_rasterlines();
     if (start_x >= end_x) {
@@ -600,7 +640,7 @@ class Rasterizer {
       stats.increase_discarded_rasterlines();
       return std::nullopt;
     }
-    if (start_x >= image_buffer_->x) {
+    if (start_x >= drawing_target_.get_width()) {
       stats.increase_discarded_rasterlines();
       return std::nullopt;
     }
@@ -619,8 +659,8 @@ class Rasterizer {
     start_data += fragment_add * delta_to_anchor;
 
     uint32_t end_xi = clamping_method.column_for(end_x);
-    if (end_xi > image_buffer_->x) {
-      end_xi = image_buffer_->x;
+    if (end_xi > drawing_target_.get_width()) {
+      end_xi = drawing_target_.get_width();
       is_clamped = true;
     }
 
@@ -638,15 +678,15 @@ class Rasterizer {
   void render_rasterline(const RasterlineType &rasterline)
   {
     FragmentInputType data = rasterline.start_data;
+    float *pixel_ptr = drawing_target_.get_pixel_ptr(rasterline.start_x, rasterline.y);
     for (uint32_t x = rasterline.start_x; x < rasterline.end_x; x++) {
-      uint32_t pixel_index = (rasterline.y * image_buffer_->x + x);
-      float *pixel_ptr = &image_buffer_->rect_float[pixel_index * 4];
 
       FragmentOutputType fragment_out;
       fragment_shader_.fragment(data, &fragment_out);
       copy_v4_v4(pixel_ptr, &fragment_out[0]);
 
       data += rasterline.fragment_add;
+      pixel_ptr += drawing_target_.get_pixel_stride();
     }
 
     stats.increase_drawn_fragments(rasterline.end_x - rasterline.start_x);
