@@ -935,16 +935,16 @@ class VIEW3D_MT_transform_base:
     def draw(self, context):
         layout = self.layout
 
-        layout.operator("transform.translate")
-        layout.operator("transform.rotate")
-        layout.operator("transform.resize", text="Scale")
+        layout.operator("transform.translate").release_confirm = False
+        layout.operator("transform.rotate").release_confirm = False
+        layout.operator("transform.resize", text="Scale").release_confirm = False
 
         layout.separator()
 
-        layout.operator("transform.tosphere", text="To Sphere")
-        layout.operator("transform.shear", text="Shear")
-        layout.operator("transform.bend", text="Bend")
-        layout.operator("transform.push_pull", text="Push/Pull")
+        layout.operator("transform.tosphere", text="To Sphere").release_confirm = False
+        layout.operator("transform.shear", text="Shear").release_confirm = False
+        layout.operator("transform.bend", text="Bend").release_confirm = False
+        layout.operator("transform.push_pull", text="Push/Pull").release_confirm = False
 
         if context.mode in {'EDIT_MESH', 'EDIT_ARMATURE', 'EDIT_SURFACE', 'EDIT_CURVE',
                             'EDIT_LATTICE', 'EDIT_METABALL'}:
@@ -963,15 +963,22 @@ class VIEW3D_MT_transform(VIEW3D_MT_transform_base, Menu):
         # generic...
         layout = self.layout
         if context.mode == 'EDIT_MESH':
-            layout.operator("transform.shrink_fatten", text="Shrink/Fatten")
-            layout.operator("transform.skin_resize")
+            layout.operator("transform.shrink_fatten", text="Shrink/Fatten").release_confirm = False
+            layout.operator("transform.skin_resize").release_confirm = False
         elif context.mode == 'EDIT_CURVE':
-            layout.operator("transform.transform", text="Radius").mode = 'CURVE_SHRINKFATTEN'
+            props = layout.operator("transform.transform", text="Radius")
+            props.mode = 'CURVE_SHRINKFATTEN'
+            props.release_confirm = False
 
         layout.separator()
 
-        layout.operator("transform.translate", text="Move Texture Space").texture_space = True
-        layout.operator("transform.resize", text="Scale Texture Space").texture_space = True
+        props = layout.operator("transform.translate", text="Move Texture Space")
+        props.texture_space = True
+        props.release_confirm = False
+
+        props = layout.operator("transform.resize", text="Scale Texture Space")
+        props.texture_space = True
+        props.release_confirm = False
 
 
 # Object-specific extensions to Transform menu
@@ -985,8 +992,13 @@ class VIEW3D_MT_transform_object(VIEW3D_MT_transform_base, Menu):
         # object-specific option follow...
         layout.separator()
 
-        layout.operator("transform.translate", text="Move Texture Space").texture_space = True
-        layout.operator("transform.resize", text="Scale Texture Space").texture_space = True
+        props = layout.operator("transform.translate", text="Move Texture Space")
+        props.texture_space = True
+        props.release_confirm = False
+
+        props = layout.operator("transform.resize", text="Scale Texture Space")
+        props.texture_space = True
+        props.release_confirm = False
 
         layout.separator()
 
@@ -1024,8 +1036,13 @@ class VIEW3D_MT_transform_armature(VIEW3D_MT_transform_base, Menu):
             elif obj.data.display_type == 'ENVELOPE':
                 layout.separator()
 
-                layout.operator("transform.transform", text="Scale Envelope Distance").mode = 'BONE_SIZE'
-                layout.operator("transform.transform", text="Scale Radius").mode = 'BONE_ENVELOPE'
+                props = layout.operator("transform.transform", text="Scale Envelope Distance")
+                props.mode = 'BONE_SIZE'
+                props.release_confirm = False
+
+                props = layout.operator("transform.transform", text="Scale Radius")
+                props.mode = 'BONE_ENVELOPE'
+                props.release_confirm = False
 
         if context.edit_object and context.edit_object.type == 'ARMATURE':
             layout.separator()
