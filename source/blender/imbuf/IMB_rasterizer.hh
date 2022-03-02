@@ -75,7 +75,7 @@
 
 #include <optional>
 
-#define DEBUG_PRINT
+// #define DEBUG_PRINT
 
 namespace blender::imbuf::rasterizer {
 
@@ -177,11 +177,11 @@ template<typename FragmentInput, typename FragmentOutput> class AbstractFragment
 template<typename FragmentInput> class Rasterline {
  public:
   /** Row where this rasterline will be rendered. */
-  uint32_t y;
+  uint32_t y = 0;
   /** Starting X coordinate of the rasterline. */
-  uint32_t start_x;
+  uint32_t start_x = 0;
   /** Ending X coordinate of the rasterline. */
-  uint32_t end_x;
+  uint32_t end_x = 0;
   /** Input data for the fragment shader on (start_x, y). */
   FragmentInput start_data;
   /** Delta to add to the start_input to create the data for the next fragment. */
@@ -200,10 +200,11 @@ template<typename FragmentInput> class Rasterline {
 
 template<typename Rasterline, int64_t BufferSize> class Rasterlines {
  public:
-  Vector<Rasterline> buffer;
+  Vector<Rasterline, BufferSize> buffer;
 
-  explicit Rasterlines() : buffer(BufferSize)
+  explicit Rasterlines() 
   {
+    buffer.reserve(BufferSize);
   }
 
   virtual ~Rasterlines() = default;
@@ -211,6 +212,7 @@ template<typename Rasterline, int64_t BufferSize> class Rasterlines {
   void append(const Rasterline &value)
   {
     buffer.append(value);
+    BLI_assert(buffer.capacity() == BufferSize);
   }
 
   bool is_empty() const
@@ -231,6 +233,8 @@ template<typename Rasterline, int64_t BufferSize> class Rasterlines {
   void clear()
   {
     buffer.clear();
+    BLI_assert(buffer.size() == 0);
+    BLI_assert(buffer.capacity() == BufferSize);
   }
 };
 
@@ -635,7 +639,6 @@ class Rasterizer {
   void render_rasterline(const RasterlineType &rasterline)
   {
     FragmentInputType data = rasterline.start_data;
-    printf("%u, %u\n", rasterline.start_x, rasterline.end_x);
     for (uint32_t x = rasterline.start_x; x < rasterline.end_x; x++) {
       uint32_t pixel_index = (rasterline.y * image_buffer_->x + x);
       float *pixel_ptr = &image_buffer_->rect_float[pixel_index * 4];

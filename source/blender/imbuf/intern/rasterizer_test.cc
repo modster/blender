@@ -53,7 +53,6 @@ TEST(imbuf_rasterizer, draw_triangle_edge_alignment_quality)
   vertex_shader.image_size = float2(image_buffer.x, image_buffer.y);
 
   float clear_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-  char file_name[FILE_MAX];
 
   float3 location(0.5, 0.5, 0.0);
   float3 rotation(0.0, 0.0, 0.0);
@@ -62,7 +61,6 @@ TEST(imbuf_rasterizer, draw_triangle_edge_alignment_quality)
   for (int i = 0; i < 1000; i++) {
     rasterizer.stats.reset();
 
-    BLI_path_sequence_encode(file_name, "/tmp/test_", ".png", 4, i);
 
     IMB_rectfill(&image_buffer, clear_color);
     rotation[2] = (i / 1000.0) * M_PI * 2;
@@ -77,16 +75,15 @@ TEST(imbuf_rasterizer, draw_triangle_edge_alignment_quality)
     rasterizer.flush();
 
     /* Check if each pixel has been drawn exactly once. */
-    if (rasterizer.stats.drawn_fragments != IMBUF_SIZE * IMBUF_SIZE) {
-      printf("%s\n", file_name);
-    }
-    EXPECT_EQ(rasterizer.stats.drawn_fragments, IMBUF_SIZE * IMBUF_SIZE);
+    EXPECT_EQ(rasterizer.stats.drawn_fragments, IMBUF_SIZE * IMBUF_SIZE) <<  i;
 
-#if 0
+#ifdef DEBUG_SAVE
+  char file_name[FILE_MAX];
+    BLI_path_sequence_encode(file_name, "/tmp/test_", ".png", 4, i);
     IMB_saveiff(&image_buffer, file_name, IB_rectfloat);
+    imb_freerectImBuf(&image_buffer);
 #endif
 
-    imb_freerectImBuf(&image_buffer);
   }
 
   imb_freerectImbuf_all(&image_buffer);
@@ -110,7 +107,6 @@ TEST(imbuf_rasterizer, edge_pixel_clamping)
   int fragments_drawn_c;
 
   {
-    printf("a\n");
     IMB_initImBuf(&image_buffer_a, IMBUF_SIZE, IMBUF_SIZE, 32, IB_rectfloat);
 
     RasterizerType rasterizer_a(&image_buffer_a);
@@ -125,7 +121,6 @@ TEST(imbuf_rasterizer, edge_pixel_clamping)
     fragments_drawn_a = rasterizer_a.stats.drawn_fragments;
   }
   {
-    printf("b\n");
     IMB_initImBuf(&image_buffer_b, IMBUF_SIZE, IMBUF_SIZE, 32, IB_rectfloat);
 
     RasterizerType rasterizer_b(&image_buffer_b);
@@ -141,7 +136,6 @@ TEST(imbuf_rasterizer, edge_pixel_clamping)
   }
 
   {
-    printf("c\n");
     IMB_initImBuf(&image_buffer_c, IMBUF_SIZE, IMBUF_SIZE, 32, IB_rectfloat);
 
     RasterizerType rasterizer_c(&image_buffer_c);
@@ -156,19 +150,16 @@ TEST(imbuf_rasterizer, edge_pixel_clamping)
     fragments_drawn_c = rasterizer_c.stats.drawn_fragments;
   }
 
-  printf("ab\n");
   EXPECT_EQ(fragments_drawn_a, fragments_drawn_b);
   EXPECT_EQ(memcmp(image_buffer_a.rect_float,
                    image_buffer_b.rect_float,
                    sizeof(float) * 4 * IMBUF_SIZE * IMBUF_SIZE),
             0);
-  printf("ac\n");
   EXPECT_EQ(fragments_drawn_a, fragments_drawn_c);
   EXPECT_EQ(memcmp(image_buffer_a.rect_float,
                    image_buffer_c.rect_float,
                    sizeof(float) * 4 * IMBUF_SIZE * IMBUF_SIZE),
             0);
-  printf("bc\n");
   EXPECT_EQ(fragments_drawn_b, fragments_drawn_c);
   EXPECT_EQ(memcmp(image_buffer_b.rect_float,
                    image_buffer_c.rect_float,
