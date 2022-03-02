@@ -490,6 +490,9 @@ void transform_input_update(TransInfo *t, const float fac)
   if (t->mode == TFM_EDGE_SLIDE) {
     transform_mode_edge_slide_reproject_input(t);
   }
+  else if (t->mode == TFM_VERT_SLIDE) {
+    transform_mode_vert_slide_reproject_input(t);
+  }
 }
 
 /** \} */

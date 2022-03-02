@@ -161,3 +161,4 @@ void initTranslation(TransInfo *t);
 void drawVertSlide(TransInfo *t);
 void initVertSlide_ex(TransInfo *t, bool use_even, bool flipped, bool use_clamp);
 void initVertSlide(TransInfo *t);
+void transform_mode_vert_slide_reproject_input(TransInfo *t);
