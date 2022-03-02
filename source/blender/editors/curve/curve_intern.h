@@ -201,7 +201,7 @@ bool ED_curve_pick_vert(struct ViewContext *vc,
                         struct Base **r_base);
 bool ED_curve_pick_vert_thresholded(struct ViewContext *vc,
                                     short sel,
-                                    const float sel_dist_mul,
+                                    float sel_dist_mul,
                                     struct Nurb **r_nurb,
                                     struct BezTriple **r_bezt,
                                     struct BPoint **r_bp,
