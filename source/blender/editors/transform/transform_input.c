@@ -19,6 +19,7 @@
 #include "WM_types.h"
 
 #include "transform.h"
+#include "transform_mode.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -484,6 +485,10 @@ void transform_input_update(TransInfo *t, const float fac)
     struct InputAngle_Data *data = mi->data;
     data->mval_prev[0] += offset_center[0];
     data->mval_prev[1] += offset_center[1];
+  }
+
+  if (t->mode == TFM_EDGE_SLIDE) {
+    transform_mode_edge_slide_reproject_input(t);
   }
 }
 
