@@ -311,7 +311,8 @@ set(GLSL_SRC
   shaders/compositor/compositor_convert_color_to_float.glsl
   shaders/compositor/compositor_convert_float_to_color.glsl
   shaders/compositor/compositor_convert_vector_to_color.glsl
-  shaders/compositor/sampler2D_to_RGBA16F_2D_image.glsl
+  shaders/compositor/compositor_image.glsl
+  shaders/compositor/compositor_image_alpha.glsl
 
   shaders/material/gpu_shader_material_add_shader.glsl
   shaders/material/gpu_shader_material_ambient_occlusion.glsl
@@ -496,7 +497,8 @@ set(SHADER_CREATE_INFOS
   shaders/compositor/infos/compositor_convert_color_to_float_info.hh
   shaders/compositor/infos/compositor_convert_float_to_color_info.hh
   shaders/compositor/infos/compositor_convert_vector_to_color_info.hh
-  shaders/compositor/infos/sampler2D_to_RGBA16F_2D_image_info.hh
+  shaders/compositor/infos/compositor_image_info.hh
+  shaders/compositor/infos/compositor_image_alpha_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")

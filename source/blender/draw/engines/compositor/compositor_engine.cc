@@ -16,6 +16,8 @@
  * Copyright 2021, Blender Foundation.
  */
 
+#include "BLI_math_vec_types.hh"
+
 #include "BLT_translation.h"
 
 #include "DNA_scene_types.h"
@@ -34,10 +36,10 @@ namespace blender::viewport_compositor {
 
 class DRWTexturePool : public TexturePool {
  public:
-  GPUTexture *allocate_texture(int width, int height, eGPUTextureFormat format) override
+  GPUTexture *allocate_texture(int2 size, eGPUTextureFormat format) override
   {
     DrawEngineType *owner = (DrawEngineType *)this;
-    return DRW_texture_pool_query_2d(width, height, format, owner);
+    return DRW_texture_pool_query_2d(size.x, size.y, format, owner);
   }
 };
 

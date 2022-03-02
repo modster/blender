@@ -17,6 +17,7 @@
 #include "BLI_assert.h"
 #include "BLI_hash.hh"
 #include "BLI_map.hh"
+#include "BLI_math_vec_types.hh"
 #include "BLI_math_vector.h"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
@@ -42,77 +43,54 @@ namespace blender::viewport_compositor {
  * Texture Pool.
  */
 
-TexturePoolKey::TexturePoolKey(int width, int height, eGPUTextureFormat format)
-    : width(width), height(height), format(format)
+TexturePoolKey::TexturePoolKey(int2 size, eGPUTextureFormat format) : size(size), format(format)
 {
 }
 
 TexturePoolKey::TexturePoolKey(const GPUTexture *texture)
 {
-  width = GPU_texture_width(texture);
-  height = GPU_texture_height(texture);
+  size = int2{GPU_texture_width(texture), GPU_texture_height(texture)};
   format = GPU_texture_format(texture);
 }
 
 uint64_t TexturePoolKey::hash() const
 {
-  return get_default_hash_3(width, height, format);
+  return get_default_hash_3(size.x, size.y, format);
 }
 
 bool operator==(const TexturePoolKey &a, const TexturePoolKey &b)
 {
-  return a.width == b.width && a.height == b.height && a.format == b.format;
+  return a.size == b.size && a.format == b.format;
 }
 
-GPUTexture *TexturePool::acquire(int width, int height, eGPUTextureFormat format)
+GPUTexture *TexturePool::acquire(int2 size, eGPUTextureFormat format)
 {
-  const TexturePoolKey key = TexturePoolKey(width, height, format);
+  const TexturePoolKey key = TexturePoolKey(size, format);
   Vector<GPUTexture *> &available_textures = textures_.lookup_or_add_default(key);
   if (available_textures.is_empty()) {
-    return allocate_texture(width, height, format);
+    return allocate_texture(size, format);
   }
   return available_textures.pop_last();
 }
 
-GPUTexture *TexturePool::acquire_color(int width, int height)
+GPUTexture *TexturePool::acquire_color(int2 size)
 {
-  return acquire(width, height, GPU_RGBA16F);
+  return acquire(size, GPU_RGBA16F);
 }
 
 /* Vectors are and should be stored in RGBA textures. */
-GPUTexture *TexturePool::acquire_vector(int width, int height)
+GPUTexture *TexturePool::acquire_vector(int2 size)
 {
-  return acquire(width, height, GPU_RGBA16F);
+  return acquire(size, GPU_RGBA16F);
 }
 
-GPUTexture *TexturePool::acquire_float(int width, int height)
+GPUTexture *TexturePool::acquire_float(int2 size)
 {
-  return acquire(width, height, GPU_R16F);
-}
-
-GPUTexture *TexturePool::acquire(int width, int height, ResultType type)
-{
-  switch (type) {
-    case ResultType::Float:
-      return acquire_float(width, height);
-    case ResultType::Vector:
-      return acquire_vector(width, height);
-    case ResultType::Color:
-      return acquire_color(width, height);
-  }
+  return acquire(size, GPU_R16F);
 }
 
 void TexturePool::release(GPUTexture *texture)
 {
-  /* Since the given texture will always have at least one more user beside the texture pool itself
-   * in a well behaved evaluation, this will not actually free the texture, it merely decrement the
-   * reference the count. */
-  GPU_texture_free(texture);
-  /* Don't release if the texture still has more than 1 user. We check if the reference count is
-   * more than 1, not zero, because the texture pool itself is considered a user of the texture. */
-  if (GPU_texture_get_reference_count(texture) > 1) {
-    return;
-  }
   textures_.lookup(TexturePoolKey(texture)).append(texture);
 }
 
@@ -133,22 +111,111 @@ TexturePool &Context::texture_pool()
  * Result.
  */
 
-Result::Result(ResultType type, bool is_texture) : type(type), is_texture(is_texture)
+Result::Result(ResultType type) : type(type)
 {
+}
+
+void Result::allocate_texture(int2 size, TexturePool *texture_pool)
+{
+  is_texture = true;
+  this->texture_pool = texture_pool;
+  switch (type) {
+    case ResultType::Float:
+      texture = texture_pool->acquire_float(size);
+      return;
+    case ResultType::Vector:
+      texture = texture_pool->acquire_vector(size);
+      return;
+    case ResultType::Color:
+      texture = texture_pool->acquire_color(size);
+      return;
+  }
+}
+
+void Result::allocate_single_value(TexturePool *texture_pool)
+{
+  is_texture = false;
+  this->texture_pool = texture_pool;
+  /* Allocate a dummy texture of size 1x1. */
+  const int2 dummy_texture_size{1, 1};
+  switch (type) {
+    case ResultType::Float:
+      texture = texture_pool->acquire_float(dummy_texture_size);
+      return;
+    case ResultType::Vector:
+      texture = texture_pool->acquire_vector(dummy_texture_size);
+      return;
+    case ResultType::Color:
+      texture = texture_pool->acquire_color(dummy_texture_size);
+      return;
+  }
+}
+
+void Result::bind_as_texture(GPUShader *shader, const char *texture_name) const
+{
+  const int texture_image_unit = GPU_shader_get_texture_binding(shader, texture_name);
+  GPU_texture_bind(texture, texture_image_unit);
+}
+
+void Result::bind_as_generic_input(GPUShader *shader,
+                                   const char *is_texture_name,
+                                   const char *value_name,
+                                   const char *texture_name) const
+{
+  /* Set the value of the is_texture uniform. */
+  GPU_shader_uniform_1b(shader, is_texture_name, is_texture);
+
+  /* Bind the texture to the texture image unit. If this is a single value result, this will be a
+   * dummy texture. */
+  bind_as_texture(shader, texture_name);
+
+  /* Set the value of the value uniform. If the result is a texture, the values will be
+   * uninitialized. */
+  switch (type) {
+    case ResultType::Float:
+      GPU_shader_uniform_1f(shader, value_name, *value);
+      break;
+    case ResultType::Vector:
+      GPU_shader_uniform_3fv(shader, value_name, value);
+      break;
+    case ResultType::Color:
+      GPU_shader_uniform_4fv(shader, value_name, value);
+      break;
+  }
+}
+
+void Result::bind_as_image(GPUShader *shader, const char *image_name) const
+{
+  const int image_unit = GPU_shader_get_texture_binding(shader, image_name);
+  GPU_texture_image_bind(texture, image_unit);
+}
+
+void Result::unbind_as_texture() const
+{
+  GPU_texture_unbind(texture);
+}
+
+void Result::unbind_as_image() const
+{
+  GPU_texture_image_unbind(texture);
 }
 
 void Result::incremenet_reference_count()
 {
-  if (is_texture) {
-    GPU_texture_ref(data.texture);
+  reference_count++;
+}
+
+void Result::release()
+{
+  reference_count--;
+  if (reference_count == 0) {
+    texture_pool->release(texture);
   }
 }
 
-void Result::release(TexturePool &texture_pool)
+int2 Result::size() const
 {
-  if (is_texture) {
-    texture_pool.release(data.texture);
-  }
+  return int2{GPU_texture_width(texture), GPU_texture_height(texture)};
 }
 
 /* --------------------------------------------------------------------
@@ -159,17 +226,32 @@ Operation::Operation(Context &context) : context_(context)
 {
 }
 
+Operation::~Operation()
+{
+  for (const Vector<ProcessorOperation *> &processors : input_processors_.values()) {
+    for (ProcessorOperation *processor : processors) {
+      delete processor;
+    }
+  }
+}
+
 void Operation::initialize()
 {
+  pre_allocate();
+  add_input_processors();
+  allocate_input_processors();
+  allocate();
 }
 
-void Operation::release()
+void Operation::evaluate()
 {
-}
+  pre_execute();
+  execute_input_processors();
+  execute();
 
-void Operation::add_result(StringRef identifier, Result result)
-{
-  results_.add_new(identifier, result);
+  pre_release();
+  release();
+  release_inputs();
 }
 
 Result &Operation::get_result(StringRef identifier)
@@ -183,16 +265,45 @@ void Operation::map_input_to_result(StringRef identifier, Result *result)
   result->incremenet_reference_count();
 }
 
-const Result &Operation::get_input(StringRef identifier) const
+void Operation::pre_allocate()
+{
+}
+
+void Operation::allocate()
+{
+}
+
+void Operation::pre_execute()
+{
+}
+
+void Operation::pre_release()
+{
+}
+
+void Operation::release()
+{
+}
+
+Result &Operation::get_input(StringRef identifier) const
 {
   return *inputs_to_results_map_.lookup(identifier);
 }
 
-void Operation::release_inputs()
+void Operation::switch_result_mapped_to_input(StringRef identifier, Result *result)
 {
-  for (Result *result : inputs_to_results_map_.values()) {
-    result->release(texture_pool());
-  }
+  get_input(identifier).release();
+  inputs_to_results_map_.lookup(identifier) = result;
+}
+
+void Operation::populate_result(StringRef identifier, Result result)
+{
+  results_.add_new(identifier, result);
+}
+
+void Operation::declare_input_type(StringRef identifier, ResultType type)
+{
+  input_types_.add_new(identifier, type);
 }
 
 Context &Operation::context()
@@ -205,17 +316,127 @@ TexturePool &Operation::texture_pool()
   return context_.texture_pool();
 }
 
+void Operation::add_input_processors()
+{
+  /* First add all needed processors for each input. */
+  for (const StringRef &identifier : inputs_to_results_map_.keys()) {
+    add_implicit_conversion_input_processor_if_needed(identifier);
+  }
+
+  /* Then update the mapped result for each input to be that of the last processor for that input
+   * if any input processor exist for it. */
+  for (const StringRef &identifier : inputs_to_results_map_.keys()) {
+    Vector<ProcessorOperation *> &processors = input_processors_.lookup_or_add_default(identifier);
+    /* No input processors, nothing to do. */
+    if (processors.is_empty()) {
+      continue;
+    }
+    /* Replace the currently mapped result with the result of the last input processor. */
+    switch_result_mapped_to_input(identifier, &processors.last()->get_result());
+  }
+}
+
+void Operation::add_implicit_conversion_input_processor_if_needed(StringRef identifier)
+{
+  ResultType result_type = get_input(identifier).type;
+  ResultType expected_type = input_types_.lookup(identifier);
+
+  if (result_type == ResultType::Float && expected_type == ResultType::Vector) {
+    add_input_processor(identifier, new ConvertFloatToVectorProcessorOperation(context()));
+  }
+  else if (result_type == ResultType::Float && expected_type == ResultType::Color) {
+    add_input_processor(identifier, new ConvertFloatToColorProcessorOperation(context()));
+  }
+  else if (result_type == ResultType::Color && expected_type == ResultType::Float) {
+    add_input_processor(identifier, new ConvertColorToFloatProcessorOperation(context()));
+  }
+  else if (result_type == ResultType::Vector && expected_type == ResultType::Float) {
+    add_input_processor(identifier, new ConvertVectorToFloatProcessorOperation(context()));
+  }
+  else if (result_type == ResultType::Vector && expected_type == ResultType::Color) {
+    add_input_processor(identifier, new ConvertVectorToColorProcessorOperation(context()));
+  }
+}
+
+void Operation::add_input_processor(StringRef identifier, ProcessorOperation *processor)
+{
+  /* Get a reference to the input processors vector for the given input. */
+  Vector<ProcessorOperation *> &processors = input_processors_.lookup_or_add_default(identifier);
+
+  /* Get the result that should serve as the input for the processor. This is either the result
+   * mapped to the input or the result of the last processor depending on whether this is the first
+   * processor or not. */
+  Result &result = processors.is_empty() ? get_input(identifier) : processors.last()->get_result();
+
+  /* Set the input result of the processor and add it to the processors vector. The output of the
+   * processor will be mapped later after all processors were added. */
+  processor->map_input_to_result(&result);
+  processors.append(processor);
+}
+
+void Operation::allocate_input_processors()
+{
+  for (const Vector<ProcessorOperation *> &processors : input_processors_.values()) {
+    for (ProcessorOperation *processor : processors) {
+      processor->allocate();
+    }
+  }
+}
+
+void Operation::execute_input_processors()
+{
+  for (const Vector<ProcessorOperation *> &processors : input_processors_.values()) {
+    for (ProcessorOperation *processor : processors) {
+      processor->execute();
+    }
+  }
+}
+
+void Operation::release_inputs()
+{
+  for (Result *result : inputs_to_results_map_.values()) {
+    result->release();
+  }
+}
+
 /* --------------------------------------------------------------------
  * Node Operation.
  */
 
 using namespace nodes::derived_node_tree_types;
 
-NodeOperation::NodeOperation(Context &context, DNode node) : Operation(context), node_(node)
+static ResultType get_node_socket_result_type(const SocketRef *socket)
 {
+  switch (socket->bsocket()->type) {
+    case SOCK_FLOAT:
+      return ResultType::Float;
+    case SOCK_VECTOR:
+      return ResultType::Vector;
+    case SOCK_RGBA:
+      return ResultType::Color;
+    default:
+      BLI_assert_unreachable();
+      return ResultType::Float;
+  }
 }
 
-/* Node operations are buffered in most cases, but the derived operation can override otherwise. */
+NodeOperation::NodeOperation(Context &context, DNode node) : Operation(context), node_(node)
+{
+  /* Populate the output results. */
+  for (const OutputSocketRef *output : node->outputs()) {
+    populate_result(output->identifier(), Result(get_node_socket_result_type(output)));
+  }
+
+  /* Populate the input types. */
+  for (const InputSocketRef *input : node->inputs()) {
+    declare_input_type(input->identifier(), get_node_socket_result_type(input));
+  }
+
+  populate_results_for_unlinked_inputs();
+}
+
+/* Node operations are buffered in most cases, but the derived operation can override
+   otherwise. */
 bool NodeOperation::is_buffered() const
 {
   return true;
@@ -235,102 +456,143 @@ const bNode &NodeOperation::node() const
   return *node_->bnode();
 }
 
-/* --------------------------------------------------------------------
- * Single Value Input Operation.
- */
-
-SingleValueInputOperation::SingleValueInputOperation(Context &context, DInputSocket input)
-    : MetaOperation(context), input_(input)
+/* Get the origin socket of the given node input. If the input is not linked, the socket itself is
+ * returned. If the input is linked, the socket that is linked to it is returned, which could
+ * either be an input or an output. An input socket is returned when the given input is connected
+ * to an unlinked input of a group input node. */
+static DSocket get_node_input_origin_socket(DInputSocket input)
 {
+  /* The input is unlinked. Return the socket itself. */
+  if (input->logically_linked_sockets().is_empty()) {
+    return input;
+  }
+
+  /* Only a single origin socket is guranteed to exist. */
+  DSocket socket;
+  input.foreach_origin_socket([&](const DSocket origin) { socket = origin; });
+  return socket;
 }
 
-const StringRef SingleValueInputOperation::output_identifier = StringRef("Output");
-
-bool SingleValueInputOperation::is_buffered() const
+void NodeOperation::populate_results_for_unlinked_inputs()
 {
-  return false;
-}
+  for (const InputSocketRef *input_ref : node_->inputs()) {
+    const DInputSocket input{node_.context(), input_ref};
+    DSocket origin = get_node_input_origin_socket(input);
 
-/* The result is a single value of the same type as the member socket. */
-void SingleValueInputOperation::initialize()
-{
-  Result result{get_input_result_type(), false};
-  add_result(output_identifier, result);
-}
+    /* Input is linked, skip it. If the origin is an input, that means the input is connected to an
+     * unlinked input of a group input node, hence why we check if the origin is an output. */
+    if (origin && origin->is_output()) {
+      continue;
+    }
 
-/* Copy the default value of the member socket to the output result. */
-void SingleValueInputOperation::execute()
-{
-  Result &result = get_result(output_identifier);
-  switch (input_->bsocket()->type) {
-    case SOCK_FLOAT:
-      result.data.value = input_->default_value<bNodeSocketValueFloat>()->value;
-      return;
-    case SOCK_VECTOR:
-      copy_v3_v3(result.data.vector, input_->default_value<bNodeSocketValueVector>()->value);
-      return;
-    case SOCK_RGBA:
-      copy_v4_v4(result.data.color, input_->default_value<bNodeSocketValueRGBA>()->value);
-      return;
-    default:
-      BLI_assert_unreachable();
+    /* Construct a result of an appropriate type, add it to the results vector, and map the input
+     * to it. */
+    Result result = Result(get_node_socket_result_type(origin.socket_ref()));
+    unlinked_inputs_results_.append(result);
+    map_input_to_result(input->identifier(), &unlinked_inputs_results_.last());
+
+    /* Map the input to the socket to later allocate and initialize its value. */
+    const DInputSocket origin_input{origin.context(), &origin->as_input()};
+    unlinked_inputs_sockets_.add_new(input->identifier(), origin_input);
   }
 }
 
-ResultType SingleValueInputOperation::get_input_result_type() const
+void NodeOperation::pre_allocate()
 {
-  switch (input_->bsocket()->type) {
-    case SOCK_FLOAT:
-      return ResultType::Float;
-    case SOCK_VECTOR:
-      return ResultType::Vector;
-    case SOCK_RGBA:
-      return ResultType::Color;
-    default:
-      BLI_assert_unreachable();
-      return ResultType::Float;
+  /* Allocate the unlinked inputs results. */
+  for (Result &result : unlinked_inputs_results_) {
+    result.allocate_single_value(&texture_pool());
+  }
+}
+
+void NodeOperation::pre_execute()
+{
+  /* For all unlinked input sockets, set the value of the input result based on the socket's
+   * default value. */
+  for (const Map<StringRef, DInputSocket>::Item &item : unlinked_inputs_sockets_.items()) {
+    Result &result = get_input(item.key);
+    DInputSocket input = item.value;
+    switch (result.type) {
+      case ResultType::Float:
+        *result.value = input->default_value<bNodeSocketValueFloat>()->value;
+        return;
+      case ResultType::Vector:
+        copy_v3_v3(result.value, input->default_value<bNodeSocketValueVector>()->value);
+        return;
+      case ResultType::Color:
+        copy_v4_v4(result.value, input->default_value<bNodeSocketValueRGBA>()->value);
+        return;
+    }
   }
 }
 
 /* --------------------------------------------------------------------
- * Conversion Operation.
+ * Processor Operation.
  */
 
-const StringRef ConversionOperation::input_identifier = StringRef("Input");
-const StringRef ConversionOperation::output_identifier = StringRef("Output");
-const char *ConversionOperation::shader_input_sampler_name = "input_sampler";
-const char *ConversionOperation::shader_output_image_name = "output_image";
+const StringRef ProcessorOperation::input_identifier = StringRef("Input");
+const StringRef ProcessorOperation::output_identifier = StringRef("Output");
 
-bool ConversionOperation::is_buffered() const
+Result &ProcessorOperation::get_result()
+{
+  return Operation::get_result(output_identifier);
+}
+
+void ProcessorOperation::map_input_to_result(Result *result)
+{
+  Operation::map_input_to_result(input_identifier, result);
+}
+
+Result &ProcessorOperation::get_input()
+{
+  return Operation::get_input(input_identifier);
+}
+
+void ProcessorOperation::switch_result_mapped_to_input(Result *result)
+{
+  Operation::switch_result_mapped_to_input(input_identifier, result);
+}
+
+void ProcessorOperation::populate_result(Result result)
+{
+  Operation::populate_result(output_identifier, result);
+}
+
+void ProcessorOperation::declare_input_type(ResultType type)
+{
+  Operation::declare_input_type(input_identifier, type);
+}
+
+/* --------------------------------------------------------------------
+ *  Conversion Processor Operation.
+ */
+
+const char *ConversionProcessorOperation::shader_input_sampler_name = "input_sampler";
+const char *ConversionProcessorOperation::shader_output_image_name = "output_image";
+
+bool ConversionProcessorOperation::is_buffered() const
 {
   return true;
 }
 
-void ConversionOperation::initialize()
+void ConversionProcessorOperation::allocate()
 {
-  /* Create a result with an appropriate description. */
-  const Result &input = get_input(input_identifier);
-  Result result{get_output_result_type(), input.is_texture};
-
-  /* If the result is not a texture, no need to initialize anything further. */
-  if (!result.is_texture) {
-    add_result(output_identifier, result);
-    return;
+  Result &result = get_result();
+  const Result &input = get_input();
+  if (input.is_texture) {
+    result.allocate_texture(input.size(), &texture_pool());
   }
-
-  /* Allocate and assign a texture with the required specification. */
-  const int width = GPU_texture_width(result.data.texture);
-  const int height = GPU_texture_height(result.data.texture);
-  result.data.texture = texture_pool().acquire(width, height, result.type);
-  add_result(output_identifier, result);
+  else {
+    result.allocate_single_value(&texture_pool());
+  }
 }
 
-void ConversionOperation::execute()
+void ConversionProcessorOperation::execute()
 {
-  const Result &input = get_input(input_identifier);
-  Result &result = get_result(output_identifier);
+  const Result &input = get_input();
+  Result &result = get_result();
 
-  /* Call the execute_single method of the derived class. */
+  /* The input is a single value, call the execute_single method of the derived class and exit. */
   if (!input.is_texture) {
     execute_single(input, result);
     return;
@@ -341,123 +603,130 @@ void ConversionOperation::execute()
   GPU_shader_bind(shader);
 
   /* Bind input texture and output image. */
-  const int input_unit = GPU_shader_get_texture_binding(shader, shader_input_sampler_name);
-  GPU_texture_bind(input.data.texture, input_unit);
-  const int output_unit = GPU_shader_get_texture_binding(shader, shader_output_image_name);
-  GPU_texture_image_bind(result.data.texture, output_unit);
+  input.bind_as_texture(shader, shader_input_sampler_name);
+  result.bind_as_image(shader, shader_output_image_name);
 
   /* Dispatch shader. */
-  const int width = GPU_texture_width(result.data.texture);
-  const int height = GPU_texture_height(result.data.texture);
-  GPU_compute_dispatch(shader, width / 16 + 1, height / 16 + 1, 1);
+  const int2 size = result.size();
+  GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
   /* Make sure the output is written before using it. */
   GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
 
   /* Unbind and free resources. */
+  input.unbind_as_texture();
+  result.unbind_as_image();
   GPU_shader_unbind();
-  GPU_texture_unbind(input.data.texture);
-  GPU_texture_image_unbind(result.data.texture);
   GPU_shader_free(shader);
 }
 
 /* --------------------------------------------------------------------
- * Convert Float To Vector Operation.
+ *  Convert Float To Vector Processor Operation.
  */
 
-void ConvertFloatToVectorOperation::execute_single(const Result &input, Result &output)
+ConvertFloatToVectorProcessorOperation::ConvertFloatToVectorProcessorOperation(Context &context)
+    : ConversionProcessorOperation(context)
 {
-  copy_v3_fl(output.data.vector, input.data.value);
+  declare_input_type(ResultType::Float);
+  populate_result(Result(ResultType::Vector));
 }
 
-ResultType ConvertFloatToVectorOperation::get_output_result_type() const
+void ConvertFloatToVectorProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  return ResultType::Vector;
+  copy_v3_fl(output.value, *input.value);
 }
 
 /* Use the shader for color conversion since they are stored in similar textures and the conversion
  * is practically the same. */
-GPUShader *ConvertFloatToVectorOperation::get_conversion_shader() const
+GPUShader *ConvertFloatToVectorProcessorOperation::get_conversion_shader() const
 {
   return GPU_shader_create_from_info_name("compositor_convert_float_to_color");
 }
 
 /* --------------------------------------------------------------------
- * Convert Float To Color Operation.
+ *  Convert Float To Color Processor Operation.
  */
 
-void ConvertFloatToColorOperation::execute_single(const Result &input, Result &output)
+ConvertFloatToColorProcessorOperation::ConvertFloatToColorProcessorOperation(Context &context)
+    : ConversionProcessorOperation(context)
 {
-  copy_v3_fl(output.data.color, input.data.value);
-  output.data.color[3] = 1.0f;
+  declare_input_type(ResultType::Float);
+  populate_result(Result(ResultType::Color));
 }
 
-ResultType ConvertFloatToColorOperation::get_output_result_type() const
+void ConvertFloatToColorProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  return ResultType::Color;
+  copy_v3_fl(output.value, *input.value);
+  output.value[3] = 1.0f;
 }
 
-GPUShader *ConvertFloatToColorOperation::get_conversion_shader() const
+GPUShader *ConvertFloatToColorProcessorOperation::get_conversion_shader() const
 {
   return GPU_shader_create_from_info_name("compositor_convert_float_to_color");
 }
 
 /* --------------------------------------------------------------------
- * Convert Color To Float Operation.
+ *  Convert Color To Float Processor Operation.
  */
 
-void ConvertColorToFloatOperation::execute_single(const Result &input, Result &output)
+ConvertColorToFloatProcessorOperation::ConvertColorToFloatProcessorOperation(Context &context)
+    : ConversionProcessorOperation(context)
 {
-  output.data.value = (input.data.color[0] + input.data.color[1] + input.data.color[1]) / 3.0f;
+  declare_input_type(ResultType::Color);
+  populate_result(Result(ResultType::Float));
 }
 
-ResultType ConvertColorToFloatOperation::get_output_result_type() const
+void ConvertColorToFloatProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  return ResultType::Float;
+  *output.value = (input.value[0] + input.value[1] + input.value[2]) / 3.0f;
 }
 
-GPUShader *ConvertColorToFloatOperation::get_conversion_shader() const
+GPUShader *ConvertColorToFloatProcessorOperation::get_conversion_shader() const
 {
   return GPU_shader_create_from_info_name("compositor_convert_color_to_float");
 }
 
 /* --------------------------------------------------------------------
- * Convert Vector To Float Operation.
+ *  Convert Vector To Float Processor Operation.
  */
 
-void ConvertVectorToFloatOperation::execute_single(const Result &input, Result &output)
+ConvertVectorToFloatProcessorOperation::ConvertVectorToFloatProcessorOperation(Context &context)
+    : ConversionProcessorOperation(context)
 {
-  output.data.value = (input.data.vector[0] + input.data.vector[1] + input.data.vector[1]) / 3.0f;
+  declare_input_type(ResultType::Vector);
+  populate_result(Result(ResultType::Float));
 }
 
-ResultType ConvertVectorToFloatOperation::get_output_result_type() const
+void ConvertVectorToFloatProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  return ResultType::Float;
+  *output.value = (input.value[0] + input.value[1] + input.value[2]) / 3.0f;
 }
 
 /* Use the shader for color conversion since they are stored in similar textures and the conversion
  * is practically the same. */
-GPUShader *ConvertVectorToFloatOperation::get_conversion_shader() const
+GPUShader *ConvertVectorToFloatProcessorOperation::get_conversion_shader() const
 {
   return GPU_shader_create_from_info_name("compositor_convert_color_to_float");
 }
 
 /* --------------------------------------------------------------------
- * Convert Vector To Color Operation.
+ *  Convert Vector To Color Processor Operation.
  */
 
-void ConvertVectorToColorOperation::execute_single(const Result &input, Result &output)
+ConvertVectorToColorProcessorOperation::ConvertVectorToColorProcessorOperation(Context &context)
+    : ConversionProcessorOperation(context)
 {
-  copy_v3_v3(output.data.color, input.data.vector);
-  output.data.color[3] = 1.0f;
+  declare_input_type(ResultType::Vector);
+  populate_result(Result(ResultType::Color));
 }
 
-ResultType ConvertVectorToColorOperation::get_output_result_type() const
+void ConvertVectorToColorProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  return ResultType::Color;
+  copy_v3_v3(output.value, input.value);
+  output.value[3] = 1.0f;
 }
 
-GPUShader *ConvertVectorToColorOperation::get_conversion_shader() const
+GPUShader *ConvertVectorToColorProcessorOperation::get_conversion_shader() const
 {
   return GPU_shader_create_from_info_name("compositor_convert_vector_to_color");
 }
@@ -500,8 +769,11 @@ void Evaluator::evaluate()
   /* Compute the operations stream. */
   compute_operations_stream(node_schedule);
 
-  /* Execute the operations stream. */
-  execute_operations_stream();
+  /* Initialize the operations stream. */
+  initialize_operations_stream();
+
+  /* Evaluate the operations stream. */
+  evaluate_operations_stream();
 }
 
 /* The output node is the one marked as NODE_DO_OUTPUT. If multiple types of output nodes are
@@ -657,153 +929,51 @@ void Evaluator::compute_schedule(DNode node,
   node_schedule.add_new(node);
 }
 
-/* Emit and initialize all node operations in the same order as the node schedule. */
 void Evaluator::compute_operations_stream(NodeSchedule &node_schedule)
 {
   for (const DNode &node : node_schedule) {
-    emit_node_operation(node);
+    /* First add the node operation corresponding to the given node to the operations stream. */
+    operations_stream_.append(node_operations_.lookup(node));
+    /* Then map the inputs of the operation to the results connected to them. */
+    map_node_inputs_to_results(node);
   }
 }
 
-/* First map the inputs to their results, emitting and initializing any meta operations in the
- * process. Then emit and initialize the node operation corresponding to the given node. */
-void Evaluator::emit_node_operation(DNode node)
-{
-  map_node_inputs_to_results(node);
-
-  NodeOperation *node_operation = node_operations_.lookup(node);
-  node_operation->initialize();
-  operations_stream_.append(node_operation);
-}
-
-/* Call map_node_input_to_result for every input in the node. */
 void Evaluator::map_node_inputs_to_results(DNode node)
 {
   for (const InputSocketRef *input_ref : node->inputs()) {
     const DInputSocket input{node.context(), input_ref};
-    map_node_input_to_result(input);
-  }
-}
+    DSocket origin = get_node_input_origin_socket(input);
 
-/* Either call map_node_linked_input_to_result or map_node_unlinked_input_to_result depending on
- * whether the input is linked to an output or not. */
-void Evaluator::map_node_input_to_result(DInputSocket input)
-{
-  /* The input is unlinked. */
-  if (input->logically_linked_sockets().is_empty()) {
-    map_node_unlinked_input_to_result(input);
-    return;
-  }
-
-  input.foreach_origin_socket([&](const DSocket origin) {
-    /* The input is linked to an input of a group input node that is actually unlinked, in this
-     * case, we pass the input of the group input node. */
+    /* If the origin socket is an input, that means the input is unlinked. Unlinked inputs are
+     * mapped internally to internal results, so skip here. */
     if (origin->is_input()) {
-      const DInputSocket group_input{origin.context(), &origin->as_input()};
-      map_node_unlinked_input_to_result(group_input);
       return;
     }
 
-    /* The input is linked to an output. */
+    /* Get the result from the operation that contains the output socket. */
     const DOutputSocket output{origin.context(), &origin->as_output()};
-    map_node_linked_input_to_result(input, output);
-  });
+    NodeOperation *output_operation = node_operations_.lookup(output.node());
+    Result &result = output_operation->get_result(output->identifier());
+
+    /* Map the input to the result we got from the output. */
+    NodeOperation *input_operation = node_operations_.lookup(input.node());
+    input_operation->map_input_to_result(input->identifier(), &result);
+  }
 }
 
-void Evaluator::map_node_linked_input_to_result(DInputSocket input, DOutputSocket output)
-{
-  Result &result = get_result_linked_to_node_input(input, output);
-  /* Map the input to the result we got from the output. */
-  NodeOperation *input_operation = node_operations_.lookup(input.node());
-  input_operation->map_input_to_result(input->identifier(), &result);
-}
-
-/* Returns true if the result we get from the output can be consumed by the input with any need for
- * conversion. */
-static bool is_output_compatible_with_input(DInputSocket input, DOutputSocket output)
-{
-  /* Trivial case. */
-  if (output->typeinfo()->type == input->typeinfo()->type) {
-    return true;
-  }
-  /* Vectors are stored in RGBA textures, so shaders can treat color textures as vectors
-   * transparently. */
-  if (output->typeinfo()->type == SOCK_RGBA && input->typeinfo()->type == SOCK_VECTOR) {
-    return true;
-  }
-  /* The rest of the combinations required conversion. */
-  return false;
-}
-
-Result &Evaluator::get_result_linked_to_node_input(DInputSocket input, DOutputSocket output)
-{
-  NodeOperation *output_operation = node_operations_.lookup(output.node());
-  Result &result = output_operation->get_result(output->identifier());
-  /* The output result is compatible with the input, return the result directly. */
-  if (is_output_compatible_with_input(input, output)) {
-    return result;
-  }
-  /* Conversion is needed, insert an appropriate conversion operation and return its result. */
-  return emit_conversion_operation(input, output);
-}
-
-Result &Evaluator::emit_conversion_operation(DInputSocket input, DOutputSocket output)
-{
-  /* Instantiate an appropriate conversion operation. */
-  ConversionOperation *conversion_operation = nullptr;
-  if (output->typeinfo()->type == SOCK_FLOAT && input->typeinfo()->type == SOCK_VECTOR) {
-    conversion_operation = new ConvertFloatToVectorOperation(context);
-  }
-  else if (output->typeinfo()->type == SOCK_FLOAT && input->typeinfo()->type == SOCK_RGBA) {
-    conversion_operation = new ConvertFloatToColorOperation(context);
-  }
-  else if (output->typeinfo()->type == SOCK_RGBA && input->typeinfo()->type == SOCK_FLOAT) {
-    conversion_operation = new ConvertColorToFloatOperation(context);
-  }
-  else if (output->typeinfo()->type == SOCK_VECTOR && input->typeinfo()->type == SOCK_FLOAT) {
-    conversion_operation = new ConvertVectorToFloatOperation(context);
-  }
-  else if (output->typeinfo()->type == SOCK_VECTOR && input->typeinfo()->type == SOCK_RGBA) {
-    conversion_operation = new ConvertVectorToColorOperation(context);
-  }
-  else {
-    BLI_assert_unreachable();
-  }
-  conversion_operation->initialize();
-
-  /* Map the input of the conversion operation to the output and return its result. */
-  NodeOperation *output_operation = node_operations_.lookup(output.node());
-  Result &result = output_operation->get_result(output->identifier());
-  conversion_operation->map_input_to_result(ConversionOperation::input_identifier, &result);
-  return conversion_operation->get_result(ConversionOperation::output_identifier);
-}
-
-void Evaluator::map_node_unlinked_input_to_result(DInputSocket input)
-{
-  /* Emit a SingleValueInputOperation for that input. */
-  SingleValueInputOperation *value_operation = new SingleValueInputOperation(context, input);
-  value_operation->initialize();
-  operations_stream_.append(value_operation);
-
-  /* Map the input to the result we get from the single value operation. */
-  NodeOperation *input_operation = node_operations_.lookup(input.node());
-  Result &result = value_operation->get_result(SingleValueInputOperation::output_identifier);
-  input_operation->map_input_to_result(input->identifier(), &result);
-}
-
-/* Call execute_operation for every operation in the stream in order. */
-void Evaluator::execute_operations_stream()
+void Evaluator::initialize_operations_stream()
 {
   for (Operation *operation : operations_stream_) {
-    execute_operation(operation);
+    operation->initialize();
   }
 }
 
-void Evaluator::execute_operation(Operation *operation)
+void Evaluator::evaluate_operations_stream()
 {
-  operation->execute();
-  operation->release();
-  operation->release_inputs();
+  for (Operation *operation : operations_stream_) {
+    operation->evaluate();
+  }
 }
 
 }  // namespace blender::viewport_compositor

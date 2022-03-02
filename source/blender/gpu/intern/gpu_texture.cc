@@ -523,16 +523,6 @@ void GPU_texture_ref(GPUTexture *tex)
   reinterpret_cast<Texture *>(tex)->refcount++;
 }
 
-void GPU_texture_set_reference_count(GPUTexture *texture, int count)
-{
-  reinterpret_cast<Texture *>(texture)->refcount = count;
-}
-
-int GPU_texture_get_reference_count(GPUTexture *texture)
-{
-  return reinterpret_cast<Texture *>(texture)->refcount;
-}
-
 int GPU_texture_width(const GPUTexture *tex)
 {
   return reinterpret_cast<const Texture *>(tex)->width_get();

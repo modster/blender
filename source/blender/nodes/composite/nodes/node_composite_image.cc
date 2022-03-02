@@ -24,6 +24,7 @@
 #include "node_composite_util.hh"
 
 #include "BLI_linklist.h"
+#include "BLI_math_vector.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
@@ -462,39 +463,67 @@ class ImageOperation : public NodeOperation {
  public:
   using NodeOperation::NodeOperation;
 
-  void initialize() override
+  void allocate() override
   {
+    allocate_output("Image");
+    allocate_output("Alpha");
+  }
+
+  void allocate_output(StringRef identifier)
+  {
+    if (!is_output_needed(identifier)) {
+      return;
+    }
+
+    Result &result = get_result(identifier);
     GPUTexture *image_texture = get_image_texture();
+    /* The image texture is invalid or missing, allocate a single zero output. */
+    if (!image_texture) {
+      result.allocate_single_value(&context().texture_pool());
+      return;
+    }
+
     const int width = GPU_texture_width(image_texture);
     const int height = GPU_texture_height(image_texture);
-
-    Result result{ResultType::Color, true};
-    result.data.texture = texture_pool().acquire_color(width, height);
-    add_result("Image", result);
+    result.allocate_texture(int2{width, height}, &context().texture_pool());
   }
 
   void execute() override
   {
-    GPUShader *shader = GPU_shader_create_from_info_name("sampler2D_to_RGBA16F_2D_image");
+    compute_output("Image", "compositor_image");
+    compute_output("Alpha", "compositor_image_alpha");
+  }
+
+  void compute_output(StringRef identifier, const char *shader_name)
+  {
+    if (!is_output_needed(identifier)) {
+      return;
+    }
+
+    Result &result = get_result(identifier);
+    /* The image texture is invalid or missing, set the output value to zero. */
+    if (!result.is_texture) {
+      copy_v4_fl(result.value, 0.0f);
+      return;
+    }
+
+    GPUShader *shader = GPU_shader_create_from_info_name(shader_name);
     GPU_shader_bind(shader);
 
     const int input_unit = GPU_shader_get_texture_binding(shader, "input_sampler");
     GPUTexture *image_texture = get_image_texture();
     GPU_texture_bind(image_texture, input_unit);
 
-    const Result &result = get_result("Image");
-    const int output_unit = GPU_shader_get_texture_binding(shader, "output_image");
-    GPU_texture_image_bind(result.data.texture, output_unit);
+    result.bind_as_image(shader, "output_image");
 
-    const int width = GPU_texture_width(image_texture);
-    const int height = GPU_texture_height(image_texture);
-    GPU_compute_dispatch(shader, width / 16 + 1, height / 16 + 1, 1);
+    const int2 size = result.size();
+    GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
     GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
 
     GPU_shader_unbind();
     GPU_texture_unbind(image_texture);
-    GPU_texture_image_unbind(result.data.texture);
+    result.unbind_as_image();
     GPU_shader_free(shader);
   }
 
@@ -680,16 +709,15 @@ class RenderLayerOperation : public NodeOperation {
  public:
   using NodeOperation::NodeOperation;
 
-  void initialize() override
+  void allocate() override
   {
     const int view_layer = node().custom1;
     const GPUTexture *pass_texture = context().get_pass_texture(view_layer, SCE_PASS_COMBINED);
     const int width = GPU_texture_width(pass_texture);
     const int height = GPU_texture_height(pass_texture);
 
-    Result result{ResultType::Color, true};
-    result.data.texture = texture_pool().acquire_color(width, height);
-    add_result("Image", result);
+    Result &image_result = get_result("Image");
+    image_result.allocate_texture(int2{width, height}, &context().texture_pool());
   }
 
   void execute() override
@@ -697,7 +725,7 @@ class RenderLayerOperation : public NodeOperation {
     const int view_layer = node().custom1;
     GPUTexture *pass_texture = context().get_pass_texture(view_layer, SCE_PASS_COMBINED);
     const Result &result = get_result("Image");
-    GPU_texture_copy(result.data.texture, pass_texture);
+    GPU_texture_copy(result.texture, pass_texture);
   }
 };
 

@@ -281,8 +281,6 @@ void GPU_texture_clear(GPUTexture *tex, eGPUDataFormat data_format, const void *
 void GPU_texture_free(GPUTexture *tex);
 
 void GPU_texture_ref(GPUTexture *tex);
-void GPU_texture_set_reference_count(GPUTexture *texture, int count);
-int GPU_texture_get_reference_count(GPUTexture *texture);
 
 void GPU_texture_bind(GPUTexture *tex, int unit);
 void GPU_texture_bind_ex(GPUTexture *tex, eGPUSamplerState state, int unit, bool set_number);
