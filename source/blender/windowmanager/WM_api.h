@@ -127,11 +127,7 @@ void WM_reinit_gizmomap_all(struct Main *bmain);
  */
 void WM_script_tag_reload(void);
 
-wmWindow *WM_window_find_under_cursor(const wmWindowManager *wm,
-                                      const wmWindow *win_ignore,
-                                      const wmWindow *win,
-                                      const int mval[2],
-                                      int r_mval[2]);
+wmWindow *WM_window_find_under_cursor(wmWindow *win, const int mval[2], int r_mval[2]);
 void WM_window_pixel_sample_read(const wmWindowManager *wm,
                                  const wmWindow *win,
                                  const int pos[2],
@@ -1247,6 +1243,8 @@ enum {
   WM_JOB_TYPE_COMPOSITE,
   WM_JOB_TYPE_RENDER,
   WM_JOB_TYPE_RENDER_PREVIEW, /* UI preview */
+  /** Job for the UI to load previews from the file system (uses OS thumbnail cache). */
+  WM_JOB_TYPE_LOAD_PREVIEW, /* UI preview */
   WM_JOB_TYPE_OBJECT_SIM_OCEAN,
   WM_JOB_TYPE_OBJECT_SIM_FLUID,
   WM_JOB_TYPE_OBJECT_BAKE_TEXTURE,
@@ -1425,15 +1423,17 @@ bool WM_window_modal_keymap_status_draw(struct bContext *C,
  */
 void WM_event_print(const struct wmEvent *event);
 
-int WM_event_modifier_flag(const struct wmEvent *event);
-
 /**
- * For modal callbacks, check configuration for how to interpret exit with tweaks.
+ * For modal callbacks, check configuration for how to interpret exit when dragging.
  */
-bool WM_event_is_modal_tweak_exit(const struct wmEvent *event, int tweak_event);
+bool WM_event_is_modal_drag_exit(const struct wmEvent *event,
+                                 short init_event_type,
+                                 short init_event_val);
 bool WM_event_is_last_mousemove(const struct wmEvent *event);
 bool WM_event_is_mouse_drag(const struct wmEvent *event);
 bool WM_event_is_mouse_drag_or_press(const wmEvent *event);
+int WM_event_drag_direction(const wmEvent *event);
+
 /**
  * Detect motion between selection (callers should only use this for selection picking),
  * typically mouse press/click events.
@@ -1583,8 +1583,7 @@ bool WM_xr_action_create(wmXrData *xr,
                          const char *action_set_name,
                          const char *action_name,
                          eXrActionType type,
-                         unsigned int count_subaction_paths,
-                         const char **subaction_paths,
+                         const ListBase *user_paths,
                          struct wmOperatorType *ot,
                          struct IDProperty *op_properties,
                          const char *haptic_name,
@@ -1599,9 +1598,8 @@ bool WM_xr_action_binding_create(wmXrData *xr,
                                  const char *action_set_name,
                                  const char *action_name,
                                  const char *profile_path,
-                                 unsigned int count_subaction_paths,
-                                 const char **subaction_paths,
-                                 const char **component_paths,
+                                 const ListBase *user_paths,
+                                 const ListBase *component_paths,
                                  const float *float_thresholds,
                                  const eXrAxisFlag *axis_flags,
                                  const struct wmXrPose *poses);

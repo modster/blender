@@ -67,7 +67,6 @@ enum {
   SHADER_BUFFER_NORMALS_ACCUMULATE,
   SHADER_BUFFER_NORMALS_FINALIZE,
   SHADER_PATCH_EVALUATION,
-  SHADER_PATCH_EVALUATION_LIMIT_NORMALS,
   SHADER_PATCH_EVALUATION_FVAR,
   SHADER_PATCH_EVALUATION_FACE_DOTS,
   SHADER_COMP_CUSTOM_DATA_INTERP_1D,
@@ -107,7 +106,6 @@ static const char *get_shader_code(int shader_type)
       return datatoc_common_subdiv_normals_finalize_comp_glsl;
     }
     case SHADER_PATCH_EVALUATION:
-    case SHADER_PATCH_EVALUATION_LIMIT_NORMALS:
     case SHADER_PATCH_EVALUATION_FVAR:
     case SHADER_PATCH_EVALUATION_FACE_DOTS: {
       return datatoc_common_subdiv_patch_evaluation_comp_glsl;
@@ -159,9 +157,6 @@ static const char *get_shader_name(int shader_type)
     case SHADER_PATCH_EVALUATION: {
       return "subdiv patch evaluation";
     }
-    case SHADER_PATCH_EVALUATION_LIMIT_NORMALS: {
-      return "subdiv patch evaluation limit normals";
-    }
     case SHADER_PATCH_EVALUATION_FVAR: {
       return "subdiv patch evaluation face-varying";
     }
@@ -199,13 +194,7 @@ static GPUShader *get_patch_evaluation_shader(int shader_type)
     const char *compute_code = get_shader_code(shader_type);
 
     const char *defines = nullptr;
-    if (shader_type == SHADER_PATCH_EVALUATION_LIMIT_NORMALS) {
-      defines =
-          "#define OSD_PATCH_BASIS_GLSL\n"
-          "#define OPENSUBDIV_GLSL_COMPUTE_USE_1ST_DERIVATIVES\n"
-          "#define LIMIT_NORMALS\n";
-    }
-    else if (shader_type == SHADER_PATCH_EVALUATION_FVAR) {
+    if (shader_type == SHADER_PATCH_EVALUATION_FVAR) {
       defines =
           "#define OSD_PATCH_BASIS_GLSL\n"
           "#define OPENSUBDIV_GLSL_COMPUTE_USE_1ST_DERIVATIVES\n"
@@ -246,7 +235,6 @@ static GPUShader *get_subdiv_shader(int shader_type, const char *defines)
 {
   if (ELEM(shader_type,
            SHADER_PATCH_EVALUATION,
-           SHADER_PATCH_EVALUATION_LIMIT_NORMALS,
            SHADER_PATCH_EVALUATION_FVAR,
            SHADER_PATCH_EVALUATION_FACE_DOTS)) {
     return get_patch_evaluation_shader(shader_type);
@@ -592,6 +580,67 @@ void draw_subdiv_cache_free(DRWSubdivCache *cache)
      SUBDIV_COARSE_FACE_FLAG_ACTIVE) \
     << SUBDIV_COARSE_FACE_FLAG_OFFSET)
 
+static uint32_t compute_coarse_face_flag(BMFace *f, BMFace *efa_act)
+{
+  if (f == nullptr) {
+    /* May happen during mapped extraction. */
+    return 0;
+  }
+
+  uint32_t flag = 0;
+  if (BM_elem_flag_test(f, BM_ELEM_SMOOTH)) {
+    flag |= SUBDIV_COARSE_FACE_FLAG_SMOOTH;
+  }
+  if (BM_elem_flag_test(f, BM_ELEM_SELECT)) {
+    flag |= SUBDIV_COARSE_FACE_FLAG_SELECT;
+  }
+  if (f == efa_act) {
+    flag |= SUBDIV_COARSE_FACE_FLAG_ACTIVE;
+  }
+  const int loopstart = BM_elem_index_get(f->l_first);
+  return (uint)(loopstart) | (flag << SUBDIV_COARSE_FACE_FLAG_OFFSET);
+}
+
+static void draw_subdiv_cache_extra_coarse_face_data_bm(BMesh *bm,
+                                                        BMFace *efa_act,
+                                                        uint32_t *flags_data)
+{
+  BMFace *f;
+  BMIter iter;
+
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    const int index = BM_elem_index_get(f);
+    flags_data[index] = compute_coarse_face_flag(f, efa_act);
+  }
+}
+
+static void draw_subdiv_cache_extra_coarse_face_data_mesh(Mesh *mesh, uint32_t *flags_data)
+{
+  for (int i = 0; i < mesh->totpoly; i++) {
+    uint32_t flag = 0;
+    if ((mesh->mpoly[i].flag & ME_SMOOTH) != 0) {
+      flag = SUBDIV_COARSE_FACE_FLAG_SMOOTH;
+    }
+    flags_data[i] = (uint)(mesh->mpoly[i].loopstart) | (flag << SUBDIV_COARSE_FACE_FLAG_OFFSET);
+  }
+}
+
+static void draw_subdiv_cache_extra_coarse_face_data_mapped(Mesh *mesh,
+                                                            BMesh *bm,
+                                                            MeshRenderData *mr,
+                                                            uint32_t *flags_data)
+{
+  if (bm == nullptr) {
+    draw_subdiv_cache_extra_coarse_face_data_mesh(mesh, flags_data);
+    return;
+  }
+
+  for (int i = 0; i < mesh->totpoly; i++) {
+    BMFace *f = bm_original_face_get(mr, i);
+    flags_data[i] = compute_coarse_face_flag(f, mr->efa_act);
+  }
+}
+
 static void draw_subdiv_cache_update_extra_coarse_face_data(DRWSubdivCache *cache,
                                                             Mesh *mesh,
                                                             MeshRenderData *mr)
@@ -611,56 +660,13 @@ static void draw_subdiv_cache_update_extra_coarse_face_data(DRWSubdivCache *cach
   uint32_t *flags_data = (uint32_t *)(GPU_vertbuf_get_data(cache->extra_coarse_face_data));
 
   if (mr->extract_type == MR_EXTRACT_BMESH) {
-    BMesh *bm = cache->bm;
-    BMFace *f;
-    BMIter iter;
-
-    /* Ensure all current elements follow new customdata layout. */
-    BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
-      const int index = BM_elem_index_get(f);
-      uint32_t flag = 0;
-      if (BM_elem_flag_test(f, BM_ELEM_SMOOTH)) {
-        flag |= SUBDIV_COARSE_FACE_FLAG_SMOOTH;
-      }
-      if (BM_elem_flag_test(f, BM_ELEM_SELECT)) {
-        flag |= SUBDIV_COARSE_FACE_FLAG_SELECT;
-      }
-      if (f == mr->efa_act) {
-        flag |= SUBDIV_COARSE_FACE_FLAG_ACTIVE;
-      }
-      const int loopstart = BM_elem_index_get(f->l_first);
-      flags_data[index] = (uint)(loopstart) | (flag << SUBDIV_COARSE_FACE_FLAG_OFFSET);
-    }
+    draw_subdiv_cache_extra_coarse_face_data_bm(cache->bm, mr->efa_act, flags_data);
   }
   else if (mr->extract_type == MR_EXTRACT_MAPPED) {
-    for (int i = 0; i < mesh->totpoly; i++) {
-      BMFace *f = bm_original_face_get(mr, i);
-      uint32_t flag = 0;
-
-      if (f) {
-        if (BM_elem_flag_test(f, BM_ELEM_SMOOTH)) {
-          flag |= SUBDIV_COARSE_FACE_FLAG_SMOOTH;
-        }
-        if (BM_elem_flag_test(f, BM_ELEM_SELECT)) {
-          flag |= SUBDIV_COARSE_FACE_FLAG_SELECT;
-        }
-        if (f == mr->efa_act) {
-          flag |= SUBDIV_COARSE_FACE_FLAG_ACTIVE;
-        }
-        const int loopstart = BM_elem_index_get(f->l_first);
-        flag = (uint)(loopstart) | (flag << SUBDIV_COARSE_FACE_FLAG_OFFSET);
-      }
-      flags_data[i] = flag;
-    }
+    draw_subdiv_cache_extra_coarse_face_data_mapped(mesh, cache->bm, mr, flags_data);
   }
   else {
-    for (int i = 0; i < mesh->totpoly; i++) {
-      uint32_t flag = 0;
-      if ((mesh->mpoly[i].flag & ME_SMOOTH) != 0) {
-        flag = SUBDIV_COARSE_FACE_FLAG_SMOOTH;
-      }
-      flags_data[i] = (uint)(mesh->mpoly[i].loopstart) | (flag << SUBDIV_COARSE_FACE_FLAG_OFFSET);
-    }
+    draw_subdiv_cache_extra_coarse_face_data_mesh(mesh, flags_data);
   }
 
   /* Make sure updated data is re-uploaded. */
@@ -1176,9 +1182,7 @@ static void drw_subdiv_compute_dispatch(const DRWSubdivCache *cache,
   GPU_compute_dispatch(shader, dispatch_rx, dispatch_ry, 1);
 }
 
-void draw_subdiv_extract_pos_nor(const DRWSubdivCache *cache,
-                                 GPUVertBuf *pos_nor,
-                                 const bool do_limit_normals)
+void draw_subdiv_extract_pos_nor(const DRWSubdivCache *cache, GPUVertBuf *pos_nor)
 {
   Subdiv *subdiv = cache->subdiv;
   OpenSubdiv_Evaluator *evaluator = subdiv->evaluator;
@@ -1203,8 +1207,7 @@ void draw_subdiv_extract_pos_nor(const DRWSubdivCache *cache,
                                                                get_patch_param_format());
   evaluator->wrapPatchParamBuffer(evaluator, &patch_param_buffer_interface);
 
-  GPUShader *shader = get_patch_evaluation_shader(
-      do_limit_normals ? SHADER_PATCH_EVALUATION_LIMIT_NORMALS : SHADER_PATCH_EVALUATION);
+  GPUShader *shader = get_patch_evaluation_shader(SHADER_PATCH_EVALUATION);
   GPU_shader_bind(shader);
 
   GPU_vertbuf_bind_as_ssbo(src_buffer, 0);
@@ -1299,7 +1302,8 @@ void draw_subdiv_interp_custom_data(const DRWSubdivCache *cache,
                                     GPUVertBuf *src_data,
                                     GPUVertBuf *dst_data,
                                     int dimensions,
-                                    int dst_offset)
+                                    int dst_offset,
+                                    bool compress_to_u16)
 {
   GPUShader *shader = nullptr;
 
@@ -1319,10 +1323,17 @@ void draw_subdiv_interp_custom_data(const DRWSubdivCache *cache,
                                "#define DIMENSIONS 3\n");
   }
   else if (dimensions == 4) {
-    shader = get_subdiv_shader(SHADER_COMP_CUSTOM_DATA_INTERP_4D,
-                               "#define SUBDIV_POLYGON_OFFSET\n"
-                               "#define DIMENSIONS 4\n"
-                               "#define GPU_FETCH_U16_TO_FLOAT\n");
+    if (compress_to_u16) {
+      shader = get_subdiv_shader(SHADER_COMP_CUSTOM_DATA_INTERP_4D,
+                                 "#define SUBDIV_POLYGON_OFFSET\n"
+                                 "#define DIMENSIONS 4\n"
+                                 "#define GPU_FETCH_U16_TO_FLOAT\n");
+    }
+    else {
+      shader = get_subdiv_shader(SHADER_COMP_CUSTOM_DATA_INTERP_4D,
+                                 "#define SUBDIV_POLYGON_OFFSET\n"
+                                 "#define DIMENSIONS 4\n");
+    }
   }
   else {
     /* Crash if dimensions are not supported. */
@@ -1376,6 +1387,7 @@ void draw_subdiv_accumulate_normals(const DRWSubdivCache *cache,
                                     GPUVertBuf *pos_nor,
                                     GPUVertBuf *face_adjacency_offsets,
                                     GPUVertBuf *face_adjacency_lists,
+                                    GPUVertBuf *vertex_loop_map,
                                     GPUVertBuf *vertex_normals)
 {
   GPUShader *shader = get_subdiv_shader(SHADER_BUFFER_NORMALS_ACCUMULATE, nullptr);
@@ -1386,6 +1398,7 @@ void draw_subdiv_accumulate_normals(const DRWSubdivCache *cache,
   GPU_vertbuf_bind_as_ssbo(pos_nor, binding_point++);
   GPU_vertbuf_bind_as_ssbo(face_adjacency_offsets, binding_point++);
   GPU_vertbuf_bind_as_ssbo(face_adjacency_lists, binding_point++);
+  GPU_vertbuf_bind_as_ssbo(vertex_loop_map, binding_point++);
   GPU_vertbuf_bind_as_ssbo(vertex_normals, binding_point++);
 
   drw_subdiv_compute_dispatch(cache, shader, 0, 0, cache->num_subdiv_verts);
@@ -1785,9 +1798,9 @@ static bool draw_subdiv_create_requested_buffers(const Scene *scene,
                                                  const float obmat[4][4],
                                                  const bool do_final,
                                                  const bool do_uvedit,
-                                                 const bool UNUSED(use_subsurf_fdots),
+                                                 const bool /*use_subsurf_fdots*/,
                                                  const ToolSettings *ts,
-                                                 const bool UNUSED(use_hide),
+                                                 const bool /*use_hide*/,
                                                  OpenSubdiv_EvaluatorCache *evaluator_cache)
 {
   SubsurfModifierData *smd = BKE_object_get_last_subsurf_modifier(ob);
@@ -1833,8 +1846,6 @@ static bool draw_subdiv_create_requested_buffers(const Scene *scene,
   draw_cache->subdiv = subdiv;
   draw_cache->optimal_display = optimal_display;
   draw_cache->num_subdiv_triangles = tris_count_from_number_of_loops(draw_cache->num_subdiv_loops);
-  /* We can only evaluate limit normals if the patches are adaptive. */
-  draw_cache->do_limit_normals = settings.is_adaptive;
 
   draw_cache->use_custom_loop_normals = (smd->flags & eSubsurfModifierFlag_UseCustomNormals) &&
                                         (mesh_eval->flag & ME_AUTOSMOOTH) &&

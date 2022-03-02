@@ -103,6 +103,7 @@ set(SRC
   intern/cryptomatte.cc
   intern/curve.cc
   intern/curves.cc
+  intern/curves_geometry.cc
   intern/curve_bevel.c
   intern/curve_convert.c
   intern/curve_decimate.c
@@ -130,6 +131,7 @@ set(SRC
   intern/fmodifier.c
   intern/freestyle.c
   intern/geometry_component_curve.cc
+  intern/geometry_component_curves.cc
   intern/geometry_component_instances.cc
   intern/geometry_component_mesh.cc
   intern/geometry_component_pointcloud.cc
@@ -199,7 +201,7 @@ set(SRC
   intern/mesh_sample.cc
   intern/mesh_tangent.c
   intern/mesh_tessellate.c
-  intern/mesh_validate.c
+  intern/mesh_validate.cc
   intern/mesh_wrapper.c
   intern/modifier.c
   intern/movieclip.c
@@ -341,6 +343,7 @@ set(SRC
   BKE_cryptomatte.hh
   BKE_curve.h
   BKE_curves.h
+  BKE_curves.hh
   BKE_curve_to_mesh.hh
   BKE_curveprofile.h
   BKE_customdata.h
@@ -375,6 +378,7 @@ set(SRC
   BKE_idprop.hh
   BKE_idtype.h
   BKE_image.h
+  BKE_image_partial_update.hh
   BKE_image_save.h
   BKE_ipo.h
   BKE_kelvinlet.h
