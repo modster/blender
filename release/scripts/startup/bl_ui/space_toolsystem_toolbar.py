@@ -1208,7 +1208,6 @@ class _defs_edit_curve:
     def pen():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("curve.pen")
-            layout.prop(props, "sel_dist_mul")
             layout.prop(props, "close_spline")
             layout.prop(props, "extrude_handle")
         return dict(

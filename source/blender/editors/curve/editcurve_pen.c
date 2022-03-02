@@ -60,6 +60,8 @@
   BKE_nurb_handles_calc(nu); \
   }
 
+#define SEL_DIST 0.2f
+
 /* Data structure to keep track of details about the cut location */
 typedef struct CutData {
   /* Index of the last #BezTriple or BPoint before the cut. */
@@ -479,7 +481,6 @@ static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
                                                  BPoint **r_bp,
                                                  short *r_bezt_idx,
                                                  const float point[2],
-                                                 const float sel_dist_mul,
                                                  const ViewContext *vc)
 {
   *r_nu = NULL;
@@ -542,7 +543,7 @@ static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
   }
 
   /* Assign closest data to the returned variables. */
-  const float threshold_dist = ED_view3d_select_dist_px() * sel_dist_mul;
+  const float threshold_dist = ED_view3d_select_dist_px() * SEL_DIST;
   if (min_dist_bezt < threshold_dist || min_dist_bp < threshold_dist) {
     if (min_dist_bp < min_dist_bezt) {
       *r_bp = closest_bp;
@@ -838,16 +839,13 @@ static CutData init_cut_data(const wmEvent *event)
   return cd;
 }
 
-static bool insert_point_to_segment(const wmEvent *event,
-                                    Nurb **r_nu,
-                                    const float sel_dist_mul,
-                                    const ViewContext *vc)
+static bool insert_point_to_segment(const wmEvent *event, Nurb **r_nu, const ViewContext *vc)
 {
   Curve *cu = vc->obedit->data;
   CutData cd = init_cut_data(event);
   float mval[2] = {UNPACK2(event->mval)};
   const bool near_spline = update_cut_data_for_all_nurbs(
-      BKE_curve_editNurbs_get(cu), mval, sel_dist_mul * ED_view3d_select_dist_px(), vc, &cd);
+      BKE_curve_editNurbs_get(cu), mval, SEL_DIST * ED_view3d_select_dist_px(), vc, &cd);
 
   if (near_spline) {
     Nurb *nu = cd.nurb;
@@ -1230,9 +1228,7 @@ static void toggle_bezt_free_align_handles(ListBase *nurbs)
 }
 
 /* If a point is found under mouse, delete point and return true. Else return false. */
-static bool delete_point_under_mouse(ViewContext *vc,
-                                     const wmEvent *event,
-                                     const float sel_dist_mul)
+static bool delete_point_under_mouse(ViewContext *vc, const wmEvent *event)
 {
   BezTriple *bezt = NULL;
   BPoint *bp = NULL;
@@ -1242,8 +1238,7 @@ static bool delete_point_under_mouse(ViewContext *vc,
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
   const float mouse_point[2] = {UNPACK2(event->mval)};
 
-  get_closest_vertex_to_point_in_nurbs(
-      nurbs, &nu, &bezt, &bp, &temp, mouse_point, sel_dist_mul, vc);
+  get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, &temp, mouse_point, vc);
   const bool found_point = nu != NULL;
 
   bool deleted = false;
@@ -1319,12 +1314,8 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase
 }
 
 /* Close the spline if endpoints are selected consecutively. Return true if cycle was created. */
-static bool make_cyclic_if_endpoints(Nurb *sel_nu,
-                                     BezTriple *sel_bezt,
-                                     BPoint *sel_bp,
-                                     ViewContext *vc,
-                                     bContext *C,
-                                     const float sel_dist_mul)
+static bool make_cyclic_if_endpoints(
+    Nurb *sel_nu, BezTriple *sel_bezt, BPoint *sel_bp, ViewContext *vc, bContext *C)
 {
   if (sel_bezt || (sel_bp && sel_nu->pntsu > 2)) {
     const bool is_bezt_endpoint = (sel_nu->type == CU_BEZIER &&
@@ -1345,7 +1336,7 @@ static bool make_cyclic_if_endpoints(Nurb *sel_nu,
     const float mval_fl[2] = {UNPACK2(vc->mval)};
 
     get_closest_vertex_to_point_in_nurbs(
-        &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, vc);
+        &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, vc);
 
     if (nu == sel_nu &&
         ((nu->type == CU_BEZIER && bezt != sel_bezt &&
@@ -1505,7 +1496,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   int ret = OPERATOR_RUNNING_MODAL;
 
   /* Distance threshold for mouse clicks to affect the spline or its points */
-  const float sel_dist_mul = RNA_float_get(op->ptr, "sel_dist_mul");
   const float mval_fl[2] = {UNPACK2(event->mval)};
 
   const bool extrude_point = RNA_boolean_get(op->ptr, "extrude_point");
@@ -1605,7 +1595,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       BPoint *bp1;
       short bezt_idx = 0;
       cpd->found_point = get_closest_vertex_to_point_in_nurbs(
-          nurbs, &nu1, &bezt1, &bp1, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+          nurbs, &nu1, &bezt1, &bp1, &bezt_idx, mval_fl, &vc);
 
       if (move_point && nu1 &&
           (bezt || (bezt1 && !BEZT_ISSEL_IDX(bezt1, bezt_idx)) || (bp1 && !(bp1->f1 & SELECT)))) {
@@ -1632,17 +1622,17 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (close_spline && close_spline_opts == ON_PRESS && cpd->nu && !is_cyclic(cpd->nu)) {
           copy_v2_v2_int(vc.mval, event->mval);
           cpd->new_point = cpd->acted = cpd->link_handles = make_cyclic_if_endpoints(
-              cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
+              cpd->nu, cpd->bezt, cpd->bp, &vc, C);
         }
       }
       else if (!cpd->acted) {
-        if (is_spline_nearby(&vc, op, event, sel_dist_mul * ED_view3d_select_dist_px())) {
+        if (is_spline_nearby(&vc, op, event, SEL_DIST * ED_view3d_select_dist_px())) {
           cpd->spline_nearby = true;
 
           /* If move segment is disabled, then insert point on key press and set
           "new_point" to true so that the new point's handles can be controlled. */
           if (insert_point && !move_seg) {
-            insert_point_to_segment(event, &nu, sel_dist_mul, &vc);
+            insert_point_to_segment(event, &nu, &vc);
             cpd->new_point = cpd->acted = cpd->link_handles = true;
           }
         }
@@ -1655,8 +1645,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     else if (event->val == KM_RELEASE) {
       if (delete_point && !cpd->new_point && !cpd->dragging) {
         if (ED_curve_editnurb_select_pick_thresholded(
-                C, event->mval, sel_dist_mul, false, false, false)) {
-          cpd->acted = delete_point_under_mouse(&vc, event, sel_dist_mul);
+                C, event->mval, SEL_DIST, false, false, false)) {
+          cpd->acted = delete_point_under_mouse(&vc, event);
         }
       }
 
@@ -1665,13 +1655,13 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           !cpd->dragging) {
         if (cpd->nu && !is_cyclic(cpd->nu)) {
           copy_v2_v2_int(vc.mval, event->mval);
-          cpd->acted = make_cyclic_if_endpoints(cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
+          cpd->acted = make_cyclic_if_endpoints(cpd->nu, cpd->bezt, cpd->bp, &vc, C);
         }
       }
 
       if (!cpd->acted && (insert_point || extrude_point) && cpd->spline_nearby && !cpd->dragging) {
         if (insert_point) {
-          insert_point_to_segment(event, &nu, sel_dist_mul, &vc);
+          insert_point_to_segment(event, &nu, &vc);
           cpd->new_point = true;
           cpd->acted = true;
         }
@@ -1683,8 +1673,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
       if (!cpd->acted && toggle_vector) {
         short bezt_idx;
-        get_closest_vertex_to_point_in_nurbs(
-            nurbs, &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+        get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, &bezt_idx, mval_fl, &vc);
         if (bezt) {
           if (bezt_idx == 1 && cycle_handle_type) {
             cycle_handles(bezt);
@@ -1703,8 +1692,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       if (!cpd->selection_made && !cpd->acted) {
         if (cpd->select_multi) {
           short bezt_idx;
-          get_closest_vertex_to_point_in_nurbs(
-              nurbs, &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+          get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, &bezt_idx, mval_fl, &vc);
           if (bezt) {
             toggle_select_bezt(bezt, bezt_idx);
             cu->actnu = get_nurb_index(nurbs, nu);
@@ -1718,8 +1706,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           }
         }
         else if (select_point) {
-          ED_curve_editnurb_select_pick_thresholded(
-              C, event->mval, sel_dist_mul, false, false, false);
+          ED_curve_editnurb_select_pick_thresholded(C, event->mval, SEL_DIST, false, false, false);
         }
       }
 
@@ -1766,15 +1753,6 @@ void CURVE_OT_pen(wmOperatorType *ot)
   WM_operator_properties_mouse_select(ot);
 
   PropertyRNA *prop;
-  prop = RNA_def_float(ot->srna,
-                       "sel_dist_mul",
-                       0.2f,
-                       0.0f,
-                       2.0f,
-                       "Select Distance",
-                       "A multiplier on the default click distance",
-                       0.1f,
-                       1.5f);
   prop = RNA_def_boolean(ot->srna,
                          "extrude_point",
                          false,
