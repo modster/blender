@@ -421,7 +421,7 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   /* Allow navigation while transforming */
-  if (!(t->flag & T_RELEASE_CONFIRM) && ED_view3d_navigation_do(C, t->vod, event)) {
+  if (t->vod && ED_view3d_navigation_do(C, t->vod, event)) {
     RegionView3D *rv3d = t->region->regiondata;
     if (event->type == EVT_MODAL_MAP) {
       /* Pass. These events can cancel modifiers. */

@@ -664,8 +664,11 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     t->flag |= T_NO_CURSOR_WRAP;
   }
 
-  if (op && t->flag & T_MODAL) {
-    t->vod = ED_view3d_navigation_init(C);
+  if (op && (t->flag & T_MODAL) && !(t->flag & T_RELEASE_CONFIRM)) {
+    /* To Sphere mode does not display mouse cursor. This is problematic for navigation. */
+    if (t->mode != TFM_TOSPHERE) {
+      t->vod = ED_view3d_navigation_init(C);
+    }
   }
 
   setTransformViewMatrices(t);
