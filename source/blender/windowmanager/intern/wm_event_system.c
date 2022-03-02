@@ -2029,6 +2029,14 @@ static bool wm_eventmatch(const wmEvent *winevent, const wmKeyMapItem *kmi)
     }
   }
 
+  if (kmi->val == KM_CLICK_DRAG) {
+    if (kmi->direction != KM_ANY) {
+      if (kmi->direction != winevent->direction) {
+        return false;
+      }
+    }
+  }
+
   const bool shift = (winevent->modifier & KM_SHIFT) != 0;
   const bool ctrl = (winevent->modifier & KM_CTRL) != 0;
   const bool alt = (winevent->modifier & KM_ALT) != 0;
@@ -2775,7 +2783,7 @@ static int wm_handlers_do_gizmo_handler(bContext *C,
 {
   /* Drag events use the previous click location to highlight the gizmos,
    * Get the highlight again in case the user dragged off the gizmo. */
-  const bool is_event_drag = ISTWEAK(event->type) || (event->val == KM_CLICK_DRAG);
+  const bool is_event_drag = (event->val == KM_CLICK_DRAG);
   const bool is_event_modifier = ISKEYMODIFIER(event->type);
   /* Only keep the highlight if the gizmo becomes modal as result of event handling.
    * Without this check, even un-handled drag events will set the highlight if the drag
@@ -2886,15 +2894,10 @@ static int wm_handlers_do_gizmo_handler(bContext *C,
           wmEvent event_test_click_drag = *event;
           event_test_click_drag.val = KM_CLICK_DRAG;
 
-          wmEvent event_test_tweak = *event;
-          event_test_tweak.type = EVT_TWEAK_L + (event->type - LEFTMOUSE);
-          event_test_tweak.val = KM_ANY;
-
           LISTBASE_FOREACH (wmKeyMapItem *, kmi, &keymap->items) {
             if ((kmi->flag & KMI_INACTIVE) == 0) {
               if (wm_eventmatch(&event_test_click, kmi) ||
-                  wm_eventmatch(&event_test_click_drag, kmi) ||
-                  wm_eventmatch(&event_test_tweak, kmi)) {
+                  wm_eventmatch(&event_test_click_drag, kmi)) {
                 wmOperatorType *ot = WM_operatortype_find(kmi->idname, 0);
                 if (WM_operator_poll_context(C, ot, WM_OP_INVOKE_DEFAULT)) {
                   is_event_handle_all = true;
@@ -3155,11 +3158,18 @@ static int wm_handlers_do(bContext *C, wmEvent *event, ListBase *handlers)
   }
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
-    /* Test for CLICK_DRAG events. */
-    if (wm_action_not_handled(action)) {
+    /* Test for #WM_CLICK_DRAG events. */
+
+    /* NOTE(@campbellbarton): Needed so drag can be used for editors that support both click
+     * selection and passing through the drag action to box select. See #WM_generic_select_modal.
+     * Unlike click, accept `action` when break isn't set.
+     * Operators can return `OPERATOR_FINISHED | OPERATOR_PASS_THROUGH` which results
+     * in `action` setting #WM_HANDLER_HANDLED, but not #WM_HANDLER_BREAK. */
+    if ((action & WM_HANDLER_BREAK) == 0 || wm_action_not_handled(action)) {
       if (win->event_queue_check_drag) {
         if (WM_event_drag_test(event, event->prev_click_xy)) {
           win->event_queue_check_drag_handled = true;
+          const int direction = WM_event_drag_direction(event);
 
           const int prev_xy[2] = {UNPACK2(event->xy)};
           const short prev_val = event->val;
@@ -3169,14 +3179,16 @@ static int wm_handlers_do(bContext *C, wmEvent *event, ListBase *handlers)
 
           copy_v2_v2_int(event->xy, event->prev_click_xy);
           event->val = KM_CLICK_DRAG;
-          event->type = event->prev_type;
+          event->type = event->prev_click_type;
           event->modifier = event->prev_click_modifier;
           event->keymodifier = event->prev_click_keymodifier;
+          event->direction = direction;
 
           CLOG_INFO(WM_LOG_HANDLERS, 1, "handling PRESS_DRAG");
 
           action |= wm_handlers_do_intern(C, win, event, handlers);
 
+          event->direction = 0;
           event->keymodifier = prev_keymodifier;
           event->modifier = prev_modifier;
           event->val = prev_val;
@@ -3184,15 +3196,11 @@ static int wm_handlers_do(bContext *C, wmEvent *event, ListBase *handlers)
           copy_v2_v2_int(event->xy, prev_xy);
 
           win->event_queue_check_click = false;
-          if (!wm_action_not_handled(action)) {
-            /* Only disable when handled as other handlers may use this drag event. */
-            win->event_queue_check_drag = false;
-          }
         }
       }
-    }
-    else {
-      win->event_queue_check_drag = false;
+      else {
+        win->event_queue_check_drag = false;
+      }
     }
   }
   else if (ISMOUSE_BUTTON(event->type) || ISKEYBOARD(event->type)) {
@@ -3212,7 +3220,7 @@ static int wm_handlers_do(bContext *C, wmEvent *event, ListBase *handlers)
       }
       else if (event->val == KM_RELEASE) {
         if (win->event_queue_check_drag) {
-          if ((event->prev_type != event->type) &&
+          if ((event->prev_click_type != event->type) &&
               (ISKEYMODIFIER(event->type) || (event->type == event->prev_click_keymodifier))) {
             /* Support releasing modifier keys without canceling the drag event, see T89989.
              * NOTE: this logic is replicated for tweak gestures. */
@@ -3223,7 +3231,7 @@ static int wm_handlers_do(bContext *C, wmEvent *event, ListBase *handlers)
         }
       }
 
-      if (event->prev_type == event->type) {
+      if (event->prev_click_type == event->type) {
 
         if (event->val == KM_RELEASE) {
           if (event->prev_val == KM_PRESS) {
@@ -3264,7 +3272,6 @@ static int wm_handlers_do(bContext *C, wmEvent *event, ListBase *handlers)
     }
     else {
       win->event_queue_check_click = false;
-      win->event_queue_check_drag = false;
     }
   }
   else if (ISMOUSE_WHEEL(event->type) || ISMOUSE_GESTURE(event->type)) {
@@ -3711,8 +3718,10 @@ void wm_event_do_handlers(bContext *C)
       /* Check dragging, creates new event or frees, adds draw tag. */
       wm_event_drag_and_drop_test(wm, win, event);
 
-      /* Builtin tweak, if action is break it removes tweak. */
-      wm_tweakevent_test(C, event, action);
+      /* Builtin drag: #KM_CLICK_DRAG. */
+      if (action & WM_HANDLER_BREAK) {
+        win->event_queue_check_drag = false;
+      }
 
       if ((action & WM_HANDLER_BREAK) == 0) {
         /* NOTE: setting subwin active should be done here, after modal handlers have been done. */
@@ -5510,15 +5519,15 @@ void WM_window_cursor_keymap_status_refresh(bContext *C, wmWindow *win)
   } event_data[] = {
       {0, 0, LEFTMOUSE, KM_PRESS},
       {0, 0, LEFTMOUSE, KM_CLICK},
-      {0, 1, EVT_TWEAK_L, KM_ANY},
+      {0, 0, LEFTMOUSE, KM_CLICK_DRAG},
 
       {1, 0, MIDDLEMOUSE, KM_PRESS},
       {1, 0, MIDDLEMOUSE, KM_CLICK},
-      {1, 1, EVT_TWEAK_M, KM_ANY},
+      {1, 0, MIDDLEMOUSE, KM_CLICK_DRAG},
 
       {2, 0, RIGHTMOUSE, KM_PRESS},
       {2, 0, RIGHTMOUSE, KM_CLICK},
-      {2, 1, EVT_TWEAK_R, KM_ANY},
+      {2, 0, RIGHTMOUSE, KM_CLICK_DRAG},
   };
 
   for (int button_index = 0; button_index < 3; button_index++) {
