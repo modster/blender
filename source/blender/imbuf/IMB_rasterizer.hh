@@ -177,17 +177,16 @@ template<typename FragmentInput, typename FragmentOutput> class AbstractFragment
 template<typename FragmentInput> class Rasterline {
  public:
   /** Row where this rasterline will be rendered. */
-  uint32_t y = 0;
+  uint32_t y ;
   /** Starting X coordinate of the rasterline. */
-  uint32_t start_x = 0;
+  uint32_t start_x ;
   /** Ending X coordinate of the rasterline. */
-  uint32_t end_x = 0;
+  uint32_t end_x ;
   /** Input data for the fragment shader on (start_x, y). */
   FragmentInput start_data;
   /** Delta to add to the start_input to create the data for the next fragment. */
   FragmentInput fragment_add;
 
-  Rasterline() = default;
   Rasterline(uint32_t y,
              uint32_t start_x,
              uint32_t end_x,
