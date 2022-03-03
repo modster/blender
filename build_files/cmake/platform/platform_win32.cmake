@@ -414,8 +414,8 @@ if(WITH_IMAGE_OPENEXR)
     set(IMATH_INCLUDE_DIRS ${IMATH_INCLUDE_DIR} ${IMATH}/include/Imath)
     set(IMATH_LIBPATH ${IMATH}/lib)
     set(IMATH_LIBRARIES
-      optimized ${IMATH_LIBPATH}/Imath-3_1.lib
-      debug ${IMATH_LIBPATH}/Imath-3_1_d.lib
+      optimized ${IMATH_LIBPATH}/Imath_s.lib
+      debug ${IMATH_LIBPATH}/Imath_s_d.lib
     )
   endif()
   set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
@@ -427,19 +427,36 @@ if(WITH_IMAGE_OPENEXR)
     set(OPENEXR_INCLUDE_DIR ${OPENEXR}/include)
     set(OPENEXR_INCLUDE_DIRS ${OPENEXR_INCLUDE_DIR} ${IMATH_INCLUDE_DIRS} ${OPENEXR}/include/OpenEXR)
     set(OPENEXR_LIBPATH ${OPENEXR}/lib)
-    set(OPENEXR_LIBRARIES
-      optimized ${OPENEXR_LIBPATH}/Iex_s.lib
-      optimized ${OPENEXR_LIBPATH}/IlmThread_s.lib
-      optimized ${OPENEXR_LIBPATH}/OpenEXR_s.lib
-      optimized ${OPENEXR_LIBPATH}/OpenEXRCore_s.lib
-      optimized ${OPENEXR_LIBPATH}/OpenEXRUtil_s.lib
-      debug ${OPENEXR_LIBPATH}/Iex_s_d.lib
-      debug ${OPENEXR_LIBPATH}/IlmThread_s_d.lib
-      debug ${OPENEXR_LIBPATH}/OpenEXR_s_d.lib
-      debug ${OPENEXR_LIBPATH}/OpenEXRCore_s_d.lib
-      debug ${OPENEXR_LIBPATH}/OpenEXRUtil_s_d.lib
-      ${IMATH_LIBRARIES}
-    )
+    # Check if the 3.x library name exists
+    # if not assume this is a 2.x library folder
+    if(EXISTS "${OPENEXR_LIBPATH}/OpenEXR_s.lib")
+      set(OPENEXR_LIBRARIES
+        optimized ${OPENEXR_LIBPATH}/Iex_s.lib
+        optimized ${OPENEXR_LIBPATH}/IlmThread_s.lib
+        optimized ${OPENEXR_LIBPATH}/OpenEXR_s.lib
+        optimized ${OPENEXR_LIBPATH}/OpenEXRCore_s.lib
+        optimized ${OPENEXR_LIBPATH}/OpenEXRUtil_s.lib
+        debug ${OPENEXR_LIBPATH}/Iex_s_d.lib
+        debug ${OPENEXR_LIBPATH}/IlmThread_s_d.lib
+        debug ${OPENEXR_LIBPATH}/OpenEXR_s_d.lib
+        debug ${OPENEXR_LIBPATH}/OpenEXRCore_s_d.lib
+        debug ${OPENEXR_LIBPATH}/OpenEXRUtil_s_d.lib
+        ${IMATH_LIBRARIES}
+      )
+    else()
+      set(OPENEXR_LIBRARIES
+        optimized ${OPENEXR_LIBPATH}/Iex_s.lib
+        optimized ${OPENEXR_LIBPATH}/Half_s.lib
+        optimized ${OPENEXR_LIBPATH}/IlmImf_s.lib
+        optimized ${OPENEXR_LIBPATH}/Imath_s.lib
+        optimized ${OPENEXR_LIBPATH}/IlmThread_s.lib
+        debug ${OPENEXR_LIBPATH}/Iex_s_d.lib
+        debug ${OPENEXR_LIBPATH}/Half_s_d.lib
+        debug ${OPENEXR_LIBPATH}/IlmImf_s_d.lib
+        debug ${OPENEXR_LIBPATH}/Imath_s_d.lib
+        debug ${OPENEXR_LIBPATH}/IlmThread_s_d.lib
+      )
+    endif()
   endif()
 endif()
 
@@ -507,6 +524,12 @@ if(WITH_BOOST)
     endif()
     set(BOOST_POSTFIX "vc142-mt-x64-${BOOST_VERSION}.lib")
     set(BOOST_DEBUG_POSTFIX "vc142-mt-gd-x64-${BOOST_VERSION}.lib")
+    if(NOT EXISTS ${BOOST_LIBPATH}/libboost_date_time-${BOOST_POSTFIX})
+      # If the new library names do not exist fall back to the old ones
+      # to ease the transition period between the libs.
+      set(BOOST_POSTFIX "vc141-mt-x64-${BOOST_VERSION}.lib")
+      set(BOOST_DEBUG_POSTFIX "vc141-mt-gd-x64-${BOOST_VERSION}.lib")
+    endif()
     set(BOOST_LIBRARIES
       optimized ${BOOST_LIBPATH}/libboost_date_time-${BOOST_POSTFIX}
       optimized ${BOOST_LIBPATH}/libboost_filesystem-${BOOST_POSTFIX}
@@ -606,9 +629,17 @@ if(WITH_OPENVDB)
 endif()
 
 if(WITH_NANOVDB)
-  set(NANOVDB ${LIBDIR}/nanoVDB)
+  set(NANOVDB ${LIBDIR}/openvdb)
   set(NANOVDB_INCLUDE_DIR ${NANOVDB}/include)
+  if(NOT EXISTS "${NANOVDB_INCLUDE_DIR}/nanovdb")
+    # When not found, could be an older lib folder with where nanovdb
+    # had its own lib folder, to ease the transition period, fall back
+    # to that copy if the copy in openvdb is not found.
+    set(NANOVDB ${LIBDIR}/nanoVDB)
+    set(NANOVDB_INCLUDE_DIR ${NANOVDB}/include)
+  endif()
 endif()
+
 
 if(WITH_OPENIMAGEDENOISE)
   set(OPENIMAGEDENOISE ${LIBDIR}/OpenImageDenoise)
@@ -635,7 +666,12 @@ endif()
 
 if(WITH_IMAGE_OPENJPEG)
   set(OPENJPEG ${LIBDIR}/openjpeg)
-  set(OPENJPEG_INCLUDE_DIRS ${OPENJPEG}/include/openjpeg-2.3)
+  set(OPENJPEG_INCLUDE_DIRS ${OPENJPEG}/include/openjpeg-2.4)
+  if(NOT EXISTS "${OPENJPEG_INCLUDE_DIRS}")
+    # when not found, could be an older lib folder with openjpeg 2.3
+    # to ease the transition period, fall back if 2.4 is not found.
+    set(OPENJPEG_INCLUDE_DIRS ${OPENJPEG}/include/openjpeg-2.3)
+  endif()
   set(OPENJPEG_LIBRARIES ${OPENJPEG}/lib/openjp2.lib)
 endif()
 
@@ -777,6 +813,13 @@ if(WITH_USD)
     set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/usd_usd_ms.lib)
     set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/usd_usd_ms_d.lib)
     set(USD_LIBRARY_DIR ${LIBDIR}/usd/lib)
+    # Older USD had different filenames, if the new ones are
+    # not found see if the older ones exist, to ease the
+    # transition period while landing libs.
+    if(NOT EXISTS "${USD_RELEASE_LIB}")
+      set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/libusd_m.lib)
+      set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/libusd_m_d.lib)
+    endif()
     set(USD_LIBRARIES
       debug ${USD_DEBUG_LIB}
       optimized ${USD_RELEASE_LIB}
