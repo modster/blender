@@ -34,7 +34,19 @@ class TreeElementOverridesBase final : public AbstractTreeElement {
   void expand(SpaceOutliner &) const override;
 };
 
-class TreeElementOverridesProperty final : public AbstractTreeElement {
+/**
+ * Common interface for any item nested under #TreeElementOverridesBase. It gives access to the ID
+ * owning the override.
+ */
+class TreeElementOverridesItem : public AbstractTreeElement {
+ public:
+  ID *getOverrideOwnerID();
+
+ protected:
+  using AbstractTreeElement::AbstractTreeElement;
+};
+
+class TreeElementOverridesProperty final : public TreeElementOverridesItem {
   IDOverrideLibraryProperty &override_prop_;
 
  public:
@@ -49,7 +61,7 @@ class TreeElementOverridesProperty final : public AbstractTreeElement {
  * If the override is within some collection or pointer property, the collection/pointer gets its
  * own parent item with items inside.
  */
-class TreeElementOverrideRNAContainer final : public AbstractTreeElement {
+class TreeElementOverrideRNAContainer final : public TreeElementOverridesItem {
  public:
   PointerRNA container_ptr;
   PropertyRNA &container_prop;
@@ -61,7 +73,7 @@ class TreeElementOverrideRNAContainer final : public AbstractTreeElement {
   void expand(SpaceOutliner &) const override;
 };
 
-class TreeElementOverrideRNACollectionItem final : public AbstractTreeElement {
+class TreeElementOverrideRNACollectionItem final : public TreeElementOverridesItem {
  public:
   PointerRNA item_ptr;
 

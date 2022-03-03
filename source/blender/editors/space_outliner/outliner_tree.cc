@@ -64,6 +64,7 @@
 #include "tree/common.hh"
 #include "tree/tree_display.hh"
 #include "tree/tree_element.hh"
+#include "tree/tree_element_overrides.hh"
 
 #ifdef WIN32
 #  include "BLI_math_base.h" /* M_PI */
@@ -810,6 +811,17 @@ TreeElement *outliner_add_element(SpaceOutliner *space_outliner,
   else if (type == TSE_GP_LAYER) {
     /* idv is the layer itself */
     id = TREESTORE(parent)->id;
+  }
+  else if (ELEM(type,
+                TSE_LIBRARY_OVERRIDE,
+                TSE_LIBRARY_OVERRIDE_RNA_CONTAINER,
+                TSE_LIBRARY_OVERRIDE_RNA_COLLECTION_ITEM)) {
+    if (auto *override_base_te = tree_element_cast<TreeElementOverridesBase>(parent)) {
+      id = &override_base_te->id;
+    }
+    else if (auto *override_item_te = tree_element_cast<TreeElementOverridesItem>(parent)) {
+      id = override_item_te->getOverrideOwnerID();
+    }
   }
 
   /* exceptions */

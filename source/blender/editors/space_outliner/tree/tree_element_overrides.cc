@@ -62,7 +62,7 @@ static void expand_from_rna_path(SpaceOutliner &space_outliner,
                                                        &property_and_ptr,
                                                        parent_to_expand,
                                                        TSE_LIBRARY_OVERRIDE_RNA_CONTAINER,
-                                                       *index++);
+                                                       (*index)++);
 
       parent_to_expand = container_te;
       /* Iterate over the children the container item expanded, and continue building the path for
@@ -78,6 +78,12 @@ static void expand_from_rna_path(SpaceOutliner &space_outliner,
         }
       }
 
+      /* All items within the same owning ID must have a unique index. If the container expands
+       * items, they count up based on the parent's index (or any preceding siblings if any). */
+      *index = BLI_listbase_is_empty(&container_te->subtree) ?
+                   container_te->index + 1 :
+                   ((TreeElement *)container_te->subtree.last)->index + 1;
+
       continue;
     }
 
@@ -89,7 +95,7 @@ static void expand_from_rna_path(SpaceOutliner &space_outliner,
                          &override_data,
                          parent_to_expand,
                          TSE_LIBRARY_OVERRIDE,
-                         *index++);
+                         (*index)++);
   }
 
   BLI_freelistN(&path_elems);
@@ -138,7 +144,7 @@ void TreeElementOverridesBase::expand(SpaceOutliner &space_outliner) const
 
 TreeElementOverridesProperty::TreeElementOverridesProperty(TreeElement &legacy_te,
                                                            TreeElementOverridesData &override_data)
-    : AbstractTreeElement(legacy_te),
+    : TreeElementOverridesItem(legacy_te),
       override_prop_(override_data.override_property),
       override_rna_ptr(override_data.override_rna_ptr),
       override_rna_prop(override_data.override_rna_prop)
@@ -153,7 +159,7 @@ TreeElementOverridesProperty::TreeElementOverridesProperty(TreeElement &legacy_t
 
 TreeElementOverrideRNAContainer::TreeElementOverrideRNAContainer(
     TreeElement &legacy_te, PropertyPointerRNA &container_prop_and_ptr)
-    : AbstractTreeElement(legacy_te),
+    : TreeElementOverridesItem(legacy_te),
       container_ptr(container_prop_and_ptr.ptr),
       container_prop(*container_prop_and_ptr.prop)
 {
@@ -169,7 +175,13 @@ void TreeElementOverrideRNAContainer::expand(SpaceOutliner &space_outliner) cons
     return;
   }
 
-  int index = 0;
+  /* All items within the same owning ID must have a unique index. Count up based on the parent's
+   * index (or any preceding siblings if any). The parent increases the index counter to be higher
+   * than its last child too. */
+  int index = BLI_listbase_is_empty(&legacy_te_.subtree) ?
+                  legacy_te_.parent->index :
+                  ((TreeElement *)legacy_te_.subtree.last)->index;
+
   /* Non-const copy. */
   PointerRNA ptr = container_ptr;
   RNA_PROP_BEGIN (&ptr, itemptr, &container_prop) {
@@ -178,14 +190,27 @@ void TreeElementOverrideRNAContainer::expand(SpaceOutliner &space_outliner) cons
                          &itemptr,
                          &legacy_te_,
                          TSE_LIBRARY_OVERRIDE_RNA_COLLECTION_ITEM,
-                         index++);
+                         ++index);
   }
   RNA_PROP_END;
 }
 
+ID *TreeElementOverridesItem::getOverrideOwnerID()
+{
+  for (AbstractTreeElement *parent = tree_element_cast<AbstractTreeElement>(legacy_te_.parent);
+       parent;
+       parent = tree_element_cast<AbstractTreeElement>(parent->getLegacyElement().parent)) {
+    if (TreeElementOverridesBase *base_te = dynamic_cast<TreeElementOverridesBase *>(parent)) {
+      return &base_te->id;
+    }
+  }
+
+  return nullptr;
+}
+
 TreeElementOverrideRNACollectionItem::TreeElementOverrideRNACollectionItem(
     TreeElement &legacy_te, const PointerRNA &item_ptr)
-    : AbstractTreeElement(legacy_te), item_ptr(item_ptr)
+    : TreeElementOverridesItem(legacy_te), item_ptr(item_ptr)
 {
   BLI_assert(legacy_te.store_elem->type == TSE_LIBRARY_OVERRIDE_RNA_COLLECTION_ITEM);
   /* Non-const copy. */
