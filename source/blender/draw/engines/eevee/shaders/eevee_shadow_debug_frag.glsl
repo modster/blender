@@ -336,9 +336,9 @@ void main()
     return;
   }
 
-  float mouse_depth = texelFetch(depth_tx, drw_view.mouse_pixel, 0).r;
+  float mouse_depth = texelFetch(hiz_tx, drw_view.mouse_pixel, 0).r;
   vec3 mouse_P = get_world_space_from_depth(
-      vec2(drw_view.mouse_pixel) / vec2(textureSize(depth_tx, 0)), mouse_depth);
+      vec2(drw_view.mouse_pixel) * drw_view.viewport_size_inverse, mouse_depth);
   ivec4 mouse_tile;
   debug_tile_index_from_position(mouse_P, mouse_tile);
 
@@ -346,7 +346,7 @@ void main()
     return;
   }
 
-  float depth = texelFetch(depth_tx, ivec2(gl_FragCoord.xy), 0).r;
+  float depth = texelFetch(hiz_tx, ivec2(gl_FragCoord.xy), 0).r;
   vec3 P = get_world_space_from_depth(uvcoordsvar.xy, depth);
   /* Make it pass the depth test. */
   gl_FragDepth = depth - 1e-6;

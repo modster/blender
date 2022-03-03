@@ -54,7 +54,7 @@ GPU_SHADER_CREATE_INFO(eevee_light_data)
 
 GPU_SHADER_CREATE_INFO(eevee_culling_debug)
     .do_static_compilation(true)
-    .sampler(0, ImageType::DEPTH_2D, "depth_tx")
+    .sampler(0, ImageType::FLOAT_2D, "hiz_tx")
     .fragment_out(0, Type::VEC4, "out_debug_color")
     .additional_info("eevee_shared", "draw_view")
     .fragment_source("eevee_culling_debug_frag.glsl")

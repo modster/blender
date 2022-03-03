@@ -58,7 +58,9 @@ class Instance {
   LightModule lights;
   LightProbeModule lightprobes;
   RaytracingModule raytracing;
+  GBuffer gbuffer;
   HiZBufferModule hiz;
+  HiZBuffer hiz_front, hiz_back;
   /* TODO(fclem) Move it to scene layer data. */
   ShadowModule shadows;
   SubsurfaceModule subsurface;
@@ -103,7 +105,10 @@ class Instance {
         lights(*this),
         lightprobes(*this),
         raytracing(*this),
+        gbuffer(*this),
         hiz(*this),
+        hiz_front(*this),
+        hiz_back(*this),
         shadows(*this),
         subsurface(*this),
         sync(*this),

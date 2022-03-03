@@ -122,7 +122,7 @@ class LightModule {
   void shgroup_resources(DRWShadingGroup *grp);
 
   void debug_end_sync(void);
-  void debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz);
+  void debug_draw(GPUFrameBuffer *view_fb);
 };
 
 /** \} */

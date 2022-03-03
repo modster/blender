@@ -61,7 +61,4 @@ void main(void)
 
   g_transparency_data.transmittance = vec3(1.0);
   g_transparency_data.holdout = 0.0;
-
-  out_volume_data = gbuffer_store_volume_data(g_volume_data);
-  out_transparency_data = gbuffer_store_transparency_data(g_transparency_data);
 }

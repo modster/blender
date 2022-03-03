@@ -245,10 +245,10 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
 Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeometry geometry_type)
 {
   eMaterialPipeline surface_pipe = (blender_mat->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
-                                                                                MAT_PIPE_FORWARD;
+                                                                                MAT_PIPE_DEFERRED;
   eMaterialPipeline prepass_pipe = (blender_mat->blend_method == MA_BM_BLEND) ?
                                        MAT_PIPE_FORWARD_PREPASS :
-                                       MAT_PIPE_FORWARD_PREPASS;
+                                       MAT_PIPE_DEFERRED_PREPASS;
 
   MaterialKey material_key(blender_mat, geometry_type, surface_pipe);
 

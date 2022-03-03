@@ -42,6 +42,8 @@ class HiZBuffer {
   DRWPass *hiz_update_ps_;
   /** References only. */
   GPUTexture *input_depth_tx_ = nullptr;
+  /** Dirty flag to check if the update is necessary. */
+  bool is_dirty_ = true;
 
  public:
   HiZBuffer(Instance &inst) : inst_(inst){};
@@ -50,13 +52,16 @@ class HiZBuffer {
   void view_sync(int2 extent);
   void end_sync();
 
-  void prepare(GPUTexture *depth_src_tx);
-
   void update(GPUTexture *depth_src);
 
-  GPUTexture *texture_get(void) const
+  GPUTexture **texture_ref_get(void)
   {
-    return hiz_tx_;
+    return &hiz_tx_;
+  }
+
+  void set_dirty()
+  {
+    is_dirty_ = true;
   }
 
  private:

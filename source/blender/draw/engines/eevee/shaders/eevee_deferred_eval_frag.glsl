@@ -10,24 +10,22 @@
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_light_eval_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_lightprobe_eval_cubemap_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_lightprobe_eval_grid_lib.glsl)
 
 void main(void)
 {
+  ivec2 texel = ivec2(gl_FragCoord.xy);
+  float gbuffer_depth = texelFetch(hiz_tx, texel, 0).r;
   vec2 uv = uvcoordsvar.xy;
-  float gbuffer_depth = texelFetch(hiz_tx, ivec2(gl_FragCoord.xy), 0).r;
   vec3 vP = get_view_space_from_depth(uv, gbuffer_depth);
   vec3 P = point_view_to_world(vP);
   vec3 V = cameraVec(P);
 
-  vec4 tra_col_in = texture(transmit_color_tx, uv);
-  vec4 tra_nor_in = texture(transmit_normal_tx, uv);
-  vec4 tra_dat_in = texture(transmit_data_tx, uv);
-  vec4 ref_col_in = texture(reflect_color_tx, uv);
-  vec4 ref_nor_in = texture(reflect_normal_tx, uv);
+  vec4 tra_col_in = texelFetch(transmit_color_tx, texel, 0);
+  vec4 tra_nor_in = texelFetch(transmit_normal_tx, texel, 0);
+  vec4 tra_dat_in = texelFetch(transmit_data_tx, texel, 0);
+  vec4 ref_col_in = texelFetch(reflect_color_tx, texel, 0);
+  vec4 ref_nor_in = texelFetch(reflect_normal_tx, texel, 0);
 
-  ClosureEmission emission = gbuffer_load_emission_data(emission_data_tx, uv);
   ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
   ClosureReflection reflection = gbuffer_load_reflection_data(ref_col_in, ref_nor_in);
 
@@ -44,15 +42,16 @@ void main(void)
 
   light_eval(diffuse, reflection, P, V, vP.z, thickness, radiance_diffuse, radiance_reflection);
 
-  out_combined = vec4(emission.emission, 0.0);
-  out_diffuse.rgb = radiance_diffuse;
-  /* FIXME(fclem): This won't work after the first light batch since we use additive blending. */
-  out_diffuse.a = fract(float(diffuse.sss_id) / 1024.0) * 1024.0;
-  /* Do not apply color to diffuse term for SSS material. */
-  if (diffuse.sss_id == 0u) {
-    out_diffuse.rgb *= diffuse.color;
-    out_combined.rgb += out_diffuse.rgb;
+  out_combined = vec4(0.0);
+  out_combined.xyz += radiance_reflection * reflection.color;
+
+  if (diffuse.sss_id != 0u) {
+    // imageStore(sss_radiance, texel, vec4(radiance_diffuse, float(diffuse.sss_id % 1024)));
   }
-  out_specular = radiance_reflection * reflection.color;
-  out_combined.rgb += out_specular;
+  else {
+    out_combined.xyz += radiance_diffuse * diffuse.color;
+  }
+
+  // output_renderpass(rpass_diffuse_light, vec3(1.0), vec4(radiance_diffuse, 0.0));
+  // output_renderpass(rpass_specular_light, vec3(1.0), vec4(radiance_reflection, 0.0));
 }

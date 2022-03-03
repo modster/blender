@@ -56,19 +56,19 @@ void HiZBuffer::end_sync()
     DRW_shgroup_call_compute_ref(grp, dispatch_size_);
     DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
   }
-}
 
-void HiZBuffer::prepare(GPUTexture *depth_src_tx)
-{
-  /* TODO(fclem) Remove. */
-  begin_sync();
-  view_sync({GPU_texture_width(depth_src_tx), GPU_texture_height(depth_src_tx)});
-  end_sync();
+  is_dirty_ = true;
 }
 
 void HiZBuffer::update(GPUTexture *depth_src_tx)
 {
+  if (!is_dirty_) {
+    return;
+  }
   int2 extent_src = {GPU_texture_width(depth_src_tx), GPU_texture_height(depth_src_tx)};
+
+  BLI_assert(extent_src.x <= extent_.x);
+  BLI_assert(extent_src.y <= extent_.y);
 
   dispatch_size_.x = divide_ceil_u(extent_src.x, kernel_size_);
   dispatch_size_.y = divide_ceil_u(extent_src.y, kernel_size_);

@@ -44,12 +44,13 @@ vec3 burley_eval(vec3 d, float r)
 void main(void)
 {
   vec2 center_uv = uvcoordsvar.xy;
+  ivec2 texel = ivec2(gl_FragCoord.xy);
 
-  float gbuffer_depth = texelFetch(hiz_tx, ivec2(gl_FragCoord.xy), 0).r;
+  float gbuffer_depth = texelFetch(hiz_tx, texel, 0).r;
   vec3 vP = get_view_space_from_depth(center_uv, gbuffer_depth);
-  vec4 tra_col_in = texture(transmit_color_tx, center_uv);
-  vec4 tra_nor_in = texture(transmit_normal_tx, center_uv);
-  vec4 tra_dat_in = texture(transmit_data_tx, center_uv);
+  vec4 tra_col_in = texelFetch(transmit_color_tx, texel, 0);
+  vec4 tra_nor_in = texelFetch(transmit_normal_tx, texel, 0);
+  vec4 tra_dat_in = texelFetch(transmit_data_tx, texel, 0);
 
   ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
 

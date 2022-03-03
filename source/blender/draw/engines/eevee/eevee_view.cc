@@ -81,6 +81,9 @@ void ShadingView::sync(int2 render_extent_)
   velocity_.sync(extent_);
   rt_buffer_opaque_.sync(extent_);
   rt_buffer_refract_.sync(extent_);
+  inst_.hiz_back.view_sync(extent_);
+  inst_.hiz_front.view_sync(extent_);
+  inst_.gbuffer.view_sync(extent_);
 
   {
     /* Query temp textures and create framebuffers. */
@@ -94,8 +97,6 @@ void ShadingView::sync(int2 render_extent_)
     postfx_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
 
     view_fb_.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx_), GPU_ATTACHMENT_TEXTURE(combined_tx_));
-
-    gbuffer_.sync(depth_tx_, combined_tx_, owner);
   }
 }
 
@@ -119,22 +120,17 @@ void ShadingView::render(void)
     inst_.shading_passes.background.render();
   }
 
-  inst_.shading_passes.deferred.render(render_view_,
-                                       gbuffer_,
-                                       hiz_front_,
-                                       hiz_back_,
-                                       rt_buffer_opaque_,
-                                       rt_buffer_refract_,
-                                       view_fb_);
+  inst_.shading_passes.deferred.render(
+      render_view_, rt_buffer_opaque_, rt_buffer_refract_, depth_tx_, combined_tx_);
 
   inst_.lightprobes.draw_cache_display();
 
   inst_.lookdev.render_overlay(view_fb_);
 
-  inst_.shading_passes.forward.render(render_view_, gbuffer_, hiz_front_, view_fb_);
+  inst_.shading_passes.forward.render(render_view_, depth_tx_, combined_tx_);
 
-  inst_.lights.debug_draw(view_fb_, hiz_front_);
-  inst_.shadows.debug_draw(view_fb_, hiz_front_);
+  inst_.lights.debug_draw(view_fb_);
+  inst_.shadows.debug_draw(view_fb_);
 
   velocity_.render(depth_tx_);
 
@@ -209,16 +205,15 @@ void LightProbeView::sync(Texture &color_tx,
 
   if (!is_only_background_) {
     /* Query temp textures and create framebuffers. */
-    /* HACK: View name should be unique and static.
-     * With this, we can reuse the same texture across views. */
-    DrawEngineType *owner = (DrawEngineType *)name_;
-    gbuffer_.sync(depth_tx, color_tx, owner, layer_);
     rt_buffer_opaque_.sync(extent_);
     rt_buffer_refract_.sync(extent_);
+    inst_.hiz_back.view_sync(extent_);
+    inst_.hiz_front.view_sync(extent_);
+    inst_.gbuffer.view_sync(extent_);
   }
 }
 
-void LightProbeView::render(void)
+void LightProbeView::render(GPUTexture *depth_tx)
 {
   if (!is_only_background_) {
     inst_.lightprobes.set_view(view_, extent_);
@@ -236,8 +231,8 @@ void LightProbeView::render(void)
     GPU_framebuffer_clear_depth(view_fb_, 1.0f);
 
     inst_.shading_passes.deferred.render(
-        view_, gbuffer_, hiz_front_, hiz_back_, rt_buffer_opaque_, rt_buffer_refract_, view_fb_);
-    inst_.shading_passes.forward.render(view_, gbuffer_, hiz_front_, view_fb_);
+        view_, rt_buffer_opaque_, rt_buffer_refract_, depth_tx, nullptr);
+    inst_.shading_passes.forward.render(view_, depth_tx, nullptr);
   }
   DRW_stats_group_end();
 }

@@ -64,28 +64,30 @@ GPU_SHADER_INTERFACE_INFO(eevee_surface_iface, "interp")
     .smooth(Type::FLOAT, "hair_thickness")
     .flat(Type::INT, "hair_strand_id");
 
+#define image_out(slot, qualifier, format, name) \
+  image(slot, format, qualifier, ImageType::FLOAT_2D, name, Frequency::PASS)
+
 GPU_SHADER_CREATE_INFO(eevee_surface_deferred)
     .vertex_out(eevee_surface_iface)
-    /* Diffuse or Transmission Color. */
-    .fragment_out(0, Type::VEC3, "out_transmit_color")
-    /* RG: Normal (negative if Tranmission), B: SSS ID, A: Min-Thickness */
-    .fragment_out(1, Type::VEC4, "out_transmit_normal")
-    /* RGB: SSS RGB Radius.
-     * or
-     * R: Transmission IOR, G: Transmission Roughness, B: Unused. */
-    .fragment_out(2, Type::VEC3, "out_transmit_data")
-    /* Reflection Color. */
-    .fragment_out(3, Type::VEC3, "out_reflection_color")
-    /* RG: Normal, B: Roughness X, A: Roughness Y. */
-    .fragment_out(4, Type::VEC4, "out_reflection_normal")
-    /* Volume Emission, Absorption, Scatter, Phase. */
-    .fragment_out(5, Type::UVEC4, "out_volume_data")
-    /* Emission. */
-    .fragment_out(6, Type::VEC3, "out_emission_data")
-    /* Transparent BSDF, Holdout. */
-    .fragment_out(7, Type::VEC4, "out_transparency_data")
+    /* Note: This removes the possibility of using gl_FragDepth. */
+    .early_fragment_test(true)
+    /* Direct output. */
+    .fragment_out(0, Type::VEC4, "out_radiance", DualBlend::SRC_0)
+    .fragment_out(0, Type::VEC4, "out_transmittance", DualBlend::SRC_1)
+    /* Gbuffer. */
+    .image_out(0, Qualifier::WRITE, GPU_R11F_G11F_B10F, "gbuff_transmit_color")
+    .image_out(1, Qualifier::WRITE, GPU_R11F_G11F_B10F, "gbuff_transmit_data")
+    .image_out(2, Qualifier::WRITE, GPU_RGBA16F, "gbuff_transmit_normal")
+    .image_out(3, Qualifier::WRITE, GPU_R11F_G11F_B10F, "gbuff_reflection_color")
+    .image_out(4, Qualifier::WRITE, GPU_RGBA16F, "gbuff_reflection_normal")
+    /* Renderpasses. */
+    .image_out(5, Qualifier::READ_WRITE, GPU_RGBA16F, "rpass_emission")
+    .image_out(6, Qualifier::READ_WRITE, GPU_RGBA16F, "rpass_volume_light")
+    /* TODO: AOVs maybe? */
     .fragment_source("eevee_surface_deferred_frag.glsl")
     .additional_info("eevee_sampling_data", "eevee_utility_texture");
+
+#undef image_out
 
 GPU_SHADER_CREATE_INFO(eevee_surface_forward)
     .auto_resource_location(true)

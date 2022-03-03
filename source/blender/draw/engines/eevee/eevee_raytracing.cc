@@ -27,27 +27,27 @@ void RaytracingModule::sync(void)
 {
   SceneEEVEE &sce_eevee = inst_.scene->eevee;
 
-  reflection_data_.thickness = sce_eevee.ssr_thickness;
-  reflection_data_.brightness_clamp = (sce_eevee.ssr_firefly_fac < 1e-8f) ?
-                                          FLT_MAX :
-                                          sce_eevee.ssr_firefly_fac;
-  reflection_data_.max_roughness = sce_eevee.ssr_max_roughness + 0.01f;
-  reflection_data_.quality = 1.0f - 0.95f * sce_eevee.ssr_quality;
-  reflection_data_.bias = 0.8f + sce_eevee.ssr_quality * 0.15f;
-  reflection_data_.pool_offset = inst_.sampling.sample_get() / 5;
+  reflection_data.thickness = sce_eevee.ssr_thickness;
+  reflection_data.brightness_clamp = (sce_eevee.ssr_firefly_fac < 1e-8f) ?
+                                         FLT_MAX :
+                                         sce_eevee.ssr_firefly_fac;
+  reflection_data.max_roughness = sce_eevee.ssr_max_roughness + 0.01f;
+  reflection_data.quality = 1.0f - 0.95f * sce_eevee.ssr_quality;
+  reflection_data.bias = 0.8f + sce_eevee.ssr_quality * 0.15f;
+  reflection_data.pool_offset = inst_.sampling.sample_get() / 5;
 
-  refraction_data_ = static_cast<RaytraceData>(reflection_data_);
-  // refraction_data_.thickness = 1e16;
+  refraction_data = static_cast<RaytraceData>(reflection_data);
+  // refraction_data.thickness = 1e16;
   /* TODO(fclem): Clamp option for refraction. */
   /* TODO(fclem): bias option for refraction. */
   /* TODO(fclem): bias option for refraction. */
 
-  diffuse_data_ = static_cast<RaytraceData>(reflection_data_);
-  diffuse_data_.max_roughness = 1.01f;
+  diffuse_data = static_cast<RaytraceData>(reflection_data);
+  diffuse_data.max_roughness = 1.01f;
 
-  reflection_data_.push_update();
-  refraction_data_.push_update();
-  diffuse_data_.push_update();
+  reflection_data.push_update();
+  refraction_data.push_update();
+  diffuse_data.push_update();
 
   // enabled_ = (sce_eevee.flag & SCE_EEVEE_RAYTRACING_ENABLED) != 0;
 }
@@ -84,7 +84,7 @@ void RaytraceBuffer::sync(int2 extent)
       GPUShader *sh = inst_.shaders.static_shader_get(do_rt ? RAYTRACE_REFLECTION :
                                                               RAYTRACE_REFLECTION_FALLBACK);
       grps[0] = DRW_shgroup_create(sh, trace_reflection_ps_);
-      DRW_shgroup_uniform_block(grps[0], "raytrace_buf", inst_.raytracing.reflection_ubo_get());
+      DRW_shgroup_uniform_block(grps[0], "raytrace_buf", inst_.raytracing.reflection_data);
       DRW_shgroup_stencil_set(grps[0], 0x0, 0x0, CLOSURE_REFLECTION);
     }
     {
@@ -92,7 +92,7 @@ void RaytraceBuffer::sync(int2 extent)
       GPUShader *sh = inst_.shaders.static_shader_get(do_rt ? RAYTRACE_REFRACTION :
                                                               RAYTRACE_REFRACTION_FALLBACK);
       grps[1] = DRW_shgroup_create(sh, trace_refraction_ps_);
-      DRW_shgroup_uniform_block(grps[1], "raytrace_buf", inst_.raytracing.refraction_ubo_get());
+      DRW_shgroup_uniform_block(grps[1], "raytrace_buf", inst_.raytracing.refraction_data);
       DRW_shgroup_stencil_set(grps[1], 0x0, 0x0, CLOSURE_REFRACTION);
     }
     {
@@ -100,7 +100,7 @@ void RaytraceBuffer::sync(int2 extent)
       GPUShader *sh = inst_.shaders.static_shader_get(do_rt ? RAYTRACE_DIFFUSE :
                                                               RAYTRACE_DIFFUSE_FALLBACK);
       grps[2] = DRW_shgroup_create(sh, trace_diffuse_ps_);
-      DRW_shgroup_uniform_block(grps[2], "raytrace_buf", inst_.raytracing.diffuse_ubo_get());
+      DRW_shgroup_uniform_block(grps[2], "raytrace_buf", inst_.raytracing.diffuse_data);
       DRW_shgroup_stencil_set(grps[2], 0x0, 0x0, CLOSURE_DIFFUSE);
     }
 
@@ -144,7 +144,7 @@ void RaytraceBuffer::sync(int2 extent)
 
     for (DRWShadingGroup *grp : grps) {
       /* Does not matter which raytrace_block we use. */
-      DRW_shgroup_uniform_block(grp, "raytrace_buf", inst_.raytracing.diffuse_ubo_get());
+      DRW_shgroup_uniform_block(grp, "raytrace_buf", inst_.raytracing.diffuse_data);
       DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
       DRW_shgroup_uniform_block(grp, "rtbuf_buf", data_);
       DRW_shgroup_uniform_texture_ref_ex(grp, "ray_data_tx", &input_ray_data_tx_, no_interp);
@@ -198,13 +198,12 @@ void RaytraceBuffer::sync(int2 extent)
   }
 }
 
-void RaytraceBuffer::trace(eClosureBits closure_type,
-                           GBuffer &gbuffer,
-                           HiZBuffer &hiz,
-                           HiZBuffer &hiz_front)
+void RaytraceBuffer::trace(eClosureBits UNUSED(closure_type),
+                           GBuffer &UNUSED(gbuffer),
+                           HiZBuffer &UNUSED(hiz),
+                           HiZBuffer &UNUSED(hiz_front))
 {
-  gbuffer.bind_tracing();
-
+#if 0
   input_hiz_tx_ = hiz.texture_get();
   input_hiz_front_tx_ = hiz_front.texture_get();
   if (closure_type == CLOSURE_REFLECTION) {
@@ -237,10 +236,12 @@ void RaytraceBuffer::trace(eClosureBits closure_type,
 
   input_ray_data_tx_ = gbuffer.ray_data_tx;
   input_ray_color_tx_ = gbuffer.ray_radiance_tx;
+#endif
 }
 
-void RaytraceBuffer::denoise(eClosureBits closure_type)
+void RaytraceBuffer::denoise(eClosureBits UNUSED(closure_type))
 {
+#if 0
   switch (closure_type) {
     default:
     case CLOSURE_REFLECTION:
@@ -265,10 +266,12 @@ void RaytraceBuffer::denoise(eClosureBits closure_type)
       DRW_draw_pass(denoise_diffuse_ps_);
       break;
   }
+#endif
 }
 
-void RaytraceBuffer::resolve(eClosureBits closure_type, GBuffer &gbuffer)
+void RaytraceBuffer::resolve(eClosureBits UNUSED(closure_type), GBuffer &UNUSED(gbuffer))
 {
+#if 0
   gbuffer.bind_radiance();
   switch (closure_type) {
     default:
@@ -282,6 +285,7 @@ void RaytraceBuffer::resolve(eClosureBits closure_type, GBuffer &gbuffer)
       DRW_draw_pass(resolve_diffuse_ps_);
       break;
   }
+#endif
 }
 
 /** \} */

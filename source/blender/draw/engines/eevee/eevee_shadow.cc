@@ -1048,6 +1048,8 @@ void ShadowModule::debug_end_sync(void)
  * Needs to be called after LightModule::set_view(); */
 void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
 {
+  GPUFrameBuffer *prev_fb = GPU_framebuffer_active_get();
+
   /* Only process each view once. */
   bool do_process_view = (view != last_processed_view);
   last_processed_view = view;
@@ -1220,15 +1222,16 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
   DRW_stats_group_end();
 
   DRW_view_set_active(view);
+  if (prev_fb) {
+    GPU_framebuffer_bind(prev_fb);
+  }
 }
 
-void ShadowModule::debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz)
+void ShadowModule::debug_draw(GPUFrameBuffer *view_fb)
 {
   if (debug_draw_ps_ == nullptr) {
     return;
   }
-  input_depth_tx_ = hiz.texture_get();
-
   const DRWView *view = DRW_view_get_active();
 
   if (debug_view_ != nullptr) {

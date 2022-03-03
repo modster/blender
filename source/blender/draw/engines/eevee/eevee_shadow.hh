@@ -599,7 +599,7 @@ class ShadowModule {
   void set_view(const DRWView *view, GPUTexture *depth_tx);
 
   void debug_end_sync(void);
-  void debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz);
+  void debug_draw(GPUFrameBuffer *view_fb);
 
   GPUTexture *atlas_tx_get(void)
   {

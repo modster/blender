@@ -18,12 +18,13 @@ class Instance;
  * \{ */
 
 class RaytracingModule {
+ public:
+  RaytraceDataBuf reflection_data;
+  RaytraceDataBuf refraction_data;
+  RaytraceDataBuf diffuse_data;
+
  private:
   Instance &inst_;
-
-  RaytraceDataBuf reflection_data_;
-  RaytraceDataBuf refraction_data_;
-  RaytraceDataBuf diffuse_data_;
 
   bool enabled_ = false;
 
@@ -31,19 +32,6 @@ class RaytracingModule {
   RaytracingModule(Instance &inst) : inst_(inst){};
 
   void sync(void);
-
-  const GPUUniformBuf *reflection_ubo_get(void) const
-  {
-    return reflection_data_;
-  }
-  const GPUUniformBuf *refraction_ubo_get(void) const
-  {
-    return refraction_data_;
-  }
-  const GPUUniformBuf *diffuse_ubo_get(void) const
-  {
-    return diffuse_data_;
-  }
 
   bool enabled(void) const
   {

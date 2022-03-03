@@ -393,7 +393,7 @@ void LightModule::debug_end_sync(void)
   DRW_shgroup_storage_block_ref(grp, "lights_cull_buf", &culling_data);
   DRW_shgroup_storage_block_ref(grp, "lights_zbin_buf", &culling_zbin_buf);
   DRW_shgroup_storage_block_ref(grp, "lights_tile_buf", &culling_tile_buf);
-  DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
+  DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", inst_.hiz_front.texture_ref_get());
   DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 }
 
@@ -444,13 +444,11 @@ void LightModule::set_view(const DRWView *view,
   DRW_draw_pass(culling_ps_);
 }
 
-void LightModule::debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz)
+void LightModule::debug_draw(GPUFrameBuffer *view_fb)
 {
   if (debug_draw_ps_ == nullptr) {
     return;
   }
-  input_depth_tx_ = hiz.texture_get();
-
   GPU_framebuffer_bind(view_fb);
   DRW_draw_pass(debug_draw_ps_);
 }

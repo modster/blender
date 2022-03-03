@@ -7,6 +7,9 @@
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 
+/* TODO(fclem): Renderpasses. */
+#define output_renderpass(a, b, c, d)
+
 void main(void)
 {
   g_data = init_globals();
@@ -21,49 +24,84 @@ void main(void)
 
   nodetree_surface();
 
-  float alpha = saturate(1.0 - avg(g_transparency_data.transmittance));
-  vec3 V = cameraVec(g_data.P);
+  out_transmittance = vec4(1.0 - g_transparency_data.holdout);
+  float transmittance_mono = saturate(avg(g_transparency_data.transmittance));
+#if 1 /* TODO(fclem): Alpha clipped materials. */
 
-  if (alpha > 0.0) {
+  /* Apply transmittance. */
+  out_transmittance *= vec4(g_transparency_data.transmittance, transmittance_mono);
+#else
+  /* Stochastique monochromatic transmittance.
+   * Pixels are discarded based on alpha. We need to compensate the applied transmittance
+   * term on all radiance channels. */
+  if (transmittance_mono < 1.0) {
+    float alpha = 1.0 - transmittance_mono;
     g_diffuse_data.color /= alpha;
     g_reflection_data.color /= alpha;
     g_refraction_data.color /= alpha;
     g_emission_data.emission /= alpha;
   }
+#endif
+  out_radiance = vec4(g_emission_data.emission, g_transparency_data.holdout);
+
+#ifdef MATERIAL_EMISSION
+  output_renderpass(rpass_emission, transmittance, vec4(g_emission_data.emission, 0.0));
+#endif
+
+#ifdef MATERIAL_VOLUME
+  output_renderpass(rpass_volume_light, transmittance, vec4(, 0.0));
+#endif
 
   if (gl_FrontFacing) {
     g_refraction_data.ior = safe_rcp(g_refraction_data.ior);
   }
 
+  vec3 V = cameraVec(g_data.P);
   g_reflection_data.N = ensure_valid_reflection(g_data.Ng, V, g_reflection_data.N);
 
-  {
-    out_reflection_color = g_reflection_data.color;
-    out_reflection_normal.xy = gbuffer_encode_normal(g_reflection_data.N);
-    out_reflection_normal.z = max(1e-4, g_reflection_data.roughness);
+  ivec2 out_texel = ivec2(gl_FragCoord.xy);
+
+  if (true) {
+    vec4 out_color;
+    out_color.xyz = g_reflection_data.color;
+    imageStore(gbuff_reflection_color, out_texel, out_color);
+
+    vec4 out_normal;
+    out_normal.xy = gbuffer_encode_normal(g_reflection_data.N);
+    out_normal.z = max(1e-4, g_reflection_data.roughness);
+    imageStore(gbuff_reflection_normal, out_texel, out_normal);
   }
 
   if (g_data.transmit_rand == 0.0) {
-    out_transmit_color = g_refraction_data.color;
-    out_transmit_normal.xy = gbuffer_encode_normal(g_refraction_data.N);
-    out_transmit_normal.z = -1.0;
-    out_transmit_normal.w = thickness;
-    out_transmit_data.x = g_refraction_data.ior;
-    out_transmit_data.y = g_refraction_data.roughness;
+    vec4 out_color;
+    out_color.xyz = g_refraction_data.color;
+    imageStore(gbuff_transmit_color, out_texel, out_color);
+
+    vec4 out_normal;
+    out_normal.xy = gbuffer_encode_normal(g_refraction_data.N);
+    out_normal.z = -1.0;
+    out_normal.w = thickness;
+    imageStore(gbuff_transmit_normal, out_texel, out_normal);
+
+    vec4 out_data;
+    out_data.x = g_refraction_data.ior;
+    out_data.y = g_refraction_data.roughness;
+    imageStore(gbuff_transmit_data, out_texel, out_data);
   }
   else {
-    if (g_diffuse_data.sss_id == 1u) {
-      g_diffuse_data.sss_id = uint(resource_handle + 1);
-    }
     /* Output diffuse / SSS in transmit data. */
-    out_transmit_color = g_diffuse_data.color;
-    out_transmit_normal.xy = gbuffer_encode_normal(g_diffuse_data.N);
-    out_transmit_normal.z = fract(float(g_diffuse_data.sss_id) / 1024.0);
-    out_transmit_normal.w = thickness;
-    out_transmit_data = g_diffuse_data.sss_radius;
-  }
+    vec4 out_color;
+    out_color.xyz = g_diffuse_data.color;
+    imageStore(gbuff_transmit_color, out_texel, out_color);
 
-  out_volume_data = gbuffer_store_volume_data(g_volume_data);
-  out_emission_data = gbuffer_store_emission_data(g_emission_data);
-  out_transparency_data = gbuffer_store_transparency_data(g_transparency_data);
+    vec4 out_normal;
+    out_normal.xy = gbuffer_encode_normal(g_diffuse_data.N);
+    out_normal.z = (g_diffuse_data.sss_id == 1u) ? fract(float(resource_handle + 1) / 1024.0) : 0;
+    out_normal.w = thickness;
+    imageStore(gbuff_transmit_normal, out_texel, out_normal);
+
+    vec4 out_data;
+    out_data.xyz = g_diffuse_data.sss_radius;
+    imageStore(gbuff_transmit_data, out_texel, out_data);
+  }
 }

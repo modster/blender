@@ -62,8 +62,7 @@ class ForwardPass {
   DRWPass *opaque_culled_ps_ = nullptr;
   DRWPass *transparent_ps_ = nullptr;
 
-  GPUTexture *input_hiz_tx_ = nullptr;
-  GPUTexture *input_radiance_tx_ = nullptr;
+  GPUTexture *input_screen_radiance_tx_ = nullptr;
 
  public:
   ForwardPass(Instance &inst) : inst_(inst){};
@@ -89,7 +88,7 @@ class ForwardPass {
   DRWShadingGroup *material_transparent_add(::Material *blender_mat, GPUMaterial *gpumat);
   DRWShadingGroup *prepass_transparent_add(::Material *blender_mat, GPUMaterial *gpumat);
 
-  void render(const DRWView *view, GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb);
+  void render(const DRWView *view, GPUTexture *depth_tx, GPUTexture *combined_tx);
 };
 
 /** \} */
@@ -102,16 +101,14 @@ class DeferredLayer {
  private:
   Instance &inst_;
 
-  /* TODO */
-  // GPUTexture *input_emission_data_tx_ = nullptr;
-  // GPUTexture *input_diffuse_data_tx_ = nullptr;
-  // GPUTexture *input_depth_tx_ = nullptr;
-
   DRWPass *prepass_ps_ = nullptr;
   DRWPass *prepass_culled_ps_ = nullptr;
   DRWPass *gbuffer_ps_ = nullptr;
   DRWPass *gbuffer_culled_ps_ = nullptr;
   DRWPass *volume_ps_ = nullptr;
+
+  /* Closures bits from the materials in this pass. */
+  eClosureBits closure_bits_;
 
  public:
   DeferredLayer(Instance &inst) : inst_(inst){};
@@ -121,14 +118,12 @@ class DeferredLayer {
   DRWShadingGroup *prepass_add(::Material *blender_mat, GPUMaterial *gpumat);
   void volume_add(Object *ob);
   void render(const DRWView *view,
-              GBuffer &gbuffer,
-              HiZBuffer &hiz_front,
-              HiZBuffer &hiz_back,
-              RaytraceBuffer &rt_buffer,
-              GPUFrameBuffer *view_fb);
+              RaytraceBuffer *rt_buffer,
+              GPUTexture *depth_tx,
+              GPUTexture *combined_tx);
 
  private:
-  void update_pass_inputs(GBuffer &gbuffer, HiZBuffer &hiz_front, HiZBuffer &hiz_back);
+  void deferred_shgroup_resources(DRWShadingGroup *grp);
 };
 
 class DeferredPass {
@@ -143,29 +138,11 @@ class DeferredPass {
   DeferredLayer refraction_layer_;
   DeferredLayer volumetric_layer_;
 
-  DRWPass *eval_direct_ps_ = nullptr;
+  DRWPass *eval_ps_ = nullptr;
   DRWPass *eval_subsurface_ps_ = nullptr;
-  DRWPass *eval_transparency_ps_ = nullptr;
-  DRWPass *eval_holdout_ps_ = nullptr;
-  // DRWPass *eval_volume_heterogeneous_ps_ = nullptr;
-  DRWPass *eval_volume_homogeneous_ps_ = nullptr;
 
   /* References only. */
   GPUTexture *input_combined_tx_ = nullptr;
-  GPUTexture *input_depth_behind_tx_ = nullptr;
-  GPUTexture *input_diffuse_tx_ = nullptr;
-  GPUTexture *input_emission_data_tx_ = nullptr;
-  GPUTexture *input_hiz_front_tx_ = nullptr;
-  GPUTexture *input_hiz_back_tx_ = nullptr;
-  GPUTexture *input_reflect_color_tx_ = nullptr;
-  GPUTexture *input_reflect_normal_tx_ = nullptr;
-  GPUTexture *input_transmit_color_tx_ = nullptr;
-  GPUTexture *input_transmit_data_tx_ = nullptr;
-  GPUTexture *input_transmit_normal_tx_ = nullptr;
-  GPUTexture *input_transparency_data_tx_ = nullptr;
-  GPUTexture *input_volume_data_tx_ = nullptr;
-  // GPUTexture *input_volume_radiance_tx_ = nullptr;
-  // GPUTexture *input_volume_transmittance_tx_ = nullptr;
 
  public:
   DeferredPass(Instance &inst)
@@ -176,12 +153,10 @@ class DeferredPass {
   DRWShadingGroup *prepass_add(::Material *material, GPUMaterial *gpumat);
   void volume_add(Object *ob);
   void render(const DRWView *drw_view,
-              GBuffer &gbuffer,
-              HiZBuffer &hiz_front,
-              HiZBuffer &hiz_back,
               RaytraceBuffer &rtbuffer_opaque,
               RaytraceBuffer &rtbuffer_refract,
-              GPUFrameBuffer *view_fb);
+              GPUTexture *depth_tx,
+              GPUTexture *combined_tx);
 };
 
 /** \} */

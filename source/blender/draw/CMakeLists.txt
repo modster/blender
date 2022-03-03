@@ -273,10 +273,7 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_culling_select_comp.glsl
   engines/eevee/shaders/eevee_culling_sort_comp.glsl
   engines/eevee/shaders/eevee_culling_tile_comp.glsl
-  engines/eevee/shaders/eevee_deferred_direct_frag.glsl
-  engines/eevee/shaders/eevee_deferred_holdout_frag.glsl
-  engines/eevee/shaders/eevee_deferred_transparent_frag.glsl
-  engines/eevee/shaders/eevee_deferred_volume_frag.glsl
+  engines/eevee/shaders/eevee_deferred_eval_frag.glsl
   engines/eevee/shaders/eevee_depth_clear_frag.glsl
   engines/eevee/shaders/eevee_hiz_update_comp.glsl
   engines/eevee/shaders/eevee_depth_of_field_accumulator_lib.glsl

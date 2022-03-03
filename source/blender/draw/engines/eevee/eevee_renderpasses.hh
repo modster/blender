@@ -29,6 +29,10 @@ enum eRenderPassBit {
   RENDERPASS_DEPTH = (1 << 1),
   RENDERPASS_NORMAL = (1 << 2),
   RENDERPASS_VECTOR = (1 << 3),
+  RENDERPASS_EMISSION = (1 << 4),
+  RENDERPASS_DIFFUSE_COLOR = (1 << 5),
+  RENDERPASS_SPECULAR_COLOR = (1 << 6),
+  RENDERPASS_VOLUME_LIGHT = (1 << 7),
   /** Used for iterator. */
   RENDERPASS_MAX,
   RENDERPASS_ALL = ((RENDERPASS_MAX - 1) << 1) - 1,
@@ -43,6 +47,10 @@ static inline eRenderPassBit to_render_passes_bits(int i_rpasses)
   SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_Z, RENDERPASS_DEPTH);
   SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_NORMAL, RENDERPASS_NORMAL);
   SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_VECTOR, RENDERPASS_VECTOR);
+  SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_EMIT, RENDERPASS_EMISSION);
+  SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_DIFFUSE_COLOR, RENDERPASS_DIFFUSE_COLOR);
+  SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_GLOSSY_COLOR, RENDERPASS_SPECULAR_COLOR);
+  /* RENDERPASS_VOLUME_LIGHT? */
   return rpasses;
 }
 
@@ -57,6 +65,14 @@ static inline const char *to_render_passes_name(eRenderPassBit rpass)
       return RE_PASSNAME_NORMAL;
     case RENDERPASS_VECTOR:
       return RE_PASSNAME_VECTOR;
+    case RENDERPASS_EMISSION:
+      return RE_PASSNAME_EMIT;
+    case RENDERPASS_DIFFUSE_COLOR:
+      return RE_PASSNAME_DIFFUSE_COLOR;
+    case RENDERPASS_SPECULAR_COLOR:
+      return RE_PASSNAME_GLOSSY_COLOR;
+    case RENDERPASS_VOLUME_LIGHT:
+      return RE_PASSNAME_VOLUME_LIGHT;
     default:
       BLI_assert(0);
       return "";
@@ -67,6 +83,10 @@ static inline eFilmDataType to_render_passes_data_type(eRenderPassBit rpass,
                                                        const bool use_log_encoding)
 {
   switch (rpass) {
+    case RENDERPASS_EMISSION:
+    case RENDERPASS_DIFFUSE_COLOR:
+    case RENDERPASS_SPECULAR_COLOR:
+    case RENDERPASS_VOLUME_LIGHT:
     case RENDERPASS_COMBINED:
       return (use_log_encoding) ? FILM_DATA_COLOR_LOG : FILM_DATA_COLOR;
     case RENDERPASS_DEPTH:
@@ -97,12 +117,26 @@ class RenderPasses {
   Film *depth = nullptr;
   Film *normal = nullptr;
   Film *vector = nullptr;
+  Film *emission = nullptr;
+  Film *diffuse_color = nullptr;
+  Film *diffuse_light = nullptr;
+  Film *specular_color = nullptr;
+  Film *specular_light = nullptr;
+  Film *volume_light = nullptr;
   Vector<Film *> aovs;
+  /** View texture to render to. */
+  TextureFromPool emission_tx = {"PassEmission"};
+  TextureFromPool diffuse_color_tx = {"PassDiffuseColor"};
+  TextureFromPool specular_color_tx = {"PassSpecularColor"};
+  TextureFromPool volume_light_tx = {"PassVolumeLight"};
 
  private:
   Instance &inst_;
 
   eRenderPassBit enabled_passes_ = RENDERPASS_NONE;
+  /* Maximum texture size. Since we use imageLoad/Store instead of framebuffer, we only need to
+   * allocate the biggest texture. */
+  int2 tmp_extent_ = int2(-1);
 
  public:
   RenderPasses(Instance &inst) : inst_(inst){};
@@ -113,6 +147,9 @@ class RenderPasses {
     delete depth;
     delete normal;
     delete vector;
+    for (Film *&film : aovs) {
+      delete film;
+    }
   }
 
   void init(const int extent[2], const rcti *output_rect);
@@ -122,6 +159,16 @@ class RenderPasses {
     for (RenderPassItem rpi : *this) {
       rpi.film->sync();
     }
+    emission_tx.sync();
+    diffuse_color_tx.sync();
+    specular_color_tx.sync();
+    volume_light_tx.sync();
+    tmp_extent_ = int2(-1);
+  }
+
+  void view_sync(int2 view_extent)
+  {
+    tmp_extent_ = math::max(tmp_extent_, view_extent);
   }
 
   void end_sync(void)
@@ -129,6 +176,25 @@ class RenderPasses {
     for (RenderPassItem rpi : *this) {
       rpi.film->end_sync();
     }
+  }
+
+  void acquire()
+  {
+    auto acquire_tmp_pass_buffer = [&](TextureFromPool &texture, bool enabled_pass) {
+      texture.acquire(enabled_pass ? tmp_extent_ : int2(1), GPU_RGBA16F, (void *)&inst_);
+    };
+    acquire_tmp_pass_buffer(emission_tx, enabled_passes_ & RENDERPASS_EMISSION);
+    acquire_tmp_pass_buffer(diffuse_color_tx, enabled_passes_ & RENDERPASS_DIFFUSE_COLOR);
+    acquire_tmp_pass_buffer(specular_color_tx, enabled_passes_ & RENDERPASS_SPECULAR_COLOR);
+    acquire_tmp_pass_buffer(volume_light_tx, enabled_passes_ & RENDERPASS_VOLUME_LIGHT);
+  }
+
+  void release()
+  {
+    emission_tx.release();
+    diffuse_color_tx.release();
+    specular_color_tx.release();
+    volume_light_tx.release();
   }
 
   void resolve_viewport(DefaultFramebufferList *dfbl)
@@ -167,6 +233,14 @@ class RenderPasses {
       case RENDERPASS_NORMAL:
         return normal;
       case RENDERPASS_VECTOR:
+        return vector;
+      case RENDERPASS_EMISSION:
+        return emission;
+      case RENDERPASS_DIFFUSE_COLOR:
+        return vector;
+      case RENDERPASS_SPECULAR_COLOR:
+        return vector;
+      case RENDERPASS_VOLUME_LIGHT:
         return vector;
       default:
         BLI_assert(0);

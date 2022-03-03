@@ -12,7 +12,7 @@
 
 void main(void)
 {
-  float depth = texelFetch(depth_tx, ivec2(gl_FragCoord.xy), 0).r;
+  float depth = texelFetch(hiz_tx, ivec2(gl_FragCoord.xy), 0).r;
   float vP_z = get_view_z_from_depth(depth);
 
   vec3 P = get_world_space_from_depth(uvcoordsvar.xy, depth);

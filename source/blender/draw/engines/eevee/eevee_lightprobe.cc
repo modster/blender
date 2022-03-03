@@ -211,7 +211,7 @@ void LightProbeModule::cubemap_render(void)
 {
   DRW_stats_group_start("Cubemap Render");
   for (auto i : IndexRange(ARRAY_SIZE(probe_views_))) {
-    probe_views_[i].render();
+    probe_views_[i].render(cube_depth_tx_);
   }
   DRW_stats_group_end();
 

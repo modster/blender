@@ -109,6 +109,11 @@ void Instance::update_eval_members(void)
 
 void Instance::begin_sync()
 {
+  /* Must be sync before views. */
+  gbuffer.begin_sync();
+  hiz_front.begin_sync();
+  hiz_back.begin_sync();
+
   camera.sync();
   render_passes.sync();
   shading_passes.sync();
@@ -225,6 +230,8 @@ void Instance::end_sync(void)
   render_passes.end_sync();
   lightprobes.end_sync();
   subsurface.end_sync();
+  hiz_front.end_sync();
+  hiz_back.end_sync();
 }
 
 void Instance::render_sync(void)

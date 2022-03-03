@@ -762,8 +762,11 @@ class TextureFromPool : public Texture, NonMovable {
 
   void release(void)
   {
-    tx_tmp_saved_ = this->tx_;
-    this->tx_ = nullptr;
+    /* Allows multiple release. */
+    if (this->tx_ != nullptr) {
+      tx_tmp_saved_ = this->tx_;
+      this->tx_ = nullptr;
+    }
   }
 
   /**

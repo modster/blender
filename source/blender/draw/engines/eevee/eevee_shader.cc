@@ -95,14 +95,8 @@ const char *ShaderModule::static_shader_create_info_name_get(eShaderType shader_
     case FILM_RESOLVE_DEPTH:
       return "eevee_film_resolve_depth";
 
-    case DEFERRED_EVAL_DIRECT:
-      return "eevee_deferred_direct";
-    case DEFERRED_EVAL_HOLDOUT:
-      return "eevee_deferred_holdout";
-    case DEFERRED_EVAL_TRANSPARENT:
-      return "eevee_deferred_transparent";
-    case DEFERRED_EVAL_VOLUME:
-      return "eevee_deferred_volume";
+    case DEFERRED_EVAL:
+      return "eevee_deferred_eval";
 
     case DEFERRED_VOLUME:
       return "eevee_volume_deferred";

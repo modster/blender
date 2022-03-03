@@ -54,10 +54,6 @@ class ShadingView {
   MotionBlur mb_;
   Velocity velocity_;
 
-  /** GBuffer for deferred passes. */
-  GBuffer gbuffer_;
-  /** HiZBuffer for screenspace effects. */
-  HiZBuffer hiz_front_, hiz_back_;
   /** Raytracing persistent buffers. Only opaque and refraction can have surface tracing. */
   RaytraceBuffer rt_buffer_opaque_;
   RaytraceBuffer rt_buffer_refract_;
@@ -90,8 +86,6 @@ class ShadingView {
         dof_(inst, name),
         mb_(inst, name),
         velocity_(inst, name),
-        hiz_front_(inst),
-        hiz_back_(inst),
         rt_buffer_opaque_(inst),
         rt_buffer_refract_(inst){};
 
@@ -124,10 +118,6 @@ class LightProbeView {
   const char *name_;
   /** Matrix to apply to the viewmat. */
   const float (*face_matrix_)[4];
-  /** GBuffer for deferred passes. */
-  GBuffer gbuffer_;
-  /** HiZBuffer for screenspace effects. */
-  HiZBuffer hiz_front_, hiz_back_;
   /** Raytracing persistent buffers. Only opaque and refraction can have surface tracing. */
   RaytraceBuffer rt_buffer_opaque_;
   RaytraceBuffer rt_buffer_refract_;
@@ -146,8 +136,6 @@ class LightProbeView {
       : inst_(inst),
         name_(name),
         face_matrix_(face_matrix),
-        hiz_front_(inst),
-        hiz_back_(inst),
         rt_buffer_opaque_(inst),
         rt_buffer_refract_(inst),
         layer_(layer_){};
@@ -160,7 +148,7 @@ class LightProbeView {
             const float4x4 &viewmat,
             bool is_only_background);
 
-  void render(void);
+  void render(GPUTexture *depth_tx);
 };
 
 /** \} */
