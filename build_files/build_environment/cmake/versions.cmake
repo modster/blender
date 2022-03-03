@@ -6,9 +6,9 @@ set(ZLIB_HASH 1c9f62f0778697a09d36121ead88e08e)
 set(ZLIB_HASH_TYPE MD5)
 set(ZLIB_FILE zlib-${ZLIB_VERSION}.tar.gz)
 
-set(OPENAL_VERSION 1.20.1)
+set(OPENAL_VERSION 1.21.1)
 set(OPENAL_URI http://openal-soft.org/openal-releases/openal-soft-${OPENAL_VERSION}.tar.bz2)
-set(OPENAL_HASH 556695068ce8375b89986083d810fd35)
+set(OPENAL_HASH a936806ebd8de417b0ffd8cf3f48f456)
 set(OPENAL_HASH_TYPE MD5)
 set(OPENAL_FILE openal-soft-${OPENAL_VERSION}.tar.bz2)
 
