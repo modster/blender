@@ -313,6 +313,7 @@ set(GLSL_SRC
   shaders/compositor/compositor_convert_vector_to_color.glsl
   shaders/compositor/compositor_image.glsl
   shaders/compositor/compositor_image_alpha.glsl
+  shaders/compositor/compositor_realize_on_domain.glsl
 
   shaders/material/gpu_shader_material_add_shader.glsl
   shaders/material/gpu_shader_material_ambient_occlusion.glsl
@@ -499,6 +500,7 @@ set(SHADER_CREATE_INFOS
   shaders/compositor/infos/compositor_convert_vector_to_color_info.hh
   shaders/compositor/infos/compositor_image_info.hh
   shaders/compositor/infos/compositor_image_alpha_info.hh
+  shaders/compositor/infos/compositor_realize_on_domain_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")

@@ -303,6 +303,7 @@ set(SRC
   BLI_threads.h
   BLI_timecode.h
   BLI_timeit.hh
+  BLI_transformation_2d.hh
   BLI_timer.h
   BLI_user_counter.hh
   BLI_utildefines.h

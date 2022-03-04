@@ -19,6 +19,7 @@
 #include "BLI_map.hh"
 #include "BLI_math_vec_types.hh"
 #include "BLI_math_vector.h"
+#include "BLI_transformation_2d.hh"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
 #include "BLI_vector_set.hh"
@@ -36,6 +37,7 @@
 
 #include "NOD_compositor_execute.hh"
 #include "NOD_derived_node_tree.hh"
+#include "NOD_node_declaration.hh"
 
 namespace blender::viewport_compositor {
 
@@ -105,6 +107,34 @@ Context::Context(TexturePool &texture_pool) : texture_pool_(texture_pool)
 TexturePool &Context::texture_pool()
 {
   return texture_pool_;
+}
+
+/* --------------------------------------------------------------------
+ * Domain.
+ */
+
+Domain::Domain(int2 size) : size(size), transformation(Transformation2D::identity())
+{
+}
+
+Domain::Domain(int2 size, Transformation2D transformation)
+    : size(size), transformation(transformation)
+{
+}
+
+Domain Domain::identity()
+{
+  return Domain(int2(1), Transformation2D::identity());
+}
+
+bool operator==(const Domain &a, const Domain &b)
+{
+  return a.size == b.size && a.transformation == b.transformation;
+}
+
+bool operator!=(const Domain &a, const Domain &b)
+{
+  return !(a == b);
 }
 
 /* --------------------------------------------------------------------
@@ -218,6 +248,11 @@ int2 Result::size() const
   return int2{GPU_texture_width(texture), GPU_texture_height(texture)};
 }
 
+Domain Result::domain() const
+{
+  return Domain(size(), transformation);
+}
+
 /* --------------------------------------------------------------------
  * Operation.
  */
@@ -301,9 +336,14 @@ void Operation::populate_result(StringRef identifier, Result result)
   results_.add_new(identifier, result);
 }
 
-void Operation::declare_input_type(StringRef identifier, ResultType type)
+void Operation::declare_input_descriptor(StringRef identifier, InputDescriptor descriptor)
 {
-  input_types_.add_new(identifier, type);
+  input_descriptors_.add_new(identifier, descriptor);
+}
+
+InputDescriptor &Operation::get_input_descriptor(StringRef identifier)
+{
+  return input_descriptors_.lookup(identifier);
 }
 
 Context &Operation::context()
@@ -321,6 +361,7 @@ void Operation::add_input_processors()
   /* First add all needed processors for each input. */
   for (const StringRef &identifier : inputs_to_results_map_.keys()) {
     add_implicit_conversion_input_processor_if_needed(identifier);
+    add_realize_on_domain_input_processor_if_needed(identifier);
   }
 
   /* Then update the mapped result for each input to be that of the last processor for that input
@@ -339,7 +380,7 @@ void Operation::add_input_processors()
 void Operation::add_implicit_conversion_input_processor_if_needed(StringRef identifier)
 {
   ResultType result_type = get_input(identifier).type;
-  ResultType expected_type = input_types_.lookup(identifier);
+  ResultType expected_type = input_descriptors_.lookup(identifier).type;
 
   if (result_type == ResultType::Float && expected_type == ResultType::Vector) {
     add_input_processor(identifier, new ConvertFloatToVectorProcessorOperation(context()));
@@ -356,6 +397,33 @@ void Operation::add_implicit_conversion_input_processor_if_needed(StringRef iden
   else if (result_type == ResultType::Vector && expected_type == ResultType::Color) {
     add_input_processor(identifier, new ConvertVectorToColorProcessorOperation(context()));
   }
+}
+
+void Operation::add_realize_on_domain_input_processor_if_needed(StringRef identifier)
+{
+  const InputDescriptor &descriptor = input_descriptors_.lookup(identifier);
+  /* This input does not need realization. */
+  if (descriptor.skip_realization) {
+    return;
+  }
+
+  /* Input is a domain input and does not need realization. */
+  if (descriptor.is_domain) {
+    return;
+  }
+
+  const Result result = get_input(identifier);
+  /* Input result is a single value and does not need realization. */
+  if (!result.is_texture) {
+    return;
+  }
+
+  /* Realization is needed. It could be that the input domain is identical to the operation domain
+   * and thus realization will not be needed, but this is handled during execution because
+   * transformation is only known at execution time, not allocation time. */
+  ProcessorOperation *processor = new RealizeOnDomainProcessorOperation(
+      context(), compute_domain(), descriptor.type);
+  add_input_processor(identifier, processor);
 }
 
 void Operation::add_input_processor(StringRef identifier, ProcessorOperation *processor)
@@ -427,9 +495,13 @@ NodeOperation::NodeOperation(Context &context, DNode node) : Operation(context),
     populate_result(output->identifier(), Result(get_node_socket_result_type(output)));
   }
 
-  /* Populate the input types. */
+  /* Populate the input descriptors. */
   for (const InputSocketRef *input : node->inputs()) {
-    declare_input_type(input->identifier(), get_node_socket_result_type(input));
+    InputDescriptor input_descriptor;
+    input_descriptor.type = get_node_socket_result_type(input);
+    input_descriptor.is_domain =
+        node->declaration()->inputs()[input->index()]->is_compositor_domain_input();
+    declare_input_descriptor(input->identifier(), input_descriptor);
   }
 
   populate_results_for_unlinked_inputs();
@@ -454,6 +526,60 @@ bool NodeOperation::is_output_needed(StringRef identifier) const
 const bNode &NodeOperation::node() const
 {
   return *node_->bnode();
+}
+
+Domain NodeOperation::compute_domain()
+{
+  /* If any of the inputs is a domain input and not a single value, return the domain of the first
+   * one. */
+  for (const InputSocketRef *input : node_->inputs()) {
+    const Result &result = get_input(input->identifier());
+    bool is_domain = get_input_descriptor(input->identifier()).is_domain;
+    if (is_domain && result.is_texture) {
+      return result.domain();
+    }
+  }
+
+  /* No domain inputs or all of them are single values, so return the domain of the first non
+   * single input. */
+  for (const InputSocketRef *input : node_->inputs()) {
+    const Result &result = get_input(input->identifier());
+    if (result.is_texture) {
+      return result.domain();
+    }
+  }
+
+  /* All inputs are single values. Return an identity domain. */
+  return Domain::identity();
+}
+
+void NodeOperation::pre_allocate()
+{
+  /* Allocate the unlinked inputs results. */
+  for (Result &result : unlinked_inputs_results_) {
+    result.allocate_single_value(&texture_pool());
+  }
+}
+
+void NodeOperation::pre_execute()
+{
+  /* For all unlinked input sockets, set the value of the input result based on the socket's
+   * default value. */
+  for (const Map<StringRef, DInputSocket>::Item &item : unlinked_inputs_sockets_.items()) {
+    Result &result = get_input(item.key);
+    DInputSocket input = item.value;
+    switch (result.type) {
+      case ResultType::Float:
+        *result.value = input->default_value<bNodeSocketValueFloat>()->value;
+        continue;
+      case ResultType::Vector:
+        copy_v3_v3(result.value, input->default_value<bNodeSocketValueVector>()->value);
+        continue;
+      case ResultType::Color:
+        copy_v4_v4(result.value, input->default_value<bNodeSocketValueRGBA>()->value);
+        continue;
+    }
+  }
 }
 
 /* Get the origin socket of the given node input. If the input is not linked, the socket itself is
@@ -497,41 +623,17 @@ void NodeOperation::populate_results_for_unlinked_inputs()
   }
 }
 
-void NodeOperation::pre_allocate()
-{
-  /* Allocate the unlinked inputs results. */
-  for (Result &result : unlinked_inputs_results_) {
-    result.allocate_single_value(&texture_pool());
-  }
-}
-
-void NodeOperation::pre_execute()
-{
-  /* For all unlinked input sockets, set the value of the input result based on the socket's
-   * default value. */
-  for (const Map<StringRef, DInputSocket>::Item &item : unlinked_inputs_sockets_.items()) {
-    Result &result = get_input(item.key);
-    DInputSocket input = item.value;
-    switch (result.type) {
-      case ResultType::Float:
-        *result.value = input->default_value<bNodeSocketValueFloat>()->value;
-        return;
-      case ResultType::Vector:
-        copy_v3_v3(result.value, input->default_value<bNodeSocketValueVector>()->value);
-        return;
-      case ResultType::Color:
-        copy_v4_v4(result.value, input->default_value<bNodeSocketValueRGBA>()->value);
-        return;
-    }
-  }
-}
-
 /* --------------------------------------------------------------------
  * Processor Operation.
  */
 
 const StringRef ProcessorOperation::input_identifier = StringRef("Input");
 const StringRef ProcessorOperation::output_identifier = StringRef("Output");
+
+bool ProcessorOperation::is_buffered() const
+{
+  return true;
+}
 
 Result &ProcessorOperation::get_result()
 {
@@ -558,9 +660,14 @@ void ProcessorOperation::populate_result(Result result)
   Operation::populate_result(output_identifier, result);
 }
 
-void ProcessorOperation::declare_input_type(ResultType type)
+void ProcessorOperation::declare_input_descriptor(InputDescriptor descriptor)
 {
-  Operation::declare_input_type(input_identifier, type);
+  Operation::declare_input_descriptor(input_identifier, descriptor);
+}
+
+InputDescriptor &ProcessorOperation::get_input_descriptor()
+{
+  return Operation::get_input_descriptor(input_identifier);
 }
 
 /* --------------------------------------------------------------------
@@ -569,11 +676,6 @@ void ProcessorOperation::declare_input_type(ResultType type)
 
 const char *ConversionProcessorOperation::shader_input_sampler_name = "input_sampler";
 const char *ConversionProcessorOperation::shader_output_image_name = "output_image";
-
-bool ConversionProcessorOperation::is_buffered() const
-{
-  return true;
-}
 
 void ConversionProcessorOperation::allocate()
 {
@@ -620,6 +722,11 @@ void ConversionProcessorOperation::execute()
   GPU_shader_free(shader);
 }
 
+Domain ConversionProcessorOperation::compute_domain()
+{
+  return get_input().domain();
+}
+
 /* --------------------------------------------------------------------
  *  Convert Float To Vector Processor Operation.
  */
@@ -627,7 +734,10 @@ void ConversionProcessorOperation::execute()
 ConvertFloatToVectorProcessorOperation::ConvertFloatToVectorProcessorOperation(Context &context)
     : ConversionProcessorOperation(context)
 {
-  declare_input_type(ResultType::Float);
+  InputDescriptor input_descriptor;
+  input_descriptor.type = ResultType::Float;
+  input_descriptor.is_domain = true;
+  declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Vector));
 }
 
@@ -650,7 +760,10 @@ GPUShader *ConvertFloatToVectorProcessorOperation::get_conversion_shader() const
 ConvertFloatToColorProcessorOperation::ConvertFloatToColorProcessorOperation(Context &context)
     : ConversionProcessorOperation(context)
 {
-  declare_input_type(ResultType::Float);
+  InputDescriptor input_descriptor;
+  input_descriptor.type = ResultType::Float;
+  input_descriptor.is_domain = true;
+  declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Color));
 }
 
@@ -672,7 +785,10 @@ GPUShader *ConvertFloatToColorProcessorOperation::get_conversion_shader() const
 ConvertColorToFloatProcessorOperation::ConvertColorToFloatProcessorOperation(Context &context)
     : ConversionProcessorOperation(context)
 {
-  declare_input_type(ResultType::Color);
+  InputDescriptor input_descriptor;
+  input_descriptor.type = ResultType::Color;
+  input_descriptor.is_domain = true;
+  declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Float));
 }
 
@@ -693,7 +809,10 @@ GPUShader *ConvertColorToFloatProcessorOperation::get_conversion_shader() const
 ConvertVectorToFloatProcessorOperation::ConvertVectorToFloatProcessorOperation(Context &context)
     : ConversionProcessorOperation(context)
 {
-  declare_input_type(ResultType::Vector);
+  InputDescriptor input_descriptor;
+  input_descriptor.type = ResultType::Vector;
+  input_descriptor.is_domain = true;
+  declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Float));
 }
 
@@ -716,7 +835,10 @@ GPUShader *ConvertVectorToFloatProcessorOperation::get_conversion_shader() const
 ConvertVectorToColorProcessorOperation::ConvertVectorToColorProcessorOperation(Context &context)
     : ConversionProcessorOperation(context)
 {
-  declare_input_type(ResultType::Vector);
+  InputDescriptor input_descriptor;
+  input_descriptor.type = ResultType::Vector;
+  input_descriptor.is_domain = true;
+  declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Color));
 }
 
@@ -729,6 +851,93 @@ void ConvertVectorToColorProcessorOperation::execute_single(const Result &input,
 GPUShader *ConvertVectorToColorProcessorOperation::get_conversion_shader() const
 {
   return GPU_shader_create_from_info_name("compositor_convert_vector_to_color");
+}
+
+/* --------------------------------------------------------------------
+ *  Realize On Domain Processor Operation.
+ */
+
+RealizeOnDomainProcessorOperation::RealizeOnDomainProcessorOperation(Context &context,
+                                                                     Domain domain,
+                                                                     ResultType type)
+    : ProcessorOperation(context), domain_(domain)
+{
+  InputDescriptor input_descriptor;
+  input_descriptor.type = type;
+  input_descriptor.skip_realization = true;
+  declare_input_descriptor(input_descriptor);
+  populate_result(Result(type));
+}
+
+void RealizeOnDomainProcessorOperation::allocate()
+{
+  get_result().allocate_texture(domain_.size, &texture_pool());
+}
+
+void RealizeOnDomainProcessorOperation::execute()
+{
+  const Result &input = get_input();
+  Result &result = get_result();
+
+  /* The input have the same domain as the operation domain, so just copy to the output. */
+  if (input.domain() == domain_) {
+    GPU_texture_copy(result.texture, input.texture);
+    return;
+  }
+
+  /* Bind a realization shader of an appropriate type. */
+  GPUShader *shader = get_realization_shader();
+  GPU_shader_bind(shader);
+
+  /* Transform the input space into the domain space. */
+  const Transformation2D local_transformation = input.transformation *
+                                                domain_.transformation.inverted();
+
+  /* Set the pivot of the transformation to be the center of the domain.  */
+  const float2 pivot = float2(result.size()) / 2.0f;
+  const Transformation2D pivoted_transformation = local_transformation.set_pivot(pivot);
+
+  /* Invert the transformation because the shader transforms the domain coordinates instead of the
+   * input image itself and thus expect the inverse. */
+  const Transformation2D inverse_transformation = pivoted_transformation.inverted();
+
+  /* Set the inverse of the transform to the shader. */
+  GPU_shader_uniform_mat3(shader, "inverse_transformation", inverse_transformation.matrix());
+
+  /* Bind input texture and output image. */
+  GPU_texture_wrap_mode(input.texture, false, false);
+  input.bind_as_texture(shader, "input_sampler");
+  result.bind_as_image(shader, "domain");
+
+  /* Dispatch shader. */
+  const int2 size = result.size();
+  GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
+
+  /* Make sure the output is written before using it. */
+  GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
+
+  /* Unbind and free resources. */
+  input.unbind_as_texture();
+  result.unbind_as_image();
+  GPU_shader_unbind();
+  GPU_shader_free(shader);
+}
+
+GPUShader *RealizeOnDomainProcessorOperation::get_realization_shader()
+{
+  switch (get_result().type) {
+    case ResultType::Color:
+      return GPU_shader_create_from_info_name("compositor_realize_on_domain_color");
+    case ResultType::Vector:
+      return GPU_shader_create_from_info_name("compositor_realize_on_domain_vector");
+    case ResultType::Float:
+      return GPU_shader_create_from_info_name("compositor_realize_on_domain_float");
+  }
+}
+
+Domain RealizeOnDomainProcessorOperation::compute_domain()
+{
+  return domain_;
 }
 
 /* --------------------------------------------------------------------

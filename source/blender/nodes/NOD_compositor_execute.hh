@@ -20,6 +20,7 @@
 
 #include "BLI_map.hh"
 #include "BLI_math_vec_types.hh"
+#include "BLI_transformation_2d.hh"
 #include "BLI_vector.hh"
 #include "BLI_vector_set.hh"
 
@@ -113,6 +114,85 @@ class Context {
 };
 
 /* --------------------------------------------------------------------
+ * Domain.
+ */
+
+/* A domain is a rectangular area of a certain size in pixels that is transformed by a certain
+ * transformation in pixel space relative to some reference space.
+ *
+ * Any result computed by an operation resides in a domain. The size of the domain of the result is
+ * the size of its texture. The transformation of the domain of the result is typically an identity
+ * transformation, indicating that the result is centered in space. But a transformation operation
+ * like the rotate, translate, or transform operations will adjust the transformation to make the
+ * result reside somewhere different in space. The domain of a single value result is irrelevant
+ * and always set to an identity domain.
+ *
+ * An operation operates in a certain domain called the operation domain, it follows that the
+ * operation only cares about the inputs whose domain is inside or at least intersects the
+ * operation domain. To abstract away the different domains of the inputs, any input that have a
+ * different domain than the operation domain is realized on the operation domain through a
+ * RealizeOnDomainProcessorOperation, except inputs whose descriptor sets skip_realization or
+ * is_domain, see InputDescriptor. The realization process simply projects the input domain on the
+ * operation domain, copies the area of input that intersects the operation domain, and fill the
+ * rest with zeros. This process is illustrated below. It follows that operations should expect all
+ * their inputs to have the same domain and consequently size, except possibly for inputs that skip
+ * realization.
+ *
+ *                                   Realized Result
+ *             +-------------+       +-------------+
+ *             |  Operation  |       |             |
+ *             |   Domain    |       |    Zeros    |
+ *             |             | ----> |             |
+ *       +-----------+       |       |-----+       |
+ *       |     |  C  |       |       |  C  |       |
+ *       |     +-----|-------+       +-----|-------+
+ *       | Input     |
+ *       | Domain    |
+ *       +-----------+
+ *
+ * Each operation can define an arbitrary operation domain, but in most cases, the operation domain
+ * is inferred from the inputs. By default, the operation domain is computed as follows. Typically,
+ * one input of the operation is said to be a domain input and it defines the operation domain. So
+ * if the operation have an input whose descriptor sets is_domain and is not a single value input,
+ * then the operation domain will be the same domain as the first such input. See the
+ * InputDescriptor class. Otherwise, if no domain inputs exists or all are single value inputs,
+ * then the first non single value input is used to define the operation domain. If all inputs are
+ * single values, then the operation domain is irrelevant and an identity domain is set. See
+ * NodeOperation::compute_domain.
+ *
+ * The aforementioned logic for operation domain computation is only a default that works for most
+ * cases, but an operation can override the compute_domain method to implement a different logic.
+ * For instance, output nodes have an operation domain the same size as the viewport and with an
+ * identity transformation, their operation domain doesn't depend on the inputs at all.
+ *
+ * For instance, a filter operation have two inputs, a factor and a color, the latter of which
+ * is a domain input. If the color input is not a single value, then the domain of this operation
+ * is computed to be the same size and transformation as the color input. And if the factor input
+ * have a different size and/or transformation from the computed domain of the operation, it will
+ * be projected and realized on it to have the same size as described above. It follows that the
+ * color input, which is a domain input, will not need to be realized because it already has the
+ * same size and transformation as the domain of the operation, because the operation domain is
+ * derived from it. On the other hand, if the color input is a single value input, then the
+ * operation domain will be the same as the domain of the factor input. Finally, if both inputs are
+ * single value inputs, the operation domain will be an identity and is irrelevant. */
+class Domain {
+ public:
+  /* The size of the domain in pixels. */
+  int2 size;
+  /* The 2D transformation of the domain defining its translation in pixels, rotation, and scale in
+   * 2D space. */
+  Transformation2D transformation;
+
+ public:
+  /* A size only constructor that sets the transformation to identity. */
+  Domain(int2 size);
+
+  Domain(int2 size, Transformation2D transformation);
+
+  static Domain identity();
+};
+
+/* --------------------------------------------------------------------
  * Result.
  */
 
@@ -124,17 +204,19 @@ enum class ResultType : uint8_t {
   Color,
 };
 
-/* A class that represents an output of an operation. A result either stores a single value or a
- * texture. An operation will output a single value result if that value would have been constant
- * over the whole texture. Even if the result is a single value, the texture member should and will
- * be pointing to a valid dummy texture. This dummy texture shouldn't and will not be used and its
- * contents needn't and will not be initialized, it solely exists because operation shaders are
- * built in such a way to operate on both texture and single value input results. Each shader have
- * three uniforms for each input. 1) A boolean that indicates if this input is a single value or a
- * texture. 2) A float that is initialized only if the input is a single value result. 3) A texture
- * that is initialized only if the input is a texture result. Since shaders expect a texture to be
- * bound even if it will not be used in the shader invocation, a dummy texture is bound regardless,
- * hence the need to always store a dummy texture if the result is a single value. */
+/* A class that represents an output of an operation. A result reside in a certain domain defined
+ * by its size and transformation, see the Domain class for more information. A result either
+ * stores a single value or a texture. An operation will output a single value result if that value
+ * would have been constant over the whole texture. Even if the result is a single value, the
+ * texture member should and will be pointing to a valid dummy texture. This dummy texture
+ * shouldn't and will not be used and its contents needn't and will not be initialized, it solely
+ * exists because operation shaders are built in such a way to operate on both texture and single
+ * value input results. Each shader have three uniforms for each input. 1) A boolean that indicates
+ * if this input is a single value or a texture. 2) A float that is initialized only if the input
+ * is a single value result. 3) A texture that is initialized only if the input is a texture
+ * result. Since shaders expect a texture to be bound even if it will not be used in the shader
+ * invocation, a dummy texture is bound regardless, hence the need to always store a dummy texture
+ * if the result is a single value. */
 class Result {
  public:
   /* The base type of the texture or the type of the single value. */
@@ -155,6 +237,9 @@ class Result {
    * only initialize the first three array elements. This member is uninitialized if the result is
    * a texture. */
   float value[4];
+  /* The transformation of the result. This only matters if the result was a texture. See the
+   * Domain class. */
+  Transformation2D transformation = Transformation2D::identity();
 
  public:
   Result(ResultType type);
@@ -195,11 +280,34 @@ class Result {
   void incremenet_reference_count();
 
   /* Release the result texture back into the texture pool. This should be called when a user that
-   * previously referenced and incremented the reference count of the result no longer needs it */
+   * previously referenced and incremented the reference count of the result no longer needs it. */
   void release();
 
   /* Returns the size of the allocated texture. */
   int2 size() const;
+
+  /* Returns the domain of the result. See the Domain class. */
+  Domain domain() const;
+};
+
+/* --------------------------------------------------------------------
+ * Input Descriptor.
+ */
+
+/* A class that describes an input of an operation. */
+class InputDescriptor {
+ public:
+  /* The type of input. This may be different that the type of result that the operation will
+   * receive for the input, in which case, an implicit conversion input processor operation will
+   * be added to convert it to the required type. */
+  ResultType type;
+  /* If true, then the input does not need to be realized on the domain of the operation before its
+   * execution. See the Domain class for more information. */
+  bool skip_realization = false;
+  /* If true, then the input is considered to be a domain input that is used by default to define
+   * the domain of the operation, this is typically the main input of the operation. See the Domain
+   * class for more information. */
+  bool is_domain = false;
 };
 
 /* --------------------------------------------------------------------
@@ -234,9 +342,9 @@ class Operation {
   /* A mapping between each input of the operation identified by its identifier and an ordered list
    * of input processor operations to be applied on that input. */
   Map<StringRef, Vector<ProcessorOperation *>> input_processors_;
-  /* A mapping between each input of the operation identified by its identifier and the type of the
-   * result it expects. This should be populated during operation construction. */
-  Map<StringRef, ResultType> input_types_;
+  /* A mapping between each input of the operation identified by its identifier and its input
+   * descriptor. This should be populated during operation construction. */
+  Map<StringRef, InputDescriptor> input_descriptors_;
 
  public:
   Operation(Context &context);
@@ -262,6 +370,9 @@ class Operation {
   void map_input_to_result(StringRef identifier, Result *result);
 
  protected:
+  /* Compute the operation domain of this operation. See the Domain class for more information. */
+  virtual Domain compute_domain() = 0;
+
   /* This method is called before the allocate method and it can be overridden by a derived class
    * to do any necessary internal allocations. */
   virtual void pre_allocate();
@@ -300,10 +411,13 @@ class Operation {
    * be allocated or initialized, this will happen later after initialization and execution. */
   void populate_result(StringRef identifier, Result result);
 
-  /* Declare the type of the input identified by the given identifier to be the given result type.
-   * Adds the given result type to the input_types_ map identified by the given input identifier.
-   * This should be called during operation constructor for every input. */
-  void declare_input_type(StringRef identifier, ResultType type);
+  /* Declare the descriptor of the input identified by the given identifier to be the given
+   * descriptor. Adds the given descriptor to the input_descriptors_ map identified by the given
+   * input identifier. This should be called during operation constructor for every input. */
+  void declare_input_descriptor(StringRef identifier, InputDescriptor descriptor);
+
+  /* Get a reference to the descriptor of the input identified by the given identified. */
+  InputDescriptor &get_input_descriptor(StringRef identified);
 
   /* Returns a reference to the compositor context. */
   Context &context();
@@ -325,6 +439,10 @@ class Operation {
   /* Add an implicit conversion input processor for the input identified by the given identifier if
    * needed. */
   void add_implicit_conversion_input_processor_if_needed(StringRef identifier);
+
+  /* Add a realize on domain input processor for the input identified by the given identifier if
+   * needed. See the Domain class for more information. */
+  void add_realize_on_domain_input_processor_if_needed(StringRef identifier);
 
   /* Add the given input processor operation to the list of input processors for the input
    * identified by the given identifier. The result of the last input processor will not be mapped
@@ -370,7 +488,8 @@ class NodeOperation : public Operation {
    * inputs. */
   NodeOperation(Context &context, DNode node);
 
-  virtual bool is_buffered() const override;
+  /* Most node operations are buffered, so return true by default. */
+  bool is_buffered() const override;
 
   /* Returns true if the output identified by the given identifier is needed and should be
    * computed, otherwise returns false. */
@@ -380,6 +499,11 @@ class NodeOperation : public Operation {
   const bNode &node() const;
 
  protected:
+  /* Compute the domain of the node operation. This implement the default logic that infers the
+   * operation domain from the node, which may be overridden for a different logic. See the Domain
+   * class for the inference logic. */
+  Domain compute_domain() override;
+
   /* Allocate the results for unlinked inputs. */
   void pre_allocate() override;
 
@@ -409,6 +533,9 @@ class ProcessorOperation : public Operation {
  public:
   using Operation::Operation;
 
+  /* Processor operations are always buffered. */
+  bool is_buffered() const override;
+
   /* Get a reference to the output result of the processor, this essentially calls the super
    * get_result with the output identifier of the processor. */
   Result &get_result();
@@ -430,9 +557,14 @@ class ProcessorOperation : public Operation {
    * with the output identifier of the processor. */
   void populate_result(Result result);
 
-  /* Declare the type of the input of the processor to be the given result type, this essentially
-   * calls the super declare_input_type with the input identifier of the processor. */
-  void declare_input_type(ResultType type);
+  /* Declare the descriptor of the input of the processor to be the given descriptor, this
+   * essentially calls the super declare_input_descriptor with the input identifier of the
+   * processor. */
+  void declare_input_descriptor(InputDescriptor descriptor);
+
+  /* Get a reference to the descriptor of the input, this essentially calls the super
+   * get_input_descriptor with the input identifier of the processor. */
+  InputDescriptor &get_input_descriptor();
 };
 
 /* --------------------------------------------------------------------
@@ -453,11 +585,13 @@ class ConversionProcessorOperation : public ProcessorOperation {
  public:
   using ProcessorOperation::ProcessorOperation;
 
-  virtual bool is_buffered() const override;
+  void allocate() override;
 
-  virtual void allocate() override;
+  void execute() override;
 
-  virtual void execute() override;
+ protected:
+  /* The operation domain is just the domain of the input. */
+  Domain compute_domain() override;
 
   /* Convert the input single value result to the output single value result. */
   virtual void execute_single(const Result &input, Result &output) = 0;
@@ -478,9 +612,9 @@ class ConvertFloatToVectorProcessorOperation : public ConversionProcessorOperati
  public:
   ConvertFloatToVectorProcessorOperation(Context &context);
 
-  virtual void execute_single(const Result &input, Result &output) override;
+  void execute_single(const Result &input, Result &output) override;
 
-  virtual GPUShader *get_conversion_shader() const override;
+  GPUShader *get_conversion_shader() const override;
 };
 
 /* --------------------------------------------------------------------
@@ -493,9 +627,9 @@ class ConvertFloatToColorProcessorOperation : public ConversionProcessorOperatio
  public:
   ConvertFloatToColorProcessorOperation(Context &context);
 
-  virtual void execute_single(const Result &input, Result &output) override;
+  void execute_single(const Result &input, Result &output) override;
 
-  virtual GPUShader *get_conversion_shader() const override;
+  GPUShader *get_conversion_shader() const override;
 };
 
 /* --------------------------------------------------------------------
@@ -508,9 +642,9 @@ class ConvertColorToFloatProcessorOperation : public ConversionProcessorOperatio
  public:
   ConvertColorToFloatProcessorOperation(Context &context);
 
-  virtual void execute_single(const Result &input, Result &output) override;
+  void execute_single(const Result &input, Result &output) override;
 
-  virtual GPUShader *get_conversion_shader() const override;
+  GPUShader *get_conversion_shader() const override;
 };
 
 /* --------------------------------------------------------------------
@@ -523,9 +657,9 @@ class ConvertVectorToFloatProcessorOperation : public ConversionProcessorOperati
  public:
   ConvertVectorToFloatProcessorOperation(Context &context);
 
-  virtual void execute_single(const Result &input, Result &output) override;
+  void execute_single(const Result &input, Result &output) override;
 
-  virtual GPUShader *get_conversion_shader() const override;
+  GPUShader *get_conversion_shader() const override;
 };
 
 /* --------------------------------------------------------------------
@@ -538,9 +672,37 @@ class ConvertVectorToColorProcessorOperation : public ConversionProcessorOperati
  public:
   ConvertVectorToColorProcessorOperation(Context &context);
 
-  virtual void execute_single(const Result &input, Result &output) override;
+  void execute_single(const Result &input, Result &output) override;
 
-  virtual GPUShader *get_conversion_shader() const override;
+  GPUShader *get_conversion_shader() const override;
+};
+
+/* --------------------------------------------------------------------
+ *  Realize On Domain Processor Operation.
+ */
+
+/* A realize on domain processor is a processor that projects the input on a certain domain, copies
+ * the area of the input that intersects the target domain, and fill the rest with zeros. See the
+ * Domain class for more information. */
+class RealizeOnDomainProcessorOperation : public ProcessorOperation {
+ private:
+  /* The target domain to realize the input on. */
+  Domain domain_;
+
+ public:
+  RealizeOnDomainProcessorOperation(Context &context, Domain domain, ResultType type);
+
+  void allocate() override;
+
+  void execute() override;
+
+ protected:
+  /* The operation domain is just the target domain. */
+  Domain compute_domain() override;
+
+ private:
+  /* Get the realization shader of the appropriate type. */
+  GPUShader *get_realization_shader();
 };
 
 /* --------------------------------------------------------------------

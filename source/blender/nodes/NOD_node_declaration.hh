@@ -102,6 +102,9 @@ class SocketDeclaration {
   InputSocketFieldType input_field_type_ = InputSocketFieldType::None;
   OutputFieldDependency output_field_dependency_;
 
+  /** This input is a domain input. See viewport_compositor::InputDescriptor. */
+  bool is_compositor_domain_input_ = false;
+
   /** Utility method to make the socket available if there is a straightforward way to do so. */
   std::function<void(bNode &)> make_available_fn_;
 
@@ -137,6 +140,8 @@ class SocketDeclaration {
 
   InputSocketFieldType input_field_type() const;
   const OutputFieldDependency &output_field_dependency() const;
+
+  bool is_compositor_domain_input() const;
 
  protected:
   void set_common_flags(bNodeSocket &socket) const;
@@ -249,6 +254,13 @@ class SocketDeclarationBuilder : public BaseSocketDeclarationBuilder {
   {
     decl_->output_field_dependency_ = OutputFieldDependency::ForPartiallyDependentField(
         std::move(input_dependencies));
+    return *(Self *)this;
+  }
+
+  /** This input is a domain input. See viewport_compositor::InputDescriptor. */
+  Self &is_compositor_domain_input(bool value = true)
+  {
+    decl_->is_compositor_domain_input_ = value;
     return *(Self *)this;
   }
 
@@ -440,6 +452,11 @@ inline InputSocketFieldType SocketDeclaration::input_field_type() const
 inline const OutputFieldDependency &SocketDeclaration::output_field_dependency() const
 {
   return output_field_dependency_;
+}
+
+inline bool SocketDeclaration::is_compositor_domain_input() const
+{
+  return is_compositor_domain_input_;
 }
 
 inline void SocketDeclaration::make_available(bNode &node) const

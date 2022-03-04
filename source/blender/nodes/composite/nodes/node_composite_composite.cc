@@ -21,6 +21,8 @@
  * \ingroup cmpnodes
  */
 
+#include "BLI_math_vec_types.hh"
+
 #include "UI_interface.h"
 #include "UI_resources.h"
 
@@ -64,6 +66,12 @@ class CompositeOperation : public NodeOperation {
       /* If the input image is a single color value, clear the viewport texture to that color. */
       GPU_texture_clear(viewport_texture, GPU_DATA_FLOAT, input_image.value);
     }
+  }
+
+  Domain compute_domain() override
+  {
+    GPUTexture *viewport_texture = context().get_viewport_texture();
+    return Domain(int2(GPU_texture_width(viewport_texture), GPU_texture_height(viewport_texture)));
   }
 };
 

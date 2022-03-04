@@ -716,6 +716,12 @@ void GPU_shader_uniform_4fv(GPUShader *sh, const char *name, const float data[4]
   GPU_shader_uniform_vector(sh, loc, 4, 1, data);
 }
 
+void GPU_shader_uniform_mat3(GPUShader *sh, const char *name, const float data[3][3])
+{
+  const int loc = GPU_shader_get_uniform(sh, name);
+  GPU_shader_uniform_vector(sh, loc, 9, 1, (const float *)data);
+}
+
 void GPU_shader_uniform_mat4(GPUShader *sh, const char *name, const float data[4][4])
 {
   const int loc = GPU_shader_get_uniform(sh, name);
