@@ -158,11 +158,6 @@ void AbcCurveReader::readObjectData(Main *bmain,
 {
   Curves *curves = static_cast<Curves *>(BKE_curves_add(bmain, m_data_name.c_str()));
 
-  // TODO(kevindietrich)
-  // cu->flag |= CU_3D;
-  // cu->actvert = CU_ACT_NONE;
-  // cu->resolu = get_curve_resolution(m_curves_schema, sample_sel);
-
   m_object = BKE_object_add_only_object(bmain, OB_CURVES, m_object_name.c_str());
   m_object->data = curves;
 
@@ -197,14 +192,34 @@ static void read_curves_sample_ex(Curves *curves,
   bke::CurvesGeometry &geometry = bke::CurvesGeometry::wrap(curves->geometry);
   MutableSpan<int> offsets = geometry.offsets();
   MutableSpan<float3> positions_ = geometry.positions();
+  MutableSpan<bool> cyclic = geometry.cyclic();
+
+  float *curves_weights = nullptr;
+  int *curves_orders = nullptr;
+
+  int *curves_resolution = static_cast<int *>(CustomData_add_layer_named(&geometry.curve_data,
+                                                                         CD_PROP_INT32,
+                                                                         CD_DEFAULT,
+                                                                         nullptr,
+                                                                         geometry.curve_size,
+                                                                         "resolution"));
+
+  const int resolution = get_curve_resolution(schema, sample_sel);
+  for (int64_t i : geometry.curves_range()) {
+    curves_resolution[i] = resolution;
+  }
 
   if (!geometry.radius) {
     geometry.radius = static_cast<float *>(CustomData_add_layer_named(
         &geometry.point_data, CD_PROP_FLOAT, CD_DEFAULT, nullptr, geometry.point_size, "radius"));
   }
 
+  /* Knots are not imported anymore. */
   const Int32ArraySamplePtr num_vertices = sample.getCurvesNumVertices();
   const P3fArraySamplePtr positions = sample.getPositions();
+  const FloatArraySamplePtr weights = sample.getPositionWeights();
+  const CurvePeriodicity periodicity = sample.getWrap();
+  const UcharArraySamplePtr orders = sample.getOrders();
 
   const IFloatGeomParam widths_param = schema.getWidthsParam();
   FloatArraySamplePtr radiuses;
@@ -217,31 +232,62 @@ static void read_curves_sample_ex(Curves *curves,
   const bool do_radius = (radiuses != nullptr) && (radiuses->size() > 1);
   float radius = (radiuses && radiuses->size() == 1) ? (*radiuses)[0] : 1.0f;
 
+  const bool do_weights = (weights != nullptr) && (weights->size() > 1);
+  if (do_weights) {
+    curves_weights = static_cast<float *>(CustomData_add_layer_named(&geometry.point_data,
+                                                                     CD_PROP_FLOAT,
+                                                                     CD_DEFAULT,
+                                                                     nullptr,
+                                                                     geometry.point_size,
+                                                                     "nurbs_weight"));
+  }
+
+  const bool do_curves_orders = (orders != nullptr) && (orders->size() > 1);
+  if (do_curves_orders) {
+    curves_orders = static_cast<int *>(CustomData_add_layer_named(&geometry.curve_data,
+                                                                  CD_PROP_INT32,
+                                                                  CD_DEFAULT,
+                                                                  nullptr,
+                                                                  geometry.curve_size,
+                                                                  "nurbs_order"));
+  }
+
   int offset = 0;
   size_t position_offset = 0;
   for (size_t i = 0; i < num_vertices->size(); i++) {
     const int num_verts = (*num_vertices)[i];
     offsets[i] = offset;
 
-    for (int j = 0; j < num_verts; j++, position_offset++) {
+    const int curve_order = get_curve_order(sample.getType(), orders, i);
+    if (do_curves_orders) {
+      curves_orders[i] = curve_order;
+    }
+
+    /* Check if the curve is cyclic. */
+    const int overlap = get_curve_overlap(
+        periodicity, positions, position_offset, num_verts, curve_order);
+
+    const bool is_cyclic = overlap != 0;
+    cyclic[i] = is_cyclic;
+
+    for (int j = 0; j < num_verts - overlap; j++, position_offset++) {
       const Imath::V3f &pos = (*positions)[position_offset];
+
+      copy_zup_from_yup(positions_[position_offset], pos.getValue());
 
       if (do_radius) {
         radius = (*radiuses)[position_offset];
       }
-
-      copy_zup_from_yup(positions_[position_offset], pos.getValue());
-
       geometry.radius[position_offset] = radius;
 
-      //  if (do_weights) {
-      //    weight = (*weights)[idx];
-      //   }
-
-      //   bp->vec[3] = weight;
+      if (do_weights) {
+        curves_weights[position_offset] = (*weights)[position_offset];
+      }
     }
 
     offset += num_verts;
+    /* Skip duplicate positions due to cyclicity. */
+    position_offset += overlap;
   }
 
   offsets[geometry.curve_size] = offset;
@@ -277,7 +323,6 @@ void AbcCurveReader::read_curves_sample(Curves *curves,
   const Int32ArraySamplePtr num_vertices = smp.getCurvesNumVertices();
   const P3fArraySamplePtr positions = smp.getPositions();
 
-#if 1
   const int point_size = abc_curves_get_total_point_size(num_vertices);
   const int curve_size = static_cast<int>(num_vertices->size());
 
@@ -285,99 +330,6 @@ void AbcCurveReader::read_curves_sample(Curves *curves,
   geometry.resize(point_size, curve_size);
 
   read_curves_sample_ex(curves, m_curves_schema, smp, sample_sel, nullptr, 0.0f, nullptr);
-#else
-  const FloatArraySamplePtr weights = smp.getPositionWeights();
-  const FloatArraySamplePtr knots = smp.getKnots();
-  const CurvePeriodicity periodicity = smp.getWrap();
-  const UcharArraySamplePtr orders = smp.getOrders();
-
-  const IFloatGeomParam widths_param = schema.getWidthsParam();
-  FloatArraySamplePtr radiuses;
-
-  if (widths_param.valid()) {
-    IFloatGeomParam::Sample wsample = widths_param.getExpandedValue(sample_sel);
-    radiuses = wsample.getVals();
-  }
-
-  int knot_offset = 0;
-
-  size_t idx = 0;
-  for (size_t i = 0; i < num_vertices->size(); i++) {
-    const int num_verts = (*num_vertices)[i];
-
-    Nurb *nu = static_cast<Nurb *>(MEM_callocN(sizeof(Nurb), "abc_getnurb"));
-    nu->resolu = cu->resolu;
-    nu->resolv = cu->resolv;
-    nu->pntsu = num_verts;
-    nu->pntsv = 1;
-    nu->flag |= CU_SMOOTH;
-    nu->orderu = get_curve_order(smp.getType(), orders, i);
-
-    const int overlap = get_curve_overlap(periodicity, positions, idx, num_verts, nu->orderu);
-
-    if (overlap == 0) {
-      nu->flagu |= CU_NURB_ENDPOINT;
-    }
-    else {
-      nu->flagu |= CU_NURB_CYCLIC;
-      nu->pntsu -= overlap;
-    }
-
-    const bool do_weights = (weights != nullptr) && (weights->size() > 1);
-    float weight = 1.0f;
-
-    const bool do_radius = (radiuses != nullptr) && (radiuses->size() > 1);
-    float radius = (radiuses && radiuses->size() == 1) ? (*radiuses)[0] : 1.0f;
-
-    nu->type = CU_NURBS;
-
-    nu->bp = static_cast<BPoint *>(MEM_callocN(sizeof(BPoint) * nu->pntsu, "abc_getnurb"));
-    BPoint *bp = nu->bp;
-
-    for (int j = 0; j < nu->pntsu; j++, bp++, idx++) {
-      const Imath::V3f &pos = (*positions)[idx];
-
-      if (do_radius) {
-        radius = (*radiuses)[idx];
-      }
-
-      if (do_weights) {
-        weight = (*weights)[idx];
-      }
-
-      copy_zup_from_yup(bp->vec, pos.getValue());
-      bp->vec[3] = weight;
-      bp->f1 = SELECT;
-      bp->radius = radius;
-      bp->weight = 1.0f;
-    }
-
-    if (knots && knots->size() != 0) {
-      nu->knotsu = static_cast<float *>(
-          MEM_callocN(KNOTSU(nu) * sizeof(float), "abc_setsplineknotsu"));
-
-      /* TODO: second check is temporary, for until the check for cycles is rock solid. */
-      if (periodicity == Alembic::AbcGeom::kPeriodic && (KNOTSU(nu) == knots->size() - 2)) {
-        /* Skip first and last knots. */
-        for (size_t i = 1; i < knots->size() - 1; i++) {
-          nu->knotsu[i - 1] = (*knots)[knot_offset + i];
-        }
-      }
-      else {
-        /* TODO: figure out how to use the knots array from other
-         * software in this case. */
-        BKE_nurb_knot_calc_u(nu);
-      }
-
-      knot_offset += knots->size();
-    }
-    else {
-      BKE_nurb_knot_calc_u(nu);
-    }
-
-    BLI_addtail(BKE_curve_nurbs_get(cu), nu);
-  }
-#endif
 }
 
 void AbcCurveReader::read_geometry(GeometrySet &geometry_set,
