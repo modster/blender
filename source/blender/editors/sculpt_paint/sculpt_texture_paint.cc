@@ -6,15 +6,19 @@
  */
 
 #include "DNA_material_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_windowmanager_types.h"
 
+#include "BKE_brush.h"
 #include "BKE_context.h"
+#include "BKE_customdata.h"
 #include "BKE_image.h"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_mapping.h"
+#include "BKE_pbvh.h"
 
 #include "BLI_task.h"
 
@@ -34,45 +38,58 @@ using namespace imbuf::rasterizer;
 
 struct VertexInput {
   float2 uv;
+  float strength;
 
-  VertexInput(float2 uv) : uv(uv)
+  VertexInput(float2 uv, float strength) : uv(uv), strength(strength)
   {
   }
 };
 
-class VertexShader : public AbstractVertexShader<VertexInput, int> {
+class VertexShader : public AbstractVertexShader<VertexInput, float> {
  public:
   float2 image_size;
   void vertex(const VertexInputType &input, VertexOutputType *r_output) override
   {
     r_output->coord = input.uv * image_size;
+    r_output->data = input.strength;
   }
 };
 
-class FragmentShader : public AbstractFragmentShader<int, float4> {
+class FragmentShader : public AbstractFragmentShader<float, float4> {
  public:
   float4 color;
-  void fragment(const FragmentInputType &UNUSED(input), FragmentOutputType *r_output) override
+  void fragment(const FragmentInputType &input, FragmentOutputType *r_output) override
   {
     copy_v4_v4(*r_output, color);
+    (*r_output)[3] = input;
   }
 };
 
-using RasterizerType = Rasterizer<VertexShader, FragmentShader>;
+using RasterizerType = Rasterizer<VertexShader, FragmentShader, AlphaBlendMode>;
 
 static void do_task_cb_ex(void *__restrict userdata,
                           const int n,
                           const TaskParallelTLS *__restrict UNUSED(tls))
 {
   SculptThreadedTaskData *data = static_cast<SculptThreadedTaskData *>(userdata);
-  SculptSession *ss = data->ob->sculpt;
-  // const Brush *brush = data->brush;
+  Object *ob = data->ob;
+  SculptSession *ss = ob->sculpt;
+  StrokeCache *cache = ss->cache;
+  const Brush *brush = data->brush;
   // ss->cache->bstrength;
   ImBuf *drawing_target = ss->mode.texture_paint.drawing_target;
   RasterizerType rasterizer;
+
+  Mesh *mesh = static_cast<Mesh *>(ob->data);
+  MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
+  if (ldata_uv == nullptr) {
+    return;
+  }
+
   rasterizer.activate_drawing_target(drawing_target);
   rasterizer.vertex_shader().image_size = float2(drawing_target->x, drawing_target->y);
-  rasterizer.fragment_shader().color = float4(1.0f, 1.0f, 1.0f, 1.0f);
+  srgb_to_linearrgb_v3_v3(rasterizer.fragment_shader().color, brush->rgb);
+  rasterizer.fragment_shader().color[3] = 1.0;
 
   PBVHVertexIter vd;
 
@@ -86,6 +103,9 @@ static void do_task_cb_ex(void *__restrict userdata,
     MeshElemMap *vert_map = &ss->pmap[vd.index];
     for (int j = 0; j < ss->pmap[vd.index].count; j++) {
       const MPoly *p = &ss->mpoly[vert_map->indices[j]];
+      if (p->totloop < 3) {
+        continue;
+      }
 
       float poly_center[3];
       const MLoop *loopstart = &ss->mloop[p->loopstart];
@@ -94,14 +114,17 @@ static void do_task_cb_ex(void *__restrict userdata,
       if (!sculpt_brush_test_sq_fn(&test, poly_center)) {
         continue;
       }
-      if (p->totloop < 3) {
-        continue;
-      }
+      const float strength = BKE_brush_curve_strength(brush, sqrtf(test.dist), cache->radius);
 
-      VertexInput v1(mvert[loopstart[0].v].co);
-      VertexInput v2(mvert[loopstart[1].v].co);
-      VertexInput v3(mvert[loopstart[2].v].co);
-      rasterizer.draw_triangle(v1, v2, v3);
+      for (int triangle = 0; triangle < p->totloop - 2; triangle++) {
+        const int v1_index = p->loopstart;                 // loopstart[0].v;
+        const int v2_index = p->loopstart + triangle + 1;  // loopstart[triangle + 1].v;
+        const int v3_index = p->loopstart + triangle + 2;  // loopstart[triangle + 2].v;
+        VertexInput v1(ldata_uv[v1_index].uv, strength);
+        VertexInput v2(ldata_uv[v2_index].uv, strength);
+        VertexInput v3(ldata_uv[v3_index].uv, strength);
+        rasterizer.draw_triangle(v1, v2, v3);
+      }
     }
   }
   BKE_pbvh_vertex_iter_end;
@@ -136,10 +159,12 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
   data.nodes = nodes;
 
   TaskParallelSettings settings;
-  BKE_pbvh_parallel_range_settings(&settings, false, totnode);
+  BKE_pbvh_parallel_range_settings(&settings, true, totnode);
   BLI_task_parallel_range(0, totnode, &data, do_task_cb_ex, &settings);
 
   BKE_image_release_ibuf(image, image_buffer, lock);
+  // TODO(do partial update
+  BKE_image_partial_update_mark_full_update(image);
   ss->mode.texture_paint.drawing_target = nullptr;
 }
 }

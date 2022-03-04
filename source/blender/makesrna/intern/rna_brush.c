@@ -467,7 +467,7 @@ static bool rna_BrushCapabilitiesSculpt_has_sculpt_plane_get(PointerRNA *ptr)
 static bool rna_BrushCapabilitiesSculpt_has_color_get(PointerRNA *ptr)
 {
   Brush *br = (Brush *)ptr->data;
-  return ELEM(br->sculpt_tool, SCULPT_TOOL_PAINT);
+  return ELEM(br->sculpt_tool, SCULPT_TOOL_PAINT, SCULPT_TOOL_TEXTURE_PAINT);
 }
 
 static bool rna_BrushCapabilitiesSculpt_has_secondary_color_get(PointerRNA *ptr)

@@ -29,4 +29,13 @@ class CopyBlendMode : public AbstractBlendMode<float4, float> {
   }
 };
 
+class AlphaBlendMode : public AbstractBlendMode<float4, float> {
+ public:
+  void blend(float *dest, const float4 &source) const override
+  {
+    interp_v3_v3v3(dest, dest, source, source[3]);
+    dest[3] = 1.0;
+  }
+};
+
 }  // namespace blender::imbuf::rasterizer
