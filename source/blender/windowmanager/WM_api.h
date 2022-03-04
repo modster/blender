@@ -798,14 +798,14 @@ void WM_operator_properties_select_walk_direction(struct wmOperatorType *ot);
  * For default click selection (with no modifier keys held), the select operators can do the
  * following:
  * - On a mouse press on an unselected item, change selection and finish immediately after.
- *   This sends an undo push and allows transform to take over should a tweak event be caught now.
+ *   This sends an undo push and allows transform to take over should a click-drag event be caught.
  * - On a mouse press on a selected item, don't change selection state, but start modal execution
  *   of the operator. Idea is that we wait with deselecting other items until we know that the
  *   intention wasn't to tweak (mouse press+drag) all selected items.
- * - If a tweak is recognized before the release event happens, cancel the operator, so that
- *   transform can take over and no undo-push is sent.
- * - If the release event occurs rather than a tweak one, deselect all items but the one under the
- *   cursor, and finish the modal operator.
+ * - If a click-drag is recognized before the release event happens, cancel the operator,
+ *   so that transform can take over and no undo-push is sent.
+ * - If the release event occurs rather than a click-drag one,
+ *   deselect all items but the one under the cursor, and finish the modal operator.
  *
  * This utility, together with #WM_generic_select_invoke() and #WM_generic_select_modal() should
  * help getting the wanted behavior to work. Most generic logic should be handled in these, so that
@@ -1131,7 +1131,7 @@ int WM_operator_flag_only_pass_through_on_press(int retval, const struct wmEvent
  */
 struct wmDrag *WM_event_start_drag(
     struct bContext *C, int icon, int type, void *poin, double value, unsigned int flags);
-void WM_event_drag_image(struct wmDrag *, struct ImBuf *, float scale, int sx, int sy);
+void WM_event_drag_image(struct wmDrag *, struct ImBuf *, float scale);
 void WM_drag_free(struct wmDrag *drag);
 void WM_drag_data_free(int dragtype, void *poin);
 void WM_drag_free_list(struct ListBase *lb);
