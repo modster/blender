@@ -233,7 +233,6 @@ static void read_curves_sample_ex(Curves *curves,
       copy_zup_from_yup(positions_[position_offset], pos.getValue());
 
       geometry.radius[position_offset] = radius;
-      std::cerr << "radius " << geometry.radius[position_offset] << '\n';
 
       //  if (do_weights) {
       //    weight = (*weights)[idx];
