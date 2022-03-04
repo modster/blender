@@ -195,6 +195,7 @@ void USDCurvesReader::read_geometry(GeometrySet &geometry_set,
     return;
   }
 
+#if 0
   pxr::UsdAttribute widthsAttr = curve_prim_.GetWidthsAttr();
   pxr::UsdAttribute vertexAttr = curve_prim_.GetCurveVertexCountsAttr();
   pxr::UsdAttribute pointsAttr = curve_prim_.GetPointsAttr();
@@ -232,6 +233,7 @@ void USDCurvesReader::read_geometry(GeometrySet &geometry_set,
       }
     }
   }
+#endif
 }
 
 }  // namespace blender::io::usd

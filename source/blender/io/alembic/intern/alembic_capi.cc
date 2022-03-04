@@ -816,28 +816,6 @@ void ABC_read_geometry(CacheReader *reader,
                             err_str);
 }
 
-Curves *ABC_read_curves(CacheReader *reader,
-                        Object *ob,
-                        Curves *curves,
-                        const ABCReadParams *params,
-                        const char **err_str)
-{
-  AbcObjectReader *abc_reader = get_abc_reader(reader, ob, err_str);
-  if (abc_reader == nullptr) {
-    return curves;
-  }
-
-  AbcCurveReader *curves_reader = static_cast<AbcCurveReader *>(abc_reader);
-
-  AttributeSelector attribute_selector(params->mappings);
-  attribute_selector.set_velocity_attribute(params->velocity_name);
-  attribute_selector.set_read_flags(params->read_flags);
-
-  ISampleSelector sample_sel = sample_selector_for_time(params->time);
-  return curves_reader->read_curves(
-      curves, sample_sel, &attribute_selector, params->velocity_scale, err_str);
-}
-
 bool ABC_mesh_topology_changed(
     CacheReader *reader, Object *ob, Mesh *existing_mesh, const float time, const char **err_str)
 {

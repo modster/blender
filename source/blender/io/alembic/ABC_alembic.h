@@ -119,12 +119,6 @@ void ABC_read_geometry(CacheReader *reader,
                        const char **err_str);
 #endif
 
-struct Curves *ABC_read_curves(struct CacheReader *reader,
-                               struct Object *ob,
-                               struct Curves *curves,
-                               const ABCReadParams *params,
-                               const char **err_str);
-
 bool ABC_mesh_topology_changed(struct CacheReader *reader,
                                struct Object *ob,
                                struct Mesh *existing_mesh,

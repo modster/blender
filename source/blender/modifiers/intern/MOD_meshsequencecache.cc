@@ -317,27 +317,29 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
   GeometrySet geometry_set;
 
-  if (ctx->object->type == OB_CURVE) {
-    std::unique_ptr<CurveEval> curve_eval = curve_eval_from_dna_curve(
-        *static_cast<Curve *>(ctx->object->data));
-    geometry_set = GeometrySet::create_with_curve(curve_eval.release(),
-                                                  GeometryOwnershipType::Editable);
-  }
-  else {
+  /*  if (ctx->object->type == OB_CURVES_LEGACY) {
+      std::unique_ptr<CurveEval> curve_eval = curve_eval_from_dna_curve(
+          *static_cast<Curve *>(ctx->object->data));
+      geometry_set = GeometrySet::create_with_curve(curve_eval.release(),
+                                                    GeometryOwnershipType::Editable);
+    }
+    else */
+  {
     geometry_set = GeometrySet::create_with_mesh(mesh, GeometryOwnershipType::Editable);
   }
 
   modifyGeometry(md, ctx, geometry_set);
 
-  if (ctx->object->type == OB_CURVE) {
-    CurveEval *curve_eval = geometry_set.get_component_for_write<CurveComponent>().release();
+  /*  if (ctx->object->type == OB_CURVES_LEGACY) {
+      CurveEval *curve_eval = geometry_set.get_component_for_write<CurveComponent>().release();
 
-    if (curve_eval) {
-      result = blender::bke::curve_to_wire_mesh(*curve_eval);
-      delete curve_eval;
+      if (curve_eval) {
+        result = blender::bke::curve_to_wire_mesh(*curve_eval);
+        delete curve_eval;
+      }
     }
-  }
-  else {
+    else */
+  {
     result = geometry_set.get_component_for_write<MeshComponent>().release();
   }
 

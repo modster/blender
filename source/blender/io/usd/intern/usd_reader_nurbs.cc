@@ -194,6 +194,7 @@ void USDNurbsReader::read_geometry(GeometrySet &geometry_set,
                                    int /* read_flag */,
                                    const char ** /* err_str */)
 {
+#if 0
   pxr::UsdGeomCurves curve_prim_(prim_);
 
   pxr::UsdAttribute widthsAttr = curve_prim_.GetWidthsAttr();
@@ -233,6 +234,7 @@ void USDNurbsReader::read_geometry(GeometrySet &geometry_set,
       }
     }
   }
+#endif
 }
 
 }  // namespace blender::io::usd

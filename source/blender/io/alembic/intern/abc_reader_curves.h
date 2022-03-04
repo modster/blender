@@ -47,12 +47,6 @@ class AbcCurveReader final : public AbcObjectReader {
   void read_curves_sample(Curves *curves,
                           const Alembic::AbcGeom::ICurvesSchema &schema,
                           const Alembic::Abc::ISampleSelector &sample_selector);
-
-  Curves *read_curves(Curves *curves_input,
-                      const Alembic::Abc::ISampleSelector &sample_sel,
-                      const AttributeSelector *attribute_selector,
-                      const float velocity_scale,
-                      const char **err_str);
 };
 
 }  // namespace blender::io::alembic

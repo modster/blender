@@ -21,6 +21,7 @@
 #include "BLI_listbase.h"
 
 #include "BKE_curves.h"
+#include "BKE_curves.hh"
 #include "BKE_geometry_set.hh"
 #include "BKE_mesh.h"
 #include "BKE_object.h"
@@ -193,7 +194,15 @@ static void read_curves_sample_ex(Curves *curves,
                                   const float velocity_scale,
                                   const char **err_str)
 {
-  CurvesGeometry &geometry = curves->geometry;
+  bke::CurvesGeometry &geometry = bke::CurvesGeometry::wrap(curves->geometry);
+  MutableSpan<int> offsets = geometry.offsets();
+  MutableSpan<float3> positions_ = geometry.positions();
+
+  if (!geometry.radius) {
+    geometry.radius = static_cast<float *>(CustomData_add_layer_named(
+        &geometry.point_data, CD_PROP_FLOAT, CD_DEFAULT, nullptr, geometry.point_size, "radius"));
+  }
+
   const Int32ArraySamplePtr num_vertices = sample.getCurvesNumVertices();
   const P3fArraySamplePtr positions = sample.getPositions();
 
@@ -212,8 +221,7 @@ static void read_curves_sample_ex(Curves *curves,
   size_t position_offset = 0;
   for (size_t i = 0; i < num_vertices->size(); i++) {
     const int num_verts = (*num_vertices)[i];
-
-    geometry.offsets[i] = offset;
+    offsets[i] = offset;
 
     for (int j = 0; j < num_verts; j++, position_offset++) {
       const Imath::V3f &pos = (*positions)[position_offset];
@@ -222,9 +230,10 @@ static void read_curves_sample_ex(Curves *curves,
         radius = (*radiuses)[position_offset];
       }
 
-      copy_zup_from_yup(geometry.position[position_offset], pos.getValue());
+      copy_zup_from_yup(positions_[position_offset], pos.getValue());
 
       geometry.radius[position_offset] = radius;
+      std::cerr << "radius " << geometry.radius[position_offset] << '\n';
 
       //  if (do_weights) {
       //    weight = (*weights)[idx];
@@ -236,7 +245,7 @@ static void read_curves_sample_ex(Curves *curves,
     offset += num_verts;
   }
 
-  geometry.offsets[geometry.curve_size] = offset;
+  offsets[geometry.curve_size] = offset;
 
   /* Attributes. */
   CDStreamConfig config;
@@ -270,14 +279,11 @@ void AbcCurveReader::read_curves_sample(Curves *curves,
   const P3fArraySamplePtr positions = smp.getPositions();
 
 #if 1
-  CurvesGeometry &geometry = curves->geometry;
-  geometry.point_size = abc_curves_get_total_point_size(num_vertices);
-  geometry.curve_size = static_cast<int>(num_vertices->size());
+  const int point_size = abc_curves_get_total_point_size(num_vertices);
+  const int curve_size = static_cast<int>(num_vertices->size());
 
-  geometry.offsets = (int *)MEM_calloc_arrayN(geometry.curve_size + 1, sizeof(int), __func__);
-  CustomData_realloc(&geometry.point_data, geometry.point_size);
-  CustomData_realloc(&geometry.curve_data, geometry.curve_size);
-  BKE_curves_update_customdata_pointers(curves);
+  bke::CurvesGeometry &geometry = bke::CurvesGeometry::wrap(curves->geometry);
+  geometry.resize(point_size, curve_size);
 
   read_curves_sample_ex(curves, m_curves_schema, smp, sample_sel, nullptr, 0.0f, nullptr);
 #else
@@ -375,61 +381,11 @@ void AbcCurveReader::read_curves_sample(Curves *curves,
 #endif
 }
 
-Curves *AbcCurveReader::read_curves(Curves *curves_input,
-                                    const Alembic::Abc::v12::ISampleSelector &sample_sel,
-                                    const AttributeSelector *attribute_selector,
-                                    const float velocity_scale,
-                                    const char **err_str)
-{
-  ICurvesSchema::Sample sample;
-
-  try {
-    sample = m_curves_schema.getValue(sample_sel);
-  }
-  catch (Alembic::Util::Exception &ex) {
-    *err_str = "Error reading curve sample; more detail on the console";
-    printf("Alembic: error reading curve sample for '%s/%s' at time %f: %s\n",
-           m_iobject.getFullName().c_str(),
-           m_curves_schema.getName().c_str(),
-           sample_sel.getRequestedTime(),
-           ex.what());
-    return curves_input;
-  }
-
-  const Int32ArraySamplePtr num_vertices = sample.getCurvesNumVertices();
-  const P3fArraySamplePtr positions = sample.getPositions();
-
-  const int point_size = abc_curves_get_total_point_size(num_vertices);
-  const int curve_size = static_cast<int>(num_vertices->size());
-
-  if (point_size != curves_input->geometry.point_size ||
-      curve_size != curves_input->geometry.curve_size) {
-    Curves *new_curves = BKE_curves_new_for_eval(curves_input, point_size, curve_size);
-    read_curves_sample_ex(new_curves,
-                          m_curves_schema,
-                          sample,
-                          sample_sel,
-                          attribute_selector,
-                          velocity_scale,
-                          err_str);
-    return new_curves;
-  }
-
-  read_curves_sample_ex(curves_input,
-                        m_curves_schema,
-                        sample,
-                        sample_sel,
-                        attribute_selector,
-                        velocity_scale,
-                        err_str);
-  return curves_input;
-}
-
 void AbcCurveReader::read_geometry(GeometrySet &geometry_set,
                                    const Alembic::Abc::ISampleSelector &sample_sel,
-                                   const AttributeSelector * /*attribute_selector*/,
+                                   const AttributeSelector *attribute_selector,
                                    int /*read_flag*/,
-                                   const float /*velocity_scale*/,
+                                   const float velocity_scale,
                                    const char **err_str)
 {
   ICurvesSchema::Sample sample;
@@ -447,48 +403,19 @@ void AbcCurveReader::read_geometry(GeometrySet &geometry_set,
     return;
   }
 
-#if 0
-  CurveEval *curve_eval = geometry_set.get_curve_for_write();
-
   const Int32ArraySamplePtr num_vertices = sample.getCurvesNumVertices();
-  const P3fArraySamplePtr &positions = sample.getPositions();
+  const P3fArraySamplePtr positions = sample.getPositions();
 
-  if (blender::io::alembic::topology_changed(curve_eval, num_vertices)) {
-    Curve *curve = static_cast<Curve *>(m_object->data);
-    BKE_nurbList_free(&curve->nurb);
-    read_curve_sample(curve, m_curves_schema, sample_sel);
+  Curves *curves = geometry_set.get_curves_for_write();
 
-    std::unique_ptr<CurveEval> new_curve_eval = curve_eval_from_dna_curve(*curve);
-    geometry_set.replace_curve(new_curve_eval.release(), GeometryOwnershipType::Editable);
-  }
-  else {
-    const IFloatGeomParam widths_param = m_curves_schema.getWidthsParam();
-    FloatArraySamplePtr radiuses;
+  const int point_size = abc_curves_get_total_point_size(num_vertices);
+  const int curve_size = static_cast<int>(num_vertices->size());
 
-    if (widths_param.valid()) {
-      IFloatGeomParam::Sample wsample = widths_param.getExpandedValue(sample_sel);
-      radiuses = wsample.getVals();
-    }
+  bke::CurvesGeometry &geometry = bke::CurvesGeometry::wrap(curves->geometry);
+  geometry.resize(point_size, curve_size);
 
-    const bool do_radius = (radiuses != nullptr) && (radiuses->size() > 1);
-    float radius = (radiuses && radiuses->size() == 1) ? (*radiuses)[0] : 1.0f;
-
-    size_t position_index = 0;
-    size_t radius_index = 0;
-
-    for (size_t i = 0; i < num_vertices->size(); i++) {
-      Spline *spline = curve_eval->splines()[i].get();
-
-      for (float3 &position : spline->positions()) {
-        copy_zup_from_yup(position, (*positions)[position_index++].getValue());
-      }
-
-      for (float &r : spline->radii()) {
-        r = (do_radius) ? (*radiuses)[radius_index++] : radius;
-      }
-    }
-  }
-#endif
+  read_curves_sample_ex(
+      curves, m_curves_schema, sample, sample_sel, attribute_selector, velocity_scale, err_str);
 }
 
 }  // namespace blender::io::alembic

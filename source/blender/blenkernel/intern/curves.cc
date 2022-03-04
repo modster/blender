@@ -27,6 +27,7 @@
 #include "BKE_anim_data.h"
 #include "BKE_curves.hh"
 #include "BKE_customdata.h"
+#include "BKE_geometry_set.hh"
 #include "BKE_global.h"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
@@ -41,12 +42,6 @@
 #include "DEG_depsgraph_query.h"
 
 #include "BLO_read_write.h"
-
-#include "ABC_alembic.h"
-#include "BKE_cachefile.h"
-#include "DNA_cachefile_types.h"
-#include "DNA_modifier_types.h"
-#include "DNA_scene_types.h"
 
 using blender::float3;
 using blender::IndexRange;
@@ -314,49 +309,12 @@ static Curves *curves_evaluate_modifiers(struct Depsgraph *depsgraph,
       continue;
     }
 
-    if (md->type == eModifierType_MeshSequenceCache) {
-      MeshSeqCacheModifierData *mcmd = reinterpret_cast<MeshSeqCacheModifierData *>(md);
+    if (mti->modifyGeometrySet) {
+      GeometrySet geometry_set = GeometrySet::create_with_curves(curves,
+                                                                 GeometryOwnershipType::ReadOnly);
+      mti->modifyGeometrySet(md, &mectx, &geometry_set);
 
-      if (!mcmd->reader || !STREQ(mcmd->reader_object_path, mcmd->object_path)) {
-        STRNCPY(mcmd->reader_object_path, mcmd->object_path);
-        BKE_cachefile_reader_open(mcmd->cache_file, &mcmd->reader, object, mcmd->object_path);
-      }
-
-      CacheReader *reader = mcmd->reader;
-      if (reader && mcmd->cache_file) {
-        float velocity_scale = mcmd->velocity_scale;
-        if (mcmd->cache_file->velocity_unit == CACHEFILE_VELOCITY_UNIT_FRAME) {
-          velocity_scale *= FPS;
-        }
-        const float frame = DEG_get_ctime(depsgraph);
-        const float time = BKE_cachefile_time_offset(mcmd->cache_file, frame, FPS);
-        ABCReadParams params;
-        params.time = time;
-        params.read_flags = mcmd->read_flag;
-        params.velocity_name = mcmd->cache_file->velocity_name;
-        params.velocity_scale = velocity_scale;
-        params.mappings = &mcmd->cache_file->attribute_mappings;
-
-        /* Ensure we are not modifying the input. */
-        if (curves == curves_input) {
-          curves = BKE_curves_copy_for_eval(curves, true);
-        }
-
-        const char *err_str = nullptr;
-
-        Curves *new_curves = ABC_read_curves(reader, object, curves, &params, &err_str);
-
-        if (err_str) {
-          BKE_modifier_set_error(object, md, "%s", err_str);
-        }
-
-        if (curves != new_curves) {
-          BKE_id_free(nullptr, &curves->id);
-          curves = new_curves;
-        }
-
-        BKE_curves_update_customdata_pointers(curves);
-      }
+      curves = geometry_set.get_component_for_write<CurveComponent>().release();
     }
     else if ((mti->type == eModifierTypeType_OnlyDeform) &&
              (mti->flags & eModifierTypeFlag_AcceptsVertexCosOnly)) {
