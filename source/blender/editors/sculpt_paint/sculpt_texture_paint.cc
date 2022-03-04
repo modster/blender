@@ -20,7 +20,10 @@
 #include "BKE_mesh_mapping.h"
 #include "BKE_pbvh.h"
 
+#include "PIL_time_utildefines.h"
+
 #include "BLI_task.h"
+#include "BLI_vector.hh"
 
 #include "IMB_rasterizer.hh"
 
@@ -37,46 +40,59 @@ namespace blender::ed::sculpt_paint::texture_paint {
 using namespace imbuf::rasterizer;
 
 struct VertexInput {
+  float3 pos;
   float2 uv;
-  float strength;
 
-  VertexInput(float2 uv, float strength) : uv(uv), strength(strength)
+  VertexInput(float3 pos, float2 uv) : pos(pos), uv(uv)
   {
   }
 };
 
-class VertexShader : public AbstractVertexShader<VertexInput, float> {
+class VertexShader : public AbstractVertexShader<VertexInput, float3> {
  public:
   float2 image_size;
   void vertex(const VertexInputType &input, VertexOutputType *r_output) override
   {
     r_output->coord = input.uv * image_size;
-    r_output->data = input.strength;
+    r_output->data = input.pos;
   }
 };
 
-class FragmentShader : public AbstractFragmentShader<float, float4> {
+class FragmentShader : public AbstractFragmentShader<float3, float4> {
  public:
   float4 color;
+  const Brush *brush = nullptr;
+  SculptBrushTest test;
+  SculptBrushTestFn sculpt_brush_test_sq_fn;
+
   void fragment(const FragmentInputType &input, FragmentOutputType *r_output) override
   {
     copy_v4_v4(*r_output, color);
-    (*r_output)[3] = input;
+    float strength = sculpt_brush_test_sq_fn(&test, input) ?
+                         BKE_brush_curve_strength(brush, sqrtf(test.dist), test.radius) :
+                         0.0f;
+
+    (*r_output)[3] *= strength;
   }
 };
 
 using RasterizerType = Rasterizer<VertexShader, FragmentShader, AlphaBlendMode>;
 
+struct TexturePaintingUserData {
+  Object *ob;
+  Brush *brush;
+  PBVHNode **nodes;
+  Vector<rctf> region_to_update;
+};
+
 static void do_task_cb_ex(void *__restrict userdata,
                           const int n,
                           const TaskParallelTLS *__restrict UNUSED(tls))
 {
-  SculptThreadedTaskData *data = static_cast<SculptThreadedTaskData *>(userdata);
+  TexturePaintingUserData *data = static_cast<TexturePaintingUserData *>(userdata);
   Object *ob = data->ob;
   SculptSession *ss = ob->sculpt;
-  StrokeCache *cache = ss->cache;
   const Brush *brush = data->brush;
-  // ss->cache->bstrength;
   ImBuf *drawing_target = ss->mode.texture_paint.drawing_target;
   RasterizerType rasterizer;
 
@@ -89,15 +105,17 @@ static void do_task_cb_ex(void *__restrict userdata,
   rasterizer.activate_drawing_target(drawing_target);
   rasterizer.vertex_shader().image_size = float2(drawing_target->x, drawing_target->y);
   srgb_to_linearrgb_v3_v3(rasterizer.fragment_shader().color, brush->rgb);
-  rasterizer.fragment_shader().color[3] = 1.0;
+  FragmentShader &fragment_shader = rasterizer.fragment_shader();
+  fragment_shader.color[3] = 1.0f;
+  fragment_shader.brush = brush;
+  fragment_shader.sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
+      ss, &fragment_shader.test, brush->falloff_shape);
 
   PBVHVertexIter vd;
 
-  SculptBrushTest test;
-  SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
-      ss, &test, data->brush->falloff_shape);
-
   MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
+  rctf &region_to_update = data->region_to_update[n];
+  BLI_rctf_init_minmax(&region_to_update);
 
   BKE_pbvh_vertex_iter_begin (ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE) {
     MeshElemMap *vert_map = &ss->pmap[vd.index];
@@ -110,20 +128,26 @@ static void do_task_cb_ex(void *__restrict userdata,
       float poly_center[3];
       const MLoop *loopstart = &ss->mloop[p->loopstart];
       BKE_mesh_calc_poly_center(p, &ss->mloop[p->loopstart], mvert, poly_center);
-
-      if (!sculpt_brush_test_sq_fn(&test, poly_center)) {
+      if (!fragment_shader.sculpt_brush_test_sq_fn(&fragment_shader.test, poly_center)) {
         continue;
       }
-      const float strength = BKE_brush_curve_strength(brush, sqrtf(test.dist), cache->radius);
 
       for (int triangle = 0; triangle < p->totloop - 2; triangle++) {
-        const int v1_index = p->loopstart;                 // loopstart[0].v;
-        const int v2_index = p->loopstart + triangle + 1;  // loopstart[triangle + 1].v;
-        const int v3_index = p->loopstart + triangle + 2;  // loopstart[triangle + 2].v;
-        VertexInput v1(ldata_uv[v1_index].uv, strength);
-        VertexInput v2(ldata_uv[v2_index].uv, strength);
-        VertexInput v3(ldata_uv[v3_index].uv, strength);
+        const int v1_index = loopstart[0].v;
+        const int v2_index = loopstart[triangle + 1].v;
+        const int v3_index = loopstart[triangle + 2].v;
+        const int v1_loop_index = p->loopstart;
+        const int v2_loop_index = p->loopstart + triangle + 1;
+        const int v3_loop_index = p->loopstart + triangle + 2;
+
+        VertexInput v1(mvert[v1_index].co, ldata_uv[v1_loop_index].uv);
+        VertexInput v2(mvert[v2_index].co, ldata_uv[v2_loop_index].uv);
+        VertexInput v3(mvert[v3_index].co, ldata_uv[v3_loop_index].uv);
         rasterizer.draw_triangle(v1, v2, v3);
+
+        BLI_rctf_do_minmax_v(&region_to_update, v1.uv);
+        BLI_rctf_do_minmax_v(&region_to_update, v2.uv);
+        BLI_rctf_do_minmax_v(&region_to_update, v3.uv);
       }
     }
   }
@@ -152,19 +176,32 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
   }
   ss->mode.texture_paint.drawing_target = image_buffer;
 
-  SculptThreadedTaskData data = {nullptr};
-  data.sd = sd;
+  TexturePaintingUserData data = {nullptr};
   data.ob = ob;
   data.brush = brush;
   data.nodes = nodes;
+  data.region_to_update.resize(totnode);
 
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, totnode);
+
+  TIMEIT_START(texture_painting);
   BLI_task_parallel_range(0, totnode, &data, do_task_cb_ex, &settings);
+  TIMEIT_END(texture_painting);
+
+  for (int i = 0; i < totnode; i++) {
+    rcti region_to_update;
+    region_to_update.xmin = data.region_to_update[i].xmin * image_buffer->x;
+    region_to_update.xmax = data.region_to_update[i].xmax * image_buffer->x;
+    region_to_update.ymin = data.region_to_update[i].ymin * image_buffer->y;
+    region_to_update.ymax = data.region_to_update[i].ymax * image_buffer->y;
+
+    /* TODO: Tiled images. */
+    BKE_image_partial_update_mark_region(
+        image, static_cast<ImageTile *>(image->tiles.first), image_buffer, &region_to_update);
+  }
 
   BKE_image_release_ibuf(image, image_buffer, lock);
-  // TODO(do partial update
-  BKE_image_partial_update_mark_full_update(image);
   ss->mode.texture_paint.drawing_target = nullptr;
 }
 }
