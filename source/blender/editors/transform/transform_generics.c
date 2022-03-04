@@ -1202,8 +1202,20 @@ void calculateCenter(TransInfo *t)
  * Adjusts the mouse position relative to the object. */
 void tranformViewUpdate(TransInfo *t)
 {
+  float zoom_prev = t->zfac;
+  float zoom_new;
   if ((t->spacetype == SPACE_VIEW3D) && (t->region->regiontype == RGN_TYPE_WINDOW)) {
+    if (!t->persp) {
+      zoom_prev *= len_v3(t->persinv[0]);
+    }
+
     setTransformViewMatrices(t);
+    calculateZfac(t);
+
+    zoom_new = t->zfac;
+    if (!t->persp) {
+      zoom_new *= len_v3(t->persinv[0]);
+    }
 
     for (int i = 0; i < ARRAY_SIZE(t->orient); i++) {
       if (t->orient[i].type == V3D_ORIENT_VIEW) {
@@ -1216,16 +1228,13 @@ void tranformViewUpdate(TransInfo *t)
       }
     }
   }
-
-  float fac = 1.0f;
-  if (ELEM(t->spacetype, SPACE_VIEW3D, SPACE_IMAGE, SPACE_NODE)) {
-    float zfac_prev = t->zfac;
+  else {
     calculateZfac(t);
-    fac = zfac_prev / t->zfac;
+    zoom_new = t->zfac;
   }
 
   calculateCenter2D(t);
-  transform_input_update(t, fac);
+  transform_input_update(t, zoom_prev / zoom_new);
 }
 
 void calculatePropRatio(TransInfo *t)

@@ -266,10 +266,9 @@ void initMouseInput(
   mi->imval[1] = mval[1];
 
   if ((t->spacetype == SPACE_VIEW3D) && (t->region->regiontype == RGN_TYPE_WINDOW)) {
-    RegionView3D *rv3d = t->region->regiondata;
-    float z = dot_m4_v3_row_z(rv3d->persmat, t->center_global) + rv3d->persmat[3][2];
-    float z_ndc = 0.5f * (1.0f + (z / t->zfac));
-    ED_view3d_depth_unproject_v3(t->region, mval, z_ndc, mi->imval_unproj);
+    float delta[3] = {mval[0] - center[0], mval[1] - center[1]};
+    ED_view3d_win_to_delta(t->region, delta, t->zfac, delta);
+    add_v3_v3v3(mi->imval_unproj, t->center_global, delta);
   }
 
   mi->post = NULL;
