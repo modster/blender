@@ -78,6 +78,22 @@ bool AbcCurveReader::accepts_object_type(
   return true;
 }
 
+void AbcCurveReader::readObjectData(Main *bmain,
+                                    const AbcReaderManager & /*manager*/,
+                                    const Alembic::Abc::ISampleSelector &sample_sel)
+{
+  Curves *curves = static_cast<Curves *>(BKE_curves_add(bmain, m_data_name.c_str()));
+
+  m_object = BKE_object_add_only_object(bmain, OB_CURVES, m_object_name.c_str());
+  m_object->data = curves;
+
+  read_curves_sample(curves, m_curves_schema, sample_sel);
+
+  if (m_settings->always_add_cache_reader || has_animations(m_curves_schema, m_settings)) {
+    addCacheModifier();
+  }
+}
+
 static short get_curve_resolution(const ICurvesSchema &schema,
                                   const Alembic::Abc::ISampleSelector &sample_sel)
 {
@@ -152,22 +168,6 @@ static int get_curve_overlap(Alembic::AbcGeom::CurvePeriodicity periodicity,
   return 0;
 }
 
-void AbcCurveReader::readObjectData(Main *bmain,
-                                    const AbcReaderManager & /*manager*/,
-                                    const Alembic::Abc::ISampleSelector &sample_sel)
-{
-  Curves *curves = static_cast<Curves *>(BKE_curves_add(bmain, m_data_name.c_str()));
-
-  m_object = BKE_object_add_only_object(bmain, OB_CURVES, m_object_name.c_str());
-  m_object->data = curves;
-
-  read_curves_sample(curves, m_curves_schema, sample_sel);
-
-  if (m_settings->always_add_cache_reader || has_animations(m_curves_schema, m_settings)) {
-    addCacheModifier();
-  }
-}
-
 static int abc_curves_get_total_point_size(const Int32ArraySamplePtr num_vertices)
 {
   if (!num_vertices) {
@@ -183,7 +183,7 @@ static int abc_curves_get_total_point_size(const Int32ArraySamplePtr num_vertice
 
 static void read_curves_sample_ex(Curves *curves,
                                   const ICurvesSchema &schema,
-                                  const ICurvesSchema::Sample &sample,
+                                  const ICurvesSchema::Sample &smp,
                                   const ISampleSelector sample_sel,
                                   const AttributeSelector *attribute_selector,
                                   const float velocity_scale,
@@ -215,11 +215,11 @@ static void read_curves_sample_ex(Curves *curves,
   }
 
   /* Knots are not imported anymore. */
-  const Int32ArraySamplePtr num_vertices = sample.getCurvesNumVertices();
-  const P3fArraySamplePtr positions = sample.getPositions();
-  const FloatArraySamplePtr weights = sample.getPositionWeights();
-  const CurvePeriodicity periodicity = sample.getWrap();
-  const UcharArraySamplePtr orders = sample.getOrders();
+  const Int32ArraySamplePtr num_vertices = smp.getCurvesNumVertices();
+  const P3fArraySamplePtr positions = smp.getPositions();
+  const FloatArraySamplePtr weights = smp.getPositionWeights();
+  const CurvePeriodicity periodicity = smp.getWrap();
+  const UcharArraySamplePtr orders = smp.getOrders();
 
   const IFloatGeomParam widths_param = schema.getWidthsParam();
   FloatArraySamplePtr radiuses;
@@ -258,7 +258,7 @@ static void read_curves_sample_ex(Curves *curves,
     const int num_verts = (*num_vertices)[i];
     offsets[i] = offset;
 
-    const int curve_order = get_curve_order(sample.getType(), orders, i);
+    const int curve_order = get_curve_order(smp.getType(), orders, i);
     if (do_curves_orders) {
       curves_orders[i] = curve_order;
     }
