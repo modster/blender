@@ -323,7 +323,7 @@ class Rasterizer {
   {
     return vertex_shader_;
   }
-  VertexShader &fragment_shader()
+  FragmentShader &fragment_shader()
   {
     return fragment_shader_;
   }

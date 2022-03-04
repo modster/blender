@@ -3387,6 +3387,9 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
     case SCULPT_TOOL_SMEAR:
       SCULPT_do_smear_brush(sd, ob, nodes, totnode);
       break;
+    case SCULPT_TOOL_TEXTURE_PAINT:
+      SCULPT_do_texture_paint_brush(sd, ob, nodes, totnode);
+      break;
   }
 
   if (!ELEM(brush->sculpt_tool, SCULPT_TOOL_SMOOTH, SCULPT_TOOL_MASK) &&
@@ -3935,6 +3938,8 @@ static const char *sculpt_tool_name(Sculpt *sd)
       return "Paint Brush";
     case SCULPT_TOOL_SMEAR:
       return "Smear Brush";
+    case SCULPT_TOOL_TEXTURE_PAINT:
+      return "Texture Paint Brush";
   }
 
   return "Sculpting";
@@ -4589,7 +4594,8 @@ static bool sculpt_needs_connectivity_info(const Sculpt *sd,
           (brush->sculpt_tool == SCULPT_TOOL_SLIDE_RELAX) ||
           (brush->sculpt_tool == SCULPT_TOOL_CLOTH) || (brush->sculpt_tool == SCULPT_TOOL_SMEAR) ||
           (brush->sculpt_tool == SCULPT_TOOL_DRAW_FACE_SETS) ||
-          (brush->sculpt_tool == SCULPT_TOOL_DISPLACEMENT_SMEAR));
+          (brush->sculpt_tool == SCULPT_TOOL_DISPLACEMENT_SMEAR) ||
+          (brush->sculpt_tool == SCULPT_TOOL_TEXTURE_PAINT));
 }
 
 void SCULPT_stroke_modifiers_check(const bContext *C, Object *ob, const Brush *brush)

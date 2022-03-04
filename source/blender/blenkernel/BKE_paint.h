@@ -29,6 +29,7 @@ struct EnumPropertyItem;
 struct GHash;
 struct GridPaintMask;
 struct ImagePool;
+struct ImBuf;
 struct ListBase;
 struct MLoop;
 struct MLoopTri;
@@ -619,6 +620,10 @@ typedef struct SculptSession {
        * Lazy initialize as needed (flag is set to 1 to tag it as uninitialized). */
       struct MDeformVert *dvert_prev;
     } wpaint;
+
+    struct {
+      struct ImBuf *drawing_target;
+    } texture_paint;
 
     /* TODO: identify sculpt-only fields */
     // struct { ... } sculpt;

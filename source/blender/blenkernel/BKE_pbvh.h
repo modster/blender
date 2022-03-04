@@ -409,6 +409,26 @@ typedef struct PBVHVertexIter {
   bool visible;
 } PBVHVertexIter;
 
+#ifdef __cplusplus
+BLI_INLINE struct BMVert *PBVH_cast_bmvert(void *src)
+{
+  return static_cast<BMVert *>(src);
+}
+BLI_INLINE float *PBVH_cast_float_ptr(void *src)
+{
+  return static_cast<float*>(src);
+}
+#else
+BLI_INLINE struct BMVert *PBVH_cast_bmvert(void *src)
+{
+  return src;
+}
+BLI_INLINE float *PBVH_cast_float_ptr(void *src)
+{
+  return src;
+}
+#endif
+
 void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int mode);
 
 #define BKE_pbvh_vertex_iter_begin(pbvh, node, vi, mode) \
@@ -467,11 +487,11 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
         } \
         else { \
           if (!BLI_gsetIterator_done(&vi.bm_unique_verts)) { \
-            vi.bm_vert = BLI_gsetIterator_getKey(&vi.bm_unique_verts); \
+            vi.bm_vert = PBVH_cast_bmvert(BLI_gsetIterator_getKey(&vi.bm_unique_verts)); \
             BLI_gsetIterator_step(&vi.bm_unique_verts); \
           } \
           else { \
-            vi.bm_vert = BLI_gsetIterator_getKey(&vi.bm_other_verts); \
+            vi.bm_vert = PBVH_cast_bmvert(BLI_gsetIterator_getKey(&vi.bm_other_verts)); \
             BLI_gsetIterator_step(&vi.bm_other_verts); \
           } \
           vi.visible = !BM_elem_flag_test_bool(vi.bm_vert, BM_ELEM_HIDDEN); \
@@ -481,7 +501,7 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
           vi.co = vi.bm_vert->co; \
           vi.fno = vi.bm_vert->no; \
           vi.index = BM_elem_index_get(vi.bm_vert); \
-          vi.mask = BM_ELEM_CD_GET_VOID_P(vi.bm_vert, vi.cd_vert_mask_offset); \
+          vi.mask = PBVH_cast_float_ptr(BM_ELEM_CD_GET_VOID_P(vi.bm_vert, vi.cd_vert_mask_offset)); \
         }
 
 #define BKE_pbvh_vertex_iter_end \
