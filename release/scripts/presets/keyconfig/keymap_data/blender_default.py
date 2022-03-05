@@ -6105,7 +6105,7 @@ def km_curve_pen_modal_map(_params):
     )
 
     items.extend([
-        ("FREE_ALIGN_TOGGLE", {"type": 'LEFT_SHIFT', "value": 'PRESS', "any": True}, None),
+        ("FREE_ALIGN_TOGGLE", {"type": 'LEFT_SHIFT', "value": 'ANY', "any": True}, None),
         ("MOVE_ADJACENT", {"type": 'LEFT_CTRL', "value": 'ANY', "any": True}, None),
         ("MOVE_ENTIRE", {"type": 'SPACE', "value": 'ANY', "any": True}, None),
         ("LOCK_ANGLE", {"type": 'LEFT_ALT', "value": 'ANY', "any": True}, None),
