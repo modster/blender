@@ -65,7 +65,7 @@ set(SRC
   sculpt_paint_color.c
   sculpt_pose.c
   sculpt_smooth.c
-  sculpt_texture_paint.cc
+  sculpt_texture_paint_a.cc
   sculpt_transform.c
   sculpt_undo.c
   sculpt_uv.c
