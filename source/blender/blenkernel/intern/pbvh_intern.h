@@ -93,6 +93,7 @@ struct PBVHNode {
 
   /* Used to store the brush color during a stroke and composite it over the original color */
   PBVHColorBufferNode color_buffer;
+  PBVHTexturePaintingNode texture_painting;
 };
 
 typedef enum {

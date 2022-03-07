@@ -82,7 +82,6 @@ struct TexturePaintingUserData {
   Object *ob;
   Brush *brush;
   PBVHNode **nodes;
-  Vector<rctf> region_to_update;
 };
 
 static void do_task_cb_ex(void *__restrict userdata,
@@ -203,6 +202,10 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
 
   BKE_image_release_ibuf(image, image_buffer, lock);
   ss->mode.texture_paint.drawing_target = nullptr;
+}
+
+void SCULPT_flush_texture_paint(Object *UNUSED(ob))
+{
 }
 }
 }  // namespace blender::ed::sculpt_paint::texture_paint

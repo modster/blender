@@ -46,6 +46,12 @@ typedef struct {
   float (*color)[4];
 } PBVHColorBufferNode;
 
+typedef void (*PBVHNodeTexturePaintDataFreeFunc)(void *ptr);
+typedef struct PBVHTexturePaintingNode {
+  void *data;
+  PBVHNodeTexturePaintDataFreeFunc free_func;
+} PBVHTexturePaintingNode;
+
 typedef enum {
   PBVH_Leaf = 1 << 0,
 
@@ -416,7 +422,7 @@ BLI_INLINE struct BMVert *PBVH_cast_bmvert(void *src)
 }
 BLI_INLINE float *PBVH_cast_float_ptr(void *src)
 {
-  return static_cast<float*>(src);
+  return static_cast<float *>(src);
 }
 #else
 BLI_INLINE struct BMVert *PBVH_cast_bmvert(void *src)
@@ -501,7 +507,8 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
           vi.co = vi.bm_vert->co; \
           vi.fno = vi.bm_vert->no; \
           vi.index = BM_elem_index_get(vi.bm_vert); \
-          vi.mask = PBVH_cast_float_ptr(BM_ELEM_CD_GET_VOID_P(vi.bm_vert, vi.cd_vert_mask_offset)); \
+          vi.mask = PBVH_cast_float_ptr( \
+              BM_ELEM_CD_GET_VOID_P(vi.bm_vert, vi.cd_vert_mask_offset)); \
         }
 
 #define BKE_pbvh_vertex_iter_end \
@@ -546,6 +553,12 @@ const float (*BKE_pbvh_get_vert_normals(const PBVH *pbvh))[3];
 
 PBVHColorBufferNode *BKE_pbvh_node_color_buffer_get(PBVHNode *node);
 void BKE_pbvh_node_color_buffer_free(PBVH *pbvh);
+
+/* Texture painting. */
+void *BKE_pbvh_node_texture_paint_data_get(const PBVHNode *node);
+void BKE_pbvh_node_texture_paint_data_set(PBVHNode *node,
+                                          void *texture_paint_data,
+                                          PBVHNodeTexturePaintDataFreeFunc free_func);
 
 #ifdef __cplusplus
 }

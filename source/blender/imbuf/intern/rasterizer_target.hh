@@ -17,19 +17,20 @@ namespace blender::imbuf::rasterizer {
  * An abstract implementation of a drawing target. Will make it possible to switch to other render
  * targets then only ImBuf types.
  */
-template<typename Inner> class AbstractDrawingTarget {
+template<typename Buffer, typename Pixel = float> class AbstractDrawingTarget {
  public:
-  using InnerType = Inner;
+  using BufferType = Buffer;
+  using PixelType = Pixel;
   virtual uint64_t get_width() const = 0;
   virtual uint64_t get_height() const = 0;
-  virtual float *get_pixel_ptr(uint64_t x, uint64_t y) = 0;
+  virtual PixelType *get_pixel_ptr(uint64_t x, uint64_t y) = 0;
   virtual int64_t get_pixel_stride() const = 0;
   virtual bool has_active_target() const = 0;
-  virtual void activate(Inner *instance) = 0;
+  virtual void activate(BufferType *instance) = 0;
   virtual void deactivate() = 0;
 };
 
-class ImageBufferDrawingTarget : public AbstractDrawingTarget<ImBuf> {
+class ImageBufferDrawingTarget : public AbstractDrawingTarget<ImBuf, float> {
  private:
   ImBuf *image_buffer_ = nullptr;
 

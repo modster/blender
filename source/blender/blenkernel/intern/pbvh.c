@@ -679,6 +679,7 @@ void BKE_pbvh_free(PBVH *pbvh)
       if (node->bm_other_verts) {
         BLI_gset_free(node->bm_other_verts, NULL);
       }
+      BKE_pbvh_node_texture_paint_data_set(node, NULL, NULL);
     }
   }
 
@@ -3071,4 +3072,33 @@ void BKE_pbvh_face_sets_set(PBVH *pbvh, int *face_sets)
 void BKE_pbvh_respect_hide_set(PBVH *pbvh, bool respect_hide)
 {
   pbvh->respect_hide = respect_hide;
+}
+
+/* -------------------------------------------------------------------- */
+/** \name Texture painting operations
+ * \{ */
+
+void *BKE_pbvh_node_texture_paint_data_get(const PBVHNode *node)
+{
+  BLI_assert(node->flag & PBVH_Leaf);
+  return node->texture_painting.data;
+}
+
+void BKE_pbvh_node_texture_paint_data_set(PBVHNode *node,
+                                          void *texture_paint_data,
+                                          PBVHNodeTexturePaintDataFreeFunc free_func)
+{
+  BLI_assert(node->flag & PBVH_Leaf);
+
+  if (node->texture_painting.data != NULL) {
+    node->texture_painting.free_func(node->texture_painting.data);
+    node->texture_painting.data = NULL;
+    node->texture_painting.free_func = NULL;
+  }
+
+  if (texture_paint_data != NULL) {
+    BLI_assert(free_func);
+    node->texture_painting.data = texture_paint_data;
+    node->texture_painting.free_func = free_func;
+  }
 }

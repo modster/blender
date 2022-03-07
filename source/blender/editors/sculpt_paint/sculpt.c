@@ -5041,6 +5041,14 @@ void SCULPT_flush_update_step(bContext *C, SculptUpdateType update_flags)
     multires_mark_as_modified(depsgraph, ob, MULTIRES_COORDS_MODIFIED);
   }
 
+  if (update_flags & SCULPT_UPDATE_TEXTURE) {
+    /* When using the texture paint brush only the texture changes. The Geometry and shading should
+     * not be touched.*/
+    SCULPT_flush_texture_paint(ob);
+    ED_region_tag_redraw(region);
+    return;
+  }
+
   DEG_id_tag_update(&ob->id, ID_RECALC_SHADING);
 
   /* Only current viewport matters, slower update for all viewports will
@@ -5255,6 +5263,9 @@ static void sculpt_stroke_update_step(bContext *C,
   }
   else if (ELEM(brush->sculpt_tool, SCULPT_TOOL_PAINT, SCULPT_TOOL_SMEAR)) {
     SCULPT_flush_update_step(C, SCULPT_UPDATE_COLOR);
+  }
+  else if (brush->sculpt_tool == SCULPT_TOOL_TEXTURE_PAINT) {
+    SCULPT_flush_update_step(C, SCULPT_UPDATE_TEXTURE);
   }
   else {
     SCULPT_flush_update_step(C, SCULPT_UPDATE_COORDS);

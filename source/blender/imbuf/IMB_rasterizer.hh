@@ -269,7 +269,8 @@ class Rasterizer {
   using VertexOutputType = typename VertexShader::VertexOutputType;
   using FragmentInputType = typename FragmentShader::FragmentInputType;
   using FragmentOutputType = typename FragmentShader::FragmentOutputType;
-  using TargetBufferType = typename DrawingTarget::InnerType;
+  using TargetBufferType = typename DrawingTarget::BufferType;
+  using PixelType = typename DrawingTarget::PixelType;
 
   /** Check if the vertex shader and the fragment shader can be linked together. */
   static_assert(std::is_same_v<InterfaceInnerType, FragmentInputType>);
@@ -684,7 +685,7 @@ class Rasterizer {
   void render_rasterline(const RasterlineType &rasterline)
   {
     FragmentInputType data = rasterline.start_data;
-    float *pixel_ptr = drawing_target_.get_pixel_ptr(rasterline.start_x, rasterline.y);
+    PixelType *pixel_ptr = drawing_target_.get_pixel_ptr(rasterline.start_x, rasterline.y);
     for (uint32_t x = rasterline.start_x; x < rasterline.end_x; x++) {
 
       FragmentOutputType fragment_out;
