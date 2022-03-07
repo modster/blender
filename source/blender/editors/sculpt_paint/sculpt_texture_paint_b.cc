@@ -200,6 +200,7 @@ using RasterizerType = Rasterizer<VertexShader, FragmentShader, AddPixel, NodeDa
 
 void NodeData::init_pixels(Object *ob, PBVHNode *node, ImBuf *image_buffer)
 {
+  printf("%s\n", __func__);
   Mesh *mesh = static_cast<Mesh *>(ob->data);
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
   if (ldata_uv == nullptr) {

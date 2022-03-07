@@ -567,12 +567,12 @@ class Rasterizer {
     if (left_target == sorted_vertices[1]) {
       VertexOutputType mid_right = right + right_add * distance_min_to_mid;
       return (mid_right.data - sorted_vertices[1]->data) /
-             (mid_right.coord[0] - sorted_vertices[1]->coord[0]);
+             max_ff(mid_right.coord[0] - sorted_vertices[1]->coord[0], 1.0);
     }
 
     VertexOutputType mid_left = left + left_add * distance_min_to_mid;
     return (sorted_vertices[1]->data - mid_left.data) /
-           (sorted_vertices[1]->coord[0] - mid_left.coord[0]);
+           max_ff(sorted_vertices[1]->coord[0] - mid_left.coord[0], 1.0);
   }
 
   /**
