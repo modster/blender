@@ -80,8 +80,6 @@ static void init_vcol_format(GPUVertFormat *format,
 {
   GPU_vertformat_deinterleave(format);
 
-  /* note that there are two vcol types that work across point and corner domains */
-
   const uint32_t vcol_layers = cache->cd_used.vcol;
 
   blender::Vector<VColRef> refs = get_vcol_refs(cd_vdata, cd_ldata, vcol_layers);

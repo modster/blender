@@ -1078,7 +1078,7 @@ static SculptUndoNode *sculpt_undo_alloc_node(Object *ob, PBVHNode *node, Sculpt
       usculpt->undo_size += alloc_size;
 
       /* FIXME: Should explain why this is allocated here, to be freed in
-       * `SCULPT_undo_push_end_ex(ob)`? */
+       * `SCULPT_undo_push_end_ex()`? */
       alloc_size = sizeof(*unode->no) * (size_t)allvert;
       unode->no = MEM_callocN(alloc_size, "SculptUndoNode.no");
       usculpt->undo_size += alloc_size;

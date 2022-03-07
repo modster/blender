@@ -474,7 +474,7 @@ static void get_domains_types(AttributeDomain domains[ATTR_DOMAIN_NUM])
     domains[i] = i;
   }
 
-  /* swap corner and face */
+  /* Swap corner and face. */
   SWAP(AttributeDomain, domains[ATTR_DOMAIN_FACE], domains[ATTR_DOMAIN_CORNER]);
 }
 

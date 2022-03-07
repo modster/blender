@@ -517,8 +517,8 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
   const CustomData *cd_vdata = mesh_cd_vdata_get_from_mesh(me_final);
   const CustomData *cd_edata = mesh_cd_edata_get_from_mesh(me_final);
 
-  /* create a local copy of mesh with final customdata domains
-     we can query */
+  /* Create a local copy of mesh with final customdata domains
+     we can query. */
   Mesh query_mesh = *me;
   BKE_id_attribute_copy_domains_temp(&query_mesh.id, cd_vdata, cd_edata, cd_ldata, cd_pdata, NULL);
 
@@ -652,9 +652,9 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
             break;
           }
 
-          /* note that attr->type will always be CD_PROP_COLOR even for
+          /* Note: attr->type will always be CD_PROP_COLOR even for
              CD_MLOOPCOL layers, see node_shader_gpu_vertex_color in
-             node_shader_vertex_color.cc
+             node_shader_vertex_color.cc.
            */
           case CD_MCOL:
           case CD_MLOOPCOL:
@@ -680,7 +680,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
                               layer_i;
               }
 
-              /* Note that this is not the same as the layer_i below. */
+              /* Note: this is not the same as the layer_i below. */
               if (layer_i != -1) {
                 layer = (domain == ATTR_DOMAIN_POINT ? cd_vdata : cd_ldata)->layers + layer_i;
               }

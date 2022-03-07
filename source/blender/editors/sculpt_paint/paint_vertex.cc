@@ -373,7 +373,6 @@ static Color vpaint_blend_cpp(const VPaint *vp,
 
   Color color_blend = ED_vpaint_blend_tool2<Color, Traits>(
       blend, color_curr, color_paint, alpha_i);
-  // = Color::blendTool(blend, color_curr, color_paint, alpha_i);
 
   /* If no accumulate, clip color adding with `color_orig` & `color_test`. */
   if (!brush_use_accumulate(vp)) {
@@ -424,7 +423,6 @@ static uint vpaint_blend(const VPaint *vp,
                          uint color_orig,
                          uint color_paint,
                          const int alpha_i,
-                         /* pre scaled from [0-1] --> [0-255] */
                          const int brush_alpha_value_i)
 {
   return color2uint(vpaint_blend_cpp<Color4b, ByteTraits>(vp,
@@ -2254,7 +2252,6 @@ static void do_wpaint_brush_calc_average_weight_cb_ex(
           BKE_brush_curve_strength(data->brush, sqrtf(test.dist), cache->radius) > 0.0) {
         const int v_index = has_grids ? data->me->mloop[vd.grid_indices[vd.g]].v :
                                         vd.vert_indices[vd.i];
-        // const float grid_alpha = has_grids ? 1.0f / vd.gridsize : 1.0f;
         const char v_flag = data->me->mvert[v_index].flag;
 
         /* If the vertex is selected. */
@@ -2784,8 +2781,6 @@ extern "C" static int vpaint_mode_toggle_exec(bContext *C, wmOperator *op)
 
   WM_event_add_notifier(C, NC_SCENE | ND_MODE, scene);
 
-  // WM_msg_publish_rna_prop(mbus, &ob->id, ob, Object, mode);
-
   WM_toolsystem_update_from_context_view3d(C);
 
   return OPERATOR_FINISHED;
@@ -2904,11 +2899,9 @@ static void *vpaint_init_vpaint(bContext *C,
    * if not we can skip face map trickiness */
   if (vertex_paint_use_fast_update_check(ob)) {
     vpd->use_fast_update = true;
-    // printf("Fast update!\n");
   }
   else {
     vpd->use_fast_update = false;
-    // printf("No fast update!\n");
   }
 
   /* to keep tracked of modified loops for shared vertex color blending */
@@ -3583,7 +3576,6 @@ static float tex_color_alpha_ubyte_2(VPaint *vp,
   mul_v3_v3(rgba_br, rgba);
 
   *r_color = fromFloat<Color>(rgba_br);
-  // rgb_float_to_uchar((uchar *)r_color, rgba_br);
   return rgba[3];
 }
 
