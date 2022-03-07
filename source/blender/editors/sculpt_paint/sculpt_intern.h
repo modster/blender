@@ -870,6 +870,7 @@ float SCULPT_vertex_mask_get(struct SculptSession *ss, int index);
 void SCULPT_vertex_color_get(SculptSession *ss, int index, float r_color[4]);
 void SCULPT_vertex_color_set(SculptSession *ss, int index, const float color[4]);
 bool SCULPT_has_colors(const SculptSession *ss);
+bool SCULPT_has_loop_colors(const struct Object *ob);
 
 const float *SCULPT_vertex_persistent_co_get(SculptSession *ss, int index);
 void SCULPT_vertex_persistent_normal_get(SculptSession *ss, int index, float no[3]);
@@ -1117,10 +1118,10 @@ bool SCULPT_search_sphere_cb(PBVHNode *node, void *data_v);
 bool SCULPT_search_circle_cb(PBVHNode *node, void *data_v);
 
 /**
- * Initialize a point-in-brush test with a given falloff shape
+ * Initialize a point-in-brush test with a given falloff shape.
  *
- * \param falloff_shape PAINT_FALLOFF_SHAPE_SPHERE or PAINT_FALLOFF_SHAPE_TUBE
- * \return The brush falloff function
+ * \param falloff_shape: #PAINT_FALLOFF_SHAPE_SPHERE or #PAINT_FALLOFF_SHAPE_TUBE.
+ * \return The brush falloff function.
  */
 SculptBrushTestFn SCULPT_brush_test_init_with_falloff_shape(SculptSession *ss,
                                                             SculptBrushTest *test,

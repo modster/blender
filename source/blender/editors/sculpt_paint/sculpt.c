@@ -144,6 +144,14 @@ const float *SCULPT_vertex_co_get(SculptSession *ss, int index)
   return NULL;
 }
 
+bool SCULPT_has_loop_colors(const Object *ob)
+{
+  Mesh *me = BKE_object_get_original_mesh(ob);
+  CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
+
+  return layer && BKE_id_attribute_domain(&me->id, layer) == ATTR_DOMAIN_CORNER;
+}
+
 bool SCULPT_has_colors(const SculptSession *ss)
 {
   return ss->vcol || ss->mcol;
@@ -2650,13 +2658,13 @@ static void update_sculpt_normal(Sculpt *sd, Object *ob, PBVHNode **nodes, int t
 static void calc_local_y(ViewContext *vc, const float center[3], float y[3])
 {
   Object *ob = vc->obact;
-  float loc[3], mval_f[2] = {0.0f, 1.0f};
-  float zfac;
+  float loc[3];
+  const float xy_delta[2] = {0.0f, 1.0f};
 
   mul_v3_m4v3(loc, ob->imat, center);
-  zfac = ED_view3d_calc_zfac(vc->rv3d, loc, NULL);
+  const float zfac = ED_view3d_calc_zfac(vc->rv3d, loc);
 
-  ED_view3d_win_to_delta(vc->region, mval_f, y, zfac);
+  ED_view3d_win_to_delta(vc->region, xy_delta, zfac, y);
   normalize_v3(y);
 
   add_v3_v3(y, ob->loc);
@@ -3165,7 +3173,8 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
 
   /* Check for unsupported features. */
   PBVHType type = BKE_pbvh_type(ss->pbvh);
-  if (SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool)) {
+
+  if (SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool) && SCULPT_has_loop_colors(ob)) {
     if (type != PBVH_FACES) {
       return;
     }

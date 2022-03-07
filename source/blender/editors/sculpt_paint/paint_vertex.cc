@@ -4089,7 +4089,13 @@ extern "C" static int vpaint_invoke(bContext *C, wmOperator *op, const wmEvent *
                                     vpaint_stroke_done,
                                     event->type);
 
-  SCULPT_undo_push_begin(CTX_data_active_object(C), "Vertex Paint");
+  Object *ob = CTX_data_active_object(C);
+
+  if (SCULPT_has_loop_colors(ob) && ob->sculpt->pbvh) {
+    BKE_pbvh_ensure_node_loops(ob->sculpt->pbvh, BKE_object_get_original_mesh(ob));
+  }
+
+  SCULPT_undo_push_begin(ob, "Vertex Paint");
 
   if ((retval = op->type->modal(C, op, event)) == OPERATOR_FINISHED) {
     paint_stroke_free(C, op, (PaintStroke *)op->customdata);
