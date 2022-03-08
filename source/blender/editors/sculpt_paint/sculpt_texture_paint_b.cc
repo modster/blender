@@ -469,6 +469,8 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
   int pixels_added = 0;
   Bucket bucket;
   for (int y_bucket = 0; y_bucket < image_buffer->y; y_bucket += Bucket::Size) {
+    printf("%d: %d pixels added.\n", y_bucket, 
+    pixels_added);
     for (int x_bucket = 0; x_bucket < image_buffer->x; x_bucket += Bucket::Size) {
       bucket.entries.clear();
       BLI_rctf_init(&bucket.bounds,
@@ -476,8 +478,7 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
                     float(x_bucket + Bucket::Size) / image_buffer->x,
                     float(y_bucket) / image_buffer->y,
                     float(y_bucket + Bucket::Size) / image_buffer->y);
-      print_rctf_id(&bucket.bounds);
-      printf("%d pixels already added.\n", pixels_added);
+      // print_rctf_id(&bucket.bounds);
 
       for (int n = 0; n < nodes_to_initialize.size(); n++) {
         PBVHNode *node = nodes_to_initialize[n];
@@ -523,7 +524,7 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
         }
         BKE_pbvh_vertex_iter_end;
       }
-      printf("Loaded %ld entries in bucket\n", bucket.entries.size());
+      // printf("Loaded %ld entries in bucket\n", bucket.entries.size());
       if (bucket.entries.size() == 0) {
         continue;
       }
