@@ -3171,6 +3171,10 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
     return;
   }
 
+  if (brush->sculpt_tool == SCULPT_TOOL_TEXTURE_PAINT && type != PBVH_FACES) {
+    return;
+  }
+
   /* Build a list of all nodes that are potentially within the brush's area of influence */
 
   if (SCULPT_tool_needs_all_pbvh_nodes(brush)) {
@@ -3214,6 +3218,11 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
       /* By default create a new Face Sets. */
       ss->cache->paint_face_set = SCULPT_face_set_next_available_get(ss);
     }
+  }
+
+  if (brush->sculpt_tool == SCULPT_TOOL_TEXTURE_PAINT) {
+    /* TODO should perhaps move to higher level.... doing this per step is not needed. */
+    SCULPT_init_texture_paint(ob);
   }
 
   /* For anchored brushes with spherical falloff, we start off with zero radius, thus we have no
