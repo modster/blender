@@ -267,13 +267,17 @@ enum {
   KM_RELEASE = 2,
   KM_CLICK = 3,
   KM_DBL_CLICK = 4,
+  /**
+   * \note The cursor location at the point dragging starts is set to #wmEvent.prev_click_xy
+   * some operators such as box selection should use this location instead of #wmEvent.xy.
+   */
   KM_CLICK_DRAG = 5,
 };
 
 /**
  * #wmKeyMapItem.direction
  *
- * Value of tweaks and line gestures. #KM_ANY (-1) works for this case too.
+ * Direction set for #KM_CLICK_DRAG key-map items. #KM_ANY (-1) to ignore direction.
  */
 enum {
   KM_DIRECTION_N = 1,
@@ -635,7 +639,7 @@ typedef struct wmTabletData {
  * Notes:
  *
  * - The previous values are only set for mouse button and keyboard events.
- *   See: #ISMOUSE_BUTTON & #ISKEYBOARD macros.
+ *   See: #ISKEYBOARD_OR_BUTTON macro.
  *
  * - Previous x/y are exceptions: #wmEvent.prev
  *   these are set on mouse motion, see #MOUSEMOVE & track-pad events.
@@ -1106,8 +1110,7 @@ typedef struct wmDrag {
 
   /** If no icon but imbuf should be drawn around cursor. */
   struct ImBuf *imb;
-  float scale;
-  int sx, sy;
+  float imbuf_scale;
 
   wmDragActiveDropState drop_state;
 
