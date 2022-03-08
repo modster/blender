@@ -53,6 +53,7 @@ struct NodeData {
 
   Vector<PixelData> pixels;
   rcti dirty_region;
+  rctf uv_region;
 
   NodeData()
   {
@@ -449,6 +450,7 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
     }
     node_data = MEM_new<NodeData>(__func__);
     BKE_pbvh_node_texture_paint_data_set(node, node_data, NodeData::free_func);
+    BLI_rctf_init_minmax(&node_data->uv_region);
     nodes_to_initialize.append(node);
   }
   if (nodes_to_initialize.size() == 0) {
@@ -480,6 +482,13 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
       for (int n = 0; n < nodes_to_initialize.size(); n++) {
         PBVHNode *node = nodes_to_initialize[n];
         PBVHVertexIter vd;
+        NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
+        if (BLI_rctf_is_valid(&node_data->uv_region)) {
+          if (!BLI_rctf_isect(&bucket.bounds, &node_data->uv_region, nullptr)) {
+            continue;
+          }
+        }
+
         BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
           MeshElemMap *vert_map = &ss->pmap[vd.index];
           for (int j = 0; j < ss->pmap[vd.index].count; j++) {
@@ -500,6 +509,9 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
               BLI_rctf_do_minmax_v(&poly_bound, v1_uv);
               BLI_rctf_do_minmax_v(&poly_bound, v2_uv);
               BLI_rctf_do_minmax_v(&poly_bound, v3_uv);
+              BLI_rctf_do_minmax_v(&node_data->uv_region, v1_uv);
+              BLI_rctf_do_minmax_v(&node_data->uv_region, v2_uv);
+              BLI_rctf_do_minmax_v(&node_data->uv_region, v3_uv);
             }
             if (BLI_rctf_isect(&bucket.bounds, &poly_bound, nullptr)) {
               BucketEntry entry;
