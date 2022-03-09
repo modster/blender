@@ -2235,6 +2235,7 @@ static float brush_strength(const Sculpt *sd,
     case SCULPT_TOOL_SLIDE_RELAX:
       return alpha * pressure * overlap * feather * 2.0f;
     case SCULPT_TOOL_PAINT:
+    case SCULPT_TOOL_TEXTURE_PAINT:
       final_pressure = pressure * pressure;
       return final_pressure * overlap * feather;
     case SCULPT_TOOL_SMEAR:

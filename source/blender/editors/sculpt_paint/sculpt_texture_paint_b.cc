@@ -68,8 +68,8 @@ struct NodeData {
     flags.dirty = false;
     for (PixelData &pixel : pixels) {
       if (pixel.flags.dirty) {
-        const int pixel_offset = (pixel.pixel_pos[1] * image_buffer.x + pixel.pixel_pos[0]) * 4;
-        copy_v4_v4(&image_buffer.rect_float[pixel_offset], pixel.content);
+        const int pixel_offset = (pixel.pixel_pos[1] * image_buffer.x + pixel.pixel_pos[0]);
+        copy_v4_v4(&image_buffer.rect_float[pixel_offset * 4], pixel.content);
         pixel.flags.dirty = false;
       }
     }
@@ -91,7 +91,13 @@ struct NodeData {
   }
 };
 
-namespace shaders {
+struct TexturePaintingUserData {
+  Object *ob;
+  Brush *brush;
+  PBVHNode **nodes;
+};
+
+namespace rasterization {
 
 using namespace imbuf::rasterizer;
 
@@ -195,91 +201,6 @@ class NodeDataDrawingTarget : public AbstractDrawingTarget<NodeDataPair, NodeDat
 
 using RasterizerType = Rasterizer<VertexShader, FragmentShader, AddPixel, NodeDataDrawingTarget>;
 
-}  // namespace shaders
-
-void NodeData::init_pixels_rasterization(Object *ob, PBVHNode *node, ImBuf *image_buffer)
-{
-  Mesh *mesh = static_cast<Mesh *>(ob->data);
-  MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
-  if (ldata_uv == nullptr) {
-    return;
-  }
-
-  shaders::RasterizerType rasterizer;
-  shaders::NodeDataPair node_data_pair;
-  rasterizer.vertex_shader().image_size = float2(image_buffer->x, image_buffer->y);
-  rasterizer.fragment_shader().image_buffer = image_buffer;
-  node_data_pair.node_data = this;
-  node_data_pair.image_buffer = image_buffer;
-  rasterizer.activate_drawing_target(&node_data_pair);
-
-  SculptSession *ss = ob->sculpt;
-  MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
-
-  PBVHVertexIter vd;
-  BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
-    MeshElemMap *vert_map = &ss->pmap[vd.index];
-    for (int j = 0; j < ss->pmap[vd.index].count; j++) {
-      const MPoly *p = &ss->mpoly[vert_map->indices[j]];
-      if (p->totloop < 3) {
-        continue;
-      }
-
-      const MLoop *loopstart = &ss->mloop[p->loopstart];
-      for (int triangle = 0; triangle < p->totloop - 2; triangle++) {
-        const int v1_index = loopstart[0].v;
-        const int v2_index = loopstart[triangle + 1].v;
-        const int v3_index = loopstart[triangle + 2].v;
-        const int v1_loop_index = p->loopstart;
-        const int v2_loop_index = p->loopstart + triangle + 1;
-        const int v3_loop_index = p->loopstart + triangle + 2;
-
-        shaders::VertexInput v1(mvert[v1_index].co, ldata_uv[v1_loop_index].uv);
-        shaders::VertexInput v2(mvert[v2_index].co, ldata_uv[v2_loop_index].uv);
-        shaders::VertexInput v3(mvert[v3_index].co, ldata_uv[v3_loop_index].uv);
-        rasterizer.draw_triangle(v1, v2, v3);
-      }
-    }
-  }
-  BKE_pbvh_vertex_iter_end;
-  rasterizer.deactivate_drawing_target();
-}
-
-struct TexturePaintingUserData {
-  Object *ob;
-  Brush *brush;
-  PBVHNode **nodes;
-};
-
-static void do_task_cb_ex(void *__restrict userdata,
-                          const int n,
-                          const TaskParallelTLS *__restrict UNUSED(tls))
-{
-  TexturePaintingUserData *data = static_cast<TexturePaintingUserData *>(userdata);
-  Object *ob = data->ob;
-  SculptSession *ss = ob->sculpt;
-  const Brush *brush = data->brush;
-  PBVHNode *node = data->nodes[n];
-  NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
-  BLI_assert(node_data != nullptr);
-
-  SculptBrushTest test;
-  SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
-      ss, &test, brush->falloff_shape);
-
-  for (PixelData &pixel : node_data->pixels) {
-    if (!sculpt_brush_test_sq_fn(&test, pixel.local_pos)) {
-      continue;
-    }
-    const float falloff_strength = BKE_brush_curve_strength(brush, sqrtf(test.dist), test.radius);
-    interp_v3_v3v3(pixel.content, pixel.content, brush->rgb, falloff_strength);
-    pixel.content[3] = 1.0f;
-    pixel.flags.dirty = true;
-    BLI_rcti_do_minmax_v(&node_data->dirty_region, pixel.pixel_pos);
-    node_data->flags.dirty = true;
-  }
-}
-
 static void init_rasterization_task_cb_ex(void *__restrict userdata,
                                           const int n,
                                           const TaskParallelTLS *__restrict UNUSED(tls))
@@ -316,9 +237,97 @@ static void init_using_rasterization(Object *ob, int totnode, PBVHNode **nodes)
   TIMEIT_END(init_using_rasterization);
 }
 
+}  // namespace rasterization
+void NodeData::init_pixels_rasterization(Object *ob, PBVHNode *node, ImBuf *image_buffer)
+{
+  using namespace rasterization;
+  Mesh *mesh = static_cast<Mesh *>(ob->data);
+  MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
+  if (ldata_uv == nullptr) {
+    return;
+  }
+
+  RasterizerType rasterizer;
+  NodeDataPair node_data_pair;
+  rasterizer.vertex_shader().image_size = float2(image_buffer->x, image_buffer->y);
+  rasterizer.fragment_shader().image_buffer = image_buffer;
+  node_data_pair.node_data = this;
+  node_data_pair.image_buffer = image_buffer;
+  rasterizer.activate_drawing_target(&node_data_pair);
+
+  SculptSession *ss = ob->sculpt;
+  MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
+
+  PBVHVertexIter vd;
+  BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
+    MeshElemMap *vert_map = &ss->pmap[vd.index];
+    for (int j = 0; j < ss->pmap[vd.index].count; j++) {
+      const MPoly *p = &ss->mpoly[vert_map->indices[j]];
+      if (p->totloop < 3) {
+        continue;
+      }
+
+      const MLoop *loopstart = &ss->mloop[p->loopstart];
+      for (int triangle = 0; triangle < p->totloop - 2; triangle++) {
+        const int v1_index = loopstart[0].v;
+        const int v2_index = loopstart[triangle + 1].v;
+        const int v3_index = loopstart[triangle + 2].v;
+        const int v1_loop_index = p->loopstart;
+        const int v2_loop_index = p->loopstart + triangle + 1;
+        const int v3_loop_index = p->loopstart + triangle + 2;
+
+        VertexInput v1(mvert[v1_index].co, ldata_uv[v1_loop_index].uv);
+        VertexInput v2(mvert[v2_index].co, ldata_uv[v2_loop_index].uv);
+        VertexInput v3(mvert[v3_index].co, ldata_uv[v3_loop_index].uv);
+        rasterizer.draw_triangle(v1, v2, v3);
+      }
+    }
+  }
+  BKE_pbvh_vertex_iter_end;
+  rasterizer.deactivate_drawing_target();
+}
+
+namespace painting {
+static void do_task_cb_ex(void *__restrict userdata,
+                          const int n,
+                          const TaskParallelTLS *__restrict UNUSED(tls))
+{
+  TexturePaintingUserData *data = static_cast<TexturePaintingUserData *>(userdata);
+  Object *ob = data->ob;
+  SculptSession *ss = ob->sculpt;
+  const Brush *brush = data->brush;
+  PBVHNode *node = data->nodes[n];
+  NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
+  BLI_assert(node_data != nullptr);
+
+  SculptBrushTest test;
+  SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
+      ss, &test, brush->falloff_shape);
+
+  float3 brush_srgb(brush->rgb[0], brush->rgb[1], brush->rgb[2]);
+  float3 brush_linear;
+  srgb_to_linearrgb_v3_v3(brush_linear, brush_srgb);
+
+  const float brush_strength = ss->cache->bstrength;
+
+  for (PixelData &pixel : node_data->pixels) {
+    if (!sculpt_brush_test_sq_fn(&test, pixel.local_pos)) {
+      continue;
+    }
+    const float falloff_strength = BKE_brush_curve_strength(brush, sqrtf(test.dist), test.radius);
+    interp_v3_v3v3(pixel.content, pixel.content, brush_linear, falloff_strength * brush_strength);
+    pixel.content[3] = 1.0f;
+    pixel.flags.dirty = true;
+    BLI_rcti_do_minmax_v(&node_data->dirty_region, pixel.pixel_pos);
+    node_data->flags.dirty = true;
+  }
+}
+}  // namespace painting
+
 struct BucketEntry {
   PBVHNode *node;
   const MPoly *poly;
+  rctf uv_bounds;
 };
 struct Bucket {
   static const int Size = 16;
@@ -336,6 +345,9 @@ static bool init_using_intersection(SculptSession *ss,
 {
   const int pixel_offset = xy[1] * image_buffer->x + xy[0];
   for (BucketEntry &entry : bucket.entries) {
+    if (!BLI_rctf_isect_pt_v(&entry.uv_bounds, uv)) {
+      continue;
+    }
     const MPoly *p = entry.poly;
 
     const MLoop *loopstart = &ss->mloop[p->loopstart];
@@ -365,8 +377,7 @@ static bool init_using_intersection(SculptSession *ss,
       PixelData new_pixel;
       new_pixel.local_pos = local_pos;
       new_pixel.pixel_pos = xy;
-      copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
-      new_pixel.content = float4(image_buffer->rect_float[pixel_offset * 4]);
+      new_pixel.content = float4(&image_buffer->rect_float[pixel_offset * 4]);
       new_pixel.flags.dirty = false;
 
       PBVHNode *node = entry.node;
@@ -424,8 +435,7 @@ static bool init_using_intersection(SculptSession *ss,
         PixelData new_pixel;
         new_pixel.local_pos = local_pos;
         new_pixel.pixel_pos = xy;
-        new_pixel.content = float4(image_buffer->rect_float[pixel_offset * 4]);
-        copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
+        new_pixel.content = float4(&image_buffer->rect_float[pixel_offset * 4]);
         new_pixel.flags.dirty = false;
         node_data->pixels.append(new_pixel);
         return true;
@@ -469,8 +479,7 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
   int pixels_added = 0;
   Bucket bucket;
   for (int y_bucket = 0; y_bucket < image_buffer->y; y_bucket += Bucket::Size) {
-    printf("%d: %d pixels added.\n", y_bucket, 
-    pixels_added);
+    printf("%d: %d pixels added.\n", y_bucket, pixels_added);
     for (int x_bucket = 0; x_bucket < image_buffer->x; x_bucket += Bucket::Size) {
       bucket.entries.clear();
       BLI_rctf_init(&bucket.bounds,
@@ -500,24 +509,17 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
 
             rctf poly_bound;
             BLI_rctf_init_minmax(&poly_bound);
-            for (int triangle = 0; triangle < p->totloop - 2; triangle++) {
-              const int v1_loop_index = p->loopstart;
-              const int v2_loop_index = p->loopstart + triangle + 1;
-              const int v3_loop_index = p->loopstart + triangle + 2;
-              const float2 v1_uv = ldata_uv[v1_loop_index].uv;
-              const float2 v2_uv = ldata_uv[v2_loop_index].uv;
-              const float2 v3_uv = ldata_uv[v3_loop_index].uv;
-              BLI_rctf_do_minmax_v(&poly_bound, v1_uv);
-              BLI_rctf_do_minmax_v(&poly_bound, v2_uv);
-              BLI_rctf_do_minmax_v(&poly_bound, v3_uv);
-              BLI_rctf_do_minmax_v(&node_data->uv_region, v1_uv);
-              BLI_rctf_do_minmax_v(&node_data->uv_region, v2_uv);
-              BLI_rctf_do_minmax_v(&node_data->uv_region, v3_uv);
+            for (int l = 0; l < p->totloop; l++) {
+              const int v_loop_index = p->loopstart + l;
+              const float2 v_uv = ldata_uv[v_loop_index].uv;
+              BLI_rctf_do_minmax_v(&poly_bound, v_uv);
+              BLI_rctf_do_minmax_v(&node_data->uv_region, v_uv);
             }
             if (BLI_rctf_isect(&bucket.bounds, &poly_bound, nullptr)) {
               BucketEntry entry;
               entry.node = node;
               entry.poly = p;
+              entry.uv_bounds = poly_bound;
               bucket.entries.append(entry);
             }
           }
@@ -604,7 +606,7 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
   BKE_pbvh_parallel_range_settings(&settings, true, totnode);
 
   TIMEIT_START(texture_painting);
-  BLI_task_parallel_range(0, totnode, &data, do_task_cb_ex, &settings);
+  BLI_task_parallel_range(0, totnode, &data, painting::do_task_cb_ex, &settings);
   TIMEIT_END(texture_painting);
 
   ss->mode.texture_paint.drawing_target = nullptr;
@@ -623,7 +625,7 @@ void SCULPT_init_texture_paint(Object *ob)
   BKE_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
   const bool do_rasterization = false;
   if (do_rasterization) {
-    init_using_rasterization(ob, totnode, nodes);
+    rasterization::init_using_rasterization(ob, totnode, nodes);
   }
   else {
     init_using_intersection(ob, totnode, nodes);
