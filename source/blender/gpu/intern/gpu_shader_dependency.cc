@@ -379,7 +379,7 @@ BuiltinBits gpu_shader_dependency_get_builtins(const StringRefNull shader_source
     return shader::BuiltinBits::NONE;
   }
   if (g_sources->contains(shader_source_name) == false) {
-    std::cout << "Error: Could not find \"" << shader_source_name
+    std::cerr << "Error: Could not find \"" << shader_source_name
               << "\" in the list of registered source.\n";
     BLI_assert(0);
     return shader::BuiltinBits::NONE;

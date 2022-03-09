@@ -354,6 +354,8 @@ set(GLSL_SRC
   shaders/gpu_shader_gpencil_stroke_frag.glsl
   shaders/gpu_shader_gpencil_stroke_geom.glsl
 
+  shaders/gpu_shader_sculpt_pixel_extraction_comp.glsl
+
   shaders/gpu_shader_cfg_world_clip_lib.glsl
   shaders/gpu_shader_colorspace_lib.glsl
 
@@ -433,6 +435,7 @@ set(SRC_SHADER_CREATE_INFOS
   shaders/infos/gpu_shader_simple_lighting_info.hh
   shaders/infos/gpu_shader_text_info.hh
   shaders/infos/gpu_srgb_to_framebuffer_space_info.hh
+  shaders/infos/gpu_shader_sculpt_pixel_extraction_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")

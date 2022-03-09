@@ -332,6 +332,9 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
 
     [GPU_SHADER_GPENCIL_STROKE] = {.name = "GPU_SHADER_GPENCIL_STROKE",
                                    .create_info = "gpu_shader_gpencil_stroke"},
+    [GPU_SHADER_SCULPT_PIXEL_EXTRACTION] = {.name = "GPU_SHADER_SCULPT_PIXEL_EXTRACTION",
+                                            .create_info = "gpu_shader_sculpt_pixel_extraction"}
+
 };
 
 GPUShader *GPU_shader_get_builtin_shader_with_config(eGPUBuiltinShader shader,

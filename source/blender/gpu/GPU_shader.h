@@ -341,6 +341,7 @@ typedef enum eGPUBuiltinShader {
   GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SIZE, /* Uniformly scaled */
   /* grease pencil drawing */
   GPU_SHADER_GPENCIL_STROKE,
+  GPU_SHADER_SCULPT_PIXEL_EXTRACTION,
   /* specialized for widget drawing */
   GPU_SHADER_2D_AREA_BORDERS,
   GPU_SHADER_2D_WIDGET_BASE,

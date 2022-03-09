@@ -433,8 +433,10 @@ inline bool validate_data_format(eGPUTextureFormat tex_format, eGPUDataFormat da
     case GPU_RG16UI:
     case GPU_R32UI:
       return data_format == GPU_DATA_UINT;
-    case GPU_RG16I:
     case GPU_R16I:
+    case GPU_RG16I:
+    case GPU_RG32I:
+    case GPU_RGBA32I:
       return data_format == GPU_DATA_INT;
     case GPU_R8:
     case GPU_RG8:

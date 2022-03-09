@@ -66,3 +66,17 @@ struct MultiRectCallData {
   float4 calls_data[MAX_CALLS * 3];
 };
 BLI_STATIC_ASSERT_ALIGN(struct MultiRectCallData, 16)
+
+struct TexturePaintPolygon {
+  float2 uv[3];
+  int pbvh_node_index;
+  int poly_index;
+};
+BLI_STATIC_ASSERT_ALIGN(struct TexturePaintPolygon, 16)
+
+struct TexturePaintPixel {
+  int pbvh_node_index;
+  int poly_index;
+  int2 _pad;
+};
+BLI_STATIC_ASSERT_ALIGN(struct TexturePaintPixel, 16)
