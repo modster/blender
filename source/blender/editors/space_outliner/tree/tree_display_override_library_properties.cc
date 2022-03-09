@@ -25,12 +25,12 @@ namespace blender::ed::outliner {
 /* Convenience/readability. */
 template<typename T> using List = ListBaseWrapper<T>;
 
-TreeDisplayOverrideLibrary::TreeDisplayOverrideLibrary(SpaceOutliner &space_outliner)
+TreeDisplayOverrideLibraryProperties::TreeDisplayOverrideLibraryProperties(SpaceOutliner &space_outliner)
     : AbstractTreeDisplay(space_outliner)
 {
 }
 
-ListBase TreeDisplayOverrideLibrary::buildTree(const TreeSourceData &source_data)
+ListBase TreeDisplayOverrideLibraryProperties::buildTree(const TreeSourceData &source_data)
 {
   ListBase tree = {nullptr};
 
@@ -94,7 +94,7 @@ ListBase TreeDisplayOverrideLibrary::buildTree(const TreeSourceData &source_data
   return tree;
 }
 
-TreeElement *TreeDisplayOverrideLibrary::add_library_contents(Main &mainvar,
+TreeElement *TreeDisplayOverrideLibraryProperties::add_library_contents(Main &mainvar,
                                                               ListBase &lb,
                                                               Library *lib)
 {
@@ -170,7 +170,7 @@ TreeElement *TreeDisplayOverrideLibrary::add_library_contents(Main &mainvar,
   return tenlib;
 }
 
-short TreeDisplayOverrideLibrary::id_filter_get() const
+short TreeDisplayOverrideLibraryProperties::id_filter_get() const
 {
   if (space_outliner_.filter & SO_FILTER_ID_TYPE) {
     return space_outliner_.filter_id_type;
@@ -178,7 +178,7 @@ short TreeDisplayOverrideLibrary::id_filter_get() const
   return 0;
 }
 
-bool TreeDisplayOverrideLibrary::override_library_id_filter_poll(const Library *lib, ID *id) const
+bool TreeDisplayOverrideLibraryProperties::override_library_id_filter_poll(const Library *lib, ID *id) const
 {
   if (id->lib != lib) {
     return false;

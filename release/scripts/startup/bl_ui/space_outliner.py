@@ -22,6 +22,8 @@ class OUTLINER_HT_header(Header):
 
         if display_mode == 'DATA_API':
             OUTLINER_MT_editor_menus.draw_collapsible(context, layout)
+        if display_mode == 'LIBRARY_OVERRIDES':
+            layout.prop(space, "lib_override_view_mode", text="")
 
         layout.separator_spacer()
 

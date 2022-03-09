@@ -127,11 +127,11 @@ class TreeDisplayLibraries final : public AbstractTreeDisplay {
 /* Library Overrides Tree-Display. */
 
 /**
- * \brief Tree-Display for the Library Overrides display mode.
+ * \brief Tree-Display for the Library Overrides display mode, Properties view mode.
  */
-class TreeDisplayOverrideLibrary final : public AbstractTreeDisplay {
+class TreeDisplayOverrideLibraryProperties final : public AbstractTreeDisplay {
  public:
-  TreeDisplayOverrideLibrary(SpaceOutliner &space_outliner);
+  TreeDisplayOverrideLibraryProperties(SpaceOutliner &space_outliner);
 
   ListBase buildTree(const TreeSourceData &source_data) override;
 
@@ -139,6 +139,16 @@ class TreeDisplayOverrideLibrary final : public AbstractTreeDisplay {
   TreeElement *add_library_contents(Main &, ListBase &, Library *);
   bool override_library_id_filter_poll(const Library *lib, ID *id) const;
   short id_filter_get() const;
+};
+
+/**
+ * \brief Tree-Display for the Library Overrides display mode, Hierarchy view mode.
+ */
+class TreeDisplayOverrideLibraryHierarchy final : public AbstractTreeDisplay {
+ public:
+  TreeDisplayOverrideLibraryHierarchy(SpaceOutliner &space_outliner);
+
+  ListBase buildTree(const TreeSourceData &source_data) override;
 };
 
 /* -------------------------------------------------------------------- */
