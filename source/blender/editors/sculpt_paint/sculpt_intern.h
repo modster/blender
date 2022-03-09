@@ -1616,6 +1616,7 @@ void SCULPT_do_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode
 void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode);
 void SCULPT_init_texture_paint(Object *ob);
 void SCULPT_flush_texture_paint(Object *ob);
+void SCULPT_extract_pixels(Object *ob, PBVHNode **nodes, int totnode);
 
 /* Smear Brush. */
 void SCULPT_do_smear_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode);
