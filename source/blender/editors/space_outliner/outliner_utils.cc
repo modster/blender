@@ -390,8 +390,7 @@ bool outliner_is_element_visible(const TreeElement *te)
 
 bool outliner_is_element_in_view(const TreeElement *te, const View2D *v2d)
 {
-  /* TODO 1 row of padding? */
-  return te->ys + UI_UNIT_Y >= v2d->cur.ymin && te->ys <= v2d->cur.ymax;
+  return ((te->ys + UI_UNIT_Y) >= v2d->cur.ymin) && (te->ys <= v2d->cur.ymax);
 }
 
 bool outliner_item_is_co_over_name_icons(const TreeElement *te, float view_co_x)
