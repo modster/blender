@@ -182,7 +182,6 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
           new_pixel.local_pos = local_pos;
           new_pixel.pixel_pos = int2(x, y);
           new_pixel.content = float4(&image_buffer->rect_float[pixel_offset * 4]);
-          new_pixel.flags.dirty = false;
           node_data->pixels.append(new_pixel);
           pixels_added += 1;
 
