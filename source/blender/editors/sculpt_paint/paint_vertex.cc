@@ -150,6 +150,12 @@ struct NormalAnglePrecalc {
   float angle_range;
 };
 
+template<typename Color> struct VPaintModeData {
+  SculptVertexPaintGeomMap gmap;
+
+  Color *previous_color;
+};
+
 /* Returns number of elements. */
 static int get_vcol_elements(Mesh *me, size_t *r_elem_size)
 {
@@ -264,14 +270,14 @@ static void paint_last_stroke_update(Scene *scene, const float location[3])
   ups->last_stroke_valid = true;
 }
 
-extern "C" bool vertex_paint_mode_poll(bContext *C)
+bool vertex_paint_mode_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
 
   return ob && ob->mode == OB_MODE_VERTEX_PAINT && ((Mesh *)ob->data)->totpoly;
 }
 
-extern "C" static bool vertex_paint_poll_ex(bContext *C, bool check_tool)
+static bool vertex_paint_poll_ex(bContext *C, bool check_tool)
 {
   if (vertex_paint_mode_poll(C) && BKE_paint_brush(&CTX_data_tool_settings(C)->vpaint->paint)) {
     ScrArea *area = CTX_wm_area(C);
@@ -304,7 +310,7 @@ bool weight_paint_mode_poll(bContext *C)
   return ob && ob->mode == OB_MODE_WEIGHT_PAINT && ((Mesh *)ob->data)->totpoly;
 }
 
-extern "C" static bool weight_paint_poll_ex(bContext *C, bool check_tool)
+static bool weight_paint_poll_ex(bContext *C, bool check_tool)
 {
   Object *ob = CTX_data_active_object(C);
   ScrArea *area;
@@ -350,9 +356,10 @@ Color vpaint_get_current_col(Scene *scene, VPaint *vp, bool secondary)
   }
 }
 
-extern "C" uint vpaint_get_current_color(Scene *scene, VPaint *vp, bool secondary)
+uint vpaint_get_current_color(Scene *scene, VPaint *vp, bool secondary)
 {
-  Color4b col = vpaint_get_current_col<Color4b, ByteTraits, ATTR_DOMAIN_CORNER>(scene, vp, secondary);
+  Color4b col = vpaint_get_current_col<Color4b, ByteTraits, ATTR_DOMAIN_CORNER>(
+      scene, vp, secondary);
 
   return *(reinterpret_cast<uint *>(&col.r));
 }
@@ -366,7 +373,7 @@ static Color vpaint_blend_cpp(const VPaint *vp,
                               const typename Traits::ValueType alpha_i,
                               const typename Traits::BlendType brush_alpha_value_i)
 {
-  using Value = Traits::ValueType;
+  using Value = typename Traits::ValueType;
 
   const Brush *brush = vp->paint.brush;
   const IMB_BlendMode blend = (IMB_BlendMode)brush->blend;
@@ -2656,7 +2663,7 @@ static void wpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
   ob->sculpt->cache = NULL;
 }
 
-extern "C" static int wpaint_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+static int wpaint_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   int retval;
 
@@ -2682,7 +2689,7 @@ extern "C" static int wpaint_invoke(bContext *C, wmOperator *op, const wmEvent *
   return OPERATOR_RUNNING_MODAL;
 }
 
-extern "C" static int wpaint_exec(bContext *C, wmOperator *op)
+static int wpaint_exec(bContext *C, wmOperator *op)
 {
   op->customdata = paint_stroke_new(C,
                                     op,
@@ -2699,7 +2706,7 @@ extern "C" static int wpaint_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-extern "C" static void wpaint_cancel(bContext *C, wmOperator *op)
+static void wpaint_cancel(bContext *C, wmOperator *op)
 {
   Object *ob = CTX_data_active_object(C);
   if (ob->sculpt->cache) {
@@ -2710,7 +2717,7 @@ extern "C" static void wpaint_cancel(bContext *C, wmOperator *op)
   paint_stroke_cancel(C, op, (PaintStroke *)op->customdata);
 }
 
-extern "C" static int wpaint_modal(bContext *C, wmOperator *op, const wmEvent *event)
+static int wpaint_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   return paint_stroke_modal(C, op, event, (PaintStroke *)op->customdata);
 }
@@ -2744,7 +2751,7 @@ void PAINT_OT_weight_paint(wmOperatorType *ot)
 /**
  * \note Keep in sync with #wpaint_mode_toggle_exec
  */
-extern "C" static int vpaint_mode_toggle_exec(bContext *C, wmOperator *op)
+static int vpaint_mode_toggle_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
   Object *ob = CTX_data_active_object(C);
@@ -2932,9 +2939,7 @@ static void *vpaint_init_vpaint(bContext *C,
   return static_cast<void *>(vpd);
 }
 
-extern "C" static bool vpaint_stroke_test_start(bContext *C,
-                                                struct wmOperator *op,
-                                                const float mouse[2])
+static bool vpaint_stroke_test_start(bContext *C, struct wmOperator *op, const float mouse[2])
 {
   Scene *scene = CTX_data_scene(C);
   ToolSettings *ts = scene->toolsettings;
@@ -3006,8 +3011,8 @@ static void do_vpaint_brush_blur_loops(bContext *C,
                                        int totnode,
                                        Color *lcol)
 {
-  using Value = Traits::ValueType;
-  using Blend = Traits::BlendType;
+  using Value = typename Traits::ValueType;
+  using Blend = typename Traits::BlendType;
 
   SculptSession *ss = ob->sculpt;
 
@@ -3150,8 +3155,8 @@ static void do_vpaint_brush_blur_verts(bContext *C,
                                        int totnode,
                                        Color *lcol)
 {
-  using Value = Traits::ValueType;
-  using Blend = Traits::BlendType;
+  using Value = typename Traits::ValueType;
+  using Blend = typename Traits::BlendType;
 
   SculptSession *ss = ob->sculpt;
 
@@ -3296,8 +3301,8 @@ static void do_vpaint_brush_smear(bContext *C,
                                   int totnode,
                                   Color *lcol)
 {
-  using Value = Traits::ValueType;
-  using Blend = Traits::BlendType;
+  using Value = typename Traits::ValueType;
+  using Blend = typename Traits::BlendType;
 
   SculptSession *ss = ob->sculpt;
 
@@ -3477,8 +3482,8 @@ static void calculate_average_color(VPaintData<Color, Traits, domain> *vpd,
                                     PBVHNode **nodes,
                                     int totnode)
 {
-  using Blend = Traits::BlendType;
-  using Value = Traits::ValueType;
+  using Blend = typename Traits::BlendType;
+  using Value = typename Traits::ValueType;
 
   struct VPaintAverageAccum<Blend> *accum = (VPaintAverageAccum<Blend> *)MEM_mallocN(
       sizeof(*accum) * totnode, __func__);
@@ -3565,7 +3570,7 @@ static float tex_color_alpha_ubyte_2(VPaint *vp,
                                      const float v_co[3],
                                      Color *r_color)
 {
-  using Value = Traits::ValueType;
+  using Value = typename Traits::ValueType;
 
   Color4f rgba;
   Color4f rgba_br = toFloat(*r_color);
@@ -3579,12 +3584,6 @@ static float tex_color_alpha_ubyte_2(VPaint *vp,
   return rgba[3];
 }
 
-template<typename Color> struct VPaintModeData {
-  SculptVertexPaintGeomMap gmap;
-
-  Color *previous_color;
-};
-
 template<typename Color, typename Traits, AttributeDomain domain>
 static void vpaint_do_draw_intern(bContext *C,
                                   Sculpt *sd,
@@ -3596,7 +3595,7 @@ static void vpaint_do_draw_intern(bContext *C,
                                   int totnode,
                                   Color *lcol)
 {
-  using Value = Traits::ValueType;
+  using Value = typename Traits::ValueType;
 
   SculptSession *ss = ob->sculpt;
   const PBVHType pbvh_type = BKE_pbvh_type(ss->pbvh);
@@ -4068,7 +4067,7 @@ static void vpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
   ob->sculpt->cache = NULL;
 }
 
-extern "C" static int vpaint_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+static int vpaint_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   int retval;
 
@@ -4103,7 +4102,7 @@ extern "C" static int vpaint_invoke(bContext *C, wmOperator *op, const wmEvent *
   return OPERATOR_RUNNING_MODAL;
 }
 
-extern "C" static int vpaint_exec(bContext *C, wmOperator *op)
+static int vpaint_exec(bContext *C, wmOperator *op)
 {
   op->customdata = paint_stroke_new(C,
                                     op,
@@ -4120,7 +4119,7 @@ extern "C" static int vpaint_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-extern "C" static void vpaint_cancel(bContext *C, wmOperator *op)
+static void vpaint_cancel(bContext *C, wmOperator *op)
 {
   Object *ob = CTX_data_active_object(C);
   if (ob->sculpt->cache) {
@@ -4131,7 +4130,7 @@ extern "C" static void vpaint_cancel(bContext *C, wmOperator *op)
   paint_stroke_cancel(C, op, (PaintStroke *)op->customdata);
 }
 
-extern "C" static int vpaint_modal(bContext *C, wmOperator *op, const wmEvent *event)
+static int vpaint_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   return paint_stroke_modal(C, op, event, (PaintStroke *)op->customdata);
 }
