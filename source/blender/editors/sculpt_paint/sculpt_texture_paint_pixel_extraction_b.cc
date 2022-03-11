@@ -85,7 +85,6 @@ static bool init_using_intersection(SculptSession *ss,
       new_pixel.local_pos = local_pos;
       new_pixel.pixel_pos = xy;
       new_pixel.content = float4(&image_buffer->rect_float[pixel_offset * 4]);
-      new_pixel.flags.dirty = false;
 
       PBVHNode *node = entry.node;
       NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
@@ -114,6 +113,7 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
     return;
   }
 
+  TIMEIT_START(extract_pixels);
   Mesh *mesh = static_cast<Mesh *>(ob->data);
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
   if (ldata_uv == nullptr) {
@@ -188,14 +188,13 @@ static void init_using_intersection(Object *ob, int totnode, PBVHNode **nodes)
       }
     }
   }
+  TIMEIT_END(extract_pixels);
 }
 }  // namespace blender::ed::sculpt_paint::texture_paint::barycentric_extraction
 extern "C" {
 void SCULPT_extract_pixels(Object *ob, PBVHNode **nodes, int totnode)
 {
-  TIMEIT_START(extract_pixels);
   blender::ed::sculpt_paint::texture_paint::barycentric_extraction::init_using_intersection(
       ob, totnode, nodes);
-  TIMEIT_END(extract_pixels);
 }
 }

@@ -45,6 +45,7 @@ static void do_task_cb_ex(void *__restrict userdata,
   TexturePaintingUserData *data = static_cast<TexturePaintingUserData *>(userdata);
   Object *ob = data->ob;
   SculptSession *ss = ob->sculpt;
+  ImBuf *drawing_target = ss->mode.texture_paint.drawing_target;
   const Brush *brush = data->brush;
   PBVHNode *node = data->nodes[n];
   NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
@@ -60,15 +61,26 @@ static void do_task_cb_ex(void *__restrict userdata,
 
   const float brush_strength = ss->cache->bstrength;
 
-  for (PixelData &pixel : node_data->pixels) {
-    if (!sculpt_brush_test_sq_fn(&test, pixel.local_pos)) {
+  for (int i = 0; i < node_data->pixels.size(); i++) {
+    const float3 &local_pos = node_data->pixels.local_position(i);
+    if (!sculpt_brush_test_sq_fn(&test, local_pos)) {
       continue;
     }
+
+    float4 &color = node_data->pixels.color(i);
+    const int2 &image_coord = node_data->pixels.image_coord(i);
+    /* Although currently the pixel is loaded each time. I expect additional performance
+     * improvement when moving the flushing to higher level on the callstack. */
+    if (!node_data->pixels.is_dirty(i)) {
+      int pixel_index = image_coord.y * drawing_target->x + image_coord.x;
+      copy_v4_v4(color, &drawing_target->rect_float[pixel_index * 4]);
+    }
     const float falloff_strength = BKE_brush_curve_strength(brush, sqrtf(test.dist), test.radius);
-    interp_v3_v3v3(pixel.content, pixel.content, brush_linear, falloff_strength * brush_strength);
-    pixel.content[3] = 1.0f;
-    pixel.flags.dirty = true;
-    BLI_rcti_do_minmax_v(&node_data->dirty_region, pixel.pixel_pos);
+
+    interp_v3_v3v3(color, color, brush_linear, falloff_strength * brush_strength);
+    color[3] = 1.0f;
+    node_data->pixels.mark_dirty(i);
+    BLI_rcti_do_minmax_v(&node_data->dirty_region, image_coord);
     node_data->flags.dirty = true;
   }
 }
