@@ -134,7 +134,7 @@ static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
       const MPoly *mp = pbvh->mpoly + melem->indices[i];
       const MLoop *ml = pbvh->mloop + mp->loopstart;
 
-      Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + mp->loopstart;
+      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + mp->loopstart;
 
       for (int j = 0; j < mp->totloop; j++, col++, ml++) {
         if (ml->v == vertex) {
@@ -152,7 +152,7 @@ static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
     }
   }
   else {
-    Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + vertex;
+    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + vertex;
     Helper::toFloat(col, r_color);
   }
 }
@@ -177,7 +177,7 @@ static void pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
       const MPoly *mp = pbvh->mpoly + melem->indices[i];
       const MLoop *ml = pbvh->mloop + mp->loopstart;
 
-      Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + mp->loopstart;
+      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + mp->loopstart;
 
       for (int j = 0; j < mp->totloop; j++, col++, ml++) {
         if (ml->v == vertex) {
@@ -187,7 +187,7 @@ static void pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
     }
   }
   else {
-    Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + vertex;
+    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + vertex;
     Setter::setFloat(col, color);
   }
 }
@@ -206,7 +206,7 @@ template<typename Helper, typename Setter = ColorSetter<Helper>>
 static void pbvh_set_colors(
     PBVH *pbvh, void *color_attr, float (*colors)[4], int *indices, int totelem)
 {
-  Helper::ColType *col = reinterpret_cast<typename Helper::ColType *>(color_attr);
+  typename Helper::ColType *col = reinterpret_cast<typename Helper::ColType *>(color_attr);
 
   for (int i : IndexRange(totelem)) {
     Setter::setFloat(col + indices[i], colors[i]);
