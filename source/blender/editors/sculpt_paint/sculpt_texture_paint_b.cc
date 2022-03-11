@@ -22,6 +22,7 @@
 
 #include "PIL_time_utildefines.h"
 
+#include "BLI_math_color_blend.h"
 #include "BLI_task.h"
 #include "BLI_vector.hh"
 
@@ -40,7 +41,7 @@ namespace blender::ed::sculpt_paint::texture_paint {
 namespace painting {
 static void do_task_cb_ex(void *__restrict userdata,
                           const int n,
-                          const TaskParallelTLS *__restrict UNUSED(tls))
+                          const TaskParallelTLS *__restrict tls)
 {
   TexturePaintingUserData *data = static_cast<TexturePaintingUserData *>(userdata);
   Object *ob = data->ob;
@@ -51,13 +52,16 @@ static void do_task_cb_ex(void *__restrict userdata,
   NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
   BLI_assert(node_data != nullptr);
 
+  const int thread_id = BLI_task_parallel_thread_id(tls);
+
   SculptBrushTest test;
   SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
       ss, &test, brush->falloff_shape);
 
   float3 brush_srgb(brush->rgb[0], brush->rgb[1], brush->rgb[2]);
-  float3 brush_linear;
+  float4 brush_linear;
   srgb_to_linearrgb_v3_v3(brush_linear, brush_srgb);
+  brush_linear[3] = 1.0f;
 
   const float brush_strength = ss->cache->bstrength;
 
@@ -75,10 +79,15 @@ static void do_task_cb_ex(void *__restrict userdata,
       int pixel_index = image_coord.y * drawing_target->x + image_coord.x;
       copy_v4_v4(color, &drawing_target->rect_float[pixel_index * 4]);
     }
-    const float falloff_strength = BKE_brush_curve_strength(brush, sqrtf(test.dist), test.radius);
+    // const float falloff_strength = BKE_brush_curve_strength(brush, sqrtf(test.dist),
+    // test.radius);
+    const float3 normal(0.0f, 0.0f, 0.0f);
+    const float3 face_normal(0.0f, 0.0f, 0.0f);
+    const float mask = 0.0f;
+    const float falloff_strength = SCULPT_brush_strength_factor(
+        ss, brush, local_pos, sqrtf(test.dist), normal, face_normal, mask, 0, thread_id);
 
-    interp_v3_v3v3(color, color, brush_linear, falloff_strength * brush_strength);
-    color[3] = 1.0f;
+    blend_color_interpolate_float(color, color, brush_linear, falloff_strength * brush_strength);
     node_data->pixels.mark_dirty(i);
     BLI_rcti_do_minmax_v(&node_data->dirty_region, image_coord);
     node_data->flags.dirty = true;
