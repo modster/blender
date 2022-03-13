@@ -24,6 +24,11 @@
 /** \name View Roll Operator
  * \{ */
 
+/**
+ * \param use_axis_view: When true, keep axis-aligned orthographic views
+ * (when rotating in 90 degree increments). While this may seem obscure some NDOF
+ * devices have key shortcuts to do this (see #NDOF_BUTTON_ROLL_CW & #NDOF_BUTTON_ROLL_CCW).
+ */
 static void view_roll_angle(ARegion *region,
                             float quat[4],
                             const float orig_quat[4],
@@ -94,11 +99,11 @@ static int viewroll_modal(bContext *C, wmOperator *op, const wmEvent *event)
         event_code = VIEW_CONFIRM;
         break;
       case VIEWROT_MODAL_SWITCH_MOVE:
-        WM_operator_name_call(C, "VIEW3D_OT_move", WM_OP_INVOKE_DEFAULT, NULL);
+        WM_operator_name_call(C, "VIEW3D_OT_move", WM_OP_INVOKE_DEFAULT, NULL, event);
         event_code = VIEW_CONFIRM;
         break;
       case VIEWROT_MODAL_SWITCH_ROTATE:
-        WM_operator_name_call(C, "VIEW3D_OT_rotate", WM_OP_INVOKE_DEFAULT, NULL);
+        WM_operator_name_call(C, "VIEW3D_OT_rotate", WM_OP_INVOKE_DEFAULT, NULL, event);
         event_code = VIEW_CONFIRM;
         break;
     }
