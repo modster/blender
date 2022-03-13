@@ -98,10 +98,10 @@ uint get_index(uint i)
 
 /* Duplicate of #PosNorLoop from the mesh extract CPU code.
  * We do not use a vec3 for the position as it will be padded to a vec4 which is incompatible with
- * the format.  */
+ * the format. */
 struct PosNorLoop {
   float x, y, z;
-  /* TODO(kevindietrich) : figure how to compress properly as GLSL does not have char/short types,
+  /* TODO(@kevindietrich): figure how to compress properly as GLSL does not have char/short types,
    * bit operations get tricky. */
   float nx, ny, nz;
   float flag;
@@ -138,6 +138,13 @@ void set_vertex_nor(inout PosNorLoop vertex_data, vec3 nor, uint flag)
 void set_vertex_nor(inout PosNorLoop vertex_data, vec3 nor)
 {
   set_vertex_nor(vertex_data, nor, 0);
+}
+
+void add_newell_cross_v3_v3v3(inout vec3 n, vec3 v_prev, vec3 v_curr)
+{
+  n[0] += (v_prev[1] - v_curr[1]) * (v_prev[2] + v_curr[2]);
+  n[1] += (v_prev[2] - v_curr[2]) * (v_prev[0] + v_curr[0]);
+  n[2] += (v_prev[0] - v_curr[0]) * (v_prev[1] + v_curr[1]);
 }
 
 #define ORIGINDEX_NONE -1

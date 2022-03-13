@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2009 Blender Foundation, Joshua Leung
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2009 Blender Foundation, Joshua Leung. All rights reserved. */
 
 /** \file
  * \ingroup edanimation
@@ -731,55 +715,54 @@ const EnumPropertyItem *ANIM_keying_sets_enum_itemf(bContext *C,
                                                     PropertyRNA *UNUSED(prop),
                                                     bool *r_free)
 {
-  Scene *scene = CTX_data_scene(C);
   KeyingSet *ks;
   EnumPropertyItem *item = NULL, item_tmp = {0};
   int totitem = 0;
   int i = 0;
 
-  if (C == NULL) {
-    return DummyRNA_DEFAULT_items;
-  }
+  if (C != NULL) {
+    Scene *scene = CTX_data_scene(C);
+    /* active Keying Set
+     * - only include entry if it exists
+     */
+    if (scene->active_keyingset) {
+      /* active Keying Set */
+      item_tmp.identifier = "__ACTIVE__";
+      item_tmp.name = "Active Keying Set";
+      item_tmp.value = i;
+      RNA_enum_item_add(&item, &totitem, &item_tmp);
 
-  /* active Keying Set
-   * - only include entry if it exists
-   */
-  if (scene->active_keyingset) {
-    /* active Keying Set */
-    item_tmp.identifier = "__ACTIVE__";
-    item_tmp.name = "Active Keying Set";
-    item_tmp.value = i;
-    RNA_enum_item_add(&item, &totitem, &item_tmp);
-
-    /* separator */
-    RNA_enum_item_add_separator(&item, &totitem);
-  }
-
-  i++;
-
-  /* user-defined Keying Sets
-   * - these are listed in the order in which they were defined for the active scene
-   */
-  if (scene->keyingsets.first) {
-    for (ks = scene->keyingsets.first; ks; ks = ks->next, i++) {
-      if (ANIM_keyingset_context_ok_poll(C, ks)) {
-        item_tmp.identifier = ks->idname;
-        item_tmp.name = ks->name;
-        item_tmp.description = ks->description;
-        item_tmp.value = i;
-        RNA_enum_item_add(&item, &totitem, &item_tmp);
-      }
+      /* separator */
+      RNA_enum_item_add_separator(&item, &totitem);
     }
 
-    /* separator */
-    RNA_enum_item_add_separator(&item, &totitem);
+    i++;
+
+    /* user-defined Keying Sets
+     * - these are listed in the order in which they were defined for the active scene
+     */
+    if (scene->keyingsets.first) {
+      for (ks = scene->keyingsets.first; ks; ks = ks->next, i++) {
+        if (ANIM_keyingset_context_ok_poll(C, ks)) {
+          item_tmp.identifier = ks->idname;
+          item_tmp.name = ks->name;
+          item_tmp.description = ks->description;
+          item_tmp.value = i;
+          RNA_enum_item_add(&item, &totitem, &item_tmp);
+        }
+      }
+
+      /* separator */
+      RNA_enum_item_add_separator(&item, &totitem);
+    }
   }
 
   /* builtin Keying Sets */
   i = -1;
   for (ks = builtin_keyingsets.first; ks; ks = ks->next, i--) {
-    /* only show KeyingSet if context is suitable */
-    if (ANIM_keyingset_context_ok_poll(C, ks)) {
+    /* Only show #KeyingSet if context is suitable or if there is no context which is needed
+     * to support key-bindings to be assigned since key bindings are not context aware. */
+    if ((C == NULL) || ANIM_keyingset_context_ok_poll(C, ks)) {
       item_tmp.identifier = ks->idname;
       item_tmp.name = ks->name;
       item_tmp.description = ks->description;

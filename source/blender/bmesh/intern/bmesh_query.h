@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -561,7 +547,7 @@ BMFace *BM_face_find_double(BMFace *f) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
  * many overlapping faces.
  *
  * An example of how this is used: when 2 tri's are selected that share an edge,
- * pressing Fkey would make a new overlapping quad (without a check like this)
+ * pressing F-key would make a new overlapping quad (without a check like this)
  *
  * \a earr and \a varr can be in any order, however they _must_ form a closed loop.
  */

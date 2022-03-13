@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -545,8 +529,8 @@ static void contarget_get_mesh_mat(Object *ob, const char *substring, float mat[
   float vec[3] = {0.0f, 0.0f, 0.0f};
   float normal[3] = {0.0f, 0.0f, 0.0f};
   float weightsum = 0.0f;
-  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(me_eval);
   if (me_eval) {
+    const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(me_eval);
     const MDeformVert *dvert = CustomData_get_layer(&me_eval->vdata, CD_MDEFORMVERT);
     int numVerts = me_eval->totvert;
 
@@ -1509,7 +1493,7 @@ static void followpath_get_tarmat(struct Depsgraph *UNUSED(depsgraph),
 {
   bFollowPathConstraint *data = con->data;
 
-  if (VALID_CONS_TARGET(ct) && (ct->tar->type == OB_CURVE)) {
+  if (VALID_CONS_TARGET(ct) && (ct->tar->type == OB_CURVES_LEGACY)) {
     Curve *cu = ct->tar->data;
     float vec[4], dir[3], radius;
     float curvetime;
@@ -2495,7 +2479,7 @@ static void pycon_get_tarmat(struct Depsgraph *UNUSED(depsgraph),
 #endif
 
   if (VALID_CONS_TARGET(ct)) {
-    if (ct->tar->type == OB_CURVE && ct->tar->runtime.curve_cache == NULL) {
+    if (ct->tar->type == OB_CURVES_LEGACY && ct->tar->runtime.curve_cache == NULL) {
       unit_m4(ct->matrix);
       return;
     }
@@ -3883,7 +3867,7 @@ static void clampto_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *tar
   bConstraintTarget *ct = targets->first;
 
   /* only evaluate if there is a target and it is a curve */
-  if (VALID_CONS_TARGET(ct) && (ct->tar->type == OB_CURVE)) {
+  if (VALID_CONS_TARGET(ct) && (ct->tar->type == OB_CURVES_LEGACY)) {
     float obmat[4][4], ownLoc[3];
     float curveMin[3], curveMax[3];
     float targetMatrix[4][4];
@@ -5531,7 +5515,7 @@ static void constraints_init_typeinfo(void)
   constraintsTypeInfo[12] = &CTI_ACTION;               /* Action Constraint */
   constraintsTypeInfo[13] = &CTI_LOCKTRACK;            /* Locked-Track Constraint */
   constraintsTypeInfo[14] = &CTI_DISTLIMIT;            /* Limit Distance Constraint */
-  constraintsTypeInfo[15] = &CTI_STRETCHTO;            /* StretchTo Constaint */
+  constraintsTypeInfo[15] = &CTI_STRETCHTO;            /* StretchTo Constraint */
   constraintsTypeInfo[16] = &CTI_MINMAX;               /* Floor Constraint */
   /* constraintsTypeInfo[17] = &CTI_RIGIDBODYJOINT; */ /* RigidBody Constraint - Deprecated */
   constraintsTypeInfo[18] = &CTI_CLAMPTO;              /* ClampTo Constraint */
@@ -5849,14 +5833,6 @@ static void add_new_constraint_to_list(Object *ob, bPoseChannel *pchan, bConstra
      */
     BLI_addtail(list, con);
     BKE_constraint_unique_name(con, list);
-
-    /* if the target list is a list on some PoseChannel belonging to a proxy-protected
-     * Armature layer, we must tag newly added constraints with a flag which allows them
-     * to persist after proxy syncing has been done
-     */
-    if (BKE_constraints_proxylocked_owner(ob, pchan)) {
-      con->flag |= CONSTRAINT_PROXY_LOCAL;
-    }
 
     /* make this constraint the active one */
     BKE_constraints_active_set(list, con);
@@ -6211,45 +6187,6 @@ bool BKE_constraint_is_nonlocal_in_liboverride(const Object *ob, const bConstrai
 {
   return (ID_IS_OVERRIDE_LIBRARY(ob) &&
           (con == NULL || (con->flag & CONSTRAINT_OVERRIDE_LIBRARY_LOCAL) == 0));
-}
-
-/* -------- Constraints and Proxies ------- */
-
-void BKE_constraints_proxylocal_extract(ListBase *dst, ListBase *src)
-{
-  bConstraint *con, *next;
-
-  /* for each tagged constraint, remove from src and move to dst */
-  for (con = src->first; con; con = next) {
-    next = con->next;
-
-    /* check if tagged */
-    if (con->flag & CONSTRAINT_PROXY_LOCAL) {
-      BLI_remlink(src, con);
-      BLI_addtail(dst, con);
-    }
-  }
-}
-
-bool BKE_constraints_proxylocked_owner(Object *ob, bPoseChannel *pchan)
-{
-  /* Currently, constraints can only be on object or bone level */
-  if (ob && ob->proxy) {
-    if (ob->pose && pchan) {
-      bArmature *arm = ob->data;
-
-      /* On bone-level, check if bone is on proxy-protected layer */
-      if ((pchan->bone) && (pchan->bone->layer & arm->layer_protected)) {
-        return true;
-      }
-    }
-    else {
-      /* FIXME: constraints on object-level are not handled well yet */
-      return true;
-    }
-  }
-
-  return false;
 }
 
 /* -------- Target-Matrix Stuff ------- */

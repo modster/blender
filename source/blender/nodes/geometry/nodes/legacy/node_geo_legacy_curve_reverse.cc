@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_task.hh"
 
@@ -33,15 +19,15 @@ static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
   geometry_set = geometry::realize_instances_legacy(geometry_set);
-  if (!geometry_set.has_curve()) {
+  if (!geometry_set.has_curves()) {
     params.set_output("Curve", geometry_set);
     return;
   }
 
   /* Retrieve data for write access so we can avoid new allocations for the reversed data. */
   CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
-  CurveEval &curve = *curve_component.get_for_write();
-  MutableSpan<SplinePtr> splines = curve.splines();
+  std::unique_ptr<CurveEval> curve = curves_to_curve_eval(*curve_component.get_for_read());
+  MutableSpan<SplinePtr> splines = curve->splines();
 
   const std::string selection_name = params.extract_input<std::string>("Selection");
   VArray<bool> selection = curve_component.attribute_get_for_read(
@@ -54,6 +40,8 @@ static void node_geo_exec(GeoNodeExecParams params)
       }
     }
   });
+
+  geometry_set.replace_curves(curve_eval_to_curves(*curve));
 
   params.set_output("Curve", geometry_set);
 }

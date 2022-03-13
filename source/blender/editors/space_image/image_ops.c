@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup spimage
@@ -2171,7 +2155,7 @@ static int image_save_exec(bContext *C, wmOperator *op)
   return OPERATOR_CANCELLED;
 }
 
-static int image_save_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int image_save_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   Image *ima = image_from_context(C);
   ImageUser *iuser = image_user_from_context(C);
@@ -2179,7 +2163,7 @@ static int image_save_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(
   /* Not writable formats or images without a file-path will go to "Save As". */
   if (!BKE_image_has_packedfile(ima) &&
       (!BKE_image_has_filepath(ima) || !image_file_format_writable(ima, iuser))) {
-    WM_operator_name_call(C, "IMAGE_OT_save_as", WM_OP_INVOKE_DEFAULT, NULL);
+    WM_operator_name_call(C, "IMAGE_OT_save_as", WM_OP_INVOKE_DEFAULT, NULL, event);
     return OPERATOR_CANCELLED;
   }
   return image_save_exec(C, op);
@@ -3605,7 +3589,7 @@ static void change_frame_apply(bContext *C, wmOperator *op)
   SUBFRA = 0.0f;
 
   /* do updates */
-  DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
+  DEG_id_tag_update(&scene->id, ID_RECALC_FRAME_CHANGE);
   WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
 }
 

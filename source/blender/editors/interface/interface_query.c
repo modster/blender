@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup edinterface
@@ -324,7 +310,7 @@ uiBut *ui_but_find_mouse_over_ex(const ARegion *region,
 
 uiBut *ui_but_find_mouse_over(const ARegion *region, const wmEvent *event)
 {
-  return ui_but_find_mouse_over_ex(region, event->xy, event->ctrl != 0, NULL, NULL);
+  return ui_but_find_mouse_over_ex(region, event->xy, event->modifier & KM_CTRL, NULL, NULL);
 }
 
 uiBut *ui_but_find_rect_over(const struct ARegion *region, const rcti *rect_px)

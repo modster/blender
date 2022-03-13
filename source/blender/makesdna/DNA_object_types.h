@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup DNA
@@ -181,6 +165,12 @@ typedef struct Object_Runtime {
    */
   struct Mesh *mesh_deform_eval;
 
+  /* Evaluated mesh cage in edit mode. */
+  struct Mesh *editmesh_eval_cage;
+
+  /** Cached cage bounding box of `editmesh_eval_cage` for selection. */
+  struct BoundBox *editmesh_bb_cage;
+
   /**
    * Original grease pencil bGPdata pointer, before object->data was changed to point
    * to gpd_eval.
@@ -210,6 +200,12 @@ typedef struct Object_Runtime {
 
   unsigned short local_collections_bits;
   short _pad2[3];
+
+  float (*crazyspace_deform_imats)[3][3];
+  float (*crazyspace_deform_cos)[3];
+  int crazyspace_num_verts;
+
+  int _pad3[3];
 } Object_Runtime;
 
 typedef struct ObjectLineArt {
@@ -251,9 +247,10 @@ typedef struct Object {
   /** String describing subobject info, MAX_ID_NAME-2. */
   char parsubstr[64];
   struct Object *parent, *track;
-  /* If `ob->proxy` (or proxy_group), this object is proxy for object `ob->proxy`. */
-  /* proxy_from is set in target back to the proxy. */
-  struct Object *proxy, *proxy_group, *proxy_from;
+  /* Proxy pointer are deprecated, only kept for conversion to liboverrides. */
+  struct Object *proxy DNA_DEPRECATED;
+  struct Object *proxy_group DNA_DEPRECATED;
+  struct Object *proxy_from DNA_DEPRECATED;
   /** Old animation system, deprecated for 2.5. */
   struct Ipo *ipo DNA_DEPRECATED;
   /* struct Path *path; */
@@ -474,7 +471,8 @@ typedef struct ObHook {
 enum {
   OB_EMPTY = 0,
   OB_MESH = 1,
-  OB_CURVE = 2,
+  /** Curve object is still used but replaced by "Curves" for the future (see T95355). */
+  OB_CURVES_LEGACY = 2,
   OB_SURF = 3,
   OB_FONT = 4,
   OB_MBALL = 5,
@@ -492,7 +490,7 @@ enum {
   /** Grease Pencil object used in 3D view but not used for annotation in 2D. */
   OB_GPENCIL = 26,
 
-  OB_HAIR = 27,
+  OB_CURVES = 27,
 
   OB_POINTCLOUD = 28,
 
@@ -507,20 +505,37 @@ enum {
   (((_type) >= OB_MESH && (_type) <= OB_MBALL) || ((_type) >= OB_GPENCIL && (_type) <= OB_VOLUME))
 /** Does the object have some render-able geometry (unlike empties, cameras, etc.). */
 #define OB_TYPE_IS_GEOMETRY(_type) \
-  (ELEM(_type, OB_MESH, OB_SURF, OB_FONT, OB_MBALL, OB_GPENCIL, OB_HAIR, OB_POINTCLOUD, OB_VOLUME))
+  (ELEM(_type, \
+        OB_MESH, \
+        OB_SURF, \
+        OB_FONT, \
+        OB_MBALL, \
+        OB_GPENCIL, \
+        OB_CURVES, \
+        OB_POINTCLOUD, \
+        OB_VOLUME))
 #define OB_TYPE_SUPPORT_VGROUP(_type) (ELEM(_type, OB_MESH, OB_LATTICE, OB_GPENCIL))
 #define OB_TYPE_SUPPORT_EDITMODE(_type) \
-  (ELEM(_type, OB_MESH, OB_FONT, OB_CURVE, OB_SURF, OB_MBALL, OB_LATTICE, OB_ARMATURE))
-#define OB_TYPE_SUPPORT_PARVERT(_type) (ELEM(_type, OB_MESH, OB_SURF, OB_CURVE, OB_LATTICE))
+  (ELEM(_type, \
+        OB_MESH, \
+        OB_FONT, \
+        OB_CURVES_LEGACY, \
+        OB_SURF, \
+        OB_MBALL, \
+        OB_LATTICE, \
+        OB_ARMATURE, \
+        OB_CURVES))
+#define OB_TYPE_SUPPORT_PARVERT(_type) \
+  (ELEM(_type, OB_MESH, OB_SURF, OB_CURVES_LEGACY, OB_LATTICE))
 
 /** Matches #OB_TYPE_SUPPORT_EDITMODE. */
-#define OB_DATA_SUPPORT_EDITMODE(_type) (ELEM(_type, ID_ME, ID_CU, ID_MB, ID_LT, ID_AR))
+#define OB_DATA_SUPPORT_EDITMODE(_type) (ELEM(_type, ID_ME, ID_CU_LEGACY, ID_MB, ID_LT, ID_AR))
 
 /* is this ID type used as object data */
 #define OB_DATA_SUPPORT_ID(_id_type) \
   (ELEM(_id_type, \
         ID_ME, \
-        ID_CU, \
+        ID_CU_LEGACY, \
         ID_MB, \
         ID_LA, \
         ID_SPK, \
@@ -529,13 +544,13 @@ enum {
         ID_LT, \
         ID_GD, \
         ID_AR, \
-        ID_HA, \
+        ID_CV, \
         ID_PT, \
         ID_VO))
 
 #define OB_DATA_SUPPORT_ID_CASE \
   ID_ME: \
-  case ID_CU: \
+  case ID_CU_LEGACY: \
   case ID_MB: \
   case ID_LA: \
   case ID_SPK: \
@@ -544,7 +559,7 @@ enum {
   case ID_LT: \
   case ID_GD: \
   case ID_AR: \
-  case ID_HA: \
+  case ID_CV: \
   case ID_PT: \
   case ID_VO
 

@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -128,15 +114,11 @@ typedef struct ModifierData {
 
   char *error;
 
-  /** Pointer to a #ModifierData in the original domain. */
-  struct ModifierData *orig_modifier_data;
-
   /** Runtime field which contains unique identifier of the modifier. */
   SessionUUID session_uuid;
 
   /** Runtime field which contains runtime data which is specific to a modifier type. */
   void *runtime;
-  void *_pad1;
 } ModifierData;
 
 typedef enum {
@@ -1012,7 +994,8 @@ typedef struct MeshDeformModifierData {
   float *bindcos;
 
   /* runtime */
-  void (*bindfunc)(struct MeshDeformModifierData *mmd,
+  void (*bindfunc)(struct Object *object,
+                   struct MeshDeformModifierData *mmd,
                    struct Mesh *cagemesh,
                    float *vertexcos,
                    int totvert,
@@ -1621,6 +1604,10 @@ enum {
   MOD_WVG_MIX_DIF = 6,
   /** Average of both weights. */
   MOD_WVG_MIX_AVG = 7,
+  /** Minimum of both weights. */
+  MOD_WVG_MIX_MIN = 8,
+  /** Maximum of both weights. */
+  MOD_WVG_MIX_MAX = 9,
 };
 
 /** #WeightVGMixModifierData.mix_set (what vertices to affect). */
@@ -1711,7 +1698,7 @@ enum {
   MOD_WVG_PROXIMITY_GEOM_FACES = (1 << 2),
   MOD_WVG_PROXIMITY_INVERT_VGROUP_MASK = (1 << 3),
   MOD_WVG_PROXIMITY_INVERT_FALLOFF = (1 << 4),
-  MOD_WVG_PROXIMITY_WEIGHTS_NORMALIZE = (1 << 3),
+  MOD_WVG_PROXIMITY_WEIGHTS_NORMALIZE = (1 << 5),
 };
 
 /* Defines common to all WeightVG modifiers. */

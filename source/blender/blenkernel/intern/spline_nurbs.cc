@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_array.hh"
 #include "BLI_span.hh"
@@ -156,15 +142,11 @@ bool NURBSpline::check_valid_size_and_order() const
     return false;
   }
 
-  if (!is_cyclic_ && this->knots_mode == KnotsMode::Bezier) {
-    if (order_ == 4) {
-      if (this->size() < 5) {
-        return false;
-      }
-    }
-    else if (order_ != 3) {
+  if (ELEM(this->knots_mode, NURBS_KNOT_MODE_BEZIER, NURBS_KNOT_MODE_ENDPOINT_BEZIER)) {
+    if (this->knots_mode == NURBS_KNOT_MODE_BEZIER && this->size() <= order_) {
       return false;
     }
+    return (!is_cyclic_ || this->size() % (order_ - 1) == 0);
   }
 
   return true;
@@ -179,65 +161,42 @@ int NURBSpline::knots_size() const
 void NURBSpline::calculate_knots() const
 {
   const KnotsMode mode = this->knots_mode;
-  const int length = this->size();
   const int order = order_;
+  const bool is_bezier = ELEM(mode, NURBS_KNOT_MODE_BEZIER, NURBS_KNOT_MODE_ENDPOINT_BEZIER);
+  const bool is_end_point = ELEM(mode, NURBS_KNOT_MODE_ENDPOINT, NURBS_KNOT_MODE_ENDPOINT_BEZIER);
+  /* Inner knots are always repeated once except on Bezier case. */
+  const int repeat_inner = is_bezier ? order - 1 : 1;
+  /* How many times to repeat 0.0 at the beginning of knot. */
+  const int head = is_end_point ? (order - (is_cyclic_ ? 1 : 0)) :
+                                  (is_bezier ? min_ii(2, repeat_inner) : 1);
+  /* Number of knots replicating widths of the starting knots.
+   * Covers both Cyclic and EndPoint cases. */
+  const int tail = is_cyclic_ ? 2 * order - 1 : (is_end_point ? order : 0);
 
   knots_.resize(this->knots_size());
-
   MutableSpan<float> knots = knots_;
 
-  if (mode == NURBSpline::KnotsMode::Normal || is_cyclic_) {
-    for (const int i : knots.index_range()) {
-      knots[i] = static_cast<float>(i);
-    }
+  int r = head;
+  float current = 0.0f;
+
+  const int offset = is_end_point && is_cyclic_ ? 1 : 0;
+  if (offset) {
+    knots[0] = current;
+    current += 1.0f;
   }
-  else if (mode == NURBSpline::KnotsMode::EndPoint) {
-    float k = 0.0f;
-    for (const int i : IndexRange(1, knots.size())) {
-      knots[i - 1] = k;
-      if (i >= order && i <= length) {
-        k += 1.0f;
-      }
-    }
-  }
-  else if (mode == NURBSpline::KnotsMode::Bezier) {
-    BLI_assert(ELEM(order, 3, 4));
-    if (order == 3) {
-      float k = 0.6f;
-      for (const int i : knots.index_range()) {
-        if (i >= order && i <= length) {
-          k += 0.5f;
-        }
-        knots[i] = std::floor(k);
-      }
-    }
-    else {
-      float k = 0.34f;
-      for (const int i : knots.index_range()) {
-        knots[i] = std::floor(k);
-        k += 1.0f / 3.0f;
-      }
+
+  for (const int i : IndexRange(offset, knots.size() - offset - tail)) {
+    knots[i] = current;
+    r--;
+    if (r == 0) {
+      current += 1.0;
+      r = repeat_inner;
     }
   }
 
-  if (is_cyclic_) {
-    const int b = length + order - 1;
-    if (order > 2) {
-      for (const int i : IndexRange(1, order - 2)) {
-        if (knots[b] != knots[b - i]) {
-          if (i == order - 1) {
-            knots[length + order - 2] += 1.0f;
-            break;
-          }
-        }
-      }
-    }
-
-    int c = order;
-    for (int i = b; i < this->knots_size(); i++) {
-      knots[i] = knots[i - 1] + (knots[c] - knots[c - 1]);
-      c--;
-    }
+  const int tail_index = knots.size() - tail;
+  for (const int i : IndexRange(tail)) {
+    knots[tail_index + i] = current + (knots[i] - knots[0]);
   }
 }
 
@@ -263,17 +222,17 @@ Span<float> NURBSpline::knots() const
 
 static void calculate_basis_for_point(const float parameter,
                                       const int size,
-                                      const int order,
+                                      const int degree,
                                       Span<float> knots,
                                       MutableSpan<float> basis_buffer,
                                       NURBSpline::BasisCache &basis_cache)
 {
   /* Clamp parameter due to floating point inaccuracy. */
-  const float t = std::clamp(parameter, knots[0], knots[size + order - 1]);
+  const float t = std::clamp(parameter, knots[0], knots[size + degree]);
 
   int start = 0;
   int end = 0;
-  for (const int i : IndexRange(size + order - 1)) {
+  for (const int i : IndexRange(size + degree)) {
     const bool knots_equal = knots[i] == knots[i + 1];
     if (knots_equal || t < knots[i] || t > knots[i + 1]) {
       basis_buffer[i] = 0.0f;
@@ -281,16 +240,16 @@ static void calculate_basis_for_point(const float parameter,
     }
 
     basis_buffer[i] = 1.0f;
-    start = std::max(i - order - 1, 0);
+    start = std::max(i - degree, 0);
     end = i;
-    basis_buffer.slice(i + 1, size + order - 1 - i).fill(0.0f);
+    basis_buffer.slice(i + 1, size + degree - i).fill(0.0f);
     break;
   }
-  basis_buffer[size + order - 1] = 0.0f;
+  basis_buffer[size + degree] = 0.0f;
 
-  for (const int i_order : IndexRange(2, order - 1)) {
-    if (end + i_order >= size + order) {
-      end = size + order - 1 - i_order;
+  for (const int i_order : IndexRange(2, degree)) {
+    if (end + i_order >= size + degree + 1) {
+      end = size + degree - i_order;
     }
     for (const int i : IndexRange(start, end - start + 1)) {
       float new_basis = 0.0f;
@@ -340,6 +299,7 @@ Span<NURBSpline::BasisCache> NURBSpline::calculate_basis_cache() const
   basis_cache_.resize(eval_size);
 
   const int order = this->order();
+  const int degree = order - 1;
   Span<float> control_weights = this->weights();
   Span<float> knots = this->knots();
 
@@ -349,14 +309,14 @@ Span<NURBSpline::BasisCache> NURBSpline::calculate_basis_cache() const
    * Theoretically it could be optimized away in the future. */
   Array<float> basis_buffer(this->knots_size());
 
-  const float start = knots[order - 1];
-  const float end = is_cyclic_ ? knots[size + order - 1] : knots[size];
+  const float start = knots[degree];
+  const float end = is_cyclic_ ? knots[size + degree] : knots[size];
   const float step = (end - start) / this->evaluated_edges_size();
   float parameter = start;
   for (const int i : IndexRange(eval_size)) {
     BasisCache &basis = basis_cache[i];
     calculate_basis_for_point(
-        parameter, size + (is_cyclic_ ? order - 1 : 0), order, knots, basis_buffer, basis);
+        parameter, size + (is_cyclic_ ? degree : 0), degree, knots, basis_buffer, basis);
     BLI_assert(basis.weights.size() <= order);
 
     for (const int j : basis.weights.index_range()) {

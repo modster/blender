@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2007 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2007 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup wm
@@ -399,7 +383,7 @@ static const char *wm_context_member_from_ptr(bContext *C, const PointerRNA *ptr
  *   since there is no convenient way to calculate partial RNA paths.
  *
  * \note While the path to the ID is typically sufficient to calculate the remainder of the path,
- * in practice this would cause #WM_context_path_resolve_property_full to crate a path such as:
+ * in practice this would cause #WM_context_path_resolve_property_full to create a path such as:
  * `object.data.bones["Bones"].use_deform` such paths are not useful for key-shortcuts,
  * so this function supports returning data-paths directly to context members that aren't ID types.
  */
@@ -927,7 +911,6 @@ int WM_generic_select_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
       ret_value = op->type->exec(C, op);
       OPERATOR_RETVAL_CHECK(ret_value);
-
       op->customdata = POINTER_FROM_INT((int)event->type);
       if (ret_value & OPERATOR_RUNNING_MODAL) {
         WM_event_add_modal_handler(C, op);
@@ -964,7 +947,7 @@ int WM_generic_select_modal(bContext *C, wmOperator *op, const wmEvent *event)
       return OPERATOR_FINISHED | OPERATOR_PASS_THROUGH;
     }
     /* Important not to return anything other than PASS_THROUGH here,
-     * otherwise it prevents underlying tweak detection code to work properly. */
+     * otherwise it prevents underlying drag detection code to work properly. */
     return OPERATOR_PASS_THROUGH;
   }
 
@@ -973,8 +956,13 @@ int WM_generic_select_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 int WM_generic_select_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  RNA_int_set(op->ptr, "mouse_x", event->mval[0]);
-  RNA_int_set(op->ptr, "mouse_y", event->mval[1]);
+  ARegion *region = CTX_wm_region(C);
+
+  int mval[2];
+  WM_event_drag_start_mval(event, region, mval);
+
+  RNA_int_set(op->ptr, "mouse_x", mval[0]);
+  RNA_int_set(op->ptr, "mouse_y", mval[1]);
 
   op->customdata = POINTER_FROM_INT(0);
 
@@ -2046,7 +2034,7 @@ static void WM_OT_quit_blender(wmOperatorType *ot)
 
 static int wm_console_toggle_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
 {
-  GHOST_toggleConsole(2);
+  setConsoleWindowState(GHOST_kConsoleWindowStateToggle);
   return OPERATOR_FINISHED;
 }
 
@@ -2838,7 +2826,7 @@ static int radial_control_modal(bContext *C, wmOperator *op, const wmEvent *even
   float numValue;
   /* TODO: fix hardcoded events */
 
-  bool snap = event->ctrl != 0;
+  bool snap = (event->modifier & KM_CTRL) != 0;
 
   /* Modal numinput active, try to handle numeric inputs first... */
   if (event->val == KM_PRESS && has_numInput && handleNumInput(C, &rc->num_input, event)) {
@@ -3609,8 +3597,11 @@ static int doc_view_manual_ui_context_exec(bContext *C, wmOperator *UNUSED(op))
     WM_operator_properties_create(&ptr_props, "WM_OT_doc_view_manual");
     RNA_string_set(&ptr_props, "doc_id", buf);
 
-    retval = WM_operator_name_call_ptr(
-        C, WM_operatortype_find("WM_OT_doc_view_manual", false), WM_OP_EXEC_DEFAULT, &ptr_props);
+    retval = WM_operator_name_call_ptr(C,
+                                       WM_operatortype_find("WM_OT_doc_view_manual", false),
+                                       WM_OP_EXEC_DEFAULT,
+                                       &ptr_props,
+                                       NULL);
 
     WM_operator_properties_free(&ptr_props);
   }

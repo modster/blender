@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup editorui
@@ -1370,6 +1354,8 @@ uiBut *uiDefIconTextButO_ptr(uiBlock *block,
 /* for passing inputs to ButO buttons */
 struct PointerRNA *UI_but_operator_ptr_get(uiBut *but);
 
+struct bContextStore *UI_but_context_get(const uiBut *but);
+
 void UI_but_unit_type_set(uiBut *but, int unit_type);
 int UI_but_unit_type_get(const uiBut *but);
 
@@ -2426,6 +2412,13 @@ void uiTemplateCacheFileProcedural(uiLayout *layout,
  */
 void uiTemplateCacheFileTimeSettings(uiLayout *layout, struct PointerRNA *fileptr);
 
+/**
+ * Draw the override layers related properties of the CacheFile.
+ */
+void uiTemplateCacheFileLayers(uiLayout *layout,
+                               const struct bContext *C,
+                               struct PointerRNA *fileptr);
+
 /* Default UIList class name, keep in sync with its declaration in bl_ui/__init__.py */
 #define UI_UL_DEFAULT_CLASS_NAME "UI_UL_list"
 enum uiTemplateListFlags {
@@ -2909,7 +2902,7 @@ uiBut *UI_context_active_but_prop_get(const struct bContext *C,
                                       struct PointerRNA *r_ptr,
                                       struct PropertyRNA **r_prop,
                                       int *r_index);
-void UI_context_active_but_prop_handle(struct bContext *C);
+void UI_context_active_but_prop_handle(struct bContext *C, bool handle_undo);
 void UI_context_active_but_clear(struct bContext *C, struct wmWindow *win, struct ARegion *region);
 
 struct wmOperator *UI_context_active_operator_get(const struct bContext *C);

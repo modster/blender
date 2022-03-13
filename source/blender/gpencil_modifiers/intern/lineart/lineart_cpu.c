@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2019 Blender Foundation. All rights reserved. */
 
 /* \file
  * \ingroup editors
@@ -1349,6 +1333,10 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
       /* Select the triangle in the array. */
       tri = (void *)(((uchar *)eln->pointer) + rb->triangle_size * i);
 
+      if (tri->flags & LRT_CULL_DISCARD) {
+        continue;
+      }
+
       LRT_CULL_DECIDE_INSIDE
       LRT_CULL_ENSURE_MEMORY
       lineart_triangle_cull_single(rb,
@@ -1403,21 +1391,20 @@ static void lineart_main_perspective_division(LineartRenderBuffer *rb)
   LineartVert *vt;
   int i;
 
-  if (!rb->cam_is_persp) {
-    return;
-  }
-
   LISTBASE_FOREACH (LineartElementLinkNode *, eln, &rb->vertex_buffer_pointers) {
     vt = eln->pointer;
     for (i = 0; i < eln->element_count; i++) {
-      /* Do not divide Z, we use Z to back transform cut points in later chaining process. */
-      vt[i].fbcoord[0] /= vt[i].fbcoord[3];
-      vt[i].fbcoord[1] /= vt[i].fbcoord[3];
-      /* Re-map z into (0-1) range, because we no longer need NDC (Normalized Device Coordinates)
-       * at the moment.
-       * The algorithm currently doesn't need Z for operation, we use W instead. If Z is needed in
-       * the future, the line below correctly transforms it to view space coordinates. */
-      // `vt[i].fbcoord[2] = -2 * vt[i].fbcoord[2] / (far - near) - (far + near) / (far - near);
+      if (rb->cam_is_persp) {
+        /* Do not divide Z, we use Z to back transform cut points in later chaining process. */
+        vt[i].fbcoord[0] /= vt[i].fbcoord[3];
+        vt[i].fbcoord[1] /= vt[i].fbcoord[3];
+        /* Re-map z into (0-1) range, because we no longer need NDC (Normalized Device Coordinates)
+         * at the moment.
+         * The algorithm currently doesn't need Z for operation, we use W instead. If Z is needed
+         * in the future, the line below correctly transforms it to view space coordinates. */
+        // `vt[i].fbcoord[2] = -2 * vt[i].fbcoord[2] / (far - near) - (far + near) / (far - near);
+      }
+      /* Shifting is always needed. */
       vt[i].fbcoord[0] -= rb->shift_x * 2;
       vt[i].fbcoord[1] -= rb->shift_y * 2;
     }
@@ -1492,6 +1479,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
   FreestyleEdge *fel, *fer;
   bool face_mark_filtered = false;
   uint16_t edge_flag_result = 0;
+  bool only_contour = false;
 
   if (use_freestyle_face && rb->filter_face_mark) {
     fel = CustomData_bmesh_get(&bm_if_freestyle->pdata, ll->f->head.data, CD_FREESTYLE_FACE);
@@ -1516,7 +1504,12 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
       face_mark_filtered = !face_mark_filtered;
     }
     if (!face_mark_filtered) {
-      return 0;
+      if (rb->filter_face_mark_keep_contour) {
+        only_contour = true;
+      }
+      else {
+        return 0;
+      }
     }
   }
 
@@ -1538,19 +1531,64 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
   double *view_vector = vv;
   double dot_1 = 0, dot_2 = 0;
   double result;
+  bool material_back_face = ((tri1->flags | tri2->flags) & LRT_TRIANGLE_MAT_BACK_FACE_CULLING);
 
-  if (rb->cam_is_persp) {
-    sub_v3_v3v3_db(view_vector, l->gloc, rb->camera_pos);
+  if (rb->use_contour || rb->use_back_face_culling || material_back_face) {
+
+    if (rb->cam_is_persp) {
+      sub_v3_v3v3_db(view_vector, rb->camera_pos, l->gloc);
+    }
+    else {
+      view_vector = rb->view_vector;
+    }
+
+    dot_1 = dot_v3v3_db(view_vector, tri1->gn);
+    dot_2 = dot_v3v3_db(view_vector, tri2->gn);
+
+    if (rb->use_contour && (result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+      edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
+    }
+
+    /* Because the ray points towards the camera, so back-face is when dot value being negative. */
+    if (rb->use_back_face_culling) {
+      if (dot_1 < 0) {
+        tri1->flags |= LRT_CULL_DISCARD;
+      }
+      if (dot_2 < 0) {
+        tri2->flags |= LRT_CULL_DISCARD;
+      }
+    }
+    if (material_back_face) {
+      if (tri1->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_1 < 0) {
+        tri1->flags |= LRT_CULL_DISCARD;
+      }
+      if (tri2->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_2 < 0) {
+        tri2->flags |= LRT_CULL_DISCARD;
+      }
+    }
   }
   else {
     view_vector = rb->view_vector;
   }
 
-  dot_1 = dot_v3v3_db(view_vector, tri1->gn);
-  dot_2 = dot_v3v3_db(view_vector, tri2->gn);
-
   if ((result = dot_1 * dot_2) <= 0 && (fabs(dot_1) + fabs(dot_2))) {
     edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
+  }
+
+  /* For when face mark filtering decided that we discard the face but keep_contour option is on.
+   * so we still have correct full contour around the object. */
+  if (only_contour) {
+    return edge_flag_result;
+  }
+
+  /* Do not show lines other than contour on back face (because contour has one adjacent face that
+   * isn't a back face).
+   * TODO(Yiming): Do we need separate option for this? */
+  if (rb->use_back_face_culling ||
+      ((tri1->flags & tri2->flags) & LRT_TRIANGLE_MAT_BACK_FACE_CULLING)) {
+    if (dot_1 < 0 && dot_2 < 0) {
+      return edge_flag_result;
+    }
   }
 
   if (rb->use_crease) {
@@ -1839,6 +1877,9 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
                                     mat->lineart.material_mask_bits :
                                     0);
     tri->mat_occlusion |= (mat ? mat->lineart.mat_occlusion : 1);
+    tri->flags |= (mat && (mat->blend_flag & MA_BL_CULL_BACKFACE)) ?
+                      LRT_TRIANGLE_MAT_BACK_FACE_CULLING :
+                      0;
 
     tri->intersection_mask = obi->override_intersection_mask;
 
@@ -1878,7 +1919,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
                                                    bm);
     if (eflag) {
       /* Only allocate for feature lines (instead of all lines) to save memory.
-       * If allow duplicated edges, one edge gets added multiple times if it has multiple types. */
+       * If allow duplicated edges, one edge gets added multiple times if it has multiple types.
+       */
       allocate_la_e += rb->allow_duplicated_types ? lineart_edge_type_duplication_count(eflag) : 1;
     }
     /* Here we just use bm's flag for when loading actual lines, then we don't need to call
@@ -2072,8 +2114,8 @@ static bool lineart_geometry_check_visible(double (*model_view_proj)[4],
   }
 
   bool cond[6] = {true, true, true, true, true, true};
-  /* Because for a point to be inside clip space, it must satisfy `-Wc <= XYCc <= Wc`, here if all
-   * verts falls to the same side of the clip space border, we know it's outside view. */
+  /* Because for a point to be inside clip space, it must satisfy `-Wc <= XYCc <= Wc`, here if
+   * all verts falls to the same side of the clip space border, we know it's outside view. */
   for (int i = 0; i < 8; i++) {
     cond[0] &= (co[i][0] < -co[i][3]);
     cond[1] &= (co[i][0] > co[i][3]);
@@ -2247,7 +2289,8 @@ static void lineart_main_load_geometries(
 
   int thread_count = rb->thread_count;
 
-  /* This memory is in render buffer memory pool. so we don't need to free those after loading. */
+  /* This memory is in render buffer memory pool. so we don't need to free those after loading.
+   */
   LineartObjectLoadTaskInfo *olti = lineart_mem_acquire(
       &rb->render_data_pool, sizeof(LineartObjectLoadTaskInfo) * thread_count);
 
@@ -2274,7 +2317,7 @@ static void lineart_main_load_geometries(
     mul_m4db_m4db_m4fl_uniq(obi->model_view_proj, rb->view_projection, ob->obmat);
     mul_m4db_m4db_m4fl_uniq(obi->model_view, rb->view, ob->obmat);
 
-    if (!ELEM(use_ob->type, OB_MESH, OB_MBALL, OB_CURVE, OB_SURF, OB_FONT)) {
+    if (!ELEM(use_ob->type, OB_MESH, OB_MBALL, OB_CURVES_LEGACY, OB_SURF, OB_FONT)) {
       continue;
     }
 
@@ -2286,13 +2329,13 @@ static void lineart_main_load_geometries(
     }
 
     if (use_ob->type == OB_MESH) {
-      use_mesh = use_ob->data;
+      use_mesh = BKE_object_get_evaluated_mesh(use_ob);
     }
     else {
-      /* If DEG_ITER_OBJECT_FLAG_DUPLI is set, the curve objects are going to have a mesh
-       * equivalent already in the object list, so ignore converting the original curve in this
-       * case. */
-      if (allow_duplicates) {
+      /* If DEG_ITER_OBJECT_FLAG_DUPLI is set, some curve objects may also have an evaluated mesh
+       * object in the list. To avoid adding duplicate geometry, ignore evaluated curve objects in
+       * those cases. */
+      if (allow_duplicates && BKE_object_get_evaluated_mesh(ob) != NULL) {
         continue;
       }
       // use_mesh = BKE_mesh_new_from_object(depsgraph, use_ob, true, true);
@@ -2673,8 +2716,9 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
   dot_f = dot_v3v3_db(Cv, tri->gn);
 
   /* NOTE(Yiming): When we don't use `dot_f==0` here, it's theoretically possible that _some_
-   * faces in perspective mode would get erroneously caught in this condition where they really are
-   * legit faces that would produce occlusion, but haven't encountered those yet in my test files.
+   * faces in perspective mode would get erroneously caught in this condition where they really
+   * are legit faces that would produce occlusion, but haven't encountered those yet in my test
+   * files.
    */
   if (fabs(dot_f) < FLT_EPSILON) {
     return false;
@@ -2721,19 +2765,16 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
     interp_v3_v3v3_db(gloc, e->v1->gloc, e->v2->gloc, cut);
     mul_v4_m4v3_db(trans, vp, gloc);
     mul_v3db_db(trans, (1 / trans[3]));
-  }
-  else {
-    interp_v3_v3v3_db(trans, e->v1->fbcoord, e->v2->fbcoord, cut);
-  }
-  trans[0] -= cam_shift_x * 2;
-  trans[1] -= cam_shift_y * 2;
-
-  /* To accommodate `k=0` and `k=inf` (vertical) lines. here the cut is in image space. */
-  if (fabs(e->v1->fbcoord[0] - e->v2->fbcoord[0]) > fabs(e->v1->fbcoord[1] - e->v2->fbcoord[1])) {
-    cut = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], trans[0]);
-  }
-  else {
-    cut = ratiod(e->v1->fbcoord[1], e->v2->fbcoord[1], trans[1]);
+    trans[0] -= cam_shift_x * 2;
+    trans[1] -= cam_shift_y * 2;
+    /* To accommodate `k=0` and `k=inf` (vertical) lines. here the cut is in image space. */
+    if (fabs(e->v1->fbcoord[0] - e->v2->fbcoord[0]) >
+        fabs(e->v1->fbcoord[1] - e->v2->fbcoord[1])) {
+      cut = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], trans[0]);
+    }
+    else {
+      cut = ratiod(e->v1->fbcoord[1], e->v2->fbcoord[1], trans[1]);
+    }
   }
 
 #define LRT_GUARD_NOT_FOUND \
@@ -2741,8 +2782,9 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
     return false; \
   }
 
-  /* Determine the pair of edges that the line has crossed. The "|" symbol in the comment indicates
-   * triangle boundary. DBL_TRIANGLE_LIM is needed to for floating point precision tolerance. */
+  /* Determine the pair of edges that the line has crossed. The "|" symbol in the comment
+   * indicates triangle boundary. DBL_TRIANGLE_LIM is needed to for floating point precision
+   * tolerance. */
 
   if (st_l == 2) {
     /* Left side is in the triangle. */
@@ -3158,9 +3200,10 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
    * them as well. */
   mul_v4_m4v3_db(v1->fbcoord, rb->view_projection, v1->gloc);
   mul_v4_m4v3_db(v2->fbcoord, rb->view_projection, v2->gloc);
-  mul_v3db_db(v1->fbcoord, (1 / v1->fbcoord[3]));
-  mul_v3db_db(v2->fbcoord, (1 / v2->fbcoord[3]));
-
+  if (rb->cam_is_persp) {
+    mul_v3db_db(v1->fbcoord, (1 / v1->fbcoord[3]));
+    mul_v3db_db(v2->fbcoord, (1 / v2->fbcoord[3]));
+  }
   v1->fbcoord[0] -= rb->shift_x * 2;
   v1->fbcoord[1] -= rb->shift_y * 2;
   v2->fbcoord[0] -= rb->shift_x * 2;
@@ -3403,6 +3446,14 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->force_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SMOOTH_SURFACES) != 0;
   rb->sharp_as_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SHARP_EDGES) != 0;
 
+  rb->chain_preserve_details = (lmd->calculation_flags & LRT_CHAIN_PRESERVE_DETAILS) != 0;
+
+  /* This is used to limit calculation to a certain level to save time, lines who have higher
+   * occlusion levels will get ignored. */
+  rb->max_occlusion_level = lmd->level_end_override;
+
+  rb->use_back_face_culling = (lmd->calculation_flags & LRT_USE_BACK_FACE_CULLING) != 0;
+
   int16_t edge_types = lmd->edge_types_override;
 
   rb->use_contour = (edge_types & LRT_EDGE_FLAG_CONTOUR) != 0;
@@ -3416,6 +3467,8 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->filter_face_mark = (lmd->calculation_flags & LRT_FILTER_FACE_MARK) != 0;
   rb->filter_face_mark_boundaries = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_BOUNDARIES) !=
                                     0;
+  rb->filter_face_mark_keep_contour = (lmd->calculation_flags &
+                                       LRT_FILTER_FACE_MARK_KEEP_CONTOUR) != 0;
 
   rb->chain_data_pool = &lc->chain_data_pool;
 
@@ -4423,12 +4476,6 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
    * See definition of LineartTriangleThread for details. */
   rb->triangle_size = lineart_triangle_size_get(scene, rb);
 
-  /* This is used to limit calculation to a certain level to save time, lines who have higher
-   * occlusion levels will get ignored. */
-  rb->max_occlusion_level = (lmd->flags & LRT_GPENCIL_USE_CACHE) ?
-                                lmd->level_end_override :
-                                (lmd->use_multiple_levels ? lmd->level_end : lmd->level_start);
-
   /* FIXME(Yiming): See definition of int #LineartRenderBuffer::_source_type for detailed. */
   rb->_source_type = lmd->source_type;
   rb->_source_collection = lmd->source_collection;
@@ -4508,8 +4555,8 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
     if (rb->chain_smooth_tolerance > FLT_EPSILON) {
       /* Keeping UI range of 0-1 for ease of read while scaling down the actual value for best
-       * effective range in image-space (Coordinate only goes from -1 to 1). This value is somewhat
-       * arbitrary, but works best for the moment.  */
+       * effective range in image-space (Coordinate only goes from -1 to 1). This value is
+       * somewhat arbitrary, but works best for the moment. */
       MOD_lineart_smooth_chains(rb, rb->chain_smooth_tolerance / 50);
     }
 
@@ -4677,7 +4724,7 @@ static void lineart_gpencil_generate(LineartCache *cache,
       if ((match_output || (gpdg = BKE_object_defgroup_name_index(gpencil_object, vgname)) >= 0)) {
         if (eval_ob && eval_ob->type == OB_MESH) {
           int dindex = 0;
-          Mesh *me = (Mesh *)eval_ob->data;
+          Mesh *me = BKE_object_get_evaluated_mesh(eval_ob);
           if (me->dvert) {
             LISTBASE_FOREACH (bDeformGroup *, db, &me->vertex_group_names) {
               if ((!source_vgname) || strstr(db->name, source_vgname) == db->name) {

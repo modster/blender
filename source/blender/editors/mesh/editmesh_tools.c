@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2004 by Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2004 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup edmesh
@@ -285,7 +269,8 @@ static void mesh_operator_edgering_props(wmOperatorType *ot,
   RNA_def_property_enum_items(prop, rna_enum_proportional_falloff_curve_only_items);
   RNA_def_property_enum_default(prop, PROP_SMOOTH);
   RNA_def_property_ui_text(prop, "Profile Shape", "Shape of the profile");
-  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
+  RNA_def_property_translation_context(prop,
+                                       BLT_I18NCONTEXT_ID_CURVE_LEGACY); /* Abusing id_curve :/ */
 }
 
 static void mesh_operator_edgering_props_get(wmOperator *op, struct EdgeRingOpSubdProps *op_props)
@@ -4364,7 +4349,7 @@ static Base *mesh_separate_tagged(
   Base *base_new = ED_object_add_duplicate(bmain, scene, view_layer, base_old, dupflag);
 
   /* normally would call directly after but in this case delay recalc */
-  /* DAG_relations_tag_update(bmain); */
+  // DAG_relations_tag_update(bmain);
 
   /* new in 2.5 */
   BKE_object_material_array_assign(bmain,
@@ -4438,7 +4423,7 @@ static Base *mesh_separate_arrays(Main *bmain,
   Base *base_new = ED_object_add_duplicate(bmain, scene, view_layer, base_old, dupflag);
 
   /* normally would call directly after but in this case delay recalc */
-  /* DAG_relations_tag_update(bmain); */
+  // DAG_relations_tag_update(bmain);
 
   /* new in 2.5 */
   BKE_object_material_array_assign(bmain,
@@ -9656,13 +9641,13 @@ static int edbm_smooth_normals_exec(bContext *C, wmOperator *op)
     float(*smooth_normal)[3] = MEM_callocN(sizeof(*smooth_normal) * lnors_ed_arr->totloop,
                                            __func__);
 
-    /* This is weird choice of operation, taking all loops of faces of current vertex.
-     * Could lead to some rather far away loops weighting as much as very close ones
+    /* NOTE(@mont29): This is weird choice of operation, taking all loops of faces of current
+     * vertex. Could lead to some rather far away loops weighting as much as very close ones
      * (topologically speaking), with complex polygons.
      * Using topological distance here (rather than geometrical one)
-     * makes sense imho, but would rather go with a more consistent and flexible code,
-     * we could even add max topological distance to take into account, * and a weighting curve.
-     * Would do that later though, think for now we can live with that choice. --mont29. */
+     * makes sense IMHO, but would rather go with a more consistent and flexible code,
+     * we could even add max topological distance to take into account, and a weighting curve.
+     * Would do that later though, think for now we can live with that choice. */
     BMLoopNorEditData *lnor_ed = lnors_ed_arr->lnor_editdata;
     for (int i = 0; i < lnors_ed_arr->totloop; i++, lnor_ed++) {
       l = lnor_ed->loop;

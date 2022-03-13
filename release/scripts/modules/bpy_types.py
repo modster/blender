@@ -1,20 +1,4 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # <pep8-80 compliant>
 
@@ -595,15 +579,6 @@ class MeshPolygon(StructRNA):
 
 class Text(bpy_types.ID):
     __slots__ = ()
-
-    def as_string(self):
-        """Return the text as a string."""
-        return "\n".join(line.body for line in self.lines)
-
-    def from_string(self, string):
-        """Replace text with this string."""
-        self.clear()
-        self.write(string)
 
     def as_module(self):
         import bpy

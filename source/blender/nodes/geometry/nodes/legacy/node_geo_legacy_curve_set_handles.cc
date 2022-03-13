@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BKE_spline.hh"
 
@@ -45,20 +31,20 @@ static void node_init(bNodeTree *UNUSED(tree), bNode *node)
   node->storage = data;
 }
 
-static BezierSpline::HandleType handle_type_from_input_type(GeometryNodeCurveHandleType type)
+static HandleType handle_type_from_input_type(GeometryNodeCurveHandleType type)
 {
   switch (type) {
     case GEO_NODE_CURVE_HANDLE_AUTO:
-      return BezierSpline::HandleType::Auto;
+      return BEZIER_HANDLE_AUTO;
     case GEO_NODE_CURVE_HANDLE_ALIGN:
-      return BezierSpline::HandleType::Align;
+      return BEZIER_HANDLE_ALIGN;
     case GEO_NODE_CURVE_HANDLE_FREE:
-      return BezierSpline::HandleType::Free;
+      return BEZIER_HANDLE_FREE;
     case GEO_NODE_CURVE_HANDLE_VECTOR:
-      return BezierSpline::HandleType::Vector;
+      return BEZIER_HANDLE_VECTOR;
   }
   BLI_assert_unreachable();
-  return BezierSpline::HandleType::Auto;
+  return BEZIER_HANDLE_AUTO;
 }
 
 static void node_geo_exec(GeoNodeExecParams params)
@@ -70,31 +56,31 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
   geometry_set = geometry::realize_instances_legacy(geometry_set);
-  if (!geometry_set.has_curve()) {
+  if (!geometry_set.has_curves()) {
     params.set_output("Curve", geometry_set);
     return;
   }
 
   /* Retrieve data for write access so we can avoid new allocations for the handles data. */
   CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
-  CurveEval &curve = *curve_component.get_for_write();
-  MutableSpan<SplinePtr> splines = curve.splines();
+  std::unique_ptr<CurveEval> curve = curves_to_curve_eval(*curve_component.get_for_read());
+  MutableSpan<SplinePtr> splines = curve->splines();
 
   const std::string selection_name = params.extract_input<std::string>("Selection");
   VArray<bool> selection = curve_component.attribute_get_for_read(
       selection_name, ATTR_DOMAIN_POINT, true);
 
-  const BezierSpline::HandleType new_handle_type = handle_type_from_input_type(type);
+  const HandleType new_handle_type = handle_type_from_input_type(type);
   int point_index = 0;
   bool has_bezier_spline = false;
   for (SplinePtr &spline : splines) {
-    if (spline->type() != Spline::Type::Bezier) {
+    if (spline->type() != CURVE_TYPE_BEZIER) {
       point_index += spline->positions().size();
       continue;
     }
 
     BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
-    if (ELEM(new_handle_type, BezierSpline::HandleType::Free, BezierSpline::HandleType::Align)) {
+    if (ELEM(new_handle_type, BEZIER_HANDLE_FREE, BEZIER_HANDLE_ALIGN)) {
       /* In this case the automatically calculated handle types need to be "baked", because
        * they're possibly changing from a type that is calculated automatically to a type that
        * is positioned manually. */
@@ -114,6 +100,8 @@ static void node_geo_exec(GeoNodeExecParams params)
     }
     bezier_spline.mark_cache_invalid();
   }
+
+  geometry_set.replace_curves(curve_eval_to_curves(*curve));
 
   if (!has_bezier_spline) {
     params.error_message_add(NodeWarningType::Info, TIP_("No Bezier splines in input curve"));

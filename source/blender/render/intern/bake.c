@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup render
@@ -83,6 +69,7 @@
 #include "IMB_imbuf_types.h"
 
 #include "RE_bake.h"
+#include "RE_texture_margin.h"
 
 /* local include */
 #include "render_types.h"
@@ -154,10 +141,24 @@ void RE_bake_mask_fill(const BakePixel pixel_array[], const size_t num_pixels, c
   }
 }
 
-void RE_bake_margin(ImBuf *ibuf, char *mask, const int margin)
+void RE_bake_margin(ImBuf *ibuf,
+                    char *mask,
+                    const int margin,
+                    const char margin_type,
+                    Mesh const *me,
+                    char const *uv_layer)
 {
   /* margin */
-  IMB_filter_extend(ibuf, mask, margin);
+  switch (margin_type) {
+    case R_BAKE_ADJACENT_FACES:
+      RE_generate_texturemargin_adjacentfaces(ibuf, mask, margin, me, uv_layer);
+      break;
+    default:
+    /* fall through */
+    case R_BAKE_EXTEND:
+      IMB_filter_extend(ibuf, mask, margin);
+      break;
+  }
 
   if (ibuf->planes != R_IMF_PLANES_RGBA) {
     /* clear alpha added by filtering */
@@ -467,7 +468,9 @@ static TriTessFace *mesh_calc_tri_tessface(Mesh *me, bool tangent, Mesh *me_eval
   looptri = MEM_mallocN(sizeof(*looptri) * tottri, __func__);
   triangles = MEM_callocN(sizeof(TriTessFace) * tottri, __func__);
 
-  const float(*precomputed_normals)[3] = CustomData_get_layer(&me->pdata, CD_NORMAL);
+  const float(*precomputed_normals)[3] = BKE_mesh_poly_normals_are_dirty(me) ?
+                                             NULL :
+                                             BKE_mesh_poly_normals_ensure(me);
   const bool calculate_normal = precomputed_normals ? false : true;
 
   if (precomputed_normals != NULL) {
@@ -497,9 +500,9 @@ static TriTessFace *mesh_calc_tri_tessface(Mesh *me, bool tangent, Mesh *me_eval
     triangles[i].mverts[0] = &mvert[me->mloop[lt->tri[0]].v];
     triangles[i].mverts[1] = &mvert[me->mloop[lt->tri[1]].v];
     triangles[i].mverts[2] = &mvert[me->mloop[lt->tri[2]].v];
-    triangles[i].vert_normals[0] = &vert_normals[me->mloop[lt->tri[0]].v][0];
-    triangles[i].vert_normals[1] = &vert_normals[me->mloop[lt->tri[1]].v][1];
-    triangles[i].vert_normals[2] = &vert_normals[me->mloop[lt->tri[2]].v][2];
+    triangles[i].vert_normals[0] = vert_normals[me->mloop[lt->tri[0]].v];
+    triangles[i].vert_normals[1] = vert_normals[me->mloop[lt->tri[1]].v];
+    triangles[i].vert_normals[2] = vert_normals[me->mloop[lt->tri[2]].v];
     triangles[i].is_smooth = (mp->flag & ME_SMOOTH) != 0;
 
     if (tangent) {

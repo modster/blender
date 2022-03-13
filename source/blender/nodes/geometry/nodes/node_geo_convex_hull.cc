@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -175,9 +161,10 @@ static Mesh *compute_hull(const GeometrySet &geometry_set)
     positions_span = varray.get_internal_span();
   }
 
-  if (geometry_set.has_curve()) {
-    const CurveEval &curve = *geometry_set.get_curve_for_read();
-    for (const SplinePtr &spline : curve.splines()) {
+  if (geometry_set.has_curves()) {
+    const std::unique_ptr<CurveEval> curve = curves_to_curve_eval(
+        *geometry_set.get_curves_for_read());
+    for (const SplinePtr &spline : curve->splines()) {
       positions_span = spline->evaluated_positions();
       total_size += positions_span.size();
       count++;
@@ -215,9 +202,10 @@ static Mesh *compute_hull(const GeometrySet &geometry_set)
     offset += varray.size();
   }
 
-  if (geometry_set.has_curve()) {
-    const CurveEval &curve = *geometry_set.get_curve_for_read();
-    for (const SplinePtr &spline : curve.splines()) {
+  if (geometry_set.has_curves()) {
+    const std::unique_ptr<CurveEval> curve = curves_to_curve_eval(
+        *geometry_set.get_curves_for_read());
+    for (const SplinePtr &spline : curve->splines()) {
       Span<float3> array = spline->evaluated_positions();
       positions.as_mutable_span().slice(offset, array.size()).copy_from(array);
       offset += array.size();
@@ -286,8 +274,8 @@ static Mesh *convex_hull_from_instances(const GeometrySet &geometry_set)
     if (set.has_mesh()) {
       read_positions(*set.get_component_for_read<MeshComponent>(), transforms, &coords);
     }
-    if (set.has_curve()) {
-      read_curve_positions(*set.get_curve_for_read(), transforms, &coords);
+    if (set.has_curves()) {
+      read_curve_positions(*curves_to_curve_eval(*set.get_curves_for_read()), transforms, &coords);
     }
   }
   return hull_from_bullet(nullptr, coords);

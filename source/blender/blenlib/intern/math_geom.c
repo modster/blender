@@ -1,23 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * The Original Code is: some of this file.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup bli
@@ -920,6 +902,18 @@ float dist_squared_to_projected_aabb_simple(const float projmat[4][4],
 }
 
 /** \} */
+
+float dist_seg_seg_v2(const float a1[3], const float a2[3], const float b1[3], const float b2[3])
+{
+  if (isect_seg_seg_v2_simple(a1, a2, b1, b2)) {
+    return 0.0f;
+  }
+  const float d1 = dist_squared_to_line_segment_v2(a1, b1, b2);
+  const float d2 = dist_squared_to_line_segment_v2(a2, b1, b2);
+  const float d3 = dist_squared_to_line_segment_v2(b1, a1, a2);
+  const float d4 = dist_squared_to_line_segment_v2(b2, a1, a2);
+  return sqrtf(min_ffff(d1, d2, d3, d4));
+}
 
 void closest_on_tri_to_point_v3(
     float r[3], const float p[3], const float v1[3], const float v2[3], const float v3[3])
@@ -3299,8 +3293,8 @@ static bool point_in_slice(const float p[3],
   return (h >= 0.0f && h <= 1.0f);
 }
 
-/* adult sister defining the slice planes by the origin and the normal
- * NOTE |normal| may not be 1 but defining the thickness of the slice */
+/* Adult sister defining the slice planes by the origin and the normal.
+ * NOTE: |normal| may not be 1 but defining the thickness of the slice. */
 static bool point_in_slice_as(const float p[3], const float origin[3], const float normal[3])
 {
   float h, rp[3];
@@ -3720,7 +3714,7 @@ void barycentric_weights_v2_quad(const float v1[2],
   /* NOTE(campbell): fabsf() here is not needed for convex quads
    * (and not used in #interp_weights_poly_v2).
    * But in the case of concave/bow-tie quads for the mask rasterizer it
-   * gives unreliable results without adding absf(). If this becomes an issue for more general
+   * gives unreliable results without adding `absf()`. If this becomes an issue for more general
    * usage we could have this optional or use a different function. */
 #define MEAN_VALUE_HALF_TAN_V2(_area, i1, i2) \
   ((_area = cross_v2v2(dirs[i1], dirs[i2])) != 0.0f ? \

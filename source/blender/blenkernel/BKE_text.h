@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 #pragma once
 
 /** \file
@@ -29,6 +13,8 @@ extern "C" {
 struct Main;
 struct Text;
 struct TextLine;
+
+#include "BLI_compiler_attrs.h"
 
 /**
  * \note caller must handle `compiled` member.
@@ -71,7 +57,8 @@ void BKE_text_write(struct Text *text, const char *str);
 int BKE_text_file_modified_check(struct Text *text);
 void BKE_text_file_modified_ignore(struct Text *text);
 
-char *txt_to_buf(struct Text *text, int *r_buf_strlen);
+char *txt_to_buf(struct Text *text, int *r_buf_strlen)
+    ATTR_NONNULL(1, 2) ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;
 void txt_clean_text(struct Text *text);
 void txt_order_cursors(struct Text *text, bool reverse);
 int txt_find_string(struct Text *text, const char *findstr, int wrap, int match_case);
@@ -151,11 +138,12 @@ enum {
 /**
  * Create a buffer, the only requirement is #txt_from_buf_for_undo can decode it.
  */
-char *txt_to_buf_for_undo(struct Text *text, int *r_buf_len);
+char *txt_to_buf_for_undo(struct Text *text, int *r_buf_len)
+    ATTR_NONNULL(1, 2) ATTR_WARN_UNUSED_RESULT ATTR_RETURNS_NONNULL;
 /**
  * Decode a buffer from #txt_to_buf_for_undo.
  */
-void txt_from_buf_for_undo(struct Text *text, const char *buf, int buf_len);
+void txt_from_buf_for_undo(struct Text *text, const char *buf, int buf_len) ATTR_NONNULL(1, 2);
 
 #ifdef __cplusplus
 }

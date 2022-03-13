@@ -1,22 +1,5 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2016, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2016 Blender Foundation. All rights reserved.
 
 # Libraries configuration for any *nix system including Linux and Unix (excluding APPLE).
 
@@ -47,6 +30,9 @@ if(NOT DEFINED LIBDIR)
   unset(LIBDIR_NATIVE_ABI)
   unset(LIBDIR_CENTOS7_ABI)
 endif()
+
+# Support restoring this value once pre-compiled libraries have been handled.
+set(WITH_STATIC_LIBS_INIT ${WITH_STATIC_LIBS})
 
 if(EXISTS ${LIBDIR})
   message(STATUS "Using pre-compiled LIBDIR: ${LIBDIR}")
@@ -100,7 +86,22 @@ find_package_wrapper(JPEG REQUIRED)
 find_package_wrapper(PNG REQUIRED)
 find_package_wrapper(ZLIB REQUIRED)
 find_package_wrapper(Zstd REQUIRED)
-find_package_wrapper(Freetype REQUIRED)
+
+if(NOT WITH_SYSTEM_FREETYPE)
+  # FreeType compiled with Brotli compression for woff2.
+  find_package_wrapper(Freetype REQUIRED)
+  if(EXISTS ${LIBDIR})
+    find_package_wrapper(Brotli REQUIRED)
+
+    # NOTE: This is done on WIN32 & APPLE but fails on some Linux systems.
+    # See: https://devtalk.blender.org/t/22536
+    # So `BROTLI_LIBRARIES` need to be added directly after `FREETYPE_LIBRARIES`.
+    #
+    # list(APPEND FREETYPE_LIBRARIES
+    #   ${BROTLI_LIBRARIES}
+    # )
+  endif()
+endif()
 
 if(WITH_PYTHON)
   # No way to set py35, remove for now.
@@ -344,6 +345,7 @@ if(WITH_BOOST)
       find_package(IcuLinux)
     endif()
     mark_as_advanced(Boost_DIR)  # why doesn't boost do this?
+    mark_as_advanced(Boost_INCLUDE_DIR)  # why doesn't boost do this?
   endif()
 
   set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
@@ -535,6 +537,21 @@ add_definitions(-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
 # System Libraries
 #
 # Keep last, so indirectly linked libraries don't override our own pre-compiled libs.
+
+if(EXISTS ${LIBDIR})
+  # Clear the prefix path as it causes the `LIBDIR` to override system locations.
+  unset(CMAKE_PREFIX_PATH)
+
+  # Since the pre-compiled `LIBDIR` directories have been handled, don't prefer static libraries.
+  set(WITH_STATIC_LIBS ${WITH_STATIC_LIBS_INIT})
+endif()
+
+if(WITH_SYSTEM_FREETYPE)
+  find_package_wrapper(Freetype)
+  if(NOT FREETYPE_FOUND)
+    message(FATAL_ERROR "Failed finding system FreeType version!")
+  endif()
+endif()
 
 if(WITH_LZO AND WITH_SYSTEM_LZO)
   find_package_wrapper(LZO)
@@ -832,3 +849,45 @@ if(WITH_COMPILER_CCACHE)
     set(WITH_COMPILER_CCACHE OFF)
   endif()
 endif()
+
+# On some platforms certain atomic operations are not possible with assembly and/or intrinsics and
+# they are emulated in software with locks. For example, on armel there is no intrinsics to grant
+# 64 bit atomic operations and STL library uses libatomic to offload software emulation of atomics
+# to.
+# This function will check whether libatomic is required and if so will configure linker flags.
+# If atomic operations are possible without libatomic then linker flags are left as-is.
+function(CONFIGURE_ATOMIC_LIB_IF_NEEDED)
+  # Source which is used to enforce situation when software emulation of atomics is required.
+  # Assume that using 64bit integer gives a definitive answer (as in, if 64bit atomic operations
+  # are possible using assembly/intrinsics 8, 16, and 32 bit operations will also be possible.
+  set(_source
+      "#include <atomic>
+      #include <cstdint>
+      int main(int argc, char **argv) {
+        std::atomic<uint64_t> uint64; uint64++;
+        return 0;
+      }")
+
+  include(CheckCXXSourceCompiles)
+  check_cxx_source_compiles("${_source}" ATOMIC_OPS_WITHOUT_LIBATOMIC)
+
+  if(NOT ATOMIC_OPS_WITHOUT_LIBATOMIC)
+    # Compilation of the test program has failed.
+    # Try it again with -latomic to see if this is what is needed, or whether something else is
+    # going on.
+
+    set(CMAKE_REQUIRED_LIBRARIES atomic)
+    check_cxx_source_compiles("${_source}" ATOMIC_OPS_WITH_LIBATOMIC)
+
+    if(ATOMIC_OPS_WITH_LIBATOMIC)
+      set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -latomic" PARENT_SCOPE)
+    else()
+      # Atomic operations are required part of Blender and it is not possible to process forward.
+      # We expect that either standard library or libatomic will make atomics to work. If both
+      # cases has failed something fishy o na bigger scope is going on.
+      message(FATAL_ERROR "Failed to detect required configuration for atomic operations")
+    endif()
+  endif()
+endfunction()
+
+CONFIGURE_ATOMIC_LIB_IF_NEEDED()

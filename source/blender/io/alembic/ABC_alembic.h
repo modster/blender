@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
 /** \file
@@ -26,6 +12,7 @@ extern "C" {
 #endif
 
 struct CacheArchiveHandle;
+struct CacheFileLayer;
 struct CacheReader;
 struct ListBase;
 struct Main;
@@ -102,6 +89,7 @@ bool ABC_import(struct bContext *C,
 
 struct CacheArchiveHandle *ABC_create_handle(struct Main *bmain,
                                              const char *filename,
+                                             const struct CacheFileLayer *layers,
                                              struct ListBase *object_paths);
 
 void ABC_free_handle(struct CacheArchiveHandle *handle);

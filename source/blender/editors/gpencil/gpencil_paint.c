@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008, Blender Foundation
- * This is a new part of Blender
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. */
 
 /** \file
  * \ingroup edgpencil
@@ -56,6 +40,7 @@
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
+#include "BKE_gpencil_update_cache.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
@@ -250,7 +235,7 @@ typedef struct tGPsdata {
   /** key used for invoking the operator */
   short keymodifier;
   /** shift modifier flag */
-  short shift;
+  bool shift;
   /** size in pixels for uv calculation */
   float totpixlen;
   /** Special mode for fill brush. */
@@ -462,21 +447,21 @@ static void gpencil_stroke_convertcoords(tGPsdata *p,
     }
 
     float mval_prj[2];
-    float rvec[3], dvec[3];
-    float mval_f[2];
-    float zfac;
+    float rvec[3];
 
     /* Current method just converts each point in screen-coordinates to
      * 3D-coordinates using the 3D-cursor as reference. In general, this
      * works OK, but it could of course be improved. */
 
     gpencil_get_3d_reference(p, rvec);
-    zfac = ED_view3d_calc_zfac(p->region->regiondata, rvec, NULL);
+    const float zfac = ED_view3d_calc_zfac(p->region->regiondata, rvec);
 
     if (ED_view3d_project_float_global(p->region, rvec, mval_prj, V3D_PROJ_TEST_NOP) ==
         V3D_PROJ_RET_OK) {
-      sub_v2_v2v2(mval_f, mval_prj, mval);
-      ED_view3d_win_to_delta(p->region, mval_f, dvec, zfac);
+      float dvec[3];
+      float xy_delta[2];
+      sub_v2_v2v2(xy_delta, mval_prj, mval);
+      ED_view3d_win_to_delta(p->region, xy_delta, zfac, dvec);
       sub_v3_v3v3(out, rvec, dvec);
     }
     else {
@@ -1341,6 +1326,7 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
   }
 
   gpencil_update_cache(p->gpd);
+  BKE_gpencil_tag_full_update(p->gpd, gpl, p->gpf, NULL);
 }
 
 /* --- 'Eraser' for 'Paint' Tool ------ */
@@ -2108,6 +2094,9 @@ static void gpencil_session_cleanup(tGPsdata *p)
   gpd->runtime.sbuffer_used = 0;
   gpd->runtime.sbuffer_size = 0;
   gpd->runtime.sbuffer_sflag = 0;
+  /* This update is required for update-on-write because the sbuffer data is not longer overwritten
+   * by a copy-on-write. */
+  ED_gpencil_sbuffer_update_eval(gpd, p->ob_eval);
   p->inittime = 0.0;
 }
 
@@ -2136,6 +2125,7 @@ static void gpencil_paint_initstroke(tGPsdata *p,
   p->gpl = BKE_gpencil_layer_active_get(p->gpd);
   if (p->gpl == NULL) {
     p->gpl = BKE_gpencil_layer_addnew(p->gpd, DATA_("GP_Layer"), true, false);
+    BKE_gpencil_tag_full_update(p->gpd, NULL, NULL, NULL);
     changed = true;
     if (p->custom_color[3]) {
       copy_v3_v3(p->gpl->color, p->custom_color);
@@ -2218,10 +2208,15 @@ static void gpencil_paint_initstroke(tGPsdata *p,
     }
 
     bool need_tag = p->gpl->actframe == NULL;
+    bGPDframe *actframe = p->gpl->actframe;
+
     p->gpf = BKE_gpencil_layer_frame_get(p->gpl, CFRA, add_frame_mode);
     /* Only if there wasn't an active frame, need update. */
     if (need_tag) {
-      DEG_id_tag_update(&p->gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+      DEG_id_tag_update(&p->gpd->id, ID_RECALC_GEOMETRY);
+    }
+    if (actframe != p->gpl->actframe) {
+      BKE_gpencil_tag_full_update(p->gpd, p->gpl, NULL, NULL);
     }
 
     if (p->gpf == NULL) {
@@ -2846,11 +2841,11 @@ static void gpencil_draw_apply_event(bContext *C,
    * add any x,y override position
    */
   copy_v2fl_v2i(p->mval, event->mval);
-  p->shift = event->shift;
+  p->shift = (event->modifier & KM_SHIFT) != 0;
 
   /* verify direction for straight lines and guides */
   if ((is_speed_guide) ||
-      (event->alt && (RNA_boolean_get(op->ptr, "disable_straight") == false))) {
+      ((event->modifier & KM_ALT) && (RNA_boolean_get(op->ptr, "disable_straight") == false))) {
     if (p->straight == 0) {
       int dx = (int)fabsf(p->mval[0] - p->mvali[0]);
       int dy = (int)fabsf(p->mval[1] - p->mvali[1]);
@@ -2891,13 +2886,13 @@ static void gpencil_draw_apply_event(bContext *C,
 
   /* special eraser modes */
   if (p->paintmode == GP_PAINTMODE_ERASER) {
-    if (event->shift) {
+    if (event->modifier & KM_SHIFT) {
       p->flags |= GP_PAINTFLAG_HARD_ERASER;
     }
     else {
       p->flags &= ~GP_PAINTFLAG_HARD_ERASER;
     }
-    if (event->alt) {
+    if (event->modifier & KM_ALT) {
       p->flags |= GP_PAINTFLAG_STROKE_ERASER;
     }
     else {
@@ -3121,11 +3116,11 @@ static void gpencil_guide_event_handling(bContext *C,
   else if ((event->type == EVT_LKEY) && (event->val == KM_RELEASE)) {
     add_notifier = true;
     guide->use_guide = true;
-    if (event->ctrl) {
+    if (event->modifier & KM_CTRL) {
       guide->angle = 0.0f;
       guide->type = GP_GUIDE_PARALLEL;
     }
-    else if (event->alt) {
+    else if (event->modifier & KM_ALT) {
       guide->type = GP_GUIDE_PARALLEL;
       guide->angle = RNA_float_get(op->ptr, "guide_last_angle");
     }
@@ -3155,10 +3150,10 @@ static void gpencil_guide_event_handling(bContext *C,
     add_notifier = true;
     float angle = guide->angle;
     float adjust = (float)M_PI / 180.0f;
-    if (event->alt) {
+    if (event->modifier & KM_ALT) {
       adjust *= 45.0f;
     }
-    else if (!event->shift) {
+    else if ((event->modifier & KM_SHIFT) == 0) {
       adjust *= 15.0f;
     }
     angle += (event->type == EVT_JKEY) ? adjust : -adjust;
@@ -3330,7 +3325,7 @@ static void gpencil_brush_angle_segment(tGPsdata *p, tGPspoint *pt_prev, tGPspoi
   CLAMP(pt->pressure, GPENCIL_ALPHA_OPACITY_THRESH, 1.0f);
 }
 
-/* Add arc points between two mouse events using the previous segment to determine the vertice of
+/* Add arc points between two mouse events using the previous segment to determine the vertex of
  * the arc.
  *        /+ CTL
  *       / |
@@ -3340,7 +3335,7 @@ static void gpencil_brush_angle_segment(tGPsdata *p, tGPspoint *pt_prev, tGPspoi
  *   /
  *  + PtA - 1
  * /
- * CTL is the vertice of the triangle created between PtA and PtB */
+ * CTL is the vertex of the triangle created between PtA and PtB */
 static void gpencil_add_arc_points(tGPsdata *p, const float mval[2], int segments)
 {
   bGPdata *gpd = p->gpd;
@@ -3638,7 +3633,7 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
        */
     }
     else if (event->type == EVT_ZKEY) {
-      if (event->ctrl) {
+      if (event->modifier & KM_CTRL) {
         p->status = GP_STATUS_DONE;
         estate = OPERATOR_FINISHED;
       }
@@ -3654,10 +3649,10 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
                   EVT_PAD7,
                   EVT_PAD8,
                   EVT_PAD9)) {
-      /* allow numpad keys so that camera/view manipulations can still take place
-       * - PAD0 in particular is really important for Grease Pencil drawing,
+      /* Allow numpad keys so that camera/view manipulations can still take place
+       * - #EVT_PAD0 in particular is really important for Grease Pencil drawing,
        *   as animators may be working "to camera", so having this working
-       *   is essential for ensuring that they can quickly return to that view
+       *   is essential for ensuring that they can quickly return to that view.
        */
     }
     else if ((!ELEM(p->paintmode, GP_PAINTMODE_ERASER, GP_PAINTMODE_SET_CP))) {

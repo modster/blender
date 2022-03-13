@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -346,9 +332,9 @@ static void spline_copy_builtin_attributes(const Spline &spline,
   copy_data_based_on_mask(spline.radii(), r_spline.radii(), mask);
   copy_data_based_on_mask(spline.tilts(), r_spline.tilts(), mask);
   switch (spline.type()) {
-    case Spline::Type::Poly:
+    case CURVE_TYPE_POLY:
       break;
-    case Spline::Type::Bezier: {
+    case CURVE_TYPE_BEZIER: {
       const BezierSpline &src = static_cast<const BezierSpline &>(spline);
       BezierSpline &dst = static_cast<BezierSpline &>(r_spline);
       copy_data_based_on_mask(src.handle_positions_left(), dst.handle_positions_left(), mask);
@@ -357,10 +343,14 @@ static void spline_copy_builtin_attributes(const Spline &spline,
       copy_data_based_on_mask(src.handle_types_right(), dst.handle_types_right(), mask);
       break;
     }
-    case Spline::Type::NURBS: {
+    case CURVE_TYPE_NURBS: {
       const NURBSpline &src = static_cast<const NURBSpline &>(spline);
       NURBSpline &dst = static_cast<NURBSpline &>(r_spline);
       copy_data_based_on_mask(src.weights(), dst.weights(), mask);
+      break;
+    }
+    case CURVE_TYPE_CATMULL_ROM: {
+      BLI_assert_unreachable();
       break;
     }
   }
@@ -485,12 +475,12 @@ static void separate_curve_selection(GeometrySet &geometry_set,
   selection_evaluator.evaluate();
   const VArray_Span<bool> &selection = selection_evaluator.get_evaluated<bool>(0);
   std::unique_ptr<CurveEval> r_curve = curve_separate(
-      *src_component.get_for_read(), selection, selection_domain, invert);
+      *curves_to_curve_eval(*src_component.get_for_read()), selection, selection_domain, invert);
   if (r_curve) {
-    geometry_set.replace_curve(r_curve.release());
+    geometry_set.replace_curves(curve_eval_to_curves(*r_curve));
   }
   else {
-    geometry_set.replace_curve(nullptr);
+    geometry_set.replace_curves(nullptr);
   }
 }
 
@@ -1296,7 +1286,7 @@ void separate_geometry(GeometrySet &geometry_set,
       some_valid_domain = true;
     }
   }
-  if (geometry_set.has_curve()) {
+  if (geometry_set.has_curves()) {
     if (ELEM(domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CURVE)) {
       file_ns::separate_curve_selection(geometry_set, selection_field, domain, invert);
       some_valid_domain = true;

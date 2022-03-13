@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2007 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2007 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup nodes
@@ -415,6 +399,22 @@ static void ntree_shader_groups_expand_inputs(bNodeTree *localtree)
 
   if (link_added) {
     BKE_ntree_update_main_tree(G.main, localtree, nullptr);
+  }
+}
+
+static void ntree_shader_groups_remove_muted_links(bNodeTree *ntree)
+{
+  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+    if (node->type == NODE_GROUP) {
+      if (node->id != nullptr) {
+        ntree_shader_groups_remove_muted_links(reinterpret_cast<bNodeTree *>(node->id));
+      }
+    }
+  }
+  LISTBASE_FOREACH_MUTABLE (bNodeLink *, link, &ntree->links) {
+    if (link->flag & NODE_LINK_MUTED) {
+      nodeRemLink(ntree, link);
+    }
   }
 }
 
@@ -875,6 +875,7 @@ void ntreeGPUMaterialNodes(bNodeTree *localtree,
 
   bNode *output = ntreeShaderOutputNode(localtree, SHD_OUTPUT_EEVEE);
 
+  ntree_shader_groups_remove_muted_links(localtree);
   ntree_shader_groups_expand_inputs(localtree);
 
   ntree_shader_groups_flatten(localtree);

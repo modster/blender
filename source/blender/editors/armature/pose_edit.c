@@ -1,25 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- * Pose Mode API's and Operators for Pose Mode armatures
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup edarmature
+ * Pose Mode API's and Operators for Pose Mode armatures.
  */
 
 #include "MEM_guardedalloc.h"
@@ -149,36 +133,6 @@ bool ED_object_posemode_exit(bContext *C, Object *ob)
   return ok;
 }
 
-/* if a selected or active bone is protected, throw error (only if warn == 1) and return 1 */
-/* only_selected == 1: the active bone is allowed to be protected */
-#if 0 /* UNUSED 2.5 */
-static bool pose_has_protected_selected(Object *ob, short warn)
-{
-  /* check protection */
-  if (ob->proxy) {
-    bPoseChannel *pchan;
-    bArmature *arm = ob->data;
-
-    for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
-      if (pchan->bone && BKE_pose_is_layer_visible(arm, pchan)) {
-        if (pchan->bone->layer & arm->layer_protected) {
-          if (pchan->bone->flag & BONE_SELECTED) {
-            break;
-          }
-        }
-      }
-    }
-    if (pchan) {
-      if (warn) {
-        error("Cannot change Proxy protected bones");
-      }
-      return 1;
-    }
-  }
-  return 0;
-}
-#endif
-
 /* ********************************************** */
 /* Motion Paths */
 
@@ -266,8 +220,8 @@ static int pose_calculate_paths_invoke(bContext *C, wmOperator *op, const wmEven
     bAnimVizSettings *avs = &ob->pose->avs;
     PointerRNA avs_ptr;
 
-    RNA_int_set(op->ptr, "start_frame", avs->path_sf);
-    RNA_int_set(op->ptr, "end_frame", avs->path_ef);
+    RNA_enum_set(op->ptr, "display_type", avs->path_type);
+    RNA_enum_set(op->ptr, "range", avs->path_range);
 
     RNA_pointer_create(NULL, &RNA_AnimVizMotionPaths, avs, &avs_ptr);
     RNA_enum_set(op->ptr, "bake_location", RNA_enum_get(&avs_ptr, "bake_location"));
@@ -275,7 +229,7 @@ static int pose_calculate_paths_invoke(bContext *C, wmOperator *op, const wmEven
 
   /* show popup dialog to allow editing of range... */
   /* FIXME: hard-coded dimensions here are just arbitrary. */
-  return WM_operator_props_dialog_popup(C, op, 200);
+  return WM_operator_props_dialog_popup(C, op, 270);
 }
 
 /* For the object with pose/action: create path curves for selected bones
@@ -295,8 +249,9 @@ static int pose_calculate_paths_exec(bContext *C, wmOperator *op)
     bAnimVizSettings *avs = &ob->pose->avs;
     PointerRNA avs_ptr;
 
-    avs->path_sf = RNA_int_get(op->ptr, "start_frame");
-    avs->path_ef = RNA_int_get(op->ptr, "end_frame");
+    avs->path_type = RNA_enum_get(op->ptr, "display_type");
+    avs->path_range = RNA_enum_get(op->ptr, "range");
+    animviz_motionpath_compute_range(ob, scene);
 
     RNA_pointer_create(NULL, &RNA_AnimVizMotionPaths, avs, &avs_ptr);
     RNA_enum_set(&avs_ptr, "bake_location", RNA_enum_get(op->ptr, "bake_location"));
@@ -304,7 +259,6 @@ static int pose_calculate_paths_exec(bContext *C, wmOperator *op)
 
   /* set up path data for bones being calculated */
   CTX_DATA_BEGIN (C, bPoseChannel *, pchan, selected_pose_bones_from_active_object) {
-    /* verify makes sure that the selected bone has a bone with the appropriate settings */
     animviz_verify_motionpaths(op->reports, scene, ob, pchan);
   }
   CTX_DATA_END;
@@ -327,6 +281,19 @@ static int pose_calculate_paths_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+static bool pose_calculate_paths_poll(bContext *C)
+{
+  if (!ED_operator_posemode_exclusive(C)) {
+    return false;
+  }
+  Object *ob = CTX_data_active_object(C);
+  bArmature *arm = ob->data;
+  if (ELEM(NULL, ob, arm, ob->pose)) {
+    return false;
+  }
+  return true;
+}
+
 void POSE_OT_paths_calculate(wmOperatorType *ot)
 {
   /* identifiers */
@@ -337,30 +304,24 @@ void POSE_OT_paths_calculate(wmOperatorType *ot)
   /* api callbacks */
   ot->invoke = pose_calculate_paths_invoke;
   ot->exec = pose_calculate_paths_exec;
-  ot->poll = ED_operator_posemode_exclusive;
+  ot->poll = pose_calculate_paths_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* properties */
-  RNA_def_int(ot->srna,
-              "start_frame",
-              1,
-              MINAFRAME,
-              MAXFRAME,
-              "Start",
-              "First frame to calculate bone paths on",
-              MINFRAME,
-              MAXFRAME / 2.0);
-  RNA_def_int(ot->srna,
-              "end_frame",
-              250,
-              MINAFRAME,
-              MAXFRAME,
-              "End",
-              "Last frame to calculate bone paths on",
-              MINFRAME,
-              MAXFRAME / 2.0);
+  RNA_def_enum(ot->srna,
+               "display_type",
+               rna_enum_motionpath_display_type_items,
+               MOTIONPATH_TYPE_RANGE,
+               "Display type",
+               "");
+  RNA_def_enum(ot->srna,
+               "range",
+               rna_enum_motionpath_range_items,
+               MOTIONPATH_RANGE_SCENE,
+               "Computation Range",
+               "");
 
   RNA_def_enum(ot->srna,
                "bake_location",
@@ -382,7 +343,7 @@ static bool pose_update_paths_poll(bContext *C)
   return false;
 }
 
-static int pose_update_paths_exec(bContext *C, wmOperator *UNUSED(op))
+static int pose_update_paths_exec(bContext *C, wmOperator *op)
 {
   Object *ob = BKE_object_pose_armature_get(CTX_data_active_object(C));
   Scene *scene = CTX_data_scene(C);
@@ -390,6 +351,13 @@ static int pose_update_paths_exec(bContext *C, wmOperator *UNUSED(op))
   if (ELEM(NULL, ob, scene)) {
     return OPERATOR_CANCELLED;
   }
+  animviz_motionpath_compute_range(ob, scene);
+
+  /* set up path data for bones being calculated */
+  CTX_DATA_BEGIN (C, bPoseChannel *, pchan, selected_pose_bones_from_active_object) {
+    animviz_verify_motionpaths(op->reports, scene, ob, pchan);
+  }
+  CTX_DATA_END;
 
   /* Calculate the bones that now have motion-paths. */
   /* TODO: only make for the selected bones? */
@@ -473,7 +441,7 @@ static int pose_clear_paths_exec(bContext *C, wmOperator *op)
 /* operator callback/wrapper */
 static int pose_clear_paths_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if ((event->shift) && !RNA_struct_property_is_set(op->ptr, "only_selected")) {
+  if ((event->modifier & KM_SHIFT) && !RNA_struct_property_is_set(op->ptr, "only_selected")) {
     RNA_boolean_set(op->ptr, "only_selected", true);
   }
   return pose_clear_paths_exec(C, op);
@@ -1055,10 +1023,6 @@ static int pose_hide_exec(bContext *C, wmOperator *op)
   for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
     Object *ob_iter = objects[ob_index];
     bArmature *arm = ob_iter->data;
-
-    if (ob_iter->proxy != NULL) {
-      BKE_report(op->reports, RPT_INFO, "Undo of hiding can only be done with Reveal Selected");
-    }
 
     bool changed = bone_looper(ob_iter, arm->bonebase.first, hide_select_p, hide_pose_bone_fn) !=
                    0;
