@@ -249,38 +249,6 @@ static void write_mcol(const OCompoundProperty &prop,
   config.abc_vertex_colors[vcol_name] = param;
 }
 
-void write_generated_coordinates(const OCompoundProperty &prop, CDStreamConfig &config)
-{
-  Mesh *mesh = config.mesh;
-  const void *customdata = CustomData_get_layer(&mesh->vdata, CD_ORCO);
-  if (customdata == nullptr) {
-    /* Data not available, so don't even bother creating an Alembic property for it. */
-    return;
-  }
-  const float(*orcodata)[3] = static_cast<const float(*)[3]>(customdata);
-
-  /* Convert 3D vertices from float[3] z=up to V3f y=up. */
-  std::vector<Imath::V3f> coords(config.totvert);
-  float orco_yup[3];
-  for (int vertex_idx = 0; vertex_idx < config.totvert; vertex_idx++) {
-    copy_yup_from_zup(orco_yup, orcodata[vertex_idx]);
-    coords[vertex_idx].setValue(orco_yup[0], orco_yup[1], orco_yup[2]);
-  }
-
-  /* ORCOs are always stored in the normalized 0..1 range in Blender, but Alembic stores them
-   * unnormalized, so we need to unnormalize (invert transform) them. */
-  BKE_mesh_orco_verts_transform(
-      mesh, reinterpret_cast<float(*)[3]>(&coords[0]), mesh->totvert, true);
-
-  if (!config.abc_orco.valid()) {
-    /* Create the Alembic property and keep a reference so future frames can reuse it. */
-    config.abc_orco = OV3fGeomParam(prop, propNameOriginalCoordinates, false, kVertexScope, 1);
-  }
-
-  OV3fGeomParam::Sample sample(coords, kVertexScope);
-  config.abc_orco.set(sample);
-}
-
 void write_custom_data(const OCompoundProperty &prop,
                        CDStreamConfig &config,
                        CustomData *data,
@@ -407,115 +375,94 @@ template<> struct type_trait_converter<ColorGeometry4f> {
   }
 };
 
-class GenericAttributeExporter {
- public:
-  void export_attributes(ID *id)
-  {
-    DomainInfo domain_info[ATTR_DOMAIN_NUM];
-    BKE_id_attribute_get_domains(id, domain_info);
+void GenericAttributeExporter::export_attributes()
+{
+  DomainInfo domain_info[ATTR_DOMAIN_NUM];
+  BKE_id_attribute_get_domains(m_id, domain_info);
 
-    export_attribute_for_domain(domain_info[ATTR_DOMAIN_POINT], ATTR_DOMAIN_POINT);
-    export_attribute_for_domain(domain_info[ATTR_DOMAIN_FACE], ATTR_DOMAIN_FACE);
-    export_attribute_for_domain(domain_info[ATTR_DOMAIN_CORNER], ATTR_DOMAIN_CORNER);
-    export_attribute_for_domain(domain_info[ATTR_DOMAIN_CURVE], ATTR_DOMAIN_CURVE);
+  export_attribute_for_domain(domain_info[ATTR_DOMAIN_POINT], ATTR_DOMAIN_POINT);
+  export_attribute_for_domain(domain_info[ATTR_DOMAIN_FACE], ATTR_DOMAIN_FACE);
+  export_attribute_for_domain(domain_info[ATTR_DOMAIN_CORNER], ATTR_DOMAIN_CORNER);
+  export_attribute_for_domain(domain_info[ATTR_DOMAIN_CURVE], ATTR_DOMAIN_CURVE);
+}
+
+void GenericAttributeExporter::export_generated_coordinates(CustomDataLayer *layer,
+                                                            DomainInfo info,
+                                                            AttributeDomain domain)
+{
+  BLI_assert_msg(GS(m_id->name) == ID_ME, "ORCO layer found on an ID that is not a Mesh!");
+
+  Mesh *mesh = reinterpret_cast<Mesh *>(m_id);
+  /* Duplicate data for transformation. */
+  float3 *export_data = static_cast<float3 *>(MEM_dupallocN(layer->data));
+
+  /* ORCOs are always stored in the normalized 0..1 range in Blender, but Alembic stores them
+   * unnormalized, so we need to unnormalize (invert transform) them. */
+  BKE_mesh_orco_verts_transform(
+      mesh, reinterpret_cast<float(*)[3]>(&export_data[0].x), mesh->totvert, true);
+
+  int64_t size = static_cast<int64_t>(info.length);
+  blender::Span<float3> data_span(export_data, size);
+  this->export_attribute(data_span, propNameOriginalCoordinates.c_str(), domain);
+  MEM_freeN(export_data);
+}
+
+void GenericAttributeExporter::export_attribute_for_domain(DomainInfo info, AttributeDomain domain)
+{
+  if (info.length == 0 || info.customdata == nullptr || info.customdata->layers == nullptr ||
+      info.customdata->totlayer == 0) {
+    return;
   }
 
- protected:
-  virtual void export_attribute(blender::Span<bool> span,
-                                const char *name,
-                                AttributeDomain domain) = 0;
+  CustomData *customdata = info.customdata;
+  for (int i = 0; i < customdata->totlayer; i++) {
+    CustomDataLayer *layer = &customdata->layers[i];
 
-  virtual void export_attribute(blender::Span<char> span,
-                                const char *name,
-                                AttributeDomain domain) = 0;
-
-  virtual void export_attribute(blender::Span<int> span,
-                                const char *name,
-                                AttributeDomain domain) = 0;
-
-  virtual void export_attribute(blender::Span<float> span,
-                                const char *name,
-                                AttributeDomain domain) = 0;
-
-  virtual void export_attribute(blender::Span<float2> span,
-                                const char *name,
-                                AttributeDomain domain) = 0;
-
-  virtual void export_attribute(blender::Span<float3> span,
-                                const char *name,
-                                AttributeDomain domain) = 0;
-
-  virtual void export_attribute(blender::Span<ColorGeometry4f> span,
-                                const char *name,
-                                AttributeDomain domain) = 0;
-
-  virtual void export_attribute(blender::Span<MLoopUV> span,
-                                const char *name,
-                                AttributeDomain domain) = 0;
-
-  virtual void export_attribute(blender::Span<MCol> span,
-                                const char *name,
-                                AttributeDomain domain) = 0;
-
-  template<typename BlenderDataType>
-  void export_customdata_layer(CustomDataLayer *layer, DomainInfo info, AttributeDomain domain)
-  {
-    BlenderDataType *data = static_cast<BlenderDataType *>(layer->data);
-    int64_t size = static_cast<int64_t>(info.length);
-    blender::Span<BlenderDataType> data_span(data, size);
-    this->export_attribute(data_span, layer->name, domain);
-  }
-
-  void export_attribute_for_domain(DomainInfo info, AttributeDomain domain)
-  {
-    if (info.length == 0 || info.customdata == nullptr || info.customdata->layers == nullptr ||
-        info.customdata->totlayer == 0) {
-      return;
+    if (layer->type == CD_PROP_BOOL) {
+      export_customdata_layer<bool>(layer, info, domain);
     }
-
-    CustomData *customdata = info.customdata;
-    for (int i = 0; i < customdata->totlayer; i++) {
-      CustomDataLayer *layer = &customdata->layers[i];
-
-      if (layer->type == CD_PROP_BOOL) {
-        export_customdata_layer<bool>(layer, info, domain);
-      }
-      else if (layer->type == CD_PROP_INT8) {
-        export_customdata_layer<char>(layer, info, domain);
-      }
-      else if (layer->type == CD_PROP_INT32) {
-        export_customdata_layer<int>(layer, info, domain);
-      }
-      else if (layer->type == CD_PROP_COLOR) {
-        export_customdata_layer<ColorGeometry4f>(layer, info, domain);
-      }
-      else if (layer->type == CD_PROP_FLOAT) {
-        export_customdata_layer<float>(layer, info, domain);
-      }
-      else if (layer->type == CD_PROP_FLOAT2) {
-        export_customdata_layer<float2>(layer, info, domain);
-      }
-      else if (layer->type == CD_PROP_FLOAT3) {
-        // todo: velocities
-        export_customdata_layer<float3>(layer, info, domain);
-      }
-      else if (layer->type == CD_MLOOPUV) {
-        BLI_assert_msg(domain == ATTR_DOMAIN_CORNER, "MLoopUVs found on non-corner domain!");
+    else if (layer->type == CD_PROP_INT8) {
+      export_customdata_layer<char>(layer, info, domain);
+    }
+    else if (layer->type == CD_PROP_INT32) {
+      export_customdata_layer<int>(layer, info, domain);
+    }
+    else if (layer->type == CD_PROP_COLOR) {
+      export_customdata_layer<ColorGeometry4f>(layer, info, domain);
+    }
+    else if (layer->type == CD_PROP_FLOAT) {
+      export_customdata_layer<float>(layer, info, domain);
+    }
+    else if (layer->type == CD_PROP_FLOAT2) {
+      export_customdata_layer<float2>(layer, info, domain);
+    }
+    else if (layer->type == CD_PROP_FLOAT3) {
+      export_customdata_layer<float3>(layer, info, domain);
+    }
+    else if (layer->type == CD_MLOOPUV) {
+      BLI_assert_msg(domain == ATTR_DOMAIN_CORNER, "MLoopUVs found on non-corner domain!");
+      if (cd_mask & CD_MASK_MLOOPUV) {
         export_customdata_layer<MLoopUV>(layer, info, domain);
       }
-      else if (layer->type == CD_MCOL) {
-        BLI_assert_msg(domain == ATTR_DOMAIN_CORNER, "MCol found on non-corner domain!");
+    }
+    else if (layer->type == CD_MCOL) {
+      BLI_assert_msg(domain == ATTR_DOMAIN_CORNER, "MCol found on non-corner domain!");
+      if (cd_mask & CD_MASK_MCOL) {
         export_customdata_layer<MCol>(layer, info, domain);
       }
-      else if (layer->type == CD_ORCO) {
-        // todo CD_ORCO
+    }
+    else if (layer->type == CD_ORCO) {
+      if (cd_mask & CD_MASK_ORCO) {
+        export_generated_coordinates(layer, info, domain);
       }
     }
   }
-};
+}
 
 class AlembicAttributeExporter final : public GenericAttributeExporter {
   const OCompoundProperty &prop;
+
+  int timesample_index_ = 0;
 
   std::map<std::string, OBoolGeomParam> bool_params;
   std::map<std::string, OCharGeomParam> int8_params;
@@ -528,8 +475,11 @@ class AlembicAttributeExporter final : public GenericAttributeExporter {
   std::map<std::string, OC4fGeomParam> mcol_params;
 
  public:
-  AlembicAttributeExporter(const OCompoundProperty &prop_) : prop(prop_)
+  AlembicAttributeExporter(ID *id, int64_t cd_mask_, const OCompoundProperty &prop_);
+
+  void set_timesample_index(int timesample_index)
   {
+    timesample_index_ = timesample_index;
   }
 
  private:
@@ -555,7 +505,7 @@ class AlembicAttributeExporter final : public GenericAttributeExporter {
 
   template<typename BlenderDataType>
   void create_attribute_for_data(blender::Span<BlenderDataType> span,
-                                 const char *name,
+                                 const std::string &name,
                                  AttributeDomain domain)
   {
     const Alembic::AbcGeom::GeometryScope scope = get_scope_for_attibute_domain(domain);
@@ -579,79 +529,161 @@ class AlembicAttributeExporter final : public GenericAttributeExporter {
 
     ParamType param;
     init_param(param, name, scope);
-    // todo: param.setTimeSampling(config.timesample_index);
+    param.setTimeSampling(timesample_index_);
 
     SampleType sample(values, scope);
     param.set(sample);
   }
 
+  void create_velocity_attribute(blender::Span<float3> span, AttributeDomain domain);
+
   void export_attribute(blender::Span<bool> span,
-                        const char *name,
-                        AttributeDomain domain) override
-  {
-    create_attribute_for_data(span, name, domain);
-  }
+                        const std::string &name,
+                        AttributeDomain domain) override;
 
   void export_attribute(blender::Span<char> span,
-                        const char *name,
-                        AttributeDomain domain) override
-  {
-    create_attribute_for_data(span, name, domain);
-  }
+                        const std::string &name,
+                        AttributeDomain domain) override;
 
-  void export_attribute(blender::Span<int> span, const char *name, AttributeDomain domain) override
-  {
-    create_attribute_for_data(span, name, domain);
-  }
+  void export_attribute(blender::Span<int> span,
+                        const std::string &name,
+                        AttributeDomain domain) override;
 
   void export_attribute(blender::Span<float> span,
-                        const char *name,
-                        AttributeDomain domain) override
-  {
-    create_attribute_for_data(span, name, domain);
-  }
+                        const std::string &name,
+                        AttributeDomain domain) override;
 
   void export_attribute(blender::Span<float2> span,
-                        const char *name,
-                        AttributeDomain domain) override
-  {
-    create_attribute_for_data(span, name, domain);
-  }
+                        const std::string &name,
+                        AttributeDomain domain) override;
 
   void export_attribute(blender::Span<float3> span,
-                        const char *name,
-                        AttributeDomain domain) override
-  {
-    create_attribute_for_data(span, name, domain);
-  }
+                        const std::string &name,
+                        AttributeDomain domain) override;
 
   void export_attribute(blender::Span<ColorGeometry4f> span,
-                        const char *name,
-                        AttributeDomain domain) override
-  {
-    create_attribute_for_data(span, name, domain);
-  }
+                        const std::string &name,
+                        AttributeDomain domain) override;
 
   void export_attribute(blender::Span<MLoopUV> span,
-                        const char *name,
-                        AttributeDomain domain) override
-  {
-    // todo
-    // if active layer, set_uvs
-  }
+                        const std::string &name,
+                        AttributeDomain domain) override;
 
   void export_attribute(blender::Span<MCol> span,
-                        const char *name,
-                        AttributeDomain domain) override
-  {
-    // todo
-  }
+                        const std::string &name,
+                        AttributeDomain domain) override;
 };
 
-static void write_arbitrary_attributes(ID *id, const OCompoundProperty &arb_geom_params)
+AlembicAttributeExporter::AlembicAttributeExporter(ID *id,
+                                                   int64_t cd_mask_,
+                                                   const OCompoundProperty &prop_)
+    : GenericAttributeExporter(id, cd_mask_), prop(prop_)
 {
-  AlembicAttributeExporter exporter{arb_geom_params};
-  exporter.export_attributes(id);
+}
+
+void AlembicAttributeExporter::create_velocity_attribute(blender::Span<float3> span,
+                                                         AttributeDomain domain)
+{
+  const Alembic::AbcGeom::GeometryScope scope = get_scope_for_attibute_domain(domain);
+  BLI_assert_msg(scope == kVertexScope, "The scope of the velocities should have been validated!");
+
+  using TypeConverter = type_trait_converter<float3>;
+  std::vector<V3f> values(static_cast<size_t>(span.size()));
+  V3f *values_ptr = values.data();
+  for (float3 value : span) {
+    *values_ptr++ = TypeConverter::convert(value);
+  }
+
+  /* Use default Alembic name. */
+  static std::string name = ".velocities";
+  OV3fGeomParam param = float3_params[name];
+  if (!param.valid()) {
+    param = OV3fGeomParam(prop, name, false, scope, 1);
+    float3_params[name] = param;
+  }
+  param.setTimeSampling(timesample_index_);
+
+  OV3fGeomParam::Sample sample(values, scope);
+  param.set(sample);
+}
+
+void AlembicAttributeExporter::export_attribute(blender::Span<bool> span,
+                                                const std::string &name,
+                                                AttributeDomain domain)
+{
+  create_attribute_for_data(span, name, domain);
+}
+
+void AlembicAttributeExporter::export_attribute(blender::Span<char> span,
+                                                const std::string &name,
+                                                AttributeDomain domain)
+{
+  create_attribute_for_data(span, name, domain);
+}
+
+void AlembicAttributeExporter::export_attribute(blender::Span<int> span,
+                                                const std::string &name,
+                                                AttributeDomain domain)
+{
+  create_attribute_for_data(span, name, domain);
+}
+
+void AlembicAttributeExporter::export_attribute(blender::Span<float> span,
+                                                const std::string &name,
+                                                AttributeDomain domain)
+{
+  create_attribute_for_data(span, name, domain);
+}
+
+void AlembicAttributeExporter::export_attribute(blender::Span<float2> span,
+                                                const std::string &name,
+                                                AttributeDomain domain)
+{
+  create_attribute_for_data(span, name, domain);
+}
+
+void AlembicAttributeExporter::export_attribute(blender::Span<float3> span,
+                                                const std::string &name,
+                                                AttributeDomain domain)
+{
+  if (name == "velocity" && domain == ATTR_DOMAIN_POINT) {
+    create_velocity_attribute(span, domain);
+  }
+  else {
+    create_attribute_for_data(span, name, domain);
+  }
+}
+
+void AlembicAttributeExporter::export_attribute(blender::Span<ColorGeometry4f> span,
+                                                const std::string &name,
+                                                AttributeDomain domain)
+{
+  create_attribute_for_data(span, name, domain);
+}
+
+void AlembicAttributeExporter::export_attribute(blender::Span<MLoopUV> /*span*/,
+                                                const std::string & /*name*/,
+                                                AttributeDomain /*domain*/)
+{
+  // todo
+  // if active layer, set_uvs
+}
+
+void AlembicAttributeExporter::export_attribute(blender::Span<MCol> /*span*/,
+                                                const std::string & /*name*/,
+                                                AttributeDomain /*domain*/)
+{
+  // todo
+}
+
+GenericAttributeExporter *make_attribute_exporter(ID *id, int64_t cd_mask, OCompoundProperty &prop)
+{
+  return new AlembicAttributeExporter(id, cd_mask, prop);
+}
+
+void set_timesample_index(GenericAttributeExporter *exporter, int timesample_index)
+{
+  static_cast<AlembicAttributeExporter *>(exporter)->set_timesample_index(timesample_index);
 }
 
 /* ************************************************************************** */
@@ -1982,6 +2014,11 @@ bool AttributeSelector::select_attribute(const std::string &attr_name) const
   }
 
   return true;
+}
+
+void delete_attribute_exporter(GenericAttributeExporter *exporter)
+{
+  delete static_cast<AlembicAttributeExporter *>(exporter);
 }
 
 }  // namespace blender::io::alembic

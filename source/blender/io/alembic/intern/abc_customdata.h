@@ -13,7 +13,10 @@
 
 #include "BKE_attribute.h"
 
+#include "BLI_color.hh"
 #include "BLI_listbase_wrapper.hh"
+#include "BLI_math_vec_types.hh"
+#include "BLI_span.hh"
 
 struct CacheAttributeMapping;
 struct CustomData;
@@ -23,6 +26,7 @@ struct MLoopUV;
 struct MPoly;
 struct MVert;
 struct Mesh;
+struct MCol;
 
 using Alembic::Abc::ICompoundProperty;
 using Alembic::Abc::OCompoundProperty;
@@ -111,12 +115,89 @@ struct CDStreamConfig {
  * For now the active layer is used, maybe needs a better way to choose this. */
 const char *get_uv_sample(UVSample &sample, const CDStreamConfig &config, CustomData *data);
 
-void write_generated_coordinates(const OCompoundProperty &prop, CDStreamConfig &config);
-
 void write_custom_data(const OCompoundProperty &prop,
                        CDStreamConfig &config,
                        CustomData *data,
                        int data_type);
+
+/* Need special handling for:
+ * - creases (vertex/edge)
+ * - velocity
+ * - generated coordinate
+ * - UVs
+ * - vertex colors
+ */
+class GenericAttributeExporter {
+  ID *m_id;
+  int64_t cd_mask = CD_MASK_ALL;
+
+ public:
+  GenericAttributeExporter(ID *id, int64_t cd_mask_) : m_id(id), cd_mask(cd_mask_)
+  {
+  }
+
+  void export_attributes();
+
+ protected:
+  virtual void export_attribute(blender::Span<bool> span,
+                                const std::string &name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<char> span,
+                                const std::string &name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<int> span,
+                                const std::string &name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<float> span,
+                                const std::string &name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<float2> span,
+                                const std::string &name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<float3> span,
+                                const std::string &name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<ColorGeometry4f> span,
+                                const std::string &name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<MLoopUV> span,
+                                const std::string &name,
+                                AttributeDomain domain) = 0;
+
+  virtual void export_attribute(blender::Span<MCol> span,
+                                const std::string &name,
+                                AttributeDomain domain) = 0;
+
+  template<typename BlenderDataType>
+  void export_customdata_layer(CustomDataLayer *layer, DomainInfo info, AttributeDomain domain)
+  {
+    BlenderDataType *data = static_cast<BlenderDataType *>(layer->data);
+    int64_t size = static_cast<int64_t>(info.length);
+    blender::Span<BlenderDataType> data_span(data, size);
+    this->export_attribute(data_span, layer->name, domain);
+  }
+
+  void export_generated_coordinates(CustomDataLayer *layer,
+                                    DomainInfo info,
+                                    AttributeDomain domain);
+
+  void export_attribute_for_domain(DomainInfo info, AttributeDomain domain);
+};
+
+GenericAttributeExporter *make_attribute_exporter(ID *id,
+                                                  int64_t cd_mask,
+                                                  OCompoundProperty &prop);
+
+void set_timesample_index(GenericAttributeExporter *exporter, int timesample_index);
+
+void delete_attribute_exporter(GenericAttributeExporter *exporter);
 
 class AttributeSelector {
   /* Name of the velocity attribute, it is ignored since we deal with separately. */

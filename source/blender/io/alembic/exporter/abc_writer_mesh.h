@@ -34,8 +34,12 @@ class ABCGenericMeshWriter : public ABCAbstractWriter {
 
   CDStreamConfig m_custom_data_config;
 
+  GenericAttributeExporter *attribute_exporter_;
+
  public:
   explicit ABCGenericMeshWriter(const ABCWriterConstructorArgs &args);
+
+  ~ABCGenericMeshWriter();
 
   virtual void create_alembic_objects(const HierarchyContext *context) override;
   virtual Alembic::Abc::OObject get_alembic_object() const override;

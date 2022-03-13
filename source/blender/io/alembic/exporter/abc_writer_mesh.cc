@@ -76,6 +76,12 @@ static void get_loop_normals(struct Mesh *mesh,
 ABCGenericMeshWriter::ABCGenericMeshWriter(const ABCWriterConstructorArgs &args)
     : ABCAbstractWriter(args), is_subd_(false)
 {
+  attribute_exporter_ = nullptr;
+}
+
+ABCGenericMeshWriter::~ABCGenericMeshWriter()
+{
+  delete_attribute_exporter(attribute_exporter_);
 }
 
 void ABCGenericMeshWriter::create_alembic_objects(const HierarchyContext *context)
@@ -254,10 +260,6 @@ void ABCGenericMeshWriter::write_mesh(HierarchyContext &context, Mesh *mesh)
     mesh_sample.setNormals(normals_sample);
   }
 
-  if (args_.export_params->orcos) {
-    write_generated_coordinates(abc_poly_mesh_schema_.getArbGeomParams(), m_custom_data_config);
-  }
-
   if (get_velocities(mesh, velocities)) {
     mesh_sample.setVelocities(V3fArraySample(velocities));
   }
@@ -266,7 +268,6 @@ void ABCGenericMeshWriter::write_mesh(HierarchyContext &context, Mesh *mesh)
   mesh_sample.setSelfBounds(bounding_box_);
 
   abc_poly_mesh_schema_.set(mesh_sample);
-
   write_arb_geo_params(mesh);
 }
 
@@ -308,10 +309,6 @@ void ABCGenericMeshWriter::write_subd(HierarchyContext &context, struct Mesh *me
         abc_subdiv_schema_.getArbGeomParams(), m_custom_data_config, &mesh->ldata, CD_MLOOPUV);
   }
 
-  if (args_.export_params->orcos) {
-    write_generated_coordinates(abc_subdiv_schema_.getArbGeomParams(), m_custom_data_config);
-  }
-
   if (!edge_crease_indices.empty()) {
     subdiv_sample.setCreaseIndices(Int32ArraySample(edge_crease_indices));
     subdiv_sample.setCreaseLengths(Int32ArraySample(edge_crease_lengths));
@@ -347,8 +344,15 @@ void ABCGenericMeshWriter::write_face_sets(Object *object, struct Mesh *mesh, Sc
 
 void ABCGenericMeshWriter::write_arb_geo_params(struct Mesh *me)
 {
+  int64_t cd_mask = CD_MASK_ALL;
   if (!args_.export_params->vcolors) {
-    return;
+    cd_mask &= ~CD_MASK_MCOL;
+  }
+  if (!args_.export_params->uvs) {
+    cd_mask &= ~CD_MASK_MLOOPUV;
+  }
+  if (!args_.export_params->orcos) {
+    cd_mask &= ~CD_MASK_ORCO;
   }
 
   OCompoundProperty arb_geom_params;
@@ -358,7 +362,13 @@ void ABCGenericMeshWriter::write_arb_geo_params(struct Mesh *me)
   else {
     arb_geom_params = abc_poly_mesh_.getSchema().getArbGeomParams();
   }
-  write_custom_data(arb_geom_params, m_custom_data_config, &me->ldata, CD_MLOOPCOL);
+
+  if (!attribute_exporter_) {
+    attribute_exporter_ = make_attribute_exporter(&me->id, cd_mask, arb_geom_params);
+  }
+
+  set_timesample_index(attribute_exporter_, m_custom_data_config.timesample_index);
+  attribute_exporter_->export_attributes();
 }
 
 bool ABCGenericMeshWriter::get_velocities(struct Mesh *mesh, std::vector<Imath::V3f> &vels)
