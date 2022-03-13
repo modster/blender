@@ -68,6 +68,7 @@ typedef enum eLineArtElementNodeFlag {
   LRT_ELEMENT_IS_ADDITIONAL = (1 << 0),
   LRT_ELEMENT_BORDER_ONLY = (1 << 1),
   LRT_ELEMENT_NO_INTERSECTION = (1 << 2),
+  LRT_ELEMENT_IS_EDGE = (1 << 3),
 } eLineArtElementNodeFlag;
 
 typedef struct LineartElementLinkNode {
@@ -79,6 +80,9 @@ typedef struct LineartElementLinkNode {
 
   /** Per object value, always set, if not enabled by #ObjectLineArt, then it's set to global. */
   float crease_threshold;
+
+  /** Occlusion virtual triangle needs this postion as the 3rd point. */
+  double *cam_pos;
 } LineartElementLinkNode;
 
 typedef struct LineartEdgeSegment {
@@ -209,6 +213,7 @@ typedef struct LineartPointArrayFinal {
   int numpoints;
   struct MLoopTri *looptri; /* Refernce to original_me->runtime->looptri; */
   struct MLoop *loop;       /* Refernce to original_me->mloop; */
+  LineartElementLinkNode *eln_triangle;
 } LineartPointArrayFinal;
 
 typedef struct LineartMeshRecord {
@@ -220,6 +225,19 @@ typedef struct LineartMeshRecord {
   uint32_t intersection_pair_max;
   uint32_t intersection_pair_next;
 } LineartMeshRecord;
+
+typedef struct LineartOcclusionPair {
+  LineartElementLinkNode *eln_edge;
+  LineartElementLinkNode *eln_triangle;
+  LineartEdge *e;
+  LineartTriangle *t;
+} LineartOcclusionPair;
+
+typedef struct LineartOcclusionPairRecord {
+  LineartOcclusionPair *array;
+  uint32_t next;
+  uint32_t max_length;
+} LineartOcclusionPairRecord;
 
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
@@ -273,6 +291,7 @@ typedef struct LineartRenderBuffer {
   RTCScene rtcscene_view;
 
   LineartMeshRecord mesh_record;
+  LineartOcclusionPairRecord occlusion_record;
 
   /* Although using ListBase here, LineartEdge is single linked list.
    * list.last is used to store worker progress along the list.
@@ -410,6 +429,8 @@ typedef struct LineartObjectInfo {
   int usage;
   uint8_t override_intersection_mask;
   int global_i_offset;
+
+  uint32_t embree_geom_id;
 
   bool free_use_mesh;
 

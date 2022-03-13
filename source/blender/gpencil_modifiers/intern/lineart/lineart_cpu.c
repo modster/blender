@@ -96,9 +96,19 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *spl,
                                                         double *from,
                                                         double *to);
 
+static void OcclusionCollideFunc(void *userPtr,
+                                 struct RTCCollision *collisions,
+                                 unsigned int num_collisions);
+static void IntersectionCollideFunc(void *userPtr,
+                                    struct RTCCollision *collisions,
+                                    unsigned int num_collisions);
+
 static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e);
 
 static LineartCache *lineart_init_cache(void);
+
+static void lineart_embree_new_virtual_geometry(LineartRenderBuffer *rb,
+                                                LineartElementLinkNode *e_eln);
 
 static void lineart_discard_segment(LineartRenderBuffer *rb, LineartEdgeSegment *es)
 {
@@ -1426,6 +1436,7 @@ static void lineart_main_discard_out_of_frame_edges(LineartRenderBuffer *rb)
         e[i].flags = LRT_EDGE_FLAG_CHAIN_PICKED;
       }
     }
+    lineart_embree_new_virtual_geometry(rb, eln);
   }
 }
 
@@ -1841,6 +1852,11 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   eln->object_ref = orig_ob;
   eln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
 
+#ifdef LINEART_USE_EMBREE
+  RTCGeometry geom = rtcGetGeometry(rb->rtcscene_geom, obi->embree_geom_id);
+  rtcSetGeometryUserData(geom, eln);
+#endif
+
   /* Note this memory is not from pool, will be deleted after culling. */
   orta = MEM_callocN(sizeof(LineartTriangleAdjacent) * bm->totface, "LineartTriangleAdjacent");
   /* Link is minimal so we use pool anyway. */
@@ -1938,6 +1954,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   BLI_spin_unlock(&rb->lock_task);
   eln->element_count = allocate_la_e;
   eln->object_ref = orig_ob;
+  eln->cam_pos = rb->camera_pos;
+  eln->flags |= LRT_ELEMENT_IS_EDGE;
 
   la_e = o_la_e;
   la_s = o_la_s;
@@ -2150,6 +2168,12 @@ static void lineart_embree_clear_mesh_record(LineartRenderBuffer *rb)
   }
   rb->mesh_record.intersection_pair_max = rb->mesh_record.intersection_pair_next = 0;
 
+  if (rb->occlusion_record.array) {
+    MEM_freeN(rb->occlusion_record.array);
+  }
+  rb->occlusion_record.array = NULL;
+  rb->occlusion_record.max_length = rb->occlusion_record.next = 0;
+
   if (rb->rtcdevice) {
     rtcReleaseDevice(rb->rtcdevice);
     rb->rtcdevice = NULL;
@@ -2157,6 +2181,10 @@ static void lineart_embree_clear_mesh_record(LineartRenderBuffer *rb)
   if (rb->rtcscene_geom) {
     rtcReleaseScene(rb->rtcscene_geom);
     rb->rtcscene_geom = NULL;
+  }
+  if (rb->rtcscene_view) {
+    rtcReleaseScene(rb->rtcscene_view);
+    rb->rtcscene_view = NULL;
   }
 }
 static void lineart_embree_init_mesh_record(LineartRenderBuffer *rb)
@@ -2167,6 +2195,7 @@ static void lineart_embree_init_mesh_record(LineartRenderBuffer *rb)
   const char *config = "verbose=3";
   rb->rtcdevice = rtcNewDevice(config);
   rb->rtcscene_geom = rtcNewScene(rb->rtcdevice);
+  rb->rtcscene_view = rtcNewScene(rb->rtcdevice);
 
   rb->mesh_record.max_length = 100;
   rb->mesh_record.array = MEM_callocN(sizeof(LineartPointArrayFinal) * rb->mesh_record.max_length,
@@ -2174,6 +2203,10 @@ static void lineart_embree_init_mesh_record(LineartRenderBuffer *rb)
   rb->mesh_record.intersection_pair_max = 100;
   rb->mesh_record.intersection_record = MEM_callocN(
       sizeof(float) * rb->mesh_record.intersection_pair_max * 6, "Lineart intersection_record");
+
+  rb->occlusion_record.max_length = 100;
+  rb->occlusion_record.array = MEM_callocN(
+      sizeof(LineartOcclusionPair) * rb->occlusion_record.max_length, "Lineart occlusion_record");
 }
 
 static void lineart_embree_mesh_bounds_func(const struct RTCBoundsFunctionArguments *args)
@@ -2190,12 +2223,32 @@ static void lineart_embree_mesh_bounds_func(const struct RTCBoundsFunctionArgume
   o->lower_z = MIN3(p0[2], p1[2], p2[2]);
   o->upper_z = MAX3(p0[2], p1[2], p2[2]);
 }
-static void lineart_embree_transform_point_array(LineartRenderBuffer *rb, Object *ob, Mesh *me)
+static void lineart_embree_virtual_bounds_func(const struct RTCBoundsFunctionArguments *args)
+{
+  /* XXX: This doesn't actually take into account of LRT_CULL_DISCARD. */
+  LineartElementLinkNode *eln = args->geometryUserPtr;
+  LineartEdge *e = eln->pointer;
+  double *p0 = e[args->primID].v1->gloc;
+  double *p1 = e[args->primID].v2->gloc;
+  double *p2 = eln->cam_pos;
+  struct RTCBounds *o = args->bounds_o;
+  o->lower_x = MIN3(p0[0], p1[0], p2[0]);
+  o->upper_x = MAX3(p0[0], p1[0], p2[0]);
+  o->lower_y = MIN3(p0[1], p1[1], p2[1]);
+  o->upper_y = MAX3(p0[1], p1[1], p2[1]);
+  o->lower_z = MIN3(p0[2], p1[2], p2[2]);
+  o->upper_z = MAX3(p0[2], p1[2], p2[2]);
+}
+static void lineart_embree_transform_point_array(LineartRenderBuffer *rb,
+                                                 Object *ob,
+                                                 Mesh *me,
+                                                 uint32_t *r_use_geom_id)
 {
   int pcount = me->totvert;
 
   RTCGeometry geom = rtcNewGeometry(rb->rtcdevice, RTC_GEOMETRY_TYPE_USER);
   uint32_t geom_id = rtcAttachGeometry(rb->rtcscene_geom, geom);
+  *r_use_geom_id = geom_id;
   if (geom_id >= rb->mesh_record.max_length) {
     LineartPointArrayFinal *new_array = MEM_callocN(sizeof(LineartPointArrayFinal) *
                                                         rb->mesh_record.max_length * 2,
@@ -2229,6 +2282,29 @@ static void lineart_embree_transform_point_array(LineartRenderBuffer *rb, Object
   /* Reduce the geom user count to 1, and when scene is destroyed the geom is destroyed
    * automatically. */
   rtcReleaseGeometry(geom);
+}
+static void lineart_embree_new_virtual_geometry(LineartRenderBuffer *rb,
+                                                LineartElementLinkNode *e_eln)
+{
+  RTCGeometry geom = rtcNewGeometry(rb->rtcdevice, RTC_GEOMETRY_TYPE_USER);
+  uint32_t geom_id = rtcAttachGeometry(rb->rtcscene_geom, geom);
+
+  rtcSetGeometryUserData(geom, e_eln);
+  rtcSetGeometryUserPrimitiveCount(geom, e_eln->element_count);
+
+  rtcSetGeometryBoundsFunction(geom, lineart_embree_virtual_bounds_func, e_eln);
+  rtcCommitGeometry(geom);
+
+  /* Reduce the geom user count to 1, and when scene is destroyed the geom is destroyed
+   * automatically. */
+  rtcReleaseGeometry(geom);
+}
+/* Must be called after lineart_embree_do_intersections() because rb->rtcscene_geom is not
+ * committed until that. */
+static void lineart_embree_generate_occlusion_pairs(LineartRenderBuffer *rb)
+{
+  rtcCommitScene(rb->rtcscene_view);
+  rtcCollide(rb->rtcscene_view, rb->rtcscene_geom, OcclusionCollideFunc, rb);
 }
 
 static void lineart_main_load_geometries(
@@ -2352,7 +2428,9 @@ static void lineart_main_load_geometries(
 
 #ifdef LINEART_USE_EMBREE
     /* Link vertices and faces to embree geometry. */
-    lineart_embree_transform_point_array(rb, ob, use_mesh);
+    uint32_t use_geom_id = 0;
+    lineart_embree_transform_point_array(rb, ob, use_mesh, &use_geom_id);
+    obi->embree_geom_id = use_geom_id;
 #endif
 
     /* Make normal matrix. */
@@ -2417,10 +2495,36 @@ static void lineart_add_intersection_record_thread(LineartRenderBuffer *rb, floa
   }
   float *write = &rec->intersection_record[rec->intersection_pair_next * 6];
   rec->intersection_pair_next++;
+  BLI_spin_unlock(&rb->lock_task);
 
   copy_v3_v3(write, i1);
   copy_v3_v3(&write[3], i2);
+}
+
+static void lineart_add_occlusion_pair_thread(LineartRenderBuffer *rb,
+                                              LineartElementLinkNode *eln_edge,
+                                              LineartElementLinkNode *eln_triangle,
+                                              LineartEdge *e,
+                                              LineartTriangle *t)
+{
+  LineartOcclusionPairRecord *rec = &rb->occlusion_record;
+  BLI_spin_lock(&rb->lock_task);
+  if (rec->next >= rec->max_length) {
+    LineartOcclusionPair *new_array = MEM_mallocN(
+        sizeof(LineartOcclusionPair) * rec->max_length * 2, "new occlusion_pair_record");
+    memcpy(new_array, rec->array, sizeof(LineartOcclusionPair) * rec->max_length);
+    MEM_freeN(rec->array);
+    rec->array = new_array;
+    rec->max_length *= 2;
+  }
+  LineartOcclusionPair *write = &rec->array[rec->next];
+  rec->next++;
   BLI_spin_unlock(&rb->lock_task);
+
+  write->eln_edge = eln_edge;
+  write->eln_triangle = eln_triangle;
+  write->e = e;
+  write->t = t;
 }
 
 static bool lineart_triangle_share_edge_generic(const float *a0,
@@ -2453,7 +2557,9 @@ static bool lineart_isect_tri_tri_v3_check_overlap(const float t_a0[3],
 }
 
 static void __attribute__((optimize("O0")))
-CollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned int num_collisions)
+IntersectionCollideFunc(void *userPtr,
+                        struct RTCCollision *collisions,
+                        unsigned int num_collisions)
 {
   LineartRenderBuffer *rb = (LineartRenderBuffer *)userPtr;
   for (size_t i = 0; i < num_collisions; i++) {
@@ -2478,6 +2584,52 @@ CollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned int num_col
                                                i2)) {
 
       lineart_add_intersection_record_thread(rb, i1, i2);
+    }
+  }
+}
+
+static void __attribute__((optimize("O0")))
+OcclusionCollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned int num_collisions)
+{
+  LineartRenderBuffer *rb = (LineartRenderBuffer *)userPtr;
+  for (size_t i = 0; i < num_collisions; i++) {
+    /* I think this is not quite possible in here? */
+    if (collisions[i].geomID0 == collisions[i].geomID1 &&
+        collisions[i].primID0 == collisions[i].primID1) {
+      continue;
+    }
+    /* Continue from here. */
+    LineartElementLinkNode *eln_edge = rtcGetGeometryUserData(collisions[i].geomID0);
+    LineartElementLinkNode *eln_triangle = rtcGetGeometryUserData(collisions[i].geomID1);
+    if (eln_triangle->flags & LRT_ELEMENT_IS_EDGE) {
+      SWAP(LineartElementLinkNode *, eln_edge, eln_triangle);
+    }
+
+    /* Get edge from eln and get triangle directly from mesh_record so we don't reconvert double to
+     * float. */
+    LineartEdge *prim_edge = &((LineartEdge *)eln_edge->pointer)[collisions[i].primID0];
+    LineartTriangle *tri = eln_triangle->pointer;
+    LineartTriangle *prim_triangle = (void *)(((uchar *)tri) + rb->triangle_size);
+    LineartPointArrayFinal *geom_triangle = &rb->mesh_record.array[collisions[i].geomID1];
+
+    float pa[9];
+    float *pb = geom_triangle->points;
+
+    copy_v3fl_v3db(&pa[0], prim_edge->v1->gloc);
+    copy_v3fl_v3db(&pa[3], prim_edge->v2->gloc);
+    copy_v3fl_v3db(&pa[6], eln_edge->cam_pos);
+
+    uint32_t *tb = geom_triangle->looptri[collisions[i].primID1].tri;
+    float i1[3], i2[3];
+    if (lineart_isect_tri_tri_v3_check_overlap(&pa[0],
+                                               &pa[3],
+                                               &pa[6],
+                                               &pb[geom_triangle->loop[tb[0]].v * 3],
+                                               &pb[geom_triangle->loop[tb[1]].v * 3],
+                                               &pb[geom_triangle->loop[tb[2]].v * 3],
+                                               i1,
+                                               i2)) {
+      lineart_add_occlusion_pair_thread(rb, eln_edge, eln_triangle, prim_edge, prim_triangle);
     }
   }
 }
@@ -2528,12 +2680,12 @@ static void lineart_embree_do_intersections(LineartRenderBuffer *rb)
   for (int32_t i = 0; i < rb->mesh_record.next; i++) {
     LineartPointArrayFinal *rec = &rb->mesh_record.array[i];
     RTCGeometry geom = rtcGetGeometry(rb->rtcscene_geom, i);
-    rtcSetGeometryUserData(geom, rec);
+    rtcSetGeometryUserData(geom, rec->eln_triangle);
     rtcSetGeometryBoundsFunction(geom, lineart_embree_mesh_bounds_func, rec);
     rtcCommitGeometry(geom);
   }
   rtcCommitScene(rb->rtcscene_geom);
-  rtcCollide(rb->rtcscene_geom, rb->rtcscene_geom, CollideFunc, rb);
+  rtcCollide(rb->rtcscene_geom, rb->rtcscene_geom, IntersectionCollideFunc, rb);
   lineart_intersection_lines_from_record(rb);
 }
 
@@ -4517,6 +4669,8 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 #ifdef LINEART_USE_EMBREE
 
   lineart_embree_do_intersections(rb);
+
+  lineart_embree_generate_occlusion_pairs(rb);
 
   lineart_embree_clear_mesh_record(rb);
 
