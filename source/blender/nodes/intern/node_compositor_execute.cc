@@ -142,7 +142,7 @@ bool operator!=(const Domain &a, const Domain &b)
  */
 
 Result::Result(ResultType type, TexturePool &texture_pool)
-    : type_(type), texture_pool_(texture_pool)
+    : type_(type), texture_pool_(&texture_pool)
 {
 }
 
@@ -151,13 +151,13 @@ void Result::allocate_texture(int2 size)
   is_texture_ = true;
   switch (type_) {
     case ResultType::Float:
-      texture_ = texture_pool_.acquire_float(size);
+      texture_ = texture_pool_->acquire_float(size);
       return;
     case ResultType::Vector:
-      texture_ = texture_pool_.acquire_vector(size);
+      texture_ = texture_pool_->acquire_vector(size);
       return;
     case ResultType::Color:
-      texture_ = texture_pool_.acquire_color(size);
+      texture_ = texture_pool_->acquire_color(size);
       return;
   }
 }
@@ -169,13 +169,13 @@ void Result::allocate_single_value()
   const int2 texture_size{1, 1};
   switch (type_) {
     case ResultType::Float:
-      texture_ = texture_pool_.acquire_float(texture_size);
+      texture_ = texture_pool_->acquire_float(texture_size);
       return;
     case ResultType::Vector:
-      texture_ = texture_pool_.acquire_vector(texture_size);
+      texture_ = texture_pool_->acquire_vector(texture_size);
       return;
     case ResultType::Color:
-      texture_ = texture_pool_.acquire_color(texture_size);
+      texture_ = texture_pool_->acquire_color(texture_size);
       return;
   }
 }
@@ -200,6 +200,15 @@ void Result::unbind_as_texture() const
 void Result::unbind_as_image() const
 {
   GPU_texture_image_unbind(texture_);
+}
+
+void Result::pass_through(Result &target)
+{
+  /* Increment the reference count of the master by the original reference count of the target. */
+  increment_reference_count(target.reference_count());
+  /* Copy the result to the target and set its master. */
+  target = *this;
+  target.master_ = this;
 }
 
 void Result::transform(const Transformation2D &transformation)
@@ -240,16 +249,30 @@ void Result::set_color_value(const float4 &value)
   GPU_texture_update(texture_, GPU_DATA_FLOAT, value_);
 }
 
-void Result::incremenet_reference_count()
+void Result::increment_reference_count(int count)
 {
-  reference_count_++;
+  /* If there is a master result, increment its reference count instead. */
+  if (master_) {
+    master_->increment_reference_count(count);
+    return;
+  }
+
+  reference_count_ += count;
 }
 
 void Result::release()
 {
+  /* If there is a master result, release it instead. */
+  if (master_) {
+    master_->release();
+    return;
+  }
+
+  /* Decrement the reference count, and if it reaches zero, release the texture back into the
+   * texture pool. */
   reference_count_--;
   if (reference_count_ == 0) {
-    texture_pool_.release(texture_);
+    texture_pool_->release(texture_);
   }
 }
 
@@ -271,6 +294,15 @@ bool Result::is_single_value() const
 GPUTexture *Result::texture() const
 {
   return texture_;
+}
+
+int Result::reference_count() const
+{
+  /* If there is a master result, return its reference count instead. */
+  if (master_) {
+    return master_->reference_count();
+  }
+  return reference_count_;
 }
 
 int2 Result::size() const
@@ -332,7 +364,7 @@ Result &Operation::get_result(StringRef identifier)
 void Operation::map_input_to_result(StringRef identifier, Result *result)
 {
   inputs_to_results_map_.add_new(identifier, result);
-  result->incremenet_reference_count();
+  result->increment_reference_count();
 }
 
 void Operation::pre_allocate()

@@ -223,8 +223,10 @@ class Result {
   GPUTexture *texture_ = nullptr;
   /* The texture pool used to allocate the texture of the result, this should be initialized during
    * construction. */
-  TexturePool &texture_pool_;
-  /* The number of users currently referencing and using this result. */
+  TexturePool *texture_pool_ = nullptr;
+  /* The number of users currently referencing and using this result. If this result have a master
+   * result, then this reference count is irrelevant and shadowed by the reference count of the
+   * master result. */
   int reference_count_ = 0;
   /* If the result is a single value, this member stores the value of the result, the value of
    * which will be identical to that stored in the texture member. While this member stores 4
@@ -236,6 +238,12 @@ class Result {
   /* The transformation of the result. This only matters if the result was a texture. See the
    * Domain class. */
   Transformation2D transformation_ = Transformation2D::identity();
+  /* If not nullptr, then this result wraps and uses the texture of another master result. In this
+   * case, calls to texture-related methods like increment_reference_count and release should
+   * operate on the master result as opposed to this result. This member is typically set upon
+   * calling the pass_through method, which sets this result to be the master of a target result.
+   * See that method for more information. */
+  Result *master_ = nullptr;
 
  public:
   Result(ResultType type, TexturePool &texture_pool);
@@ -261,6 +269,18 @@ class Result {
 
   /* Unbind the texture which was previously bound using bind_as_image. */
   void unbind_as_image() const;
+
+  /* Pass this result through to a target result. This method makes the target result a copy of
+   * this result, essentially having identical values between the two and consequently sharing the
+   * underlying texture. Additionally, this result is set to be the master of the target result, by
+   * setting the master member of the target. Finally, the reference count of the result is
+   * incremented by the reference count of the target result. This is typically called in the
+   * allocate method of an operation whose input texture will not change and can be passed to the
+   * output directly. It should be noted that such operations can still adjust other properties of
+   * the result, like its transformation. So for instance, the transform operation passes its input
+   * through to its output because it will not change it, however, it may adjusts its
+   * transformation. */
+  void pass_through(Result &target);
 
   /* Transform the result by the given transformation. This effectively pre-multiply the given
    * transformation by the current transformation of the result. */
@@ -290,12 +310,15 @@ class Result {
    * texture. Otherwise, an undefined behavior is invoked. */
   void set_color_value(const float4 &value);
 
-  /* Increment the reference count of the result. This should be called when a user gets a
-   * reference to the result to use as an input. */
-  void incremenet_reference_count();
+  /* Increment the reference count of the result by the given count. This should be called when a
+   * user gets a reference to the result to use. If this result have a master result, the reference
+   * count of the master result is incremented instead. */
+  void increment_reference_count(int count = 1);
 
-  /* Release the result texture back into the texture pool. This should be called when a user that
-   * previously referenced and incremented the reference count of the result no longer needs it. */
+  /* Decrement the reference count of the result and release the result texture back into the
+   * texture pool if the reference count reaches zero. This should be called when a user that
+   * previously referenced and incremented the reference count of the result no longer needs it. If
+   * this result have a master result, the master result is released instead. */
   void release();
 
   /* Returns the type of the result. */
@@ -309,6 +332,10 @@ class Result {
 
   /* Returns the allocated GPU texture of the result. */
   GPUTexture *texture() const;
+
+  /* Returns the reference count of the result. If this result have a master result, then the
+   * reference count of the master result is returned instead. */
+  int reference_count() const;
 
   /* Returns the size of the allocated texture. */
   int2 size() const;
