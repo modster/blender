@@ -361,18 +361,6 @@ void Operation::add_input_processors()
     add_implicit_conversion_input_processor_if_needed(identifier);
     add_realize_on_domain_input_processor_if_needed(identifier);
   }
-
-  /* Then update the mapped result for each input to be that of the last processor for that input
-   * if any input processor exist for it. */
-  for (const StringRef &identifier : inputs_to_results_map_.keys()) {
-    Vector<ProcessorOperation *> &processors = input_processors_.lookup_or_add_default(identifier);
-    /* No input processors, nothing to do. */
-    if (processors.is_empty()) {
-      continue;
-    }
-    /* Replace the currently mapped result with the result of the last input processor. */
-    switch_result_mapped_to_input(identifier, &processors.last()->get_result());
-  }
 }
 
 void Operation::add_implicit_conversion_input_processor_if_needed(StringRef identifier)
@@ -434,10 +422,11 @@ void Operation::add_input_processor(StringRef identifier, ProcessorOperation *pr
    * processor or not. */
   Result &result = processors.is_empty() ? get_input(identifier) : processors.last()->get_result();
 
-  /* Set the input result of the processor and add it to the processors vector. The output of the
-   * processor will be mapped later after all processors were added. */
+  /* Set the input result of the processor, add it to the processors vector, and switch the result
+   * mapped to the input to the result of the last processor. */
   processor->map_input_to_result(&result);
   processors.append(processor);
+  switch_result_mapped_to_input(identifier, &processor->get_result());
 }
 
 void Operation::allocate_input_processors()

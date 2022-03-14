@@ -403,8 +403,8 @@ class Operation {
   Result &get_input(StringRef identifier) const;
 
   /* Switch the result mapped to the input identified by the given identifier with the given
-   * result. This will involve releasing original result, but it is assumed that the result will be
-   * mapped to something else. */
+   * result. This will involve releasing the original result, but it is assumed that the result
+   * will be mapped to something else. */
   void switch_result_mapped_to_input(StringRef identifier, Result *result);
 
   /* Add the given result to the results_ map identified by the given output identifier. This
@@ -427,14 +427,10 @@ class Operation {
   TexturePool &texture_pool();
 
  private:
-  /* Add all the necessary input processors for each input as needed. Then update the mapped result
-   * for each input to be that of the last processor for that input if any input processors exist
-   * for it. This is done now in a separate step after all processors were added because the
-   * operation might use the original mapped results to determine what processors needs to be
-   * added. This method is called in the operation initialization method after pre_allocate but
-   * before the allocate method, it needs to happen then and not before at operation construction
-   * because the logic for adding input processors can depend on the nature of the input results,
-   * but not on their value. */
+  /* Add all the necessary input processors for each input as needed. This method is called in the
+   * operation initialization method after pre_allocate but before the allocate method, it needs to
+   * happen then and not before at operation construction because the logic for adding input
+   * processors can depend on the nature of the input results, but not on their value. */
   void add_input_processors();
 
   /* Add an implicit conversion input processor for the input identified by the given identifier if
@@ -446,9 +442,10 @@ class Operation {
   void add_realize_on_domain_input_processor_if_needed(StringRef identifier);
 
   /* Add the given input processor operation to the list of input processors for the input
-   * identified by the given identifier. The result of the last input processor will not be mapped
-   * to the input in this method, this is done later, see add_input_processors for more
-   * information. */
+   * identified by the given identifier. This will also involve mapping the input of the processor
+   * to be the result of the last input processor or the result mapped to the input if no previous
+   * processors exists. Finally, the result mapped to the input is switched to be the result of the
+   * newly added processor. */
   void add_input_processor(StringRef identifier, ProcessorOperation *processor);
 
   /* Allocate all input processors in order. This is called before allocating the operation but
