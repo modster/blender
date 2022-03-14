@@ -84,6 +84,8 @@ static bool init_using_intersection(SculptSession *ss,
       PixelData new_pixel;
       new_pixel.local_pos = local_pos;
       new_pixel.pixel_pos = xy;
+      new_pixel.vertices = int3(v1_index, v2_index, v3_index);
+      new_pixel.weights = weights;
       new_pixel.content = float4(&image_buffer->rect_float[pixel_offset * 4]);
 
       PBVHNode *node = entry.node;

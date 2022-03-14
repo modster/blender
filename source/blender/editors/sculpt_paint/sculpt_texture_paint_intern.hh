@@ -3,12 +3,17 @@ namespace blender::ed::sculpt_paint::texture_paint {
 struct PixelData {
   int2 pixel_pos;
   float3 local_pos;
+  float3 weights;
+  int3 vertices;
   float4 content;
 };
 
 struct Pixels {
   Vector<int2> image_coordinates;
   Vector<float3> local_positions;
+  Vector<int3> vertices;
+  Vector<float3> weights;
+
   Vector<float4> colors;
   std::vector<bool> dirty;
 
@@ -29,6 +34,18 @@ struct Pixels {
   const float3 &local_position(uint64_t index) const
   {
     return local_positions[index];
+  }
+
+  const float3 local_position(uint64_t index, MVert *mvert) const
+  {
+    const int3 &verts = vertices[index];
+    const float3 &weight = weights[index];
+    const float3 &pos1 = mvert[verts.x].co;
+    const float3 &pos2 = mvert[verts.y].co;
+    const float3 &pos3 = mvert[verts.z].co;
+    float3 local_pos;
+    interp_v3_v3v3v3(local_pos, pos1, pos2, pos3, weight);
+    return local_pos;
   }
 
   const float4 &color(uint64_t index) const
@@ -55,6 +72,8 @@ struct Pixels {
     image_coordinates.append(pixel.pixel_pos);
     local_positions.append(pixel.local_pos);
     colors.append(pixel.content);
+    weights.append(pixel.weights);
+    vertices.append(pixel.vertices);
     dirty.push_back(false);
   }
 };

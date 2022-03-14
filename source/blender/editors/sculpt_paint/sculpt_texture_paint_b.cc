@@ -62,11 +62,13 @@ static void do_task_cb_ex(void *__restrict userdata,
   float4 brush_linear;
   srgb_to_linearrgb_v3_v3(brush_linear, brush_srgb);
   brush_linear[3] = 1.0f;
+  MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
+  
 
   const float brush_strength = ss->cache->bstrength;
 
   for (int i = 0; i < node_data->pixels.size(); i++) {
-    const float3 &local_pos = node_data->pixels.local_position(i);
+    const float3 &local_pos = node_data->pixels.local_position(i, mvert);
     if (!sculpt_brush_test_sq_fn(&test, local_pos)) {
       continue;
     }
