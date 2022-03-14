@@ -45,54 +45,14 @@ static float3 packed_edge_coordinate(const float2 v1,
                                      const float2 v3,
                                      const float2 co)
 {
-#if 0
-  float2 v13 = v3 - v1;
-  float2 v12 = v2 - v1;
-  float2 isect_point;
-  float2 tmp;
-
-  float2 point_1 = co - v13;
-  isect_line_line_v2_point(v1, v2, co, point_1, isect_point);
-  print_v2_id(v1);
-  print_v2_id(v2);
-  print_v2_id(co);
-  print_v2_id(point_1);
-  print_v2_id(isect_point);
-  float d1 = closest_to_line_v2(tmp, isect_point, v1, v2);
-  printf("d: %f\n")
-  float2 point_2 = co - v12;
-  isect_line_line_v2_point(v1, v3, co, point_2, isect_point);
-  print_v2_id(v1);
-  print_v2_id(v3);
-  print_v2_id(co);
-  print_v2_id(point_2);
-  print_v2_id(isect_point);
-  float d2 = closest_to_line_v2(tmp, isect_point, v1, v3);
-  return float2(d1, d2);
-#else
   float3 weights;
   barycentric_weights_v2(v1, v2, v3, co, weights);
   return weights;
-#endif
 }
 
 static bool is_inside_triangle(const float3 co)
 {
-#if 0
-  if (co.x < 0.0 || co.x > 1.0) {
-    return false;
-  }
-  if (co.y < 0.0 || co.y > 1.0) {
-    return false;
-  }
-  const float v = co.x + co.y;
-  if (v > 1.0) {
-    return false;
-  }
-  return true;
-#else
   return barycentric_inside_triangle_v2(co);
-#endif
 }
 
 static void init(Object *ob, int totnode, PBVHNode **nodes)
@@ -153,10 +113,6 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
               ldata_uv[triangle.loop_indices[2]].uv,
           };
 
-          // print_v2_id(uvs[0]);
-          // print_v2_id(uvs[1]);
-          // print_v2_id(uvs[2]);
-
           const float minv = min_fff(uvs[0].y, uvs[1].y, uvs[2].y);
           const int miny = floor(minv * image_buffer->y);
           const float maxv = max_fff(uvs[0].y, uvs[1].y, uvs[2].y);
@@ -168,8 +124,6 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
           const float add_u = 1.0 / image_buffer->x;
           const float add_v = 1.0 / image_buffer->y;
 
-          // printf("(%d, %d) - (%d, %d)\n", minx, miny, maxx, maxy);
-
           float2 min_uv(minu, minv);
           float3 start_edge_coord = packed_edge_coordinate(uvs[0], uvs[1], uvs[2], min_uv);
           float3 add_edge_coord_x = packed_edge_coordinate(
@@ -178,9 +132,6 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
           float3 add_edge_coord_y = packed_edge_coordinate(
                                         uvs[0], uvs[1], uvs[2], min_uv + float2(0.0, add_v)) -
                                     start_edge_coord;
-          // print_v3_id(start_edge_coord);
-          // print_v3_id(add_edge_coord_x);
-          // print_v3_id(add_edge_coord_y);
 
           triangle.add_edge_coord_x = add_edge_coord_x;
           int triangle_index = node_data->triangles.size();
@@ -196,8 +147,6 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
             int end_x = -1;
             int x;
             for (x = minx; x < maxx; x++) {
-              // printf("(%d, %d)", x, y);
-              // print_v2_id(edge_coord);
               if (is_inside_triangle(edge_coord)) {
                 start_x = x;
                 break;
@@ -207,8 +156,6 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
             edge_coord += add_edge_coord_x;
             x += 1;
             for (; x < maxx; x++) {
-              // printf("(%d, %d)", x, y);
-              // print_v2_id(edge_coord);
               if (!is_inside_triangle(edge_coord)) {
                 break;
               }
@@ -228,24 +175,12 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
             package.num_pixels = num_pixels;
             node_data->encoded_pixels.append(package);
             num_encoded_pixels += num_pixels;
-            // printf("x: %d y: %d, cx: %f, cy: %f, len: %d\n",
-            //  package.start_image_coordinate.x,
-            //  package.start_image_coordinate.y,
-            //  package.start_edge_coord.x,
-            //  package.start_edge_coord.y,
-            //  package.num_pixels);
             num_packages += 1;
           }
-          // printf("new pixel packages created: %d\n", num_packages);
         }
       }
     }
     BKE_pbvh_vertex_iter_end;
-
-    // printf(" - encoded %d pixels into %lu bytes\n",
-    //  num_encoded_pixels,
-    //  node_data->encoded_pixels.size() * sizeof(PixelsPackage) +
-    //  node_data->triangles.size() * sizeof(Triangle));
   }
 
   {

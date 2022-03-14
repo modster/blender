@@ -41,12 +41,11 @@ namespace blender::ed::sculpt_paint::texture_paint {
 namespace painting {
 
 static Pixel get_start_pixel(const PixelsPackage &encoded_pixels,
-                             const Vector<Triangle> &triangles,
+                             const Triangle &triangle,
                              const MVert *mvert,
                              const MLoopUV *ldata_uv)
 {
   Pixel result;
-  const Triangle &triangle = triangles[encoded_pixels.triangle_index];
   const float3 weights = encoded_pixels.start_edge_coord;
   interp_v3_v3v3v3(result.pos,
                    mvert[triangle.vert_indices[0]].co,
@@ -63,7 +62,7 @@ static Pixel get_start_pixel(const PixelsPackage &encoded_pixels,
 }
 
 static Pixel get_delta_pixel(const PixelsPackage &encoded_pixels,
-                             const Vector<Triangle> &triangles,
+                             const Triangle &triangle,
                              const Pixel &start_pixel,
                              const MVert *mvert,
                              const MLoopUV *ldata_uv
@@ -71,7 +70,6 @@ static Pixel get_delta_pixel(const PixelsPackage &encoded_pixels,
 )
 {
   Pixel result;
-  const Triangle &triangle = triangles[encoded_pixels.triangle_index];
   const float3 weights = encoded_pixels.start_edge_coord + triangle.add_edge_coord_x;
   interp_v3_v3v3v3(result.pos,
                    mvert[triangle.vert_indices[0]].co,
@@ -121,16 +119,41 @@ static void do_task_cb_ex(void *__restrict userdata,
   Mesh *mesh = static_cast<Mesh *>(ob->data);
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
 
+  std::vector<bool> vert_brush_test_results(mesh->totvert);
+
+  PBVHVertexIter vd;
+  BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
+    vert_brush_test_results[vd.index] = sculpt_brush_test_sq_fn(&test, vd.co);
+  }
+  BKE_pbvh_vertex_iter_end;
+
+  /* Propagate vertex brush test to triangle. This should be extended with brush overlapping edges
+   * and faces only. */
+  std::vector<bool> triangle_brush_test_results(node_data->triangles.size());
+  int triangle_index = 0;
+  for (Triangle &triangle : node_data->triangles) {
+    for (int i = 0; i < 3; i++) {
+      triangle_brush_test_results[triangle_index] =
+          triangle_brush_test_results[triangle_index] ||
+          vert_brush_test_results[triangle.vert_indices[i]];
+    }
+    triangle_index += 1;
+  }
+
   const float brush_strength = ss->cache->bstrength;
+  int packages_clipped = 0;
 
   for (PixelsPackage &encoded_pixels : node_data->encoded_pixels) {
+    if (!triangle_brush_test_results[encoded_pixels.triangle_index]) {
+      packages_clipped += 1;
+      continue;
+    }
     Triangle &triangle = node_data->triangles[encoded_pixels.triangle_index];
     int pixel_offset = encoded_pixels.start_image_coordinate.y * image_buffer->x +
                        encoded_pixels.start_image_coordinate.x;
     float3 edge_coord = encoded_pixels.start_edge_coord;
-    Pixel pixel = get_start_pixel(encoded_pixels, node_data->triangles, mvert, ldata_uv);
-    const Pixel add_pixel = get_delta_pixel(
-        encoded_pixels, node_data->triangles, pixel, mvert, ldata_uv);
+    Pixel pixel = get_start_pixel(encoded_pixels, triangle, mvert, ldata_uv);
+    const Pixel add_pixel = get_delta_pixel(encoded_pixels, triangle, pixel, mvert, ldata_uv);
     bool pixels_painted = false;
     for (int x = 0; x < encoded_pixels.num_pixels; x++) {
       if (!sculpt_brush_test_sq_fn(&test, pixel.pos)) {
@@ -150,8 +173,8 @@ static void do_task_cb_ex(void *__restrict userdata,
       pixels_painted = true;
 
       edge_coord += triangle.add_edge_coord_x;
-      pixel_offset++;
       add(pixel, add_pixel);
+      pixel_offset++;
     }
 
     if (pixels_painted) {
@@ -163,6 +186,7 @@ static void do_task_cb_ex(void *__restrict userdata,
       node_data->flags.dirty = true;
     }
   }
+  printf("%d of %ld pixel packages clipped\n", packages_clipped, node_data->encoded_pixels.size());
 }
 }  // namespace painting
 
