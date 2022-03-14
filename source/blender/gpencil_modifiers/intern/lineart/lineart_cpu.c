@@ -1854,7 +1854,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
 
 #ifdef LINEART_USE_EMBREE
   RTCGeometry geom = rtcGetGeometry(rb->rtcscene_geom, obi->embree_geom_id);
-  rtcSetGeometryUserData(geom, eln);
+  rb->mesh_record.array[obi->embree_geom_id].eln_triangle = eln;
 #endif
 
   /* Note this memory is not from pool, will be deleted after culling. */
@@ -2228,6 +2228,7 @@ static void lineart_embree_virtual_bounds_func(const struct RTCBoundsFunctionArg
   /* XXX: This doesn't actually take into account of LRT_CULL_DISCARD. */
   LineartElementLinkNode *eln = args->geometryUserPtr;
   LineartEdge *e = eln->pointer;
+  /* XXX: Every E is 0. */
   double *p0 = e[args->primID].v1->gloc;
   double *p1 = e[args->primID].v2->gloc;
   double *p2 = eln->cam_pos;
@@ -2599,8 +2600,11 @@ OcclusionCollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned in
       continue;
     }
     /* Continue from here. */
-    LineartElementLinkNode *eln_edge = rtcGetGeometryUserData(collisions[i].geomID0);
-    LineartElementLinkNode *eln_triangle = rtcGetGeometryUserData(collisions[i].geomID1);
+    RTCGeometry g_edge = rtcGetGeometry(rb->rtcscene_geom, collisions[i].geomID0);
+    RTCGeometry g_triangle = rtcGetGeometry(rb->rtcscene_view, collisions[i].geomID1);
+
+    LineartElementLinkNode *eln_edge = rtcGetGeometryUserData(g_edge);
+    LineartElementLinkNode *eln_triangle = rtcGetGeometryUserData(g_triangle);
     if (eln_triangle->flags & LRT_ELEMENT_IS_EDGE) {
       SWAP(LineartElementLinkNode *, eln_edge, eln_triangle);
     }
@@ -2680,7 +2684,7 @@ static void lineart_embree_do_intersections(LineartRenderBuffer *rb)
   for (int32_t i = 0; i < rb->mesh_record.next; i++) {
     LineartPointArrayFinal *rec = &rb->mesh_record.array[i];
     RTCGeometry geom = rtcGetGeometry(rb->rtcscene_geom, i);
-    rtcSetGeometryUserData(geom, rec->eln_triangle);
+    rtcSetGeometryUserData(geom, rec);
     rtcSetGeometryBoundsFunction(geom, lineart_embree_mesh_bounds_func, rec);
     rtcCommitGeometry(geom);
   }
