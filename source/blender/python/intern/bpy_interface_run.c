@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup pythonintern
@@ -116,7 +102,8 @@ static bool python_script_exec(
 
       fn_dummy_py = PyC_UnicodeFromByte(fn_dummy);
 
-      buf = txt_to_buf(text, NULL);
+      int buf_len_dummy;
+      buf = txt_to_buf(text, &buf_len_dummy);
       text->compiled = Py_CompileStringObject(buf, fn_dummy_py, Py_file_input, NULL, -1);
       MEM_freeN(buf);
 
@@ -180,7 +167,7 @@ static bool python_script_exec(
   if (!py_result) {
     if (text) {
       if (do_jump) {
-        /* ensure text is valid before use, the script may have freed its self */
+        /* ensure text is valid before use, the script may have freed itself */
         Main *bmain_new = CTX_data_main(C);
         if ((bmain_old == bmain_new) && (BLI_findindex(&bmain_new->texts, text) != -1)) {
           python_script_error_jump_text(text);

@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_array.hh"
 #include "BLI_task.hh"
@@ -282,18 +268,20 @@ static void copy_uniform_sample_point_attributes(const Span<SplinePtr> splines,
       }
 
       if (!data.tangents.is_empty()) {
-        spline.sample_with_index_factors<float3>(
-            spline.evaluated_tangents(), uniform_samples, data.tangents.slice(offset, size));
-        for (float3 &tangent : data.tangents) {
-          tangent = math::normalize(tangent);
+        Span<float3> src_tangents = spline.evaluated_tangents();
+        MutableSpan<float3> sampled_tangents = data.tangents.slice(offset, size);
+        spline.sample_with_index_factors<float3>(src_tangents, uniform_samples, sampled_tangents);
+        for (float3 &vector : sampled_tangents) {
+          vector = math::normalize(vector);
         }
       }
 
       if (!data.normals.is_empty()) {
-        spline.sample_with_index_factors<float3>(
-            spline.evaluated_normals(), uniform_samples, data.normals.slice(offset, size));
-        for (float3 &normals : data.normals) {
-          normals = math::normalize(normals);
+        Span<float3> src_normals = spline.evaluated_normals();
+        MutableSpan<float3> sampled_normals = data.normals.slice(offset, size);
+        spline.sample_with_index_factors<float3>(src_normals, uniform_samples, sampled_normals);
+        for (float3 &vector : sampled_normals) {
+          vector = math::normalize(vector);
         }
       }
     }
@@ -333,15 +321,16 @@ static void node_geo_exec(GeoNodeExecParams params)
   attribute_outputs.rotation_id = StrongAnonymousAttributeID("Rotation");
 
   geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
-    if (!geometry_set.has_curve()) {
+    if (!geometry_set.has_curves()) {
       geometry_set.keep_only({GEO_COMPONENT_TYPE_INSTANCES});
       return;
     }
-    const CurveEval &curve = *geometry_set.get_curve_for_read();
-    const Span<SplinePtr> splines = curve.splines();
-    curve.assert_valid_point_attributes();
+    const std::unique_ptr<CurveEval> curve = curves_to_curve_eval(
+        *geometry_set.get_curves_for_read());
+    const Span<SplinePtr> splines = curve->splines();
+    curve->assert_valid_point_attributes();
 
-    const Array<int> offsets = calculate_spline_point_offsets(params, mode, curve, splines);
+    const Array<int> offsets = calculate_spline_point_offsets(params, mode, *curve, splines);
     const int total_size = offsets.last();
     if (total_size == 0) {
       geometry_set.keep_only({GEO_COMPONENT_TYPE_INSTANCES});
@@ -351,7 +340,7 @@ static void node_geo_exec(GeoNodeExecParams params)
     geometry_set.replace_pointcloud(BKE_pointcloud_new_nomain(total_size));
     PointCloudComponent &points = geometry_set.get_component_for_write<PointCloudComponent>();
     ResultAttributes point_attributes = create_attributes_for_transfer(
-        points, curve, attribute_outputs);
+        points, *curve, attribute_outputs);
 
     switch (mode) {
       case GEO_NODE_CURVE_RESAMPLE_COUNT:
@@ -363,7 +352,7 @@ static void node_geo_exec(GeoNodeExecParams params)
         break;
     }
 
-    copy_spline_domain_attributes(curve, offsets, points);
+    copy_spline_domain_attributes(*curve, offsets, points);
 
     if (!point_attributes.rotations.is_empty()) {
       curve_create_default_rotation_attribute(

@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #include "scene/background.h"
 #include "scene/camera.h"
@@ -259,7 +246,12 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
                             int height,
                             void **python_thread_state)
 {
-  if (!has_updates_) {
+  /* For auto refresh images. */
+  ImageManager *image_manager = scene->image_manager;
+  const int frame = b_scene.frame_current();
+  const bool auto_refresh_update = image_manager->set_animation_frame_update(frame);
+
+  if (!has_updates_ && !auto_refresh_update) {
     return;
   }
 
@@ -274,7 +266,7 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
   sync_view_layer(b_view_layer);
   sync_integrator(b_view_layer, background);
   sync_film(b_view_layer, b_v3d);
-  sync_shaders(b_depsgraph, b_v3d);
+  sync_shaders(b_depsgraph, b_v3d, auto_refresh_update);
   sync_images();
 
   geometry_synced.clear(); /* use for objects and motion sync */
@@ -787,6 +779,7 @@ SceneParams BlenderSync::get_scene_params(BL::Scene &b_scene, bool background)
     params.bvh_type = BVH_TYPE_DYNAMIC;
 
   params.use_bvh_spatial_split = RNA_boolean_get(&cscene, "debug_use_spatial_splits");
+  params.use_bvh_compact_structure = RNA_boolean_get(&cscene, "debug_use_compact_bvh");
   params.use_bvh_unaligned_nodes = RNA_boolean_get(&cscene, "debug_use_hair_bvh");
   params.num_bvh_time_steps = RNA_int_get(&cscene, "debug_bvh_time_steps");
 

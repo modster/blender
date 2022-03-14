@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -610,7 +596,9 @@ void BKE_pbvh_build_mesh(PBVH *pbvh,
   }
 
   MEM_freeN(prim_bbc);
-  MEM_freeN(pbvh->vert_bitmap);
+
+  /* Clear the bitmap so it can be used as an update tag later on. */
+  BLI_bitmap_set_all(pbvh->vert_bitmap, false, totvert);
 }
 
 void BKE_pbvh_build_grids(PBVH *pbvh,
@@ -713,6 +701,8 @@ void BKE_pbvh_free(PBVH *pbvh)
   if (pbvh->prim_indices) {
     MEM_freeN(pbvh->prim_indices);
   }
+
+  MEM_SAFE_FREE(pbvh->vert_bitmap);
 
   MEM_freeN(pbvh);
 }
@@ -1007,6 +997,27 @@ typedef struct PBVHUpdateData {
   bool show_sculpt_face_sets;
 } PBVHUpdateData;
 
+static void pbvh_update_normals_clear_task_cb(void *__restrict userdata,
+                                              const int n,
+                                              const TaskParallelTLS *__restrict UNUSED(tls))
+{
+  PBVHUpdateData *data = userdata;
+  PBVH *pbvh = data->pbvh;
+  PBVHNode *node = data->nodes[n];
+  float(*vnors)[3] = data->vnors;
+
+  if (node->flag & PBVH_UpdateNormals) {
+    const int *verts = node->vert_indices;
+    const int totvert = node->uniq_verts;
+    for (int i = 0; i < totvert; i++) {
+      const int v = verts[i];
+      if (BLI_BITMAP_TEST(pbvh->vert_bitmap, v)) {
+        zero_v3(vnors[v]);
+      }
+    }
+  }
+}
+
 static void pbvh_update_normals_accum_task_cb(void *__restrict userdata,
                                               const int n,
                                               const TaskParallelTLS *__restrict UNUSED(tls))
@@ -1043,7 +1054,7 @@ static void pbvh_update_normals_accum_task_cb(void *__restrict userdata,
       for (int j = sides; j--;) {
         const int v = vtri[j];
 
-        if (pbvh->verts[v].flag & ME_VERT_PBVH_UPDATE) {
+        if (BLI_BITMAP_TEST(pbvh->vert_bitmap, v)) {
           /* NOTE: This avoids `lock, add_v3_v3, unlock`
            * and is five to ten times quicker than a spin-lock.
            * Not exact equivalent though, since atomicity is only ensured for one component
@@ -1072,13 +1083,12 @@ static void pbvh_update_normals_store_task_cb(void *__restrict userdata,
 
     for (int i = 0; i < totvert; i++) {
       const int v = verts[i];
-      MVert *mvert = &pbvh->verts[v];
 
       /* No atomics necessary because we are iterating over uniq_verts only,
        * so we know only this thread will handle this vertex. */
-      if (mvert->flag & ME_VERT_PBVH_UPDATE) {
+      if (BLI_BITMAP_TEST(pbvh->vert_bitmap, v)) {
         normalize_v3(vnors[v]);
-        mvert->flag &= ~ME_VERT_PBVH_UPDATE;
+        BLI_BITMAP_DISABLE(pbvh->vert_bitmap, v);
       }
     }
 
@@ -1095,7 +1105,7 @@ static void pbvh_faces_update_normals(PBVH *pbvh, PBVHNode **nodes, int totnode)
    *   bounding box of its adjacent faces will be as well.
    * - However this is only true for the vertices that have actually been
    *   edited, not for all vertices in the nodes marked for update, so we
-   *   can only update vertices marked with ME_VERT_PBVH_UPDATE.
+   *   can only update vertices marked in the `vert_bitmap`.
    */
 
   PBVHUpdateData data = {
@@ -1107,6 +1117,8 @@ static void pbvh_faces_update_normals(PBVH *pbvh, PBVHNode **nodes, int totnode)
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, totnode);
 
+  /* Zero normals before accumulation. */
+  BLI_task_parallel_range(0, totnode, &data, pbvh_update_normals_clear_task_cb, &settings);
   BLI_task_parallel_range(0, totnode, &data, pbvh_update_normals_accum_task_cb, &settings);
   BLI_task_parallel_range(0, totnode, &data, pbvh_update_normals_store_task_cb, &settings);
 }
@@ -1802,6 +1814,12 @@ bool BKE_pbvh_node_fully_unmasked_get(PBVHNode *node)
   return (node->flag & PBVH_Leaf) && (node->flag & PBVH_FullyUnmasked);
 }
 
+void BKE_pbvh_vert_mark_update(PBVH *pbvh, int index)
+{
+  BLI_assert(pbvh->type == PBVH_FACES);
+  BLI_BITMAP_ENABLE(pbvh->vert_bitmap, index);
+}
+
 void BKE_pbvh_node_get_verts(PBVH *pbvh,
                              PBVHNode *node,
                              const int **r_vert_indices,
@@ -1947,9 +1965,8 @@ bool BKE_pbvh_node_vert_update_check_any(PBVH *pbvh, PBVHNode *node)
 
   for (int i = 0; i < totvert; i++) {
     const int v = verts[i];
-    const MVert *mvert = &pbvh->verts[v];
 
-    if (mvert->flag & ME_VERT_PBVH_UPDATE) {
+    if (BLI_BITMAP_TEST(pbvh->vert_bitmap, v)) {
       return true;
     }
   }
@@ -2803,7 +2820,7 @@ void BKE_pbvh_vert_coords_apply(PBVH *pbvh, const float (*vertCos)[3], const int
       /* no need for float comparison here (memory is exactly equal or not) */
       if (memcmp(mvert->co, vertCos[a], sizeof(float[3])) != 0) {
         copy_v3_v3(mvert->co, vertCos[a]);
-        mvert->flag |= ME_VERT_PBVH_UPDATE;
+        BKE_pbvh_vert_mark_update(pbvh, a);
       }
     }
 
@@ -2960,7 +2977,6 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
 
   vi->mask = NULL;
   if (pbvh->type == PBVH_FACES) {
-    /* Cast away const because sculpt/paint code can adjust normals when restoring mesh data. */
     vi->vert_normals = pbvh->vert_normals;
 
     vi->vmask = CustomData_get_layer(pbvh->vdata, CD_PAINT_MASK);

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup editorui
@@ -82,6 +66,8 @@ int UI_icon_get_height(int icon_id);
 bool UI_icon_get_theme_color(int icon_id, unsigned char color[4]);
 
 /**
+ * Render a #PreviewImage for the data block.
+ *
  * Note that if an ID doesn't support jobs for preview creation, \a use_job will be ignored.
  */
 void UI_icon_render_id(const struct bContext *C,
@@ -89,6 +75,17 @@ void UI_icon_render_id(const struct bContext *C,
                        struct ID *id,
                        enum eIconSizes size,
                        bool use_job);
+
+/**
+ * Render the data block into the provided #PreviewImage.
+ */
+void UI_icon_render_id_ex(const struct bContext *C,
+                          struct Scene *scene,
+                          struct ID *id_to_render,
+                          const enum eIconSizes size,
+                          const bool use_job,
+                          struct PreviewImage *r_preview_image);
+
 /**
  * Render size for preview images and icons
  */

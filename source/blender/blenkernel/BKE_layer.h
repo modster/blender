@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -156,6 +142,14 @@ int BKE_layer_collection_findindex(struct ViewLayer *view_layer, const struct La
 
 void BKE_layer_collection_resync_forbid(void);
 void BKE_layer_collection_resync_allow(void);
+
+/**
+ * Helper to fix older pre-2.80 blend-files.
+ *
+ * Ensures the given `view_layer` as a valid first-level layer collection, i.e. a single one
+ * matching the scene's master collection. This is a requirement for `BKE_layer_collection_sync`.
+ */
+void BKE_layer_collection_doversion_2_80(const struct Scene *scene, struct ViewLayer *view_layer);
 
 void BKE_main_collection_sync(const struct Main *bmain);
 void BKE_scene_collection_sync(const struct Scene *scene);

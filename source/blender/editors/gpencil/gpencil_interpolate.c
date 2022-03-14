@@ -1,25 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016, Blender Foundation
- * This is a new part of Blender
- * Operators for interpolating new Grease Pencil frames from existing strokes
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2016 Blender Foundation. */
 
 /** \file
  * \ingroup edgpencil
+ * Operators for interpolating new Grease Pencil frames from existing strokes.
  */
 
 #include <math.h>
@@ -1590,6 +1574,8 @@ void GPENCIL_OT_interpolate_sequence(wmOperatorType *ot)
       {0, NULL, 0, NULL, NULL},
   };
 
+  PropertyRNA *prop;
+
   /* identifiers */
   ot->name = "Interpolate Sequence";
   ot->idname = "GPENCIL_OT_interpolate_sequence";
@@ -1650,14 +1636,15 @@ void GPENCIL_OT_interpolate_sequence(wmOperatorType *ot)
                 0.0f,
                 2.0f);
 
-  RNA_def_enum(ot->srna,
-               "type",
-               gpencil_interpolation_type_items,
-               0,
-               "Type",
-               "Interpolation method to use the next time 'Interpolate Sequence' is run");
+  prop = RNA_def_enum(ot->srna,
+                      "type",
+                      gpencil_interpolation_type_items,
+                      0,
+                      "Type",
+                      "Interpolation method to use the next time 'Interpolate Sequence' is run");
+  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_GPENCIL);
 
-  RNA_def_enum(
+  prop = RNA_def_enum(
       ot->srna,
       "easing",
       gpencil_interpolation_easing_items,
@@ -1665,6 +1652,7 @@ void GPENCIL_OT_interpolate_sequence(wmOperatorType *ot)
       "Easing",
       "Which ends of the segment between the preceding and following grease pencil frames "
       "easing interpolation is applied to");
+  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_GPENCIL);
 
   RNA_def_float(ot->srna,
                 "back",

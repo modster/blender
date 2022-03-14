@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #include "scene/object.h"
 #include "device/device.h"
@@ -89,6 +76,7 @@ NODE_DEFINE(Object)
   SOCKET_TRANSFORM(tfm, "Transform", transform_identity());
   SOCKET_UINT(visibility, "Visibility", ~0);
   SOCKET_COLOR(color, "Color", zero_float3());
+  SOCKET_FLOAT(alpha, "Alpha", 0.0f);
   SOCKET_UINT(random_id, "Random ID", 0);
   SOCKET_INT(pass_id, "Pass ID", 0);
   SOCKET_BOOLEAN(use_holdout, "Use Holdout", false);
@@ -427,6 +415,7 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   kobject.color[0] = color.x;
   kobject.color[1] = color.y;
   kobject.color[2] = color.z;
+  kobject.alpha = ob->alpha;
   kobject.pass_id = pass_id;
   kobject.random_number = random_number;
   kobject.particle_index = particle_index;

@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -352,6 +338,55 @@ static void motionpath_free_free_tree_data(ListBase *targets)
   LISTBASE_FOREACH (MPathTarget *, mpt, targets) {
     ED_keylist_free(mpt->keylist);
   }
+}
+
+void animviz_motionpath_compute_range(Object *ob, Scene *scene)
+{
+  struct AnimKeylist *keylist = ED_keylist_create();
+  bAnimVizSettings *avs;
+  if (ob->mode == OB_MODE_POSE) {
+    avs = &ob->pose->avs;
+    bArmature *arm = ob->data;
+
+    if (!ELEM(NULL, ob->adt, ob->adt->action, arm->adt)) {
+      /* Loop through all the fcurves and get only the keylists for the bone location fcurves */
+      LISTBASE_FOREACH (FCurve *, fcu, &ob->adt->action->curves) {
+        if (strstr(fcu->rna_path, "pose.bones[") && strstr(fcu->rna_path, "location")) {
+          fcurve_to_keylist(arm->adt, fcu, keylist, 0);
+        }
+      }
+    }
+  }
+  else {
+    avs = &ob->avs;
+
+    if (!ELEM(NULL, ob->adt, ob->adt->action)) {
+      /* Loop through all the fcurves and get only the keylists for the location fcurves */
+      LISTBASE_FOREACH (FCurve *, fcu, &ob->adt->action->curves) {
+        if (strcmp(fcu->rna_path, "location") == 0) {
+          fcurve_to_keylist(ob->adt, fcu, keylist, 0);
+        }
+      }
+    }
+  }
+
+  if (ED_keylist_is_empty(keylist) || (avs->path_range == MOTIONPATH_RANGE_SCENE)) {
+    /* Apply scene frame range if no keys where found or if scene range is selected */
+    avs->path_sf = PSFRA;
+    avs->path_ef = PEFRA;
+  }
+  else {
+    /* Compute keys range */
+    Range2f frame_range;
+    const bool only_selected = avs->path_range == MOTIONPATH_RANGE_KEYS_SELECTED;
+    /* Get range for all keys if selected_only is false or if no keys are selected */
+    if (!(only_selected && ED_keylist_selected_keys_frame_range(keylist, &frame_range))) {
+      ED_keylist_all_keys_frame_range(keylist, &frame_range);
+    }
+    avs->path_sf = frame_range.min;
+    avs->path_ef = frame_range.max;
+  }
+  ED_keylist_free(keylist);
 }
 
 void animviz_calc_motionpaths(Depsgraph *depsgraph,

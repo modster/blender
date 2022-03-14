@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spnode
@@ -88,13 +72,6 @@
 
 #include "node_intern.hh" /* own include */
 
-using blender::Array;
-using blender::float2;
-using blender::Map;
-using blender::Set;
-using blender::Span;
-using blender::Vector;
-using blender::VectorSet;
 using blender::fn::CPPType;
 using blender::fn::FieldCPPType;
 using blender::fn::FieldInput;
@@ -115,6 +92,8 @@ float ED_node_grid_size()
 
 void ED_node_tree_update(const bContext *C)
 {
+  using namespace blender::ed::space_node;
+
   SpaceNode *snode = CTX_wm_space_node(C);
   if (snode) {
     snode_set_context(*C);
@@ -176,6 +155,8 @@ void ED_node_tag_update_id(ID *id)
   }
 }
 
+namespace blender::ed::space_node {
+
 static bool compare_nodes(const bNode *a, const bNode *b)
 {
   /* These tell if either the node or any of the parent nodes is selected.
@@ -232,14 +213,14 @@ static bool compare_nodes(const bNode *a, const bNode *b)
   return false;
 }
 
-void ED_node_sort(bNodeTree *ntree)
+void node_sort(bNodeTree &ntree)
 {
   /* Merge sort is the algorithm of choice here. */
-  int totnodes = BLI_listbase_count(&ntree->nodes);
+  int totnodes = BLI_listbase_count(&ntree.nodes);
 
   int k = 1;
   while (k < totnodes) {
-    bNode *first_a = (bNode *)ntree->nodes.first;
+    bNode *first_a = (bNode *)ntree.nodes.first;
     bNode *first_b = first_a;
 
     do {
@@ -266,8 +247,8 @@ void ED_node_sort(bNodeTree *ntree)
           bNode *tmp = node_b;
           node_b = node_b->next;
           b++;
-          BLI_remlink(&ntree->nodes, tmp);
-          BLI_insertlinkbefore(&ntree->nodes, node_a, tmp);
+          BLI_remlink(&ntree.nodes, tmp);
+          BLI_insertlinkbefore(&ntree.nodes, node_a, tmp);
         }
       }
 
@@ -400,7 +381,7 @@ static void node_update_basis(const bContext &C, bNodeTree &ntree, bNode &node, 
 
     /* Round the socket location to stop it from jiggling. */
     nsock->locx = round(loc.x + NODE_WIDTH(node));
-    nsock->locy = round(0.5f * (dy + buty));
+    nsock->locy = round(dy - NODE_DYS);
 
     dy = buty;
     if (nsock->next) {
@@ -530,7 +511,7 @@ static void node_update_basis(const bContext &C, bNodeTree &ntree, bNode &node, 
 
     nsock->locx = loc.x;
     /* Round the socket vertical position to stop it from jiggling. */
-    nsock->locy = round(0.5f * (dy + buty));
+    nsock->locy = round(dy - NODE_DYS);
 
     dy = buty - multi_input_socket_offset * 0.5;
     if (nsock->next) {
@@ -629,7 +610,9 @@ static void node_update_hidden(bNode &node, uiBlock &block)
 
 static int node_get_colorid(const bNode &node)
 {
-  switch (node.typeinfo->nclass) {
+  const int nclass = (node.typeinfo->ui_class == nullptr) ? node.typeinfo->nclass :
+                                                            node.typeinfo->ui_class(&node);
+  switch (nclass) {
     case NODE_CLASS_INPUT:
       return TH_NODE_INPUT;
     case NODE_CLASS_OUTPUT:
@@ -677,7 +660,7 @@ static void node_draw_mute_line(const bContext &C,
   GPU_blend(GPU_BLEND_ALPHA);
 
   LISTBASE_FOREACH (const bNodeLink *, link, &node.internal_links) {
-    node_draw_link_bezier(C, v2d, snode, *link, TH_WIRE_INNER, TH_WIRE_INNER, TH_WIRE);
+    node_draw_link_bezier(C, v2d, snode, *link, TH_WIRE_INNER, TH_WIRE_INNER, TH_WIRE, false);
   }
 
   GPU_blend(GPU_BLEND_NONE);
@@ -735,7 +718,12 @@ static void node_socket_draw_multi_input(const float color[4],
                                          const int locx,
                                          const int locy)
 {
-  const float outline_width = 1.0f;
+  /* The other sockets are drawn with the keyframe shader. There, the outline has a base thickness
+   * that can be varied but always scales with the size the socket is drawn at. Using `U.dpi_fac`
+   * has the same effect here. It scales the outline correctly across different screen DPI's
+   * and UI scales without being affected by the 'line-width'. */
+  const float outline_width = NODE_SOCK_OUTLINE_SCALE * U.dpi_fac;
+
   /* UI_draw_roundbox draws the outline on the outer side, so compensate for the outline width. */
   const rctf rect = {
       locx - width + outline_width * 0.5f,
@@ -1066,14 +1054,18 @@ static void node_socket_draw_nested(const bContext &C,
       },
       data,
       MEM_freeN);
-  /* Disable the button so that clicks on it are ignored the the link operator still works. */
+  /* Disable the button so that clicks on it are ignored the link operator still works. */
   UI_but_flag_enable(but, UI_BUT_DISABLED);
   UI_block_emboss_set(&block, old_emboss);
 }
 
+}  // namespace blender::ed::space_node
+
 void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[4], float scale)
 {
-  const float size = 2.25f * NODE_SOCKSIZE * scale;
+  using namespace blender::ed::space_node;
+
+  const float size = NODE_SOCKSIZE_DRAW_MULIPLIER * NODE_SOCKSIZE * scale;
   rcti draw_rect = *rect;
   float outline_color[4] = {0};
 
@@ -1094,7 +1086,7 @@ void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[
   GPU_program_point_size(true);
 
   immBindBuiltinProgram(GPU_SHADER_KEYFRAME_SHAPE);
-  immUniform1f("outline_scale", 1.0f);
+  immUniform1f("outline_scale", NODE_SOCK_OUTLINE_SCALE);
   immUniform2f("ViewportSize", -1.0f, -1.0f);
 
   /* Single point. */
@@ -1118,6 +1110,8 @@ void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[
   /* Restore. */
   GPU_blend(state);
 }
+
+namespace blender::ed::space_node {
 
 /* **************  Socket callbacks *********** */
 
@@ -1169,17 +1163,17 @@ static void node_draw_preview(bNodePreview *preview, rctf *prv)
   GPU_blend(GPU_BLEND_ALPHA);
 
   IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-  immDrawPixelsTex(&state,
-                   draw_rect.xmin,
-                   draw_rect.ymin,
-                   preview->xsize,
-                   preview->ysize,
-                   GPU_RGBA8,
-                   true,
-                   preview->rect,
-                   scale,
-                   scale,
-                   nullptr);
+  immDrawPixelsTexTiled(&state,
+                        draw_rect.xmin,
+                        draw_rect.ymin,
+                        preview->xsize,
+                        preview->ysize,
+                        GPU_RGBA8,
+                        true,
+                        preview->rect,
+                        scale,
+                        scale,
+                        nullptr);
 
   GPU_blend(GPU_BLEND_NONE);
 
@@ -1199,7 +1193,7 @@ static void node_toggle_button_cb(struct bContext *C, void *node_argv, void *op_
   /* Select & activate only the button's node. */
   node_select_single(*C, *node);
 
-  WM_operator_name_call(C, opname, WM_OP_INVOKE_DEFAULT, nullptr);
+  WM_operator_name_call(C, opname, WM_OP_INVOKE_DEFAULT, nullptr, nullptr);
 }
 
 static void node_draw_shadow(const SpaceNode &snode,
@@ -1243,13 +1237,14 @@ static void node_draw_sockets(const View2D &v2d,
   GPU_blend(GPU_BLEND_ALPHA);
   GPU_program_point_size(true);
   immBindBuiltinProgram(GPU_SHADER_KEYFRAME_SHAPE);
-  immUniform1f("outline_scale", 1.0f);
+  immUniform1f("outline_scale", NODE_SOCK_OUTLINE_SCALE);
   immUniform2f("ViewportSize", -1.0f, -1.0f);
 
   /* Set handle size. */
+  const float socket_draw_size = NODE_SOCKSIZE * NODE_SOCKSIZE_DRAW_MULIPLIER;
   float scale;
   UI_view2d_scale_get(&v2d, &scale, nullptr);
-  scale *= 2.25f * NODE_SOCKSIZE;
+  scale *= socket_draw_size;
 
   if (!select_all) {
     immBeginAtMost(GPU_PRIM_POINTS, total_input_len + total_output_len);
@@ -1262,7 +1257,10 @@ static void node_draw_sockets(const View2D &v2d,
       continue;
     }
     if (select_all || (sock->flag & SELECT)) {
-      selected_input_len++;
+      if (!(sock->flag & SOCK_MULTI_INPUT)) {
+        /* Don't add multi-input sockets here since they are drawn in a different batch. */
+        selected_input_len++;
+      }
       continue;
     }
     /* Don't draw multi-input sockets here since they are drawn in a different batch. */
@@ -1327,6 +1325,10 @@ static void node_draw_sockets(const View2D &v2d,
       /* Socket inputs. */
       LISTBASE_FOREACH (bNodeSocket *, sock, &node.inputs) {
         if (nodeSocketIsHidden(sock)) {
+          continue;
+        }
+        /* Don't draw multi-input sockets here since they are drawn in a different batch. */
+        if (sock->flag & SOCK_MULTI_INPUT) {
           continue;
         }
         if (select_all || (sock->flag & SELECT)) {
@@ -1394,13 +1396,13 @@ static void node_draw_sockets(const View2D &v2d,
     }
 
     const bool is_node_hidden = (node.flag & NODE_HIDDEN);
-    const float width = NODE_SOCKSIZE;
+    const float width = 0.5f * socket_draw_size;
     float height = is_node_hidden ? width : node_socket_calculate_height(*socket) - width;
 
     float color[4];
     float outline_color[4];
     node_socket_color_get(C, ntree, node_ptr, *socket, color);
-    node_socket_outline_color_get(selected, socket->type, outline_color);
+    node_socket_outline_color_get(socket->flag & SELECT, socket->type, outline_color);
 
     node_socket_draw_multi_input(color, outline_color, width, height, socket->locx, socket->locy);
   }
@@ -2025,7 +2027,7 @@ static void node_draw_basis(const bContext &C,
     }
 
     UI_draw_roundbox_corner_set(UI_CNR_ALL);
-    UI_draw_roundbox_4fv(&rect, false, BASIS_RAD, color_outline);
+    UI_draw_roundbox_4fv(&rect, false, BASIS_RAD + outline_width, color_outline);
   }
 
   float scale;
@@ -2267,6 +2269,13 @@ void node_set_cursor(wmWindow &win, SpaceNode &snode, const float2 &cursor)
   if (node) {
     NodeResizeDirection dir = node_get_resize_direction(node, cursor[0], cursor[1]);
     wmcursor = node_get_resize_cursor(dir);
+    /* We want to indicate that Frame nodes can be moved/selected on their borders. */
+    if (node->type == NODE_FRAME && dir == NODE_RESIZE_NONE) {
+      const rctf frame_inside = node_frame_rect_inside(*node);
+      if (!BLI_rctf_isect_pt(&frame_inside, cursor[0], cursor[1])) {
+        wmcursor = WM_CURSOR_NSEW_SCROLL;
+      }
+    }
   }
 
   WM_cursor_set(&win, wmcursor);
@@ -2654,10 +2663,18 @@ static void node_draw_nodetree(const bContext &C,
   nodelink_batch_start(snode);
 
   LISTBASE_FOREACH (bNodeLink *, link, &ntree.links) {
-    if (!nodeLinkIsHidden(link)) {
-      node_draw_link(C, region.v2d, snode, *link);
+    if (!nodeLinkIsHidden(link) && !nodeLinkIsSelected(link)) {
+      node_draw_link(C, region.v2d, snode, *link, false);
     }
   }
+
+  /* Draw selected node links after the unselected ones, so they are shown on top. */
+  LISTBASE_FOREACH (bNodeLink *, link, &ntree.links) {
+    if (!nodeLinkIsHidden(link) && nodeLinkIsSelected(link)) {
+      node_draw_link(C, region.v2d, snode, *link, true);
+    }
+  }
+
   nodelink_batch_end(snode);
   GPU_blend(GPU_BLEND_NONE);
 
@@ -2842,7 +2859,7 @@ void node_draw_space(const bContext &C, ARegion &region)
     GPU_line_smooth(true);
     if (snode.runtime->linkdrag) {
       for (const bNodeLink *link : snode.runtime->linkdrag->links) {
-        node_draw_link(C, v2d, snode, *link);
+        node_draw_link(C, v2d, snode, *link, true);
       }
     }
     GPU_line_smooth(false);
@@ -2879,3 +2896,5 @@ void node_draw_space(const bContext &C, ARegion &region)
   /* Scrollers. */
   UI_view2d_scrollers_draw(&v2d, nullptr);
 }
+
+}  // namespace blender::ed::space_node

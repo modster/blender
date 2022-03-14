@@ -1,22 +1,5 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2016, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2016 Blender Foundation. All rights reserved.
 
 # Libraries configuration for Apple.
 
@@ -128,25 +111,20 @@ if(WITH_CODEC_SNDFILE)
 endif()
 
 if(WITH_PYTHON)
-  # we use precompiled libraries for py 3.9 and up by default
-  set(PYTHON_VERSION 3.9)
+  # Use precompiled libraries by default.
+  set(PYTHON_VERSION 3.10)
   if(NOT WITH_PYTHON_MODULE AND NOT WITH_PYTHON_FRAMEWORK)
-    # normally cached but not since we include them with blender
+    # Normally cached but not since we include them with blender.
     set(PYTHON_INCLUDE_DIR "${LIBDIR}/python/include/python${PYTHON_VERSION}")
     set(PYTHON_EXECUTABLE "${LIBDIR}/python/bin/python${PYTHON_VERSION}")
     set(PYTHON_LIBRARY ${LIBDIR}/python/lib/libpython${PYTHON_VERSION}.a)
     set(PYTHON_LIBPATH "${LIBDIR}/python/lib/python${PYTHON_VERSION}")
-    # set(PYTHON_LINKFLAGS "-u _PyMac_Error")  # won't  build with this enabled
   else()
-    # module must be compiled against Python framework
+    # Module must be compiled against Python framework.
     set(_py_framework "/Library/Frameworks/Python.framework/Versions/${PYTHON_VERSION}")
-
     set(PYTHON_INCLUDE_DIR "${_py_framework}/include/python${PYTHON_VERSION}")
     set(PYTHON_EXECUTABLE "${_py_framework}/bin/python${PYTHON_VERSION}")
     set(PYTHON_LIBPATH "${_py_framework}/lib/python${PYTHON_VERSION}")
-    # set(PYTHON_LIBRARY python${PYTHON_VERSION})
-    # set(PYTHON_LINKFLAGS "-u _PyMac_Error -framework Python")  # won't  build with this enabled
-
     unset(_py_framework)
   endif()
 
@@ -166,7 +144,11 @@ if(WITH_FFTW3)
   find_package(Fftw3)
 endif()
 
+# FreeType compiled with Brotli compression for woff2.
 find_package(Freetype REQUIRED)
+list(APPEND FREETYPE_LIBRARIES
+  ${LIBDIR}/brotli/lib/libbrotlicommon-static.a
+  ${LIBDIR}/brotli/lib/libbrotlidec-static.a)
 
 if(WITH_IMAGE_OPENEXR)
   find_package(OpenEXR)

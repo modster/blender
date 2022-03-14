@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -371,7 +355,7 @@ static const Mesh *mesh_data_from_duplicator_object(Object *ob,
   if (em != nullptr) {
     /* Note that this will only show deformation if #eModifierMode_OnCage is enabled.
      * We could change this but it matches 2.7x behavior. */
-    me_eval = em->mesh_eval_cage;
+    me_eval = BKE_object_get_editmesh_eval_cage(ob);
     if ((me_eval == nullptr) || (me_eval->runtime.wrapper_type == ME_WRAPPER_TYPE_BMESH)) {
       EditMeshData *emd = me_eval ? me_eval->runtime.edit_data : nullptr;
 
@@ -867,7 +851,7 @@ static void make_duplis_geometry_set_impl(const DupliContext *ctx,
       dupli->ob_data = (ID *)volume;
     }
   }
-  if (!ELEM(ctx->object->type, OB_CURVE, OB_FONT) || geometry_set_is_instance) {
+  if (!ELEM(ctx->object->type, OB_CURVES_LEGACY, OB_FONT) || geometry_set_is_instance) {
     const CurveComponent *curve_component = geometry_set.get_component_for_read<CurveComponent>();
     if (curve_component != nullptr) {
       const Curve *curve = curve_component->get_curve_for_render();

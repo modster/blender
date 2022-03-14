@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2006 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2006 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup render
@@ -72,6 +56,8 @@
 #include "BKE_scene.h"
 #include "BKE_sound.h"
 #include "BKE_writeavi.h" /* <------ should be replaced once with generic movie module */
+
+#include "NOD_composite.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
@@ -130,14 +116,20 @@
  * - save file or append in movie
  */
 
-/* ********* globals ******** */
+/* -------------------------------------------------------------------- */
+/** \name Globals
+ * \{ */
 
 /* here we store all renders */
 static struct {
   ListBase renderlist;
 } RenderGlobal = {{NULL, NULL}};
 
-/* ********* callbacks ******** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Callbacks
+ * \{ */
 
 static void render_callback_exec_null(Render *re, Main *bmain, eCbEvent evt)
 {
@@ -155,7 +147,11 @@ static void render_callback_exec_id(Render *re, Main *bmain, ID *id, eCbEvent ev
   BKE_callback_exec_id(bmain, id, evt);
 }
 
-/* ********* alloc and free ******** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Allocation & Free
+ * \{ */
 
 static int do_write_image_or_movie(Render *re,
                                    Main *bmain,
@@ -322,7 +318,11 @@ static bool render_scene_has_layers_to_render(Scene *scene, ViewLayer *single_la
   return false;
 }
 
-/* *************************************************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Public Render API
+ * \{ */
 
 Render *RE_GetRender(const char *name)
 {
@@ -700,7 +700,11 @@ void RE_FreePersistentData(const Scene *scene)
   }
 }
 
-/* ********* initialize state ******** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Initialize State
+ * \{ */
 
 static void re_init_resolution(Render *re, Render *source, int winx, int winy, rcti *disprect)
 {
@@ -919,7 +923,11 @@ void RE_test_break_cb(Render *re, void *handle, int (*f)(void *handle))
   re->tbh = handle;
 }
 
-/* ********* GL Context ******** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name OpenGL Context
+ * \{ */
 
 void RE_gl_context_create(Render *re)
 {
@@ -957,6 +965,16 @@ void *RE_gpu_context_get(Render *re)
   }
   return re->gpu_context;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Render & Composite Scenes (Implementation & Public API)
+ *
+ * Main high-level functions defined here are:
+ * - #RE_RenderFrame
+ * - #RE_RenderAnim
+ * \{ */
 
 /* ************  This part uses API, for rendering Blender scenes ********** */
 
@@ -1120,6 +1138,8 @@ static void do_render_compositor_scenes(Render *re)
     return;
   }
 
+  bool changed_scene = false;
+
   /* now foreach render-result node we do a full render */
   /* results are stored in a way compositor will find it */
   GSet *scenes_rendered = BLI_gset_ptr_new(__func__);
@@ -1132,11 +1152,20 @@ static void do_render_compositor_scenes(Render *re)
           do_render_compositor_scene(re, scene, cfra);
           BLI_gset_add(scenes_rendered, scene);
           node->typeinfo->updatefunc(restore_scene->nodetree, node);
+
+          if (scene != re->scene) {
+            changed_scene = true;
+          }
         }
       }
     }
   }
   BLI_gset_free(scenes_rendered, NULL);
+
+  if (changed_scene) {
+    /* If rendered another scene, switch back to the current scene with compositing nodes. */
+    re->current_scene_update(re->suh, re->scene);
+  }
 }
 
 /* bad call... need to think over proper method still */
@@ -1943,6 +1972,12 @@ void RE_RenderFreestyleExternal(Render *re)
 }
 #endif
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Read/Write Render Result (Images & Movies)
+ * \{ */
+
 bool RE_WriteRenderViewsImage(
     ReportList *reports, RenderResult *rr, Scene *scene, const bool stamp, char *name)
 {
@@ -2603,11 +2638,6 @@ bool RE_ReadRenderResult(Scene *scene, Scene *scenode)
   return success;
 }
 
-void RE_init_threadcount(Render *re)
-{
-  re->r.threads = BKE_render_num_threads(&re->r);
-}
-
 void RE_layer_load_from_file(
     RenderLayer *layer, ReportList *reports, const char *filename, int x, int y)
 {
@@ -2788,6 +2818,12 @@ RenderPass *RE_create_gp_pass(RenderResult *rr, const char *layername, const cha
   return render_layer_add_pass(rr, rl, 4, RE_PASSNAME_COMBINED, viewname, "RGBA", true);
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Miscellaneous Public Render API
+ * \{ */
+
 bool RE_allow_render_generic_object(Object *ob)
 {
   /* override not showing object when duplis are used with particles */
@@ -2799,3 +2835,10 @@ bool RE_allow_render_generic_object(Object *ob)
   }
   return true;
 }
+
+void RE_init_threadcount(Render *re)
+{
+  re->r.threads = BKE_render_num_threads(&re->r);
+}
+
+/** \} */

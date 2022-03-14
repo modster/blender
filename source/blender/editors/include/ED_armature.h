@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup editors
@@ -35,6 +19,7 @@ struct Base;
 struct Bone;
 struct Depsgraph;
 struct EditBone;
+struct GPUSelectResult;
 struct ListBase;
 struct Main;
 struct Mesh;
@@ -157,22 +142,22 @@ int ED_armature_join_objects_exec(struct bContext *C, struct wmOperator *op);
 
 struct Base *ED_armature_base_and_ebone_from_select_buffer(struct Base **bases,
                                                            uint bases_len,
-                                                           int hit,
+                                                           unsigned int select_id,
                                                            struct EditBone **r_ebone);
 struct Object *ED_armature_object_and_ebone_from_select_buffer(struct Object **objects,
                                                                uint objects_len,
-                                                               int hit,
+                                                               unsigned int select_id,
                                                                struct EditBone **r_ebone);
 struct Base *ED_armature_base_and_pchan_from_select_buffer(struct Base **bases,
                                                            uint bases_len,
-                                                           int hit,
+                                                           unsigned int select_id,
                                                            struct bPoseChannel **r_pchan);
 /**
  * For callers that don't need the pose channel.
  */
 struct Base *ED_armature_base_and_bone_from_select_buffer(struct Base **bases,
                                                           uint bases_len,
-                                                          int hit,
+                                                          unsigned int select_id,
                                                           struct Bone **r_bone);
 bool ED_armature_edit_deselect_all(struct Object *obedit);
 bool ED_armature_edit_deselect_all_visible(struct Object *obedit);
@@ -334,7 +319,7 @@ void ED_armature_pose_select_pick_bone(struct ViewLayer *view_layer,
 bool ED_armature_pose_select_pick_with_buffer(struct ViewLayer *view_layer,
                                               struct View3D *v3d,
                                               struct Base *base,
-                                              const unsigned int *buffer,
+                                              const struct GPUSelectResult *buffer,
                                               short hits,
                                               bool extend,
                                               bool deselect,
@@ -368,7 +353,8 @@ void ED_pose_bone_select_tag_update(struct Object *ob);
 void ED_pose_bone_select(struct Object *ob, struct bPoseChannel *pchan, bool select);
 
 /* meshlaplacian.c */
-void ED_mesh_deform_bind_callback(struct MeshDeformModifierData *mmd,
+void ED_mesh_deform_bind_callback(struct Object *object,
+                                  struct MeshDeformModifierData *mmd,
                                   struct Mesh *cagemesh,
                                   float *vertexcos,
                                   int totvert,

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup edinterface
@@ -661,8 +645,43 @@ static float ui_but_get_float_precision(uiBut *but)
   return but->a2;
 }
 
+static float ui_but_get_float_step_size(uiBut *but)
+{
+  if (but->type == UI_BTYPE_NUM) {
+    return ((uiButNumber *)but)->step_size;
+  }
+
+  return but->a1;
+}
+
+static bool ui_but_hide_fraction(uiBut *but, double value)
+{
+  /* Hide the fraction if both the value and the step are exact integers. */
+  if (floor(value) == value) {
+    const float step = ui_but_get_float_step_size(but) * UI_PRECISION_FLOAT_SCALE;
+
+    if (floorf(step) == step) {
+      /* Don't hide if it has any unit except frame count. */
+      switch (UI_but_unit_type_get(but)) {
+        case PROP_UNIT_NONE:
+        case PROP_UNIT_TIME:
+          return true;
+
+        default:
+          return false;
+      }
+    }
+  }
+
+  return false;
+}
+
 static int ui_but_calc_float_precision(uiBut *but, double value)
 {
+  if (ui_but_hide_fraction(but, value)) {
+    return 0;
+  }
+
   int prec = (int)ui_but_get_float_precision(but);
 
   /* first check for various special cases:
@@ -1399,7 +1418,7 @@ static bool ui_but_event_property_operator_string(const bContext *C,
   }
 
   /* This version is only for finding hotkeys for properties.
-   * These are set set via a data-path which is appended to the context,
+   * These are set via a data-path which is appended to the context,
    * manipulated using operators (see #ctx_toggle_opnames). */
 
   if (ptr->owner_id) {
@@ -2813,8 +2832,14 @@ void ui_but_string_get_ex(uiBut *but,
     }
 
     if (ui_but_is_float(but)) {
-      int prec = (float_precision == -1) ? ui_but_calc_float_precision(but, value) :
-                                           float_precision;
+      int prec = float_precision;
+
+      if (float_precision == -1) {
+        prec = ui_but_calc_float_precision(but, value);
+      }
+      else if (!use_exp_float && ui_but_hide_fraction(but, value)) {
+        prec = 0;
+      }
 
       if (ui_but_is_unit(but)) {
         ui_get_but_string_unit(but, str, maxlen, value, false, prec);
@@ -3062,11 +3087,11 @@ bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
         PointerRNA rptr;
 
         /* This is kind of hackish, in theory think we could only ever use the second member of
-         * this if/else, since ui_searchbox_apply() is supposed to always set that pointer when
+         * this if/else, since #ui_searchbox_apply() is supposed to always set that pointer when
          * we are storing pointers... But keeping str search first for now,
          * to try to break as little as possible existing code. All this is band-aids anyway.
-         * Fact remains, using editstr as main 'reference' over whole search button thingy
-         * is utterly weak and should be redesigned imho, but that's not a simple task. */
+         * Fact remains, using `editstr` as main 'reference' over whole search button thingy
+         * is utterly weak and should be redesigned IMHO, but that's not a simple task. */
         if (search_but && search_but->rnasearchprop &&
             RNA_property_collection_lookup_string(
                 &search_but->rnasearchpoin, search_but->rnasearchprop, str, &rptr)) {
@@ -4859,7 +4884,7 @@ int UI_autocomplete_end(AutoComplete *autocpl, char *autoname)
     BLI_strncpy(autoname, autocpl->truncate, autocpl->maxlen);
   }
   else {
-    if (autoname != autocpl->startname) { /* don't copy a string over its self */
+    if (autoname != autocpl->startname) { /* don't copy a string over itself */
       BLI_strncpy(autoname, autocpl->startname, autocpl->maxlen);
     }
   }
@@ -5887,6 +5912,11 @@ PointerRNA *UI_but_operator_ptr_get(uiBut *but)
   return but->opptr;
 }
 
+bContextStore *UI_but_context_get(const uiBut *but)
+{
+  return but->context;
+}
+
 void UI_but_unit_type_set(uiBut *but, const int unit_type)
 {
   but->unit_type = (uchar)(RNA_SUBTYPE_UNIT_VALUE(unit_type));
@@ -6499,7 +6529,7 @@ void UI_but_focus_on_enter_event(wmWindow *win, uiBut *but)
 
   event.type = EVT_BUT_OPEN;
   event.val = KM_PRESS;
-  event.is_repeat = false;
+  event.flag = 0;
   event.customdata = but;
   event.customdata_free = false;
 

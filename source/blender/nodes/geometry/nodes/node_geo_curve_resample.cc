@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_array.hh"
 #include "BLI_task.hh"
@@ -172,7 +158,7 @@ static SplinePtr resample_spline_evaluated(const Spline &src)
 static std::unique_ptr<CurveEval> resample_curve(const CurveComponent *component,
                                                  const SampleModeParam &mode_param)
 {
-  const CurveEval *input_curve = component->get_for_read();
+  const std::unique_ptr<CurveEval> input_curve = curves_to_curve_eval(*component->get_for_read());
   GeometryComponentFieldContext field_context{*component, ATTR_DOMAIN_CURVE};
   const int domain_size = component->attribute_domain_size(ATTR_DOMAIN_CURVE);
 
@@ -249,14 +235,14 @@ static std::unique_ptr<CurveEval> resample_curve(const CurveComponent *component
 static void geometry_set_curve_resample(GeometrySet &geometry_set,
                                         const SampleModeParam &mode_param)
 {
-  if (!geometry_set.has_curve()) {
+  if (!geometry_set.has_curves()) {
     return;
   }
 
   std::unique_ptr<CurveEval> output_curve = resample_curve(
       geometry_set.get_component_for_read<CurveComponent>(), mode_param);
 
-  geometry_set.replace_curve(output_curve.release());
+  geometry_set.replace_curves(curve_eval_to_curves(*output_curve));
 }
 
 static void node_geo_exec(GeoNodeExecParams params)

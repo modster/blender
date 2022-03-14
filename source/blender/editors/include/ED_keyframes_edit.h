@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup editors
@@ -92,6 +76,13 @@ typedef enum eEditKeyframes_Snap {
   SNAP_KEYS_VALUE,
   SNAP_KEYS_TIME,
 } eEditKeyframes_Snap;
+
+/* equalizing tools */
+typedef enum eEditKeyframes_Equalize {
+  EQUALIZE_HANDLES_LEFT = (1 << 0),
+  EQUALIZE_HANDLES_RIGHT = (1 << 1),
+  EQUALIZE_HANDLES_BOTH = (EQUALIZE_HANDLES_LEFT | EQUALIZE_HANDLES_RIGHT),
+} eEditKeyframes_Equalize;
 
 /* mirroring tools */
 typedef enum eEditKeyframes_Mirror {
@@ -258,6 +249,18 @@ short ANIM_fcurve_keyframes_loop(KeyframeEditData *ked,
                                  KeyframeEditFunc key_ok,
                                  KeyframeEditFunc key_cb,
                                  FcuEditFunc fcu_cb);
+/**
+ * Sets selected keyframes' bezier handles to an equal length and optionally makes
+ * the keyframes' handles horizontal.
+ * \param handle_length: Desired handle length, must be positive.
+ * \param flatten: Makes the keyframes' handles the same value as the keyframe,
+ * flattening the curve at that point.
+ */
+void ANIM_fcurve_equalize_keyframes_loop(struct FCurve *fcu,
+                                         eEditKeyframes_Equalize mode,
+                                         float handle_length,
+                                         bool flatten);
+
 /**
  * Function for working with any type (i.e. one of the known types) of animation channel.
  */

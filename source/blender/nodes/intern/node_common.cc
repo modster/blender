@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2007 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2007 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup nodes
@@ -187,7 +171,7 @@ static void group_verify_socket_list(bNodeTree &node_tree,
       BLI_addtail(&verify_lb, matching_socket);
     }
     else {
-      /* If there was no socket withe the same identifier already, simply create a new socket
+      /* If there was no socket with the same identifier already, simply create a new socket
        * based on the interface socket, which will already add it to the new list. */
       add_new_socket_from_interface(node_tree, node, *interface_socket, in_out);
     }
@@ -342,7 +326,7 @@ void ntree_update_reroute_nodes(bNodeTree *ntree)
   }
 
   /* Propagate socket types from right to left. This affects reroute nodes that haven't been
-   * changed in the the loop above. */
+   * changed in the loop above. */
   for (bNode *start_node : nodes_linked_with_reroutes) {
     LISTBASE_FOREACH (bNodeSocket *, input_socket, &start_node->inputs) {
       propagate_reroute_type_from_start_socket(input_socket, links_map, reroute_types);

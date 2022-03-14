@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_array.hh"
 #include "BLI_task.hh"
@@ -297,19 +283,19 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   geometry_set = geometry::realize_instances_legacy(geometry_set);
 
-  if (!geometry_set.has_curve()) {
+  if (!geometry_set.has_curves()) {
     params.set_output("Geometry", GeometrySet());
     return;
   }
 
   const CurveComponent &curve_component = *geometry_set.get_component_for_read<CurveComponent>();
-  const CurveEval &curve = *curve_component.get_for_read();
-  const Span<SplinePtr> splines = curve.splines();
-  curve.assert_valid_point_attributes();
+  const std::unique_ptr<CurveEval> curve = curves_to_curve_eval(*curve_component.get_for_read());
+  const Span<SplinePtr> splines = curve->splines();
+  curve->assert_valid_point_attributes();
 
   evaluate_splines(splines);
 
-  const Array<int> offsets = calculate_spline_point_offsets(params, mode, curve, splines);
+  const Array<int> offsets = calculate_spline_point_offsets(params, mode, *curve, splines);
   const int total_size = offsets.last();
   if (total_size == 0) {
     params.set_output("Geometry", GeometrySet());
@@ -320,7 +306,7 @@ static void node_geo_exec(GeoNodeExecParams params)
   PointCloudComponent &point_component = result.get_component_for_write<PointCloudComponent>();
 
   CurveToPointsResults new_attributes = curve_to_points_create_result_attributes(point_component,
-                                                                                 curve);
+                                                                                 *curve);
   switch (mode) {
     case GEO_NODE_CURVE_RESAMPLE_COUNT:
     case GEO_NODE_CURVE_RESAMPLE_LENGTH:

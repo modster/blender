@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup spseq
@@ -492,7 +476,7 @@ static void draw_seq_waveform_overlay(View2D *v2d,
 
       bool is_line_strip = (value_max - value_min < 0.05f);
 
-      if (was_line_strip != -1 && is_line_strip != was_line_strip) {
+      if (!ELEM(was_line_strip, -1, is_line_strip)) {
         /* If the previously added strip type isn't the same as the current one,
          * add transition areas so they transition smoothly between each other. */
         if (is_line_strip) {
@@ -1652,7 +1636,9 @@ static void sequencer_draw_gpencil_overlay(const bContext *C)
   ED_annotation_draw_view2d(C, 0);
 }
 
-/* Draw content and safety borders borders. */
+/**
+ * Draw content and safety borders.
+ */
 static void sequencer_draw_borders_overlay(const SpaceSeq *sseq,
                                            const View2D *v2d,
                                            const Scene *scene)
@@ -1942,7 +1928,6 @@ static void sequencer_draw_display_buffer(const bContext *C,
   if (!glsl_used) {
     immBindBuiltinProgram(GPU_SHADER_2D_IMAGE_COLOR);
     immUniformColor3f(1.0f, 1.0f, 1.0f);
-    immUniform1i("image", 0);
   }
 
   immBegin(GPU_PRIM_TRI_FAN, 4);
@@ -2705,12 +2690,7 @@ void draw_timeline_seq(const bContext *C, ARegion *region)
   GPU_depth_test(GPU_DEPTH_NONE);
 
   UI_GetThemeColor3fv(TH_BACK, col);
-  if (ed && ed->metastack.first) {
-    GPU_clear_color(col[0], col[1], col[2] - 0.1f, 0.0f);
-  }
-  else {
-    GPU_clear_color(col[0], col[1], col[2], 0.0f);
-  }
+  GPU_clear_color(col[0], col[1], col[2], 0.0f);
 
   UI_view2d_view_ortho(v2d);
   draw_seq_timeline_channels(v2d);

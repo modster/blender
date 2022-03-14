@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -415,6 +401,8 @@ typedef enum eBuildGpencil_Mode {
   GP_BUILD_MODE_SEQUENTIAL = 0,
   /* All strokes start at the same time */
   GP_BUILD_MODE_CONCURRENT = 1,
+  /* Only the new strokes are built */
+  GP_BUILD_MODE_ADDITIVE = 2,
 } eBuildGpencil_Mode;
 
 typedef enum eBuildGpencil_Transition {
@@ -663,9 +651,10 @@ typedef struct SimplifyGpencilModifierData {
   int layer_pass;
   /** Sample length */
   float length;
+  /** Sample sharp threshold */
+  float sharp_threshold;
   /** Merge distance */
   float distance;
-  char _pad[4];
 } SimplifyGpencilModifierData;
 
 typedef enum eSimplifyGpencil_Flag {

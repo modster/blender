@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
@@ -45,6 +31,7 @@
 #include "BKE_modifier.h"
 #include "BKE_object.h"
 
+using Alembic::Abc::FloatArraySamplePtr;
 using Alembic::Abc::Int32ArraySamplePtr;
 using Alembic::Abc::IV3fArrayProperty;
 using Alembic::Abc::P3fArraySamplePtr;
@@ -910,6 +897,66 @@ static void read_subd_sample(const std::string &iobject_full_name,
   }
 }
 
+static void read_vertex_creases(Mesh *mesh,
+                                const Int32ArraySamplePtr &indices,
+                                const FloatArraySamplePtr &sharpnesses)
+{
+  if (!(indices && sharpnesses && indices->size() == sharpnesses->size() &&
+        indices->size() != 0)) {
+    return;
+  }
+
+  float *vertex_crease_data = (float *)CustomData_add_layer(
+      &mesh->vdata, CD_CREASE, CD_DEFAULT, nullptr, mesh->totvert);
+  const int totvert = mesh->totvert;
+
+  for (int i = 0, v = indices->size(); i < v; ++i) {
+    const int idx = (*indices)[i];
+
+    if (idx >= totvert) {
+      continue;
+    }
+
+    vertex_crease_data[idx] = (*sharpnesses)[i];
+  }
+
+  mesh->cd_flag |= ME_CDFLAG_VERT_CREASE;
+}
+
+static void read_edge_creases(Mesh *mesh,
+                              const Int32ArraySamplePtr &indices,
+                              const FloatArraySamplePtr &sharpnesses)
+{
+  if (!(indices && sharpnesses)) {
+    return;
+  }
+
+  MEdge *edges = mesh->medge;
+  int totedge = mesh->totedge;
+
+  for (int i = 0, s = 0, e = indices->size(); i < e; i += 2, s++) {
+    int v1 = (*indices)[i];
+    int v2 = (*indices)[i + 1];
+
+    if (v2 < v1) {
+      /* It appears to be common to store edges with the smallest index first, in which case this
+       * prevents us from doing the second search below. */
+      std::swap(v1, v2);
+    }
+
+    MEdge *edge = find_edge(edges, totedge, v1, v2);
+    if (edge == nullptr) {
+      edge = find_edge(edges, totedge, v2, v1);
+    }
+
+    if (edge) {
+      edge->crease = unit_float_to_uchar_clamp((*sharpnesses)[s]);
+    }
+  }
+
+  mesh->cd_flag |= ME_CDFLAG_EDGE_CREASE;
+}
+
 /* ************************************************************************** */
 
 AbcSubDReader::AbcSubDReader(const IObject &object, ImportSettings &settings)
@@ -973,35 +1020,9 @@ void AbcSubDReader::readObjectData(Main *bmain, const Alembic::Abc::ISampleSelec
     return;
   }
 
-  Int32ArraySamplePtr indices = sample.getCreaseIndices();
-  Alembic::Abc::FloatArraySamplePtr sharpnesses = sample.getCreaseSharpnesses();
+  read_edge_creases(mesh, sample.getCreaseIndices(), sample.getCreaseSharpnesses());
 
-  if (indices && sharpnesses) {
-    MEdge *edges = mesh->medge;
-    int totedge = mesh->totedge;
-
-    for (int i = 0, s = 0, e = indices->size(); i < e; i += 2, s++) {
-      int v1 = (*indices)[i];
-      int v2 = (*indices)[i + 1];
-
-      if (v2 < v1) {
-        /* It appears to be common to store edges with the smallest index first, in which case this
-         * prevents us from doing the second search below. */
-        std::swap(v1, v2);
-      }
-
-      MEdge *edge = find_edge(edges, totedge, v1, v2);
-      if (edge == nullptr) {
-        edge = find_edge(edges, totedge, v2, v1);
-      }
-
-      if (edge) {
-        edge->crease = unit_float_to_uchar_clamp((*sharpnesses)[s]);
-      }
-    }
-
-    mesh->cd_flag |= ME_CDFLAG_EDGE_CREASE;
-  }
+  read_vertex_creases(mesh, sample.getCornerIndices(), sample.getCornerSharpnesses());
 
   if (m_settings->validate_meshes) {
     BKE_mesh_validate(mesh, false, false);

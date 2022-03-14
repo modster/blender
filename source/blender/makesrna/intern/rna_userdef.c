@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup RNA
@@ -652,7 +638,7 @@ static void rna_userdef_autosave_update(Main *bmain, Scene *scene, PointerRNA *p
   wmWindowManager *wm = bmain->wm.first;
 
   if (wm) {
-    WM_autosave_init(wm);
+    WM_file_autosave_init(wm);
   }
   rna_userdef_update(bmain, scene, ptr);
 }
@@ -5148,6 +5134,7 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
                            "New Interpolation Type",
                            "Interpolation mode used for first keyframe on newly added F-Curves "
                            "(subsequent keyframes take interpolation from preceding keyframe)");
+  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_ACTION);
 
   prop = RNA_def_property(srna, "keyframe_new_handle_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_keyframe_handle_type_items);
@@ -5293,7 +5280,7 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
       prop, "Duplicate GPencil", "Causes grease pencil data to be duplicated with the object");
 
   prop = RNA_def_property(srna, "use_duplicate_hair", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "dupflag", USER_DUP_HAIR);
+  RNA_def_property_boolean_sdna(prop, NULL, "dupflag", USER_DUP_CURVES);
   RNA_def_property_ui_text(
       prop, "Duplicate Hair", "Causes hair data to be duplicated with the object");
 
@@ -5912,20 +5899,20 @@ static void rna_def_userdef_input(BlenderRNA *brna)
   RNA_def_property_ui_range(prop, 0.1f, 2.0f, 0.01f, 2);
   RNA_def_property_ui_text(prop, "Orbit Sensitivity", "Scale trackball orbit sensitivity");
 
-  /* tweak tablet & mouse preset */
+  /* Click-drag threshold for tablet & mouse. */
   prop = RNA_def_property(srna, "drag_threshold_mouse", PROP_INT, PROP_PIXEL);
   RNA_def_property_range(prop, 1, 255);
   RNA_def_property_ui_text(prop,
                            "Mouse Drag Threshold",
-                           "Number of pixels to drag before a tweak/drag event is triggered "
-                           "for mouse/trackpad input "
+                           "Number of pixels to drag before a drag event is triggered "
+                           "for mouse/track-pad input "
                            "(otherwise click events are detected)");
 
   prop = RNA_def_property(srna, "drag_threshold_tablet", PROP_INT, PROP_PIXEL);
   RNA_def_property_range(prop, 1, 255);
   RNA_def_property_ui_text(prop,
                            "Tablet Drag Threshold",
-                           "Number of pixels to drag before a tweak/drag event is triggered "
+                           "Number of pixels to drag before a drag event is triggered "
                            "for tablet input "
                            "(otherwise click events are detected)");
 
@@ -6053,6 +6040,13 @@ static void rna_def_userdef_input(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Helicopter Mode",
                            "Device up/down directly controls the Z position of the 3D viewport");
+
+  prop = RNA_def_property(srna, "ndof_lock_camera_pan_zoom", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "ndof_flag", NDOF_CAMERA_PAN_ZOOM);
+  RNA_def_property_ui_text(
+      prop,
+      "Lock Camera Pan/Zoom",
+      "Pan/zoom the camera view instead of leaving the camera view when orbiting");
 
   /* let Python know whether NDOF is enabled */
   prop = RNA_def_boolean(srna, "use_ndof", true, "", "");
@@ -6386,13 +6380,6 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
       "Enable library overrides automatic resync detection and process on file load. Disable when "
       "dealing with older .blend files that need manual Resync (Enforce) handling");
 
-  prop = RNA_def_property(srna, "proxy_to_override_auto_conversion", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_negative_sdna(prop, NULL, "no_proxy_to_override_conversion", 1);
-  RNA_def_property_ui_text(
-      prop,
-      "Proxy to Override Auto Conversion",
-      "Enable automatic conversion of proxies to library overrides on file load");
-
   prop = RNA_def_property(srna, "use_new_point_cloud_type", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_new_point_cloud_type", 1);
   RNA_def_property_ui_text(
@@ -6406,9 +6393,9 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
                            "reduces execution time and memory usage)");
   RNA_def_property_update(prop, 0, "rna_userdef_update");
 
-  prop = RNA_def_property(srna, "use_new_hair_type", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "use_new_hair_type", 1);
-  RNA_def_property_ui_text(prop, "New Hair Type", "Enable the new hair type in the ui");
+  prop = RNA_def_property(srna, "use_new_curves_type", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "use_new_curves_type", 1);
+  RNA_def_property_ui_text(prop, "New Curves Type", "Enable the new curves data type in the UI");
 
   prop = RNA_def_property(srna, "use_cycles_debug", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_cycles_debug", 1);
@@ -6435,6 +6422,14 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Asset Debug Info",
                            "Enable some extra fields in the Asset Browser to aid in debugging");
+  RNA_def_property_update(prop, 0, "rna_userdef_ui_update");
+
+  prop = RNA_def_property(srna, "use_asset_indexing", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "no_asset_indexing", 1);
+  RNA_def_property_ui_text(prop,
+                           "Asset Indexing",
+                           "Disabling the asset indexer forces every asset library refresh to "
+                           "completely reread assets from disk");
   RNA_def_property_update(prop, 0, "rna_userdef_ui_update");
 
   prop = RNA_def_property(srna, "use_override_templates", PROP_BOOLEAN, PROP_NONE);

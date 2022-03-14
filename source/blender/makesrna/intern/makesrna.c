@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup RNA
@@ -738,10 +724,10 @@ static char *rna_def_property_get_func(
       }
       else {
         const PropertySubType subtype = prop->subtype;
-        const char *string_copy_func = (subtype == PROP_FILEPATH || subtype == PROP_DIRPATH ||
-                                        subtype == PROP_FILENAME || subtype == PROP_BYTESTRING) ?
-                                           "BLI_strncpy" :
-                                           "BLI_strncpy_utf8";
+        const char *string_copy_func =
+            ELEM(subtype, PROP_FILEPATH, PROP_DIRPATH, PROP_FILENAME, PROP_BYTESTRING) ?
+                "BLI_strncpy" :
+                "BLI_strncpy_utf8";
 
         rna_print_data_get(f, dp);
 
@@ -1087,10 +1073,10 @@ static char *rna_def_property_set_func(
       }
       else {
         const PropertySubType subtype = prop->subtype;
-        const char *string_copy_func = (subtype == PROP_FILEPATH || subtype == PROP_DIRPATH ||
-                                        subtype == PROP_FILENAME || subtype == PROP_BYTESTRING) ?
-                                           "BLI_strncpy" :
-                                           "BLI_strncpy_utf8";
+        const char *string_copy_func =
+            ELEM(subtype, PROP_FILEPATH, PROP_DIRPATH, PROP_FILENAME, PROP_BYTESTRING) ?
+                "BLI_strncpy" :
+                "BLI_strncpy_utf8";
 
         rna_print_data_get(f, dp);
 
@@ -2376,7 +2362,12 @@ static void rna_def_struct_function_prototype_cpp(FILE *f,
     pout = (flag_parameter & PARM_OUTPUT);
 
     if (flag & PROP_DYNAMIC) {
-      ptrstr = pout ? "**" : "*";
+      if (type == PROP_STRING) {
+        ptrstr = pout ? "*" : "";
+      }
+      else {
+        ptrstr = pout ? "**" : "*";
+      }
     }
     else if (type == PROP_POINTER) {
       ptrstr = pout ? "*" : "";
@@ -2867,7 +2858,12 @@ static void rna_def_function_funcs(FILE *f, StructDefRNA *dsrna, FunctionDefRNA 
       /* XXX only arrays and strings are allowed to be dynamic, is this checked anywhere? */
     }
     else if (cptr || (flag & PROP_DYNAMIC)) {
-      ptrstr = pout ? "**" : "*";
+      if (type == PROP_STRING) {
+        ptrstr = pout ? "*" : "";
+      }
+      else {
+        ptrstr = pout ? "**" : "*";
+      }
       /* Fixed size arrays and RNA pointers are pre-allocated on the ParameterList stack,
        * pass a pointer to it. */
     }
@@ -2947,8 +2943,14 @@ static void rna_def_function_funcs(FILE *f, StructDefRNA *dsrna, FunctionDefRNA 
     else {
       const char *data_str;
       if (cptr || (flag & PROP_DYNAMIC)) {
-        ptrstr = "**";
-        valstr = "*";
+        if (type == PROP_STRING) {
+          ptrstr = "*";
+          valstr = "";
+        }
+        else {
+          ptrstr = "**";
+          valstr = "*";
+        }
       }
       else if ((type == PROP_POINTER) && !(flag & PROP_THICK_WRAP)) {
         ptrstr = "**";
@@ -3545,7 +3547,12 @@ static void rna_generate_static_parameter_prototypes(FILE *f,
     }
 
     if (cptr || (flag & PROP_DYNAMIC)) {
-      ptrstr = pout ? "**" : "*";
+      if (type == PROP_STRING) {
+        ptrstr = pout ? "*" : "";
+      }
+      else {
+        ptrstr = pout ? "**" : "*";
+      }
     }
     else if (type == PROP_POINTER || dparm->prop->arraydimension) {
       ptrstr = "*";
@@ -4376,8 +4383,8 @@ static RNAProcessItem PROCESS_ITEMS[] = {
     {"rna_dynamicpaint.c", NULL, RNA_def_dynamic_paint},
     {"rna_fcurve.c", "rna_fcurve_api.c", RNA_def_fcurve},
     {"rna_gpencil.c", NULL, RNA_def_gpencil},
-#ifdef WITH_HAIR_NODES
-    {"rna_hair.c", NULL, RNA_def_hair},
+#ifdef WITH_NEW_CURVES_TYPE
+    {"rna_curves.c", NULL, RNA_def_curves},
 #endif
     {"rna_image.c", "rna_image_api.c", RNA_def_image},
     {"rna_key.c", NULL, RNA_def_key},
@@ -4401,9 +4408,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
     {"rna_packedfile.c", NULL, RNA_def_packedfile},
     {"rna_palette.c", NULL, RNA_def_palette},
     {"rna_particle.c", NULL, RNA_def_particle},
-#ifdef WITH_POINT_CLOUD
     {"rna_pointcloud.c", NULL, RNA_def_pointcloud},
-#endif
     {"rna_pose.c", "rna_pose_api.c", RNA_def_pose},
     {"rna_curveprofile.c", NULL, RNA_def_profile},
     {"rna_lightprobe.c", NULL, RNA_def_lightprobe},

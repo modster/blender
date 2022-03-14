@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_array.hh"
 #include "BLI_delaunay_2d.h"
@@ -127,13 +113,14 @@ static Mesh *cdt_to_mesh(const blender::meshintersect::CDT_result<double> &resul
 
 static void curve_fill_calculate(GeometrySet &geometry_set, const GeometryNodeCurveFillMode mode)
 {
-  if (!geometry_set.has_curve()) {
+  if (!geometry_set.has_curves()) {
     return;
   }
 
-  const CurveEval &curve = *geometry_set.get_curve_for_read();
-  if (curve.splines().is_empty()) {
-    geometry_set.replace_curve(nullptr);
+  const std::unique_ptr<CurveEval> curve = curves_to_curve_eval(
+      *geometry_set.get_curves_for_read());
+  if (curve->splines().is_empty()) {
+    geometry_set.replace_curves(nullptr);
     return;
   }
 
@@ -141,11 +128,11 @@ static void curve_fill_calculate(GeometrySet &geometry_set, const GeometryNodeCu
                                           CDT_CONSTRAINTS_VALID_BMESH_WITH_HOLES :
                                           CDT_INSIDE_WITH_HOLES;
 
-  const blender::meshintersect::CDT_result<double> results = do_cdt(curve, output_type);
+  const blender::meshintersect::CDT_result<double> results = do_cdt(*curve, output_type);
   Mesh *mesh = cdt_to_mesh(results);
 
   geometry_set.replace_mesh(mesh);
-  geometry_set.replace_curve(nullptr);
+  geometry_set.replace_curves(nullptr);
 }
 
 static void node_geo_exec(GeoNodeExecParams params)

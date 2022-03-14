@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2005 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup gpu
@@ -30,6 +14,8 @@ extern "C" {
 struct GPUIndexBuf;
 struct GPUVertBuf;
 
+/** Opaque type hiding #blender::gpu::shader::ShaderCreateInfo */
+typedef struct GPUShaderCreateInfo GPUShaderCreateInfo;
 /** Opaque type hiding #blender::gpu::Shader */
 typedef struct GPUShader GPUShader;
 
@@ -66,6 +52,10 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
                                 const char **tf_names,
                                 int tf_count,
                                 const char *shname);
+GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info);
+GPUShader *GPU_shader_create_from_info_name(const char *info_name);
+
+const GPUShaderCreateInfo *GPU_shader_create_info_get(const char *info_name);
 
 struct GPU_ShaderCreateFromArray_Params {
   const char **vert, **geom, **frag, **defs;
@@ -145,9 +135,14 @@ typedef enum {
 } GPUUniformBuiltin;
 
 typedef enum {
+  /** Deprecated */
   GPU_UNIFORM_BLOCK_VIEW = 0, /* viewBlock */
   GPU_UNIFORM_BLOCK_MODEL,    /* modelBlock */
   GPU_UNIFORM_BLOCK_INFO,     /* infoBlock */
+  /** New ones */
+  GPU_UNIFORM_BLOCK_DRW_VIEW,
+  GPU_UNIFORM_BLOCK_DRW_MODEL,
+  GPU_UNIFORM_BLOCK_DRW_INFOS,
 
   GPU_NUM_UNIFORM_BLOCKS, /* Special value, denotes number of builtin uniforms block. */
 } GPUUniformBlockBuiltin;

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 by Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2021 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup draw
@@ -84,7 +68,8 @@ typedef struct MeshRenderData {
   const float (*bm_poly_centers)[3];
 
   int *v_origindex, *e_origindex, *p_origindex;
-  int crease_ofs;
+  int edge_crease_ofs;
+  int vert_crease_ofs;
   int bweight_ofs;
   int freestyle_edge_ofs;
   int freestyle_face_ofs;
@@ -205,7 +190,6 @@ typedef void(ExtractLVertMeshFn)(const MeshRenderData *mr,
                                  void *data);
 typedef void(ExtractLooseGeomSubdivFn)(const struct DRWSubdivCache *subdiv_cache,
                                        const MeshRenderData *mr,
-                                       const MeshExtractLooseGeom *loose_geom,
                                        void *buffer,
                                        void *data);
 typedef void(ExtractInitFn)(const MeshRenderData *mr,
@@ -280,7 +264,8 @@ typedef struct MeshExtract {
  * \param is_mode_active: When true, use the modifiers from the edit-data,
  * otherwise don't use modifiers as they are not from this object.
  */
-MeshRenderData *mesh_render_data_create(Mesh *me,
+MeshRenderData *mesh_render_data_create(Object *object,
+                                        Mesh *me,
                                         bool is_editmode,
                                         bool is_paint_mode,
                                         bool is_mode_active,
@@ -308,6 +293,8 @@ void mesh_render_data_update_looptris(MeshRenderData *mr,
 typedef struct EditLoopData {
   uchar v_flag;
   uchar e_flag;
+  /* This is used for both vertex and edge creases. The edge crease value is stored in the bottom 4
+   * bits, while the vertex crease is stored in the upper 4 bits. */
   uchar crease;
   uchar bweight;
 } EditLoopData;
