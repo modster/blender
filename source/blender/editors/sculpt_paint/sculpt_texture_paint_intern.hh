@@ -1,5 +1,27 @@
 namespace blender::ed::sculpt_paint::texture_paint {
 
+struct Polygon {
+};
+
+struct Triangle {
+  int3 loop_indices;
+  int3 vert_indices;
+  int poly_index;
+  float3 add_edge_coord_x;
+};
+
+struct PixelsPackage {
+  int2 start_image_coordinate;
+  float3 start_edge_coord;
+  int num_pixels;
+  int triangle_index;
+};
+
+struct Pixel {
+  float3 pos;
+  float2 uv;
+};
+
 struct PixelData {
   int2 pixel_pos;
   float3 local_pos;
@@ -87,6 +109,9 @@ struct NodeData {
   Pixels pixels;
   rcti dirty_region;
   rctf uv_region;
+
+  Vector<Triangle> triangles;
+  Vector<PixelsPackage> encoded_pixels;
 
   NodeData()
   {
