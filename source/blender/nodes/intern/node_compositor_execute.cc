@@ -141,40 +141,41 @@ bool operator!=(const Domain &a, const Domain &b)
  * Result.
  */
 
-Result::Result(ResultType type, TexturePool &texture_pool) : type(type), texture_pool(texture_pool)
+Result::Result(ResultType type, TexturePool &texture_pool)
+    : type_(type), texture_pool_(texture_pool)
 {
 }
 
 void Result::allocate_texture(int2 size)
 {
-  is_texture = true;
-  switch (type) {
+  is_texture_ = true;
+  switch (type_) {
     case ResultType::Float:
-      texture = texture_pool.acquire_float(size);
+      texture_ = texture_pool_.acquire_float(size);
       return;
     case ResultType::Vector:
-      texture = texture_pool.acquire_vector(size);
+      texture_ = texture_pool_.acquire_vector(size);
       return;
     case ResultType::Color:
-      texture = texture_pool.acquire_color(size);
+      texture_ = texture_pool_.acquire_color(size);
       return;
   }
 }
 
 void Result::allocate_single_value()
 {
-  is_texture = false;
-  /* Allocate a dummy texture of size 1x1. */
-  const int2 dummy_texture_size{1, 1};
-  switch (type) {
+  is_texture_ = false;
+  /* Single values are stored in 1x1 textures. */
+  const int2 texture_size{1, 1};
+  switch (type_) {
     case ResultType::Float:
-      texture = texture_pool.acquire_float(dummy_texture_size);
+      texture_ = texture_pool_.acquire_float(texture_size);
       return;
     case ResultType::Vector:
-      texture = texture_pool.acquire_vector(dummy_texture_size);
+      texture_ = texture_pool_.acquire_vector(texture_size);
       return;
     case ResultType::Color:
-      texture = texture_pool.acquire_color(dummy_texture_size);
+      texture_ = texture_pool_.acquire_color(texture_size);
       return;
   }
 }
@@ -182,73 +183,109 @@ void Result::allocate_single_value()
 void Result::bind_as_texture(GPUShader *shader, const char *texture_name) const
 {
   const int texture_image_unit = GPU_shader_get_texture_binding(shader, texture_name);
-  GPU_texture_bind(texture, texture_image_unit);
-}
-
-void Result::bind_as_generic_input(GPUShader *shader,
-                                   const char *is_texture_name,
-                                   const char *value_name,
-                                   const char *texture_name) const
-{
-  /* Set the value of the is_texture uniform. */
-  GPU_shader_uniform_1b(shader, is_texture_name, is_texture);
-
-  /* Bind the texture to the texture image unit. If this is a single value result, this will be a
-   * dummy texture. */
-  bind_as_texture(shader, texture_name);
-
-  /* Set the value of the value uniform. If the result is a texture, the values will be
-   * uninitialized. */
-  switch (type) {
-    case ResultType::Float:
-      GPU_shader_uniform_1f(shader, value_name, *value);
-      break;
-    case ResultType::Vector:
-      GPU_shader_uniform_3fv(shader, value_name, value);
-      break;
-    case ResultType::Color:
-      GPU_shader_uniform_4fv(shader, value_name, value);
-      break;
-  }
+  GPU_texture_bind(texture_, texture_image_unit);
 }
 
 void Result::bind_as_image(GPUShader *shader, const char *image_name) const
 {
   const int image_unit = GPU_shader_get_texture_binding(shader, image_name);
-  GPU_texture_image_bind(texture, image_unit);
+  GPU_texture_image_bind(texture_, image_unit);
 }
 
 void Result::unbind_as_texture() const
 {
-  GPU_texture_unbind(texture);
+  GPU_texture_unbind(texture_);
 }
 
 void Result::unbind_as_image() const
 {
-  GPU_texture_image_unbind(texture);
+  GPU_texture_image_unbind(texture_);
+}
+
+void Result::transform(const Transformation2D &transformation)
+{
+  transformation_ = transformation * transformation_;
+}
+
+float Result::get_float_value() const
+{
+  return *value_;
+}
+
+float3 Result::get_vector_value() const
+{
+  return float3(value_);
+}
+
+float4 Result::get_color_value() const
+{
+  return float4(value_);
+}
+
+void Result::set_float_value(float value)
+{
+  *value_ = value;
+  GPU_texture_update(texture_, GPU_DATA_FLOAT, value_);
+}
+
+void Result::set_vector_value(const float3 &value)
+{
+  copy_v3_v3(value_, value);
+  GPU_texture_update(texture_, GPU_DATA_FLOAT, value_);
+}
+
+void Result::set_color_value(const float4 &value)
+{
+  copy_v4_v4(value_, value);
+  GPU_texture_update(texture_, GPU_DATA_FLOAT, value_);
 }
 
 void Result::incremenet_reference_count()
 {
-  reference_count++;
+  reference_count_++;
 }
 
 void Result::release()
 {
-  reference_count--;
-  if (reference_count == 0) {
-    texture_pool.release(texture);
+  reference_count_--;
+  if (reference_count_ == 0) {
+    texture_pool_.release(texture_);
   }
+}
+
+ResultType Result::type() const
+{
+  return type_;
+}
+
+bool Result::is_texture() const
+{
+  return is_texture_;
+}
+
+bool Result::is_single_value() const
+{
+  return !is_texture_;
+}
+
+GPUTexture *Result::texture() const
+{
+  return texture_;
 }
 
 int2 Result::size() const
 {
-  return int2{GPU_texture_width(texture), GPU_texture_height(texture)};
+  return int2{GPU_texture_width(texture_), GPU_texture_height(texture_)};
+}
+
+Transformation2D Result::transformation() const
+{
+  return transformation_;
 }
 
 Domain Result::domain() const
 {
-  return Domain(size(), transformation);
+  return Domain(size(), transformation_);
 }
 
 /* --------------------------------------------------------------------
@@ -365,7 +402,7 @@ void Operation::add_input_processors()
 
 void Operation::add_implicit_conversion_input_processor_if_needed(StringRef identifier)
 {
-  ResultType result_type = get_input(identifier).type;
+  ResultType result_type = get_input(identifier).type();
   ResultType expected_type = input_descriptors_.lookup(identifier).type;
 
   if (result_type == ResultType::Float && expected_type == ResultType::Vector) {
@@ -400,7 +437,7 @@ void Operation::add_realize_on_domain_input_processor_if_needed(StringRef identi
 
   const Result result = get_input(identifier);
   /* Input result is a single value and does not need realization. */
-  if (!result.is_texture) {
+  if (result.is_single_value()) {
     return;
   }
 
@@ -524,7 +561,7 @@ Domain NodeOperation::compute_domain()
   for (const InputSocketRef *input : node_->inputs()) {
     const Result &result = get_input(input->identifier());
     bool is_domain = get_input_descriptor(input->identifier()).is_domain;
-    if (is_domain && result.is_texture) {
+    if (is_domain && result.is_texture()) {
       return result.domain();
     }
   }
@@ -533,7 +570,7 @@ Domain NodeOperation::compute_domain()
    * single input. */
   for (const InputSocketRef *input : node_->inputs()) {
     const Result &result = get_input(input->identifier());
-    if (result.is_texture) {
+    if (result.is_texture()) {
       return result.domain();
     }
   }
@@ -557,15 +594,15 @@ void NodeOperation::pre_execute()
   for (const Map<StringRef, DInputSocket>::Item &item : unlinked_inputs_sockets_.items()) {
     Result &result = get_input(item.key);
     DInputSocket input = item.value;
-    switch (result.type) {
+    switch (result.type()) {
       case ResultType::Float:
-        *result.value = input->default_value<bNodeSocketValueFloat>()->value;
+        result.set_float_value(input->default_value<bNodeSocketValueFloat>()->value);
         continue;
       case ResultType::Vector:
-        copy_v3_v3(result.value, input->default_value<bNodeSocketValueVector>()->value);
+        result.set_vector_value(float3(input->default_value<bNodeSocketValueVector>()->value));
         continue;
       case ResultType::Color:
-        copy_v4_v4(result.value, input->default_value<bNodeSocketValueRGBA>()->value);
+        result.set_color_value(float4(input->default_value<bNodeSocketValueRGBA>()->value));
         continue;
     }
   }
@@ -671,7 +708,7 @@ void ConversionProcessorOperation::allocate()
 {
   Result &result = get_result();
   const Result &input = get_input();
-  if (input.is_texture) {
+  if (input.is_texture()) {
     result.allocate_texture(input.size());
   }
   else {
@@ -685,7 +722,7 @@ void ConversionProcessorOperation::execute()
   Result &result = get_result();
 
   /* The input is a single value, call the execute_single method of the derived class and exit. */
-  if (!input.is_texture) {
+  if (input.is_single_value()) {
     execute_single(input, result);
     return;
   }
@@ -733,7 +770,7 @@ ConvertFloatToVectorProcessorOperation::ConvertFloatToVectorProcessorOperation(C
 
 void ConvertFloatToVectorProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  copy_v3_fl(output.value, *input.value);
+  output.set_vector_value(float3(input.get_float_value()));
 }
 
 /* Use the shader for color conversion since they are stored in similar textures and the conversion
@@ -759,8 +796,9 @@ ConvertFloatToColorProcessorOperation::ConvertFloatToColorProcessorOperation(Con
 
 void ConvertFloatToColorProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  copy_v3_fl(output.value, *input.value);
-  output.value[3] = 1.0f;
+  float4 color = float4(input.get_float_value());
+  color[3] = 1.0f;
+  output.set_color_value(color);
 }
 
 GPUShader *ConvertFloatToColorProcessorOperation::get_conversion_shader() const
@@ -784,7 +822,8 @@ ConvertColorToFloatProcessorOperation::ConvertColorToFloatProcessorOperation(Con
 
 void ConvertColorToFloatProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  *output.value = (input.value[0] + input.value[1] + input.value[2]) / 3.0f;
+  float4 color = input.get_color_value();
+  output.set_float_value((color[0] + color[1] + color[2]) / 3.0f);
 }
 
 GPUShader *ConvertColorToFloatProcessorOperation::get_conversion_shader() const
@@ -808,7 +847,8 @@ ConvertVectorToFloatProcessorOperation::ConvertVectorToFloatProcessorOperation(C
 
 void ConvertVectorToFloatProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  *output.value = (input.value[0] + input.value[1] + input.value[2]) / 3.0f;
+  float3 vector = input.get_vector_value();
+  output.set_float_value((vector[0] + vector[1] + vector[2]) / 3.0f);
 }
 
 /* Use the shader for color conversion since they are stored in similar textures and the conversion
@@ -834,8 +874,7 @@ ConvertVectorToColorProcessorOperation::ConvertVectorToColorProcessorOperation(C
 
 void ConvertVectorToColorProcessorOperation::execute_single(const Result &input, Result &output)
 {
-  copy_v3_v3(output.value, input.value);
-  output.value[3] = 1.0f;
+  output.set_color_value(float4(input.get_vector_value(), 1.0f));
 }
 
 GPUShader *ConvertVectorToColorProcessorOperation::get_conversion_shader() const
@@ -871,7 +910,7 @@ void RealizeOnDomainProcessorOperation::execute()
 
   /* The input have the same domain as the operation domain, so just copy to the output. */
   if (input.domain() == domain_) {
-    GPU_texture_copy(result.texture, input.texture);
+    GPU_texture_copy(result.texture(), input.texture());
     return;
   }
 
@@ -880,7 +919,7 @@ void RealizeOnDomainProcessorOperation::execute()
   GPU_shader_bind(shader);
 
   /* Transform the input space into the domain space. */
-  const Transformation2D local_transformation = input.transformation *
+  const Transformation2D local_transformation = input.transformation() *
                                                 domain_.transformation.inverted();
 
   /* Set the pivot of the transformation to be the center of the domain.  */
@@ -895,7 +934,7 @@ void RealizeOnDomainProcessorOperation::execute()
   GPU_shader_uniform_mat3(shader, "inverse_transformation", inverse_transformation.matrix());
 
   /* Bind input texture and output image. */
-  GPU_texture_wrap_mode(input.texture, false, false);
+  GPU_texture_wrap_mode(input.texture(), false, false);
   input.bind_as_texture(shader, "input_sampler");
   result.bind_as_image(shader, "domain");
 
@@ -915,7 +954,7 @@ void RealizeOnDomainProcessorOperation::execute()
 
 GPUShader *RealizeOnDomainProcessorOperation::get_realization_shader()
 {
-  switch (get_result().type) {
+  switch (get_result().type()) {
     case ResultType::Color:
       return GPU_shader_create_from_info_name("compositor_realize_on_domain_color");
     case ResultType::Vector:

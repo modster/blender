@@ -24,7 +24,7 @@
 #include "node_composite_util.hh"
 
 #include "BLI_linklist.h"
-#include "BLI_math_vector.h"
+#include "BLI_math_vec_types.hh"
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
@@ -502,8 +502,8 @@ class ImageOperation : public NodeOperation {
 
     Result &result = get_result(identifier);
     /* The image texture is invalid or missing, set the output value to zero. */
-    if (!result.is_texture) {
-      copy_v4_fl(result.value, 0.0f);
+    if (result.is_single_value()) {
+      result.set_color_value(float4(0.0f));
       return;
     }
 
@@ -725,7 +725,7 @@ class RenderLayerOperation : public NodeOperation {
     const int view_layer = node().custom1;
     GPUTexture *pass_texture = context().get_pass_texture(view_layer, SCE_PASS_COMBINED);
     const Result &result = get_result("Image");
-    GPU_texture_copy(result.texture, pass_texture);
+    GPU_texture_copy(result.texture(), pass_texture);
   }
 };
 

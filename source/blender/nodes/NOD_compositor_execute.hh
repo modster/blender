@@ -189,6 +189,7 @@ class Domain {
 
   Domain(int2 size, Transformation2D transformation);
 
+  /* Returns a domain of size 1x1 and an identity transformation. */
   static Domain identity();
 };
 
@@ -207,40 +208,34 @@ enum class ResultType : uint8_t {
 /* A class that represents an output of an operation. A result reside in a certain domain defined
  * by its size and transformation, see the Domain class for more information. A result either
  * stores a single value or a texture. An operation will output a single value result if that value
- * would have been constant over the whole texture. Even if the result is a single value, the
- * texture member should and will be pointing to a valid dummy texture. This dummy texture
- * shouldn't and will not be used and its contents needn't and will not be initialized, it solely
- * exists because operation shaders are built in such a way to operate on both texture and single
- * value input results. Each shader have three uniforms for each input. 1) A boolean that indicates
- * if this input is a single value or a texture. 2) A float that is initialized only if the input
- * is a single value result. 3) A texture that is initialized only if the input is a texture
- * result. Since shaders expect a texture to be bound even if it will not be used in the shader
- * invocation, a dummy texture is bound regardless, hence the need to always store a dummy texture
- * if the result is a single value. */
+ * would have been constant over the whole texture. Single value results are stored in 1x1 textures
+ * to make them easily accessible in shaders. But the same value is also stored in the value member
+ * of the result for any host-side processing. */
 class Result {
- public:
+ private:
   /* The base type of the texture or the type of the single value. */
-  ResultType type;
+  ResultType type_;
   /* If true, the result is a texture, otherwise, the result is a single value. */
-  bool is_texture;
-  /* If the result is a texture, this member points to a GPU texture storing the result data. If
-   * the result is not a texture, this member points to a valid dummy GPU texture. See class
-   * description above. */
-  GPUTexture *texture = nullptr;
+  bool is_texture_;
+  /* A GPU texture storing the result data. This will be a 1x1 texture if the result is a single
+   * value, the value of which will be identical to that of the value member. See class description
+   * for more information. */
+  GPUTexture *texture_ = nullptr;
   /* The texture pool used to allocate the texture of the result, this should be initialized during
    * construction. */
-  TexturePool &texture_pool;
+  TexturePool &texture_pool_;
   /* The number of users currently referencing and using this result. */
-  int reference_count = 0;
-  /* If the result is a single value, this member stores the value of the result. While this member
-   * stores 4 values, only a subset of which could be initialized depending on the type, for
-   * instance, a float result will only initialize the first array element and a vector result will
-   * only initialize the first three array elements. This member is uninitialized if the result is
-   * a texture. */
-  float value[4];
+  int reference_count_ = 0;
+  /* If the result is a single value, this member stores the value of the result, the value of
+   * which will be identical to that stored in the texture member. While this member stores 4
+   * values, only a subset of which could be initialized depending on the type, for instance, a
+   * float result will only initialize the first array element and a vector result will only
+   * initialize the first three array elements. This member is uninitialized if the result is a
+   * texture. */
+  float value_[4];
   /* The transformation of the result. This only matters if the result was a texture. See the
    * Domain class. */
-  Transformation2D transformation = Transformation2D::identity();
+  Transformation2D transformation_ = Transformation2D::identity();
 
  public:
   Result(ResultType type, TexturePool &texture_pool);
@@ -249,32 +244,51 @@ class Result {
    * the given size from the given texture pool. */
   void allocate_texture(int2 size);
 
-  /* Declare the result to be a single value result and allocate a dummy texture of an appropriate
-   * type from the given texture pool. See class description for more information. */
+  /* Declare the result to be a single value result and allocate a texture of an appropriate
+   * type with size 1x1 from the given texture pool. See class description for more information. */
   void allocate_single_value();
 
   /* Bind the texture of the result to the texture image unit with the given name in the currently
    * bound given shader. */
   void bind_as_texture(GPUShader *shader, const char *texture_name) const;
 
-  /* Bind the result as an input that could be single value or a texture to the currently bound
-   * given shader. The names of three uniforms corresponding to the input are given as arguments.
-   * See class description for more details. */
-  void bind_as_generic_input(GPUShader *shader,
-                             const char *is_texture_name,
-                             const char *value_name,
-                             const char *texture_name) const;
-
   /* Bind the texture of the result to the image unit with the given name in the currently bound
    * given shader. */
   void bind_as_image(GPUShader *shader, const char *image_name) const;
 
-  /* Unbind the texture which was previously bound using bind_as_texture or bind_as_generic_input.
-   * This should be called even for single value results due to the use of the dummy texture. */
+  /* Unbind the texture which was previously bound using bind_as_texture. */
   void unbind_as_texture() const;
 
   /* Unbind the texture which was previously bound using bind_as_image. */
   void unbind_as_image() const;
+
+  /* Transform the result by the given transformation. This effectively pre-multiply the given
+   * transformation by the current transformation of the result. */
+  void transform(const Transformation2D &transformation);
+
+  /* If the result is a single value result of type float, return its float value. Otherwise, an
+   * uninitialized value is returned. */
+  float get_float_value() const;
+
+  /* If the result is a single value result of type vector, return its vector value. Otherwise, an
+   * uninitialized value is returned. */
+  float3 get_vector_value() const;
+
+  /* If the result is a single value result of type color, return its color value. Otherwise, an
+   * uninitialized value is returned. */
+  float4 get_color_value() const;
+
+  /* If the result is a single value result of type float, set its float value and upload it to the
+   * texture. Otherwise, an undefined behavior is invoked. */
+  void set_float_value(float value);
+
+  /* If the result is a single value result of type vector, set its vector value and upload it to
+   * the texture. Otherwise, an undefined behavior is invoked. */
+  void set_vector_value(const float3 &value);
+
+  /* If the result is a single value result of type color, set its color value and upload it to the
+   * texture. Otherwise, an undefined behavior is invoked. */
+  void set_color_value(const float4 &value);
 
   /* Increment the reference count of the result. This should be called when a user gets a
    * reference to the result to use as an input. */
@@ -284,8 +298,23 @@ class Result {
    * previously referenced and incremented the reference count of the result no longer needs it. */
   void release();
 
+  /* Returns the type of the result. */
+  ResultType type() const;
+
+  /* Returns true if the result is a texture and false of it is a single value. */
+  bool is_texture() const;
+
+  /* Returns true if the result is a single value and false of it is a texture. */
+  bool is_single_value() const;
+
+  /* Returns the allocated GPU texture of the result. */
+  GPUTexture *texture() const;
+
   /* Returns the size of the allocated texture. */
   int2 size() const;
+
+  /* Returns the transformation of the result. */
+  Transformation2D transformation() const;
 
   /* Returns the domain of the result. See the Domain class. */
   Domain domain() const;

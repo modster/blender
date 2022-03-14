@@ -65,7 +65,7 @@ class TransformOperation : public NodeOperation {
   {
     const Result &input = get_input("Image");
     Result &result = get_result("Image");
-    if (input.is_texture) {
+    if (input.is_texture()) {
       result.allocate_texture(input.size());
     }
     else {
@@ -77,21 +77,22 @@ class TransformOperation : public NodeOperation {
   {
     const Result &input = get_input("Image");
     Result &result = get_result("Image");
-    if (!result.is_texture) {
-      copy_v4_v4(result.value, input.value);
+    if (result.is_single_value()) {
+      result.set_color_value(input.get_color_value());
       return;
     }
 
-    GPU_texture_copy(result.texture, input.texture);
+    GPU_texture_copy(result.texture(), input.texture());
 
-    const float2 translation = float2(*get_input("X").value, *get_input("Y").value);
-    const float rotation = *get_input("Angle").value;
-    const float2 scale = float2(*get_input("Scale").value);
+    const float2 translation = float2(get_input("X").get_float_value(),
+                                      get_input("Y").get_float_value());
+    const float rotation = get_input("Angle").get_float_value();
+    const float2 scale = float2(get_input("Scale").get_float_value());
 
     const Transformation2D transformation = Transformation2D::from_translation_rotation_scale(
         translation, rotation, scale);
 
-    result.transformation = transformation * input.transformation;
+    result.transform(transformation);
   }
 };
 
