@@ -1218,7 +1218,7 @@ void Evaluator::map_node_inputs_to_results(DNode node)
     /* If the origin socket is an input, that means the input is unlinked. Unlinked inputs are
      * mapped internally to internal results, so skip here. */
     if (origin->is_input()) {
-      return;
+      continue;
     }
 
     /* Get the result from the operation that contains the output socket. */
