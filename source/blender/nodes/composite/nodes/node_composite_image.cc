@@ -463,31 +463,6 @@ class ImageOperation : public NodeOperation {
  public:
   using NodeOperation::NodeOperation;
 
-  void allocate() override
-  {
-    allocate_output("Image");
-    allocate_output("Alpha");
-  }
-
-  void allocate_output(StringRef identifier)
-  {
-    if (!is_output_needed(identifier)) {
-      return;
-    }
-
-    Result &result = get_result(identifier);
-    GPUTexture *image_texture = get_image_texture();
-    /* The image texture is invalid or missing, allocate a single zero output. */
-    if (!image_texture) {
-      result.allocate_single_value();
-      return;
-    }
-
-    const int width = GPU_texture_width(image_texture);
-    const int height = GPU_texture_height(image_texture);
-    result.allocate_texture(int2{width, height});
-  }
-
   void execute() override
   {
     compute_output("Image", "compositor_image");
@@ -501,17 +476,23 @@ class ImageOperation : public NodeOperation {
     }
 
     Result &result = get_result(identifier);
+
+    GPUTexture *image_texture = get_image_texture();
     /* The image texture is invalid or missing, set the output value to zero. */
-    if (result.is_single_value()) {
+    if (!image_texture) {
+      result.allocate_single_value();
       result.set_color_value(float4(0.0f));
       return;
     }
+
+    const int width = GPU_texture_width(image_texture);
+    const int height = GPU_texture_height(image_texture);
+    result.allocate_texture(int2(width, height));
 
     GPUShader *shader = GPU_shader_create_from_info_name(shader_name);
     GPU_shader_bind(shader);
 
     const int input_unit = GPU_shader_get_texture_binding(shader, "input_sampler");
-    GPUTexture *image_texture = get_image_texture();
     GPU_texture_bind(image_texture, input_unit);
 
     result.bind_as_image(shader, "output_image");
@@ -709,22 +690,15 @@ class RenderLayerOperation : public NodeOperation {
  public:
   using NodeOperation::NodeOperation;
 
-  void allocate() override
-  {
-    const int view_layer = node().custom1;
-    const GPUTexture *pass_texture = context().get_pass_texture(view_layer, SCE_PASS_COMBINED);
-    const int width = GPU_texture_width(pass_texture);
-    const int height = GPU_texture_height(pass_texture);
-
-    Result &image_result = get_result("Image");
-    image_result.allocate_texture(int2{width, height});
-  }
-
   void execute() override
   {
     const int view_layer = node().custom1;
     GPUTexture *pass_texture = context().get_pass_texture(view_layer, SCE_PASS_COMBINED);
-    const Result &result = get_result("Image");
+    const int width = GPU_texture_width(pass_texture);
+    const int height = GPU_texture_height(pass_texture);
+
+    Result &result = get_result("Image");
+    result.allocate_texture(int2(width, height));
     GPU_texture_copy(result.texture(), pass_texture);
   }
 };

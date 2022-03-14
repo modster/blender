@@ -361,22 +361,14 @@ Operation::~Operation()
   }
 }
 
-void Operation::initialize()
-{
-  pre_allocate();
-  add_input_processors();
-  allocate_input_processors();
-  allocate();
-}
-
 void Operation::evaluate()
 {
   pre_execute();
-  execute_input_processors();
+
+  evaluate_input_processors();
+
   execute();
 
-  pre_release();
-  release();
   release_inputs();
 }
 
@@ -391,24 +383,24 @@ void Operation::map_input_to_result(StringRef identifier, Result *result)
   result->increment_reference_count();
 }
 
-void Operation::pre_allocate()
-{
-}
-
-void Operation::allocate()
-{
-}
-
 void Operation::pre_execute()
 {
 }
 
-void Operation::pre_release()
+void Operation::evaluate_input_processors()
 {
-}
+  /* First add all needed processors for each input. */
+  for (const StringRef &identifier : inputs_to_results_map_.keys()) {
+    add_implicit_conversion_input_processor_if_needed(identifier);
+    add_realize_on_domain_input_processor_if_needed(identifier);
+  }
 
-void Operation::release()
-{
+  /* Then evaluate the input processors in order. */
+  for (const Vector<ProcessorOperation *> &processors : input_processors_.values()) {
+    for (ProcessorOperation *processor : processors) {
+      processor->evaluate();
+    }
+  }
 }
 
 Result &Operation::get_input(StringRef identifier) const
@@ -445,15 +437,6 @@ Context &Operation::context()
 TexturePool &Operation::texture_pool()
 {
   return context_.texture_pool();
-}
-
-void Operation::add_input_processors()
-{
-  /* First add all needed processors for each input. */
-  for (const StringRef &identifier : inputs_to_results_map_.keys()) {
-    add_implicit_conversion_input_processor_if_needed(identifier);
-    add_realize_on_domain_input_processor_if_needed(identifier);
-  }
 }
 
 void Operation::add_implicit_conversion_input_processor_if_needed(StringRef identifier)
@@ -522,24 +505,6 @@ void Operation::add_input_processor(StringRef identifier, ProcessorOperation *pr
   switch_result_mapped_to_input(identifier, &processor->get_result());
 }
 
-void Operation::allocate_input_processors()
-{
-  for (const Vector<ProcessorOperation *> &processors : input_processors_.values()) {
-    for (ProcessorOperation *processor : processors) {
-      processor->allocate();
-    }
-  }
-}
-
-void Operation::execute_input_processors()
-{
-  for (const Vector<ProcessorOperation *> &processors : input_processors_.values()) {
-    for (ProcessorOperation *processor : processors) {
-      processor->execute();
-    }
-  }
-}
-
 void Operation::release_inputs()
 {
   for (Result *result : inputs_to_results_map_.values()) {
@@ -596,6 +561,11 @@ bool NodeOperation::is_buffered() const
   return true;
 }
 
+const bNode &NodeOperation::node() const
+{
+  return *node_->bnode();
+}
+
 bool NodeOperation::is_output_needed(StringRef identifier) const
 {
   DOutputSocket output = node_.output_by_identifier(identifier);
@@ -603,11 +573,6 @@ bool NodeOperation::is_output_needed(StringRef identifier) const
     return false;
   }
   return true;
-}
-
-const bNode &NodeOperation::node() const
-{
-  return *node_->bnode();
 }
 
 Domain NodeOperation::compute_domain()
@@ -635,21 +600,14 @@ Domain NodeOperation::compute_domain()
   return Domain::identity();
 }
 
-void NodeOperation::pre_allocate()
-{
-  /* Allocate the unlinked inputs results. */
-  for (Result &result : unlinked_inputs_results_) {
-    result.allocate_single_value();
-  }
-}
-
 void NodeOperation::pre_execute()
 {
-  /* For all unlinked input sockets, set the value of the input result based on the socket's
+  /* For each unlinked input socket, allocate a single value and set the value to the socket's
    * default value. */
   for (const Map<StringRef, DInputSocket>::Item &item : unlinked_inputs_sockets_.items()) {
     Result &result = get_input(item.key);
     DInputSocket input = item.value;
+    result.allocate_single_value();
     switch (result.type()) {
       case ResultType::Float:
         result.set_float_value(input->default_value<bNodeSocketValueFloat>()->value);
@@ -728,6 +686,10 @@ void ProcessorOperation::map_input_to_result(Result *result)
   Operation::map_input_to_result(input_identifier, result);
 }
 
+void ProcessorOperation::evaluate_input_processors()
+{
+}
+
 Result &ProcessorOperation::get_input()
 {
   return Operation::get_input(input_identifier);
@@ -760,45 +722,30 @@ InputDescriptor &ProcessorOperation::get_input_descriptor()
 const char *ConversionProcessorOperation::shader_input_sampler_name = "input_sampler";
 const char *ConversionProcessorOperation::shader_output_image_name = "output_image";
 
-void ConversionProcessorOperation::allocate()
-{
-  Result &result = get_result();
-  const Result &input = get_input();
-  if (input.is_texture()) {
-    result.allocate_texture(input.size());
-  }
-  else {
-    result.allocate_single_value();
-  }
-}
-
 void ConversionProcessorOperation::execute()
 {
-  const Result &input = get_input();
   Result &result = get_result();
+  const Result &input = get_input();
 
-  /* The input is a single value, call the execute_single method of the derived class and exit. */
   if (input.is_single_value()) {
+    result.allocate_single_value();
     execute_single(input, result);
     return;
   }
 
-  /* Get the conversion shader from the derived class and bind it. */
+  result.allocate_texture(input.size());
+
   GPUShader *shader = get_conversion_shader();
   GPU_shader_bind(shader);
 
-  /* Bind input texture and output image. */
   input.bind_as_texture(shader, shader_input_sampler_name);
   result.bind_as_image(shader, shader_output_image_name);
 
-  /* Dispatch shader. */
   const int2 size = result.size();
   GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
-  /* Make sure the output is written before using it. */
   GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
 
-  /* Unbind and free resources. */
   input.unbind_as_texture();
   result.unbind_as_image();
   GPU_shader_unbind();
@@ -954,23 +901,19 @@ RealizeOnDomainProcessorOperation::RealizeOnDomainProcessorOperation(Context &co
   populate_result(Result(type, texture_pool()));
 }
 
-void RealizeOnDomainProcessorOperation::allocate()
-{
-  get_result().allocate_texture(domain_.size);
-}
-
 void RealizeOnDomainProcessorOperation::execute()
 {
-  const Result &input = get_input();
+  Result &input = get_input();
   Result &result = get_result();
 
-  /* The input have the same domain as the operation domain, so just copy to the output. */
+  /* The input have the same domain as the operation domain, so just pass the input through. */
   if (input.domain() == domain_) {
-    GPU_texture_copy(result.texture(), input.texture());
+    input.pass_through(result);
     return;
   }
 
-  /* Bind a realization shader of an appropriate type. */
+  result.allocate_texture(domain_.size);
+
   GPUShader *shader = get_realization_shader();
   GPU_shader_bind(shader);
 
@@ -989,19 +932,17 @@ void RealizeOnDomainProcessorOperation::execute()
   /* Set the inverse of the transform to the shader. */
   GPU_shader_uniform_mat3(shader, "inverse_transformation", inverse_transformation.matrix());
 
-  /* Bind input texture and output image. */
+  /* Make out-of-bound texture access return zero. */
   GPU_texture_wrap_mode(input.texture(), false, false);
+
   input.bind_as_texture(shader, "input_sampler");
   result.bind_as_image(shader, "domain");
 
-  /* Dispatch shader. */
   const int2 size = result.size();
   GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
-  /* Make sure the output is written before using it. */
   GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
 
-  /* Unbind and free resources. */
   input.unbind_as_texture();
   result.unbind_as_image();
   GPU_shader_unbind();
@@ -1062,9 +1003,6 @@ void Evaluator::evaluate()
 
   /* Compute the operations stream. */
   compute_operations_stream(node_schedule);
-
-  /* Initialize the operations stream. */
-  initialize_operations_stream();
 
   /* Evaluate the operations stream. */
   evaluate_operations_stream();
@@ -1253,13 +1191,6 @@ void Evaluator::map_node_inputs_to_results(DNode node)
     /* Map the input to the result we got from the output. */
     NodeOperation *input_operation = node_operations_.lookup(input.node());
     input_operation->map_input_to_result(input->identifier(), &result);
-  }
-}
-
-void Evaluator::initialize_operations_stream()
-{
-  for (Operation *operation : operations_stream_) {
-    operation->initialize();
   }
 }
 

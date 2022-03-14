@@ -52,8 +52,11 @@ class TexturePoolKey {
 };
 
 /* A pool of textures that can be allocated and reused transparently throughout the evaluation of
- * the node tree. Concrete derived classes are expected to free the textures once the pool is no
- * longer in use. */
+ * the compositor. This texture pool only pools textures throughout a single evaluation of the
+ * compositor and will reset after evaluation without freeing any textures. Cross-evaluation
+ * pooling and freeing of unused textures is the responsibility of the back-end texture pool used
+ * by the allocate_texture method. In the case of the viewport compositor engine, this would be the
+ * global DRWTexturePool of the draw manager. */
 class TexturePool {
  private:
   /* The set of textures in the pool that are available to acquire for each distinct texture
@@ -82,8 +85,9 @@ class TexturePool {
 
  private:
   /* Returns a newly allocated texture with the given specification. This method should be
-   * implemented by the compositor engine and should ideally use the DRW texture pool for
-   * allocation. */
+   * implemented by the compositor engine and should use a global texture pool that is persistent
+   * across evaluations and capable of freeing unused textures. In the case of the viewport
+   * compositor engine, this would be the global DRWTexturePool of the draw manager. */
   virtual GPUTexture *allocate_texture(int2 size, eGPUTextureFormat format) = 0;
 };
 
@@ -392,9 +396,8 @@ class Operation {
   Context &context_;
   /* A mapping between each output of the operation identified by its identifier and the computed
    * result for that output. A result for each output of an appropriate type should be constructed
-   * and added to the map during operation construction. The results should be allocated in the
-   * initialization methods. The contents of the results should be computed in the execution
-   * methods. */
+   * and added to the map during operation construction. The results should be allocated and their
+   * contents should be computed in the execute method. */
   Map<StringRef, Result> results_;
   /* A mapping between each input of the operation identified by its identifier and a reference to
    * the computed result providing its data. The mapped result can be one that was computed by
@@ -421,10 +424,11 @@ class Operation {
    * return false if the operation can be applied pixel-wise. */
   virtual bool is_buffered() const = 0;
 
-  /* Calls the initialization methods. */
-  void initialize();
-
-  /* Calls the execution methods followed by the release methods. */
+  /* Evaluate the operation as follows:
+   * 1. Run any pre-execute computations.
+   * 2. Add an evaluate any input processors.
+   * 3. Invoking the execute method of the operation.
+   * 4. Releasing the results mapped to the inputs. */
   void evaluate();
 
   /* Get a reference to the output result identified by the given identifier. */
@@ -439,30 +443,20 @@ class Operation {
   /* Compute the operation domain of this operation. See the Domain class for more information. */
   virtual Domain compute_domain() = 0;
 
-  /* This method is called before the allocate method and it can be overridden by a derived class
-   * to do any necessary internal allocations. */
-  virtual void pre_allocate();
-
-  /* This method should allocate all the necessary buffers needed by the operation. This includes
-   * the output results as well as any temporary intermediate buffers used by the operation. The
-   * texture pool provided by the context should be used to do any texture allocations. */
-  virtual void allocate();
-
-  /* This method is called before the execute method and it can be overridden by a derived class
-   * to do any necessary internal computations. */
+  /* This method is called before the execute method and can be overridden by a derived class to do
+   * any necessary internal computations before the operation is executed. For instance, this is
+   * overridden by node operations to compute results for unlinked sockets. */
   virtual void pre_execute();
 
-  /* This method should execute the operation, compute its outputs, and write them to the
-   * appropriate result. */
+  /* Add all the necessary input processors for each input, then evaluate them. This is called
+   * before executing the operation to prepare its inputs but after the pre_execute method was
+   * called. The class defines a default implementation, but derived class can override the method
+   * to have a different implementation, extend the implementation, or remove it. */
+  virtual void evaluate_input_processors();
+
+  /* This method should allocate the operation results, execute the operation, and compute the
+   * output results. */
   virtual void execute() = 0;
-
-  /* This method is called before the release method and it can be overridden by a derived class
-   * to do any necessary internal releases. */
-  virtual void pre_release();
-
-  /* This method should release any temporary intermediate buffers that were allocated in the
-   * allocation method. */
-  virtual void release();
 
   /* Get a reference to the result connected to the input identified by the given identifier. */
   Result &get_input(StringRef identifier) const;
@@ -474,7 +468,7 @@ class Operation {
 
   /* Add the given result to the results_ map identified by the given output identifier. This
    * should be called during operation construction for every output. The provided result shouldn't
-   * be allocated or initialized, this will happen later after initialization and execution. */
+   * be allocated or initialized, this will happen later during execution. */
   void populate_result(StringRef identifier, Result result);
 
   /* Declare the descriptor of the input identified by the given identifier to be the given
@@ -492,12 +486,6 @@ class Operation {
   TexturePool &texture_pool();
 
  private:
-  /* Add all the necessary input processors for each input as needed. This method is called in the
-   * operation initialization method after pre_allocate but before the allocate method, it needs to
-   * happen then and not before at operation construction because the logic for adding input
-   * processors can depend on the nature of the input results, but not on their value. */
-  void add_input_processors();
-
   /* Add an implicit conversion input processor for the input identified by the given identifier if
    * needed. */
   void add_implicit_conversion_input_processor_if_needed(StringRef identifier);
@@ -516,10 +504,6 @@ class Operation {
   /* Allocate all input processors in order. This is called before allocating the operation but
    * after the pre_allocate method was called. */
   void allocate_input_processors();
-
-  /* Execute all input processors in order. This is called before executing the operation to
-   * prepare its inputs but after the pre_execute method was called. */
-  void execute_input_processors();
 
   /* Release the results that are mapped to the inputs of the operation. This is called after the
    * evaluation of the operation to declare that the results are no longer needed by this
@@ -554,21 +538,18 @@ class NodeOperation : public Operation {
   /* Most node operations are buffered, so return true by default. */
   bool is_buffered() const override;
 
-  /* Returns true if the output identified by the given identifier is needed and should be
-   * computed, otherwise returns false. */
-  bool is_output_needed(StringRef identifier) const;
-
   /* Returns a reference to the node this operations represents. */
   const bNode &node() const;
 
  protected:
+  /* Returns true if the output identified by the given identifier is needed and should be
+   * computed, otherwise returns false. */
+  bool is_output_needed(StringRef identifier) const;
+
   /* Compute the domain of the node operation. This implement the default logic that infers the
    * operation domain from the node, which may be overridden for a different logic. See the Domain
    * class for the inference logic. */
   Domain compute_domain() override;
-
-  /* Allocate the results for unlinked inputs. */
-  void pre_allocate() override;
 
   /* Set the values of the results for unlinked inputs. */
   void pre_execute() override;
@@ -608,6 +589,9 @@ class ProcessorOperation : public Operation {
   void map_input_to_result(Result *result);
 
  protected:
+  /* Processor operations don't need input processors, so override with an empty implementation. */
+  void evaluate_input_processors() override;
+
   /* Get a reference to the input result of the processor, this essentially calls the super
    * get_result with the input identifier of the processor. */
   Result &get_input();
@@ -647,8 +631,6 @@ class ConversionProcessorOperation : public ProcessorOperation {
 
  public:
   using ProcessorOperation::ProcessorOperation;
-
-  void allocate() override;
 
   void execute() override;
 
@@ -755,8 +737,6 @@ class RealizeOnDomainProcessorOperation : public ProcessorOperation {
  public:
   RealizeOnDomainProcessorOperation(Context &context, Domain domain, ResultType type);
 
-  void allocate() override;
-
   void execute() override;
 
  protected:
@@ -839,9 +819,6 @@ class Evaluator {
 
   /* Maps each of the inputs of the node operation to the result of output linked to it. */
   void map_node_inputs_to_results(DNode node);
-
-  /* Initialize the operations in the operations stream in order. */
-  void initialize_operations_stream();
 
   /* Evaluate the operations in the operations stream in order. */
   void evaluate_operations_stream();

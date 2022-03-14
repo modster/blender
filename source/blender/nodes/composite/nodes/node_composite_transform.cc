@@ -61,15 +61,12 @@ class TransformOperation : public NodeOperation {
  public:
   using NodeOperation::NodeOperation;
 
-  void allocate() override
+  void execute() override
   {
     Result &input = get_input("Image");
     Result &result = get_result("Image");
     input.pass_through(result);
-  }
 
-  void execute() override
-  {
     const float2 translation = float2(get_input("X").get_float_value_default(0.0f),
                                       get_input("Y").get_float_value_default(0.0f));
     const float rotation = get_input("Angle").get_float_value_default(0.0f);
@@ -78,7 +75,6 @@ class TransformOperation : public NodeOperation {
     const Transformation2D transformation = Transformation2D::from_translation_rotation_scale(
         translation, rotation, scale);
 
-    Result &result = get_result("Image");
     result.transform(transformation);
   }
 };
