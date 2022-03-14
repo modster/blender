@@ -298,6 +298,15 @@ class Result {
    * uninitialized value is returned. */
   float4 get_color_value() const;
 
+  /* Same as get_float_value but returns a default value if the result is not a single value. */
+  float get_float_value_default(float default_value) const;
+
+  /* Same as get_vector_value but returns a default value if the result is not a single value. */
+  float3 get_vector_value_default(const float3 &default_value) const;
+
+  /* Same as get_color_value but returns a default value if the result is not a single value. */
+  float4 get_color_value_default(const float4 &default_value) const;
+
   /* If the result is a single value result of type float, set its float value and upload it to the
    * texture. Otherwise, an undefined behavior is invoked. */
   void set_float_value(float value);

@@ -231,6 +231,30 @@ float4 Result::get_color_value() const
   return float4(value_);
 }
 
+float Result::get_float_value_default(float default_value) const
+{
+  if (is_single_value()) {
+    return get_float_value();
+  }
+  return default_value;
+}
+
+float3 Result::get_vector_value_default(const float3 &default_value) const
+{
+  if (is_single_value()) {
+    return get_vector_value();
+  }
+  return default_value;
+}
+
+float4 Result::get_color_value_default(const float4 &default_value) const
+{
+  if (is_single_value()) {
+    return get_color_value();
+  }
+  return default_value;
+}
+
 void Result::set_float_value(float value)
 {
   *value_ = value;

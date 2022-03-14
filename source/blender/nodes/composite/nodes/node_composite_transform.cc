@@ -70,10 +70,10 @@ class TransformOperation : public NodeOperation {
 
   void execute() override
   {
-    const float2 translation = float2(get_input("X").get_float_value(),
-                                      get_input("Y").get_float_value());
-    const float rotation = get_input("Angle").get_float_value();
-    const float2 scale = float2(get_input("Scale").get_float_value());
+    const float2 translation = float2(get_input("X").get_float_value_default(0.0f),
+                                      get_input("Y").get_float_value_default(0.0f));
+    const float rotation = get_input("Angle").get_float_value_default(0.0f);
+    const float2 scale = float2(get_input("Scale").get_float_value_default(1.0f));
 
     const Transformation2D transformation = Transformation2D::from_translation_rotation_scale(
         translation, rotation, scale);
