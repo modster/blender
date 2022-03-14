@@ -66,10 +66,10 @@ class TransformOperation : public NodeOperation {
     const Result &input = get_input("Image");
     Result &result = get_result("Image");
     if (input.is_texture) {
-      result.allocate_texture(input.size(), &texture_pool());
+      result.allocate_texture(input.size());
     }
     else {
-      result.allocate_single_value(&texture_pool());
+      result.allocate_single_value();
     }
   }
 

@@ -479,13 +479,13 @@ class ImageOperation : public NodeOperation {
     GPUTexture *image_texture = get_image_texture();
     /* The image texture is invalid or missing, allocate a single zero output. */
     if (!image_texture) {
-      result.allocate_single_value(&context().texture_pool());
+      result.allocate_single_value();
       return;
     }
 
     const int width = GPU_texture_width(image_texture);
     const int height = GPU_texture_height(image_texture);
-    result.allocate_texture(int2{width, height}, &context().texture_pool());
+    result.allocate_texture(int2{width, height});
   }
 
   void execute() override
@@ -717,7 +717,7 @@ class RenderLayerOperation : public NodeOperation {
     const int height = GPU_texture_height(pass_texture);
 
     Result &image_result = get_result("Image");
-    image_result.allocate_texture(int2{width, height}, &context().texture_pool());
+    image_result.allocate_texture(int2{width, height});
   }
 
   void execute() override

@@ -141,42 +141,40 @@ bool operator!=(const Domain &a, const Domain &b)
  * Result.
  */
 
-Result::Result(ResultType type) : type(type)
+Result::Result(ResultType type, TexturePool &texture_pool) : type(type), texture_pool(texture_pool)
 {
 }
 
-void Result::allocate_texture(int2 size, TexturePool *texture_pool)
+void Result::allocate_texture(int2 size)
 {
   is_texture = true;
-  this->texture_pool = texture_pool;
   switch (type) {
     case ResultType::Float:
-      texture = texture_pool->acquire_float(size);
+      texture = texture_pool.acquire_float(size);
       return;
     case ResultType::Vector:
-      texture = texture_pool->acquire_vector(size);
+      texture = texture_pool.acquire_vector(size);
       return;
     case ResultType::Color:
-      texture = texture_pool->acquire_color(size);
+      texture = texture_pool.acquire_color(size);
       return;
   }
 }
 
-void Result::allocate_single_value(TexturePool *texture_pool)
+void Result::allocate_single_value()
 {
   is_texture = false;
-  this->texture_pool = texture_pool;
   /* Allocate a dummy texture of size 1x1. */
   const int2 dummy_texture_size{1, 1};
   switch (type) {
     case ResultType::Float:
-      texture = texture_pool->acquire_float(dummy_texture_size);
+      texture = texture_pool.acquire_float(dummy_texture_size);
       return;
     case ResultType::Vector:
-      texture = texture_pool->acquire_vector(dummy_texture_size);
+      texture = texture_pool.acquire_vector(dummy_texture_size);
       return;
     case ResultType::Color:
-      texture = texture_pool->acquire_color(dummy_texture_size);
+      texture = texture_pool.acquire_color(dummy_texture_size);
       return;
   }
 }
@@ -239,7 +237,7 @@ void Result::release()
 {
   reference_count--;
   if (reference_count == 0) {
-    texture_pool->release(texture);
+    texture_pool.release(texture);
   }
 }
 
@@ -492,7 +490,9 @@ NodeOperation::NodeOperation(Context &context, DNode node) : Operation(context),
 {
   /* Populate the output results. */
   for (const OutputSocketRef *output : node->outputs()) {
-    populate_result(output->identifier(), Result(get_node_socket_result_type(output)));
+    const ResultType result_type = get_node_socket_result_type(output);
+    const Result result = Result(result_type, texture_pool());
+    populate_result(output->identifier(), result);
   }
 
   /* Populate the input descriptors. */
@@ -557,7 +557,7 @@ void NodeOperation::pre_allocate()
 {
   /* Allocate the unlinked inputs results. */
   for (Result &result : unlinked_inputs_results_) {
-    result.allocate_single_value(&texture_pool());
+    result.allocate_single_value();
   }
 }
 
@@ -613,7 +613,8 @@ void NodeOperation::populate_results_for_unlinked_inputs()
 
     /* Construct a result of an appropriate type, add it to the results vector, and map the input
      * to it. */
-    Result result = Result(get_node_socket_result_type(origin.socket_ref()));
+    const ResultType result_type = get_node_socket_result_type(origin.socket_ref());
+    const Result result = Result(result_type, texture_pool());
     unlinked_inputs_results_.append(result);
     map_input_to_result(input->identifier(), &unlinked_inputs_results_.last());
 
@@ -682,10 +683,10 @@ void ConversionProcessorOperation::allocate()
   Result &result = get_result();
   const Result &input = get_input();
   if (input.is_texture) {
-    result.allocate_texture(input.size(), &texture_pool());
+    result.allocate_texture(input.size());
   }
   else {
-    result.allocate_single_value(&texture_pool());
+    result.allocate_single_value();
   }
 }
 
@@ -738,7 +739,7 @@ ConvertFloatToVectorProcessorOperation::ConvertFloatToVectorProcessorOperation(C
   input_descriptor.type = ResultType::Float;
   input_descriptor.is_domain = true;
   declare_input_descriptor(input_descriptor);
-  populate_result(Result(ResultType::Vector));
+  populate_result(Result(ResultType::Vector, texture_pool()));
 }
 
 void ConvertFloatToVectorProcessorOperation::execute_single(const Result &input, Result &output)
@@ -764,7 +765,7 @@ ConvertFloatToColorProcessorOperation::ConvertFloatToColorProcessorOperation(Con
   input_descriptor.type = ResultType::Float;
   input_descriptor.is_domain = true;
   declare_input_descriptor(input_descriptor);
-  populate_result(Result(ResultType::Color));
+  populate_result(Result(ResultType::Color, texture_pool()));
 }
 
 void ConvertFloatToColorProcessorOperation::execute_single(const Result &input, Result &output)
@@ -789,7 +790,7 @@ ConvertColorToFloatProcessorOperation::ConvertColorToFloatProcessorOperation(Con
   input_descriptor.type = ResultType::Color;
   input_descriptor.is_domain = true;
   declare_input_descriptor(input_descriptor);
-  populate_result(Result(ResultType::Float));
+  populate_result(Result(ResultType::Float, texture_pool()));
 }
 
 void ConvertColorToFloatProcessorOperation::execute_single(const Result &input, Result &output)
@@ -813,7 +814,7 @@ ConvertVectorToFloatProcessorOperation::ConvertVectorToFloatProcessorOperation(C
   input_descriptor.type = ResultType::Vector;
   input_descriptor.is_domain = true;
   declare_input_descriptor(input_descriptor);
-  populate_result(Result(ResultType::Float));
+  populate_result(Result(ResultType::Float, texture_pool()));
 }
 
 void ConvertVectorToFloatProcessorOperation::execute_single(const Result &input, Result &output)
@@ -839,7 +840,7 @@ ConvertVectorToColorProcessorOperation::ConvertVectorToColorProcessorOperation(C
   input_descriptor.type = ResultType::Vector;
   input_descriptor.is_domain = true;
   declare_input_descriptor(input_descriptor);
-  populate_result(Result(ResultType::Color));
+  populate_result(Result(ResultType::Color, texture_pool()));
 }
 
 void ConvertVectorToColorProcessorOperation::execute_single(const Result &input, Result &output)
@@ -866,12 +867,12 @@ RealizeOnDomainProcessorOperation::RealizeOnDomainProcessorOperation(Context &co
   input_descriptor.type = type;
   input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
-  populate_result(Result(type));
+  populate_result(Result(type, texture_pool()));
 }
 
 void RealizeOnDomainProcessorOperation::allocate()
 {
-  get_result().allocate_texture(domain_.size, &texture_pool());
+  get_result().allocate_texture(domain_.size);
 }
 
 void RealizeOnDomainProcessorOperation::execute()

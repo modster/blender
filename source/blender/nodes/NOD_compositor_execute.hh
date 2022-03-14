@@ -227,8 +227,9 @@ class Result {
    * the result is not a texture, this member points to a valid dummy GPU texture. See class
    * description above. */
   GPUTexture *texture = nullptr;
-  /* The texture pool used to allocate the texture of the result. */
-  TexturePool *texture_pool = nullptr;
+  /* The texture pool used to allocate the texture of the result, this should be initialized during
+   * construction. */
+  TexturePool &texture_pool;
   /* The number of users currently referencing and using this result. */
   int reference_count = 0;
   /* If the result is a single value, this member stores the value of the result. While this member
@@ -242,15 +243,15 @@ class Result {
   Transformation2D transformation = Transformation2D::identity();
 
  public:
-  Result(ResultType type);
+  Result(ResultType type, TexturePool &texture_pool);
 
   /* Declare the result to be a texture result and allocate a texture of an appropriate type with
    * the given size from the given texture pool. */
-  void allocate_texture(int2 size, TexturePool *texture_pool);
+  void allocate_texture(int2 size);
 
   /* Declare the result to be a single value result and allocate a dummy texture of an appropriate
    * type from the given texture pool. See class description for more information. */
-  void allocate_single_value(TexturePool *texture_pool);
+  void allocate_single_value();
 
   /* Bind the texture of the result to the texture image unit with the given name in the currently
    * bound given shader. */
