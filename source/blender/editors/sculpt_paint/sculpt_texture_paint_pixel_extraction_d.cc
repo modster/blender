@@ -39,23 +39,77 @@
 
 namespace blender::ed::sculpt_paint::texture_paint::packed_pixels {
 
+enum class ExtractionMethod { BarycentricEdges, BarycentricPixels };
+
 /* Express co as term of movement along 2 edges of a triangle. */
-static float3 packed_edge_coordinate(const float2 v1,
-                                     const float2 v2,
-                                     const float2 v3,
-                                     const float2 co)
+static float3 barycentric_weights(const float2 v1,
+                                  const float2 v2,
+                                  const float2 v3,
+                                  const float2 co)
 {
   float3 weights;
   barycentric_weights_v2(v1, v2, v3, co, weights);
   return weights;
 }
 
-static bool is_inside_triangle(const float3 co)
+static bool is_inside_triangle(const float3 barycentric_weights)
 {
-  return barycentric_inside_triangle_v2(co);
+  return barycentric_inside_triangle_v2(barycentric_weights);
 }
 
-static void init(Object *ob, int totnode, PBVHNode **nodes)
+static bool has_been_visited(std::vector<bool> &visited_polygons, const int poly_index)
+{
+  bool visited = visited_polygons[poly_index];
+  visited_polygons[poly_index] = true;
+  return visited;
+}
+
+static void extract_barycentric_pixels(NodeData *node_data,
+                                       const ImBuf *image_buffer,
+                                       Triangle &triangle,
+                                       const int triangle_index,
+                                       const float2 uvs[3],
+                                       const int minx,
+                                       const int miny,
+                                       const int maxx,
+                                       const int maxy)
+{
+  int best_num_pixels = 0;
+  for (int y = miny; y < maxy; y++) {
+    bool start_detected = false;
+    float3 barycentric;
+    PixelsPackage package;
+    package.triangle_index = triangle_index;
+    package.num_pixels = 0;
+    int x;
+
+    for (x = minx; x < maxx; x++) {
+      float2 uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
+      barycentric = barycentric_weights(uvs[0], uvs[1], uvs[2], uv);
+      const bool is_inside = is_inside_triangle(barycentric);
+      if (!start_detected && is_inside) {
+        start_detected = true;
+        package.start_image_coordinate = int2(x, y);
+        package.start_edge_coord = barycentric;
+      }
+      else if (start_detected && !is_inside) {
+        break;
+      }
+    }
+
+    if (!start_detected) {
+      continue;
+    }
+    package.num_pixels = x - package.start_image_coordinate.x;
+    if (package.num_pixels > best_num_pixels) {
+      triangle.add_edge_coord_x = (barycentric - package.start_edge_coord) / package.num_pixels;
+      best_num_pixels = package.num_pixels;
+    }
+    node_data->encoded_pixels.append(package);
+  }
+}
+
+static void init(const Object *ob, int totnode, PBVHNode **nodes, const ExtractionMethod method)
 {
   Vector<PBVHNode *> nodes_to_initialize;
   for (int n = 0; n < totnode; n++) {
@@ -89,16 +143,14 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
     PBVHNode *node = nodes[n];
     NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
     PBVHVertexIter vd;
-    int num_encoded_pixels = 0;
 
     BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
       MeshElemMap *vert_map = &ss->pmap[vd.index];
       for (int j = 0; j < ss->pmap[vd.index].count; j++) {
         const int poly_index = vert_map->indices[j];
-        if (visited_polygons[poly_index]) {
+        if (has_been_visited(visited_polygons, poly_index)) {
           continue;
         }
-        visited_polygons[poly_index] = true;
 
         const MPoly *p = &ss->mpoly[poly_index];
         const MLoop *loopstart = &ss->mloop[p->loopstart];
@@ -112,6 +164,7 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
               ldata_uv[triangle.loop_indices[1]].uv,
               ldata_uv[triangle.loop_indices[2]].uv,
           };
+          const int triangle_index = node_data->triangles.size();
 
           const float minv = min_fff(uvs[0].y, uvs[1].y, uvs[2].y);
           const int miny = floor(minv * image_buffer->y);
@@ -121,62 +174,71 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
           const int minx = floor(minu * image_buffer->x);
           const float maxu = max_fff(uvs[0].x, uvs[1].x, uvs[2].x);
           const int maxx = ceil(maxu * image_buffer->x);
-          const float add_u = 1.0 / image_buffer->x;
-          const float add_v = 1.0 / image_buffer->y;
 
-          float2 min_uv(minu, minv);
-          float3 start_edge_coord = packed_edge_coordinate(uvs[0], uvs[1], uvs[2], min_uv);
-          float3 add_edge_coord_x = packed_edge_coordinate(
-                                        uvs[0], uvs[1], uvs[2], min_uv + float2(add_u, 0.0)) -
-                                    start_edge_coord;
-          float3 add_edge_coord_y = packed_edge_coordinate(
-                                        uvs[0], uvs[1], uvs[2], min_uv + float2(0.0, add_v)) -
-                                    start_edge_coord;
+          switch (method) {
+            case ExtractionMethod::BarycentricEdges: {
+              const float add_u = 1.0 / image_buffer->x;
+              const float add_v = 1.0 / image_buffer->y;
 
-          triangle.add_edge_coord_x = add_edge_coord_x;
-          int triangle_index = node_data->triangles.size();
-          node_data->triangles.append(triangle);
+              float2 min_uv(minu, minv);
+              float3 start_edge_coord = barycentric_weights(uvs[0], uvs[1], uvs[2], min_uv);
+              float3 add_edge_coord_x = barycentric_weights(
+                                            uvs[0], uvs[1], uvs[2], min_uv + float2(add_u, 0.0)) -
+                                        start_edge_coord;
+              float3 add_edge_coord_y = barycentric_weights(
+                                            uvs[0], uvs[1], uvs[2], min_uv + float2(0.0, add_v)) -
+                                        start_edge_coord;
 
-          int num_packages = 0;
+              triangle.add_edge_coord_x = add_edge_coord_x;
 
-          for (int y = miny; y < maxy; y++) {
-            float3 start_y_edge_coord = start_edge_coord + add_edge_coord_y * (y - miny);
-            float3 edge_coord = start_y_edge_coord;
+              for (int y = miny; y < maxy; y++) {
+                float3 start_y_edge_coord = start_edge_coord + add_edge_coord_y * (y - miny);
+                float3 edge_coord = start_y_edge_coord;
 
-            int start_x = -1;
-            int end_x = -1;
-            int x;
-            for (x = minx; x < maxx; x++) {
-              if (is_inside_triangle(edge_coord)) {
-                start_x = x;
-                break;
+                int start_x = -1;
+                int end_x = -1;
+                int x;
+                for (x = minx; x < maxx; x++) {
+                  if (is_inside_triangle(edge_coord)) {
+                    start_x = x;
+                    break;
+                  }
+                  edge_coord += add_edge_coord_x;
+                }
+                edge_coord += add_edge_coord_x;
+                x += 1;
+                for (; x < maxx; x++) {
+                  if (!is_inside_triangle(edge_coord)) {
+                    break;
+                  }
+                  edge_coord += add_edge_coord_x;
+                }
+                end_x = x;
+
+                if (start_x == -1 || end_x == -1) {
+                  continue;
+                }
+
+                int num_pixels = end_x - start_x;
+
+                PixelsPackage package;
+                package.start_image_coordinate = int2(start_x, y);
+                package.start_edge_coord = start_y_edge_coord +
+                                           add_edge_coord_x * (start_x - minx);
+                package.triangle_index = triangle_index;
+                package.num_pixels = num_pixels;
+                node_data->encoded_pixels.append(package);
               }
-              edge_coord += add_edge_coord_x;
-            }
-            edge_coord += add_edge_coord_x;
-            x += 1;
-            for (; x < maxx; x++) {
-              if (!is_inside_triangle(edge_coord)) {
-                break;
-              }
-              edge_coord += add_edge_coord_x;
-            }
-            end_x = x;
-
-            if (start_x == -1 || end_x == -1) {
-              continue;
+              break;
             }
 
-            int num_pixels = end_x - start_x;
-            PixelsPackage package;
-            package.start_image_coordinate = int2(start_x, y);
-            package.start_edge_coord = start_y_edge_coord + add_edge_coord_x * (start_x - minx);
-            package.triangle_index = triangle_index;
-            package.num_pixels = num_pixels;
-            node_data->encoded_pixels.append(package);
-            num_encoded_pixels += num_pixels;
-            num_packages += 1;
+            case ExtractionMethod::BarycentricPixels: {
+              extract_barycentric_pixels(
+                  node_data, image_buffer, triangle, triangle_index, uvs, minx, miny, maxx, maxy);
+              break;
+            }
           }
+          node_data->triangles.append(triangle);
         }
       }
     }
@@ -202,7 +264,7 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
            float(compressed_data_len) / num_pixels);
   }
 
-// #define DO_WATERTIGHT_CHECK
+//#define DO_WATERTIGHT_CHECK
 #ifdef DO_WATERTIGHT_CHECK
   for (int n = 0; n < nodes_to_initialize.size(); n++) {
     PBVHNode *node = nodes[n];
@@ -225,8 +287,9 @@ static void init(Object *ob, int totnode, PBVHNode **nodes)
 extern "C" {
 void SCULPT_extract_pixels(Object *ob, PBVHNode **nodes, int totnode)
 {
+  using namespace blender::ed::sculpt_paint::texture_paint::packed_pixels;
   TIMEIT_START(extract_pixels);
-  blender::ed::sculpt_paint::texture_paint::packed_pixels::init(ob, totnode, nodes);
+  init(ob, totnode, nodes, ExtractionMethod::BarycentricPixels);
   TIMEIT_END(extract_pixels);
 }
 }
