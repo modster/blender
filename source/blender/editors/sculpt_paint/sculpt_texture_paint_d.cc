@@ -92,6 +92,26 @@ static void add(Pixel &dst, const Pixel &lh)
   dst.uv += lh.uv;
 }
 
+static void do_vertex_brush_test(void *__restrict userdata,
+                                 const int n,
+                                 const TaskParallelTLS *__restrict UNUSED(tls))
+{
+  TexturePaintingUserData *data = static_cast<TexturePaintingUserData *>(userdata);
+  const Object *ob = data->ob;
+  SculptSession *ss = ob->sculpt;
+  const Brush *brush = data->brush;
+  SculptBrushTest test;
+  SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
+      ss, &test, brush->falloff_shape);
+  PBVHNode *node = data->nodes[n];
+
+  PBVHVertexIter vd;
+  BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
+    data->vertex_brush_tests[vd.index] = sculpt_brush_test_sq_fn(&test, vd.co);
+  }
+  BKE_pbvh_vertex_iter_end;
+}
+
 static void do_task_cb_ex(void *__restrict userdata,
                           const int n,
                           const TaskParallelTLS *__restrict tls)
@@ -119,14 +139,6 @@ static void do_task_cb_ex(void *__restrict userdata,
   Mesh *mesh = static_cast<Mesh *>(ob->data);
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
 
-  std::vector<bool> vert_brush_test_results(mesh->totvert);
-
-  PBVHVertexIter vd;
-  BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
-    vert_brush_test_results[vd.index] = sculpt_brush_test_sq_fn(&test, vd.co);
-  }
-  BKE_pbvh_vertex_iter_end;
-
   /* Propagate vertex brush test to triangle. This should be extended with brush overlapping edges
    * and faces only. */
   std::vector<bool> triangle_brush_test_results(node_data->triangles.size());
@@ -135,7 +147,7 @@ static void do_task_cb_ex(void *__restrict userdata,
     for (int i = 0; i < 3; i++) {
       triangle_brush_test_results[triangle_index] =
           triangle_brush_test_results[triangle_index] ||
-          vert_brush_test_results[triangle.vert_indices[i]];
+          data->vertex_brush_tests[triangle.vert_indices[i]];
     }
     triangle_index += 1;
   }
@@ -230,15 +242,19 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
 
   ss->mode.texture_paint.drawing_target = image_data.image_buffer;
 
+  Mesh *mesh = (Mesh *)ob->data;
+
   TexturePaintingUserData data = {nullptr};
   data.ob = ob;
   data.brush = brush;
   data.nodes = nodes;
+  data.vertex_brush_tests = std::vector<bool>(mesh->totvert);
 
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, totnode);
 
   TIMEIT_START(texture_painting);
+  BLI_task_parallel_range(0, totnode, &data, painting::do_vertex_brush_test, &settings);
   BLI_task_parallel_range(0, totnode, &data, painting::do_task_cb_ex, &settings);
   TIMEIT_END(texture_painting);
 
@@ -282,8 +298,8 @@ void SCULPT_flush_texture_paint(Object *ob)
     }
 
     if (data->flags.dirty) {
-      data->flush(*image_data.image_buffer);
       data->mark_region(*image_data.image, *image_data.image_buffer);
+      data->flags.dirty = false;
     }
   }
 

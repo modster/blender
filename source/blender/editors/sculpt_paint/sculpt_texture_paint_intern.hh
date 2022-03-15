@@ -138,7 +138,6 @@ struct NodeData {
 
   void mark_region(Image &image, ImBuf &image_buffer)
   {
-    printf("%s", __func__);
     print_rcti_id(&dirty_region);
     BKE_image_partial_update_mark_region(
         &image, static_cast<ImageTile *>(image.tiles.first), &image_buffer, &dirty_region);
@@ -156,6 +155,7 @@ struct TexturePaintingUserData {
   Object *ob;
   Brush *brush;
   PBVHNode **nodes;
+  std::vector<bool> vertex_brush_tests;
 };
 
 }  // namespace blender::ed::sculpt_paint::texture_paint
