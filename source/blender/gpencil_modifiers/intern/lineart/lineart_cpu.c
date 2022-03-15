@@ -427,20 +427,36 @@ static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRend
 
   BLI_spin_lock(&rb->lock_task);
 
-#define LRT_ASSIGN_OCCLUSION_TASK(name) \
-  if (rb->name.last) { \
-    data = rb->name.last; \
-    rti->name.first = (void *)data; \
-    for (i = 0; i < LRT_THREAD_EDGE_COUNT && data; i++) { \
-      data = data->next; \
-    } \
-    rti->name.last = data; \
-    rb->name.last = data; \
-    res = 1; \
-  } \
-  else { \
-    rti->name.first = rti->name.last = NULL; \
+#ifdef LINEART_USE_EMBREE
+
+  LineartOcclusionPairRecord *rec = &rb->occlusion_record;
+  if (rec->scheduled_next >= rec->next) {
+    res = 0;
   }
+  else {
+    rti->ocpair_index_start = rec->scheduled_next;
+    size_t length = MIN2(LRT_THREAD_EDGE_COUNT, rec->next - rec->scheduled_next);
+    rec->scheduled_next += length;
+    rti->ocpair_index_end = rti->ocpair_index_start + length;
+    res = 1;
+  }
+
+#else
+
+#  define LRT_ASSIGN_OCCLUSION_TASK(name) \
+    if (rb->name.last) { \
+      data = rb->name.last; \
+      rti->name.first = (void *)data; \
+      for (i = 0; i < LRT_THREAD_EDGE_COUNT && data; i++) { \
+        data = data->next; \
+      } \
+      rti->name.last = data; \
+      rb->name.last = data; \
+      res = 1; \
+    } \
+    else { \
+      rti->name.first = rti->name.last = NULL; \
+    }
 
   LRT_ASSIGN_OCCLUSION_TASK(contour);
   LRT_ASSIGN_OCCLUSION_TASK(intersection);
@@ -449,7 +465,9 @@ static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRend
   LRT_ASSIGN_OCCLUSION_TASK(edge_mark);
   LRT_ASSIGN_OCCLUSION_TASK(floating);
 
-#undef LRT_ASSIGN_OCCLUSION_TASK
+#  undef LRT_ASSIGN_OCCLUSION_TASK
+
+#endif
 
   BLI_spin_unlock(&rb->lock_task);
 
@@ -462,6 +480,37 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
   LineartEdge *eip;
 
   while (lineart_occlusion_make_task_info(rb, rti)) {
+
+#ifdef LINEART_USE_EMBREE
+    double l, r;
+
+    LineartOcclusionPairRecord *rec = &rb->occlusion_record;
+    for (size_t i = rti->ocpair_index_start; i < rti->ocpair_index_end; i++) {
+      LineartOcclusionPair *op = &rec->array[i];
+      if (lineart_triangle_edge_image_space_occlusion(&rb->lock_task,
+                                                      op->t,
+                                                      op->e,
+                                                      rb->camera_pos,
+                                                      rb->cam_is_persp,
+                                                      rb->allow_overlapping_edges,
+                                                      rb->view_projection,
+                                                      rb->view_vector,
+                                                      rb->shift_x,
+                                                      rb->shift_y,
+                                                      &l,
+                                                      &r)) {
+        BLI_spin_lock(&rb->lock_task);
+        lineart_edge_cut(rb, op->e, l, r, op->t->material_mask_bits, op->t->mat_occlusion);
+        BLI_spin_unlock(&rb->lock_task);
+        if (op->e->min_occ > rb->max_occlusion_level) {
+          /* No need to calculate any longer on this line because no level more than set value is
+           * going to show up in the rendered result. */
+          continue;
+        }
+      }
+    }
+
+#else
 
     for (eip = rti->contour.first; eip && eip != rti->contour.last; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
@@ -486,6 +535,8 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
     for (eip = rti->floating.first; eip && eip != rti->floating.last; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
+
+#endif /* embree */
   }
 }
 
@@ -1436,6 +1487,11 @@ static void lineart_main_discard_out_of_frame_edges(LineartRenderBuffer *rb)
         e[i].flags = LRT_EDGE_FLAG_CHAIN_PICKED;
       }
     }
+    if (eln->flags & LRT_ELEMENT_IS_ADDITIONAL) {
+      /* XXX: Technically this is incorrect because this way embree doesn't take into account of
+       * post-clipping edges. */
+      continue;
+    }
     lineart_embree_new_virtual_geometry(rb, eln);
   }
 }
@@ -2288,7 +2344,7 @@ static void lineart_embree_new_virtual_geometry(LineartRenderBuffer *rb,
                                                 LineartElementLinkNode *e_eln)
 {
   RTCGeometry geom = rtcNewGeometry(rb->rtcdevice, RTC_GEOMETRY_TYPE_USER);
-  uint32_t geom_id = rtcAttachGeometry(rb->rtcscene_geom, geom);
+  uint32_t geom_id = rtcAttachGeometry(rb->rtcscene_view, geom);
 
   rtcSetGeometryUserData(geom, e_eln);
   rtcSetGeometryUserPrimitiveCount(geom, e_eln->element_count);
@@ -2599,13 +2655,16 @@ OcclusionCollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned in
         collisions[i].primID0 == collisions[i].primID1) {
       continue;
     }
-    /* Continue from here. */
-    RTCGeometry g_edge = rtcGetGeometry(rb->rtcscene_geom, collisions[i].geomID0);
-    RTCGeometry g_triangle = rtcGetGeometry(rb->rtcscene_view, collisions[i].geomID1);
 
+    /* Continue from here. */
+    RTCGeometry g_edge = rtcGetGeometry(rb->rtcscene_view, collisions[i].geomID0);
+    RTCGeometry g_triangle = rtcGetGeometry(rb->rtcscene_geom, collisions[i].geomID1);
     LineartElementLinkNode *eln_edge = rtcGetGeometryUserData(g_edge);
-    LineartElementLinkNode *eln_triangle = rtcGetGeometryUserData(g_triangle);
-    if (eln_triangle->flags & LRT_ELEMENT_IS_EDGE) {
+    LineartPointArrayFinal *rec = rtcGetGeometryUserData(g_triangle);
+    LineartElementLinkNode *eln_triangle = rec->eln_triangle;
+
+    /* This is actually incorrect? */
+    if (UNLIKELY(eln_triangle->flags & LRT_ELEMENT_IS_EDGE)) {
       SWAP(LineartElementLinkNode *, eln_edge, eln_triangle);
     }
 
@@ -2613,7 +2672,8 @@ OcclusionCollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned in
      * float. */
     LineartEdge *prim_edge = &((LineartEdge *)eln_edge->pointer)[collisions[i].primID0];
     LineartTriangle *tri = eln_triangle->pointer;
-    LineartTriangle *prim_triangle = (void *)(((uchar *)tri) + rb->triangle_size);
+    LineartTriangle *prim_triangle = (void *)(((uchar *)tri) +
+                                              rb->triangle_size * collisions[i].primID1);
     LineartPointArrayFinal *geom_triangle = &rb->mesh_record.array[collisions[i].geomID1];
 
     float pa[9];
@@ -4676,8 +4736,6 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
   lineart_embree_generate_occlusion_pairs(rb);
 
-  lineart_embree_clear_mesh_record(rb);
-
 #endif
 
   /* Link lines to acceleration structure, this can only be done after perspective division, if
@@ -4693,6 +4751,11 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
     /* Occlusion is work-and-wait. This call will not return before work is completed. */
     lineart_main_occlusion_begin(rb);
+
+#ifdef LINEART_USE_EMBREE
+    /* Do this after occlusion because we need occlusion pairs available. */
+    lineart_embree_clear_mesh_record(rb);
+#endif
 
     /* Chaining is all single threaded. See lineart_chain.c
      * In this particular call, only lines that are geometrically connected (share the _exact_

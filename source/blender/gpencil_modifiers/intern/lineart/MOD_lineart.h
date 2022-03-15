@@ -237,6 +237,7 @@ typedef struct LineartOcclusionPairRecord {
   LineartOcclusionPair *array;
   uint32_t next;
   uint32_t max_length;
+  uint32_t scheduled_next;
 } LineartOcclusionPairRecord;
 
 typedef struct LineartRenderBuffer {
@@ -415,6 +416,10 @@ typedef struct LineartRenderTaskInfo {
   ListBase material;
   ListBase edge_mark;
   ListBase floating;
+
+  /* Range: [start, end) */
+  size_t ocpair_index_start;
+  size_t ocpair_index_end;
 
 } LineartRenderTaskInfo;
 
