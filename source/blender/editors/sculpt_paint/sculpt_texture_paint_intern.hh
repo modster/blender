@@ -8,6 +8,7 @@ struct Triangle {
   int3 vert_indices;
   int poly_index;
   float3 add_edge_coord_x;
+  float automasking_factor;
 };
 
 struct PixelsPackage {
@@ -156,6 +157,7 @@ struct TexturePaintingUserData {
   Brush *brush;
   PBVHNode **nodes;
   std::vector<bool> vertex_brush_tests;
+  Vector<float> automask_factors;
 };
 
 }  // namespace blender::ed::sculpt_paint::texture_paint

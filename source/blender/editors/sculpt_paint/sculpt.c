@@ -2325,15 +2325,15 @@ static float brush_strength(const Sculpt *sd,
   }
 }
 
-float SCULPT_brush_strength_factor(SculptSession *ss,
-                                   const Brush *br,
-                                   const float brush_point[3],
-                                   const float len,
-                                   const float vno[3],
-                                   const float fno[3],
-                                   const float mask,
-                                   const int vertex_index,
-                                   const int thread_id)
+float SCULPT_brush_strength_factor_custom_automask(SculptSession *ss,
+                                                   const Brush *br,
+                                                   const float brush_point[3],
+                                                   const float len,
+                                                   const float vno[3],
+                                                   const float fno[3],
+                                                   const float mask,
+                                                   const float automask_factor,
+                                                   const int thread_id)
 {
   StrokeCache *cache = ss->cache;
   const Scene *scene = cache->vc->scene;
@@ -2417,9 +2417,25 @@ float SCULPT_brush_strength_factor(SculptSession *ss,
   avg *= 1.0f - mask;
 
   /* Auto-masking. */
-  avg *= SCULPT_automasking_factor_get(cache->automasking, ss, vertex_index);
+  avg *= automask_factor;
 
   return avg;
+}
+
+float SCULPT_brush_strength_factor(SculptSession *ss,
+                                   const Brush *br,
+                                   const float brush_point[3],
+                                   const float len,
+                                   const float vno[3],
+                                   const float fno[3],
+                                   const float mask,
+                                   const int vertex_index,
+                                   const int thread_id)
+{
+  const float automask_factor = SCULPT_automasking_factor_get(
+      ss->cache->automasking, ss, vertex_index);
+  return SCULPT_brush_strength_factor_custom_automask(
+      ss, br, brush_point, len, vno, fno, mask, automask_factor, thread_id);
 }
 
 bool SCULPT_search_sphere_cb(PBVHNode *node, void *data_v)

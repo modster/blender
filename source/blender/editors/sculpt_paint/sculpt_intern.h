@@ -1133,6 +1133,15 @@ float SCULPT_brush_strength_factor(struct SculptSession *ss,
                                    float mask,
                                    int vertex_index,
                                    int thread_id);
+float SCULPT_brush_strength_factor_custom_automask(struct SculptSession *ss,
+                                                   const struct Brush *br,
+                                                   const float point[3],
+                                                   float len,
+                                                   const float vno[3],
+                                                   const float fno[3],
+                                                   float mask,
+                                                   float automask_factor,
+                                                   int thread_id);
 
 /**
  * Tilts a normal by the x and y tilt values using the view axis.

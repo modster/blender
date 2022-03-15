@@ -40,13 +40,12 @@
 namespace blender::ed::sculpt_paint::texture_paint {
 namespace painting {
 
-static Pixel get_start_pixel(const PixelsPackage &encoded_pixels,
-                             const Triangle &triangle,
-                             const MVert *mvert,
-                             const MLoopUV *ldata_uv)
+static Pixel init_pixel(const Triangle &triangle,
+                        const float3 weights,
+                        const MVert *mvert,
+                        const MLoopUV *ldata_uv)
 {
   Pixel result;
-  const float3 weights = encoded_pixels.start_edge_coord;
   interp_v3_v3v3v3(result.pos,
                    mvert[triangle.vert_indices[0]].co,
                    mvert[triangle.vert_indices[1]].co,
@@ -57,8 +56,15 @@ static Pixel get_start_pixel(const PixelsPackage &encoded_pixels,
                    ldata_uv[triangle.loop_indices[1]].uv,
                    ldata_uv[triangle.loop_indices[2]].uv,
                    weights);
-
   return result;
+}
+
+static Pixel get_start_pixel(const PixelsPackage &encoded_pixels,
+                             const Triangle &triangle,
+                             const MVert *mvert,
+                             const MLoopUV *ldata_uv)
+{
+  return init_pixel(triangle, encoded_pixels.start_edge_coord, mvert, ldata_uv);
 }
 
 static Pixel get_delta_pixel(const PixelsPackage &encoded_pixels,
@@ -69,18 +75,8 @@ static Pixel get_delta_pixel(const PixelsPackage &encoded_pixels,
 
 )
 {
-  Pixel result;
-  const float3 weights = encoded_pixels.start_edge_coord + triangle.add_edge_coord_x;
-  interp_v3_v3v3v3(result.pos,
-                   mvert[triangle.vert_indices[0]].co,
-                   mvert[triangle.vert_indices[1]].co,
-                   mvert[triangle.vert_indices[2]].co,
-                   weights);
-  interp_v3_v3v3v3(result.uv,
-                   ldata_uv[triangle.loop_indices[0]].uv,
-                   ldata_uv[triangle.loop_indices[1]].uv,
-                   ldata_uv[triangle.loop_indices[2]].uv,
-                   weights);
+  Pixel result = init_pixel(
+      triangle, encoded_pixels.start_edge_coord + triangle.add_edge_coord_x, mvert, ldata_uv);
   result.pos -= start_pixel.pos;
   result.uv -= start_pixel.uv;
   return result;
@@ -107,7 +103,11 @@ static void do_vertex_brush_test(void *__restrict userdata,
 
   PBVHVertexIter vd;
   BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
-    data->vertex_brush_tests[vd.index] = sculpt_brush_test_sq_fn(&test, vd.co);
+    if (sculpt_brush_test_sq_fn(&test, vd.co)) {
+      data->vertex_brush_tests[vd.index] = true;
+    }
+    data->automask_factors[vd.index] = SCULPT_automasking_factor_get(
+        ss->cache->automasking, ss, vd.index);
   }
   BKE_pbvh_vertex_iter_end;
 }
@@ -143,11 +143,32 @@ static void do_task_cb_ex(void *__restrict userdata,
    * and faces only. */
   std::vector<bool> triangle_brush_test_results(node_data->triangles.size());
   int triangle_index = 0;
+  int last_poly_index = -1;
   for (Triangle &triangle : node_data->triangles) {
     for (int i = 0; i < 3; i++) {
       triangle_brush_test_results[triangle_index] =
           triangle_brush_test_results[triangle_index] ||
           data->vertex_brush_tests[triangle.vert_indices[i]];
+    }
+    if (last_poly_index != triangle.poly_index) {
+      last_poly_index = triangle.poly_index;
+      float automasking_factor = 1.0f;
+      for (int t_index = triangle_index;
+           t_index < node_data->triangles.size() &&
+           node_data->triangles[t_index].poly_index == triangle.poly_index;
+           t_index++) {
+        for (int i = 0; i < 3; i++) {
+          automasking_factor = min_ff(automasking_factor,
+                                      data->automask_factors[triangle.vert_indices[i]]);
+        }
+      }
+
+      for (int t_index = triangle_index;
+           t_index < node_data->triangles.size() &&
+           node_data->triangles[t_index].poly_index == triangle.poly_index;
+           t_index++) {
+        node_data->triangles[t_index].automasking_factor = automasking_factor;
+      }
     }
     triangle_index += 1;
   }
@@ -178,8 +199,16 @@ static void do_task_cb_ex(void *__restrict userdata,
       const float3 normal(0.0f, 0.0f, 0.0f);
       const float3 face_normal(0.0f, 0.0f, 0.0f);
       const float mask = 0.0f;
-      const float falloff_strength = SCULPT_brush_strength_factor(
-          ss, brush, pixel.pos, sqrtf(test.dist), normal, face_normal, mask, 0, thread_id);
+      const float falloff_strength = SCULPT_brush_strength_factor_custom_automask(
+          ss,
+          brush,
+          pixel.pos,
+          sqrtf(test.dist),
+          normal,
+          face_normal,
+          mask,
+          triangle.automasking_factor,
+          thread_id);
 
       blend_color_interpolate_float(color, color, brush_linear, falloff_strength * brush_strength);
       pixels_painted = true;
@@ -249,6 +278,7 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
   data.brush = brush;
   data.nodes = nodes;
   data.vertex_brush_tests = std::vector<bool>(mesh->totvert);
+  data.automask_factors = Vector<float>(mesh->totvert);
 
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, totnode);
