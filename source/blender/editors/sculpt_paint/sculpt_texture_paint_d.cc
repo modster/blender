@@ -30,6 +30,7 @@
 
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf_types.h"
+#include "IMB_imbuf_wrappers.hh"
 
 #include "WM_types.h"
 
@@ -264,7 +265,6 @@ static void do_vertex_brush_test(void *__restrict userdata,
   BKE_pbvh_vertex_iter_end;
 }
 
-template<typename PaintingKernelType>
 static void do_task_cb_ex(void *__restrict userdata,
                           const int n,
                           const TaskParallelTLS *__restrict tls)
@@ -272,7 +272,6 @@ static void do_task_cb_ex(void *__restrict userdata,
   TexturePaintingUserData *data = static_cast<TexturePaintingUserData *>(userdata);
   Object *ob = data->ob;
   SculptSession *ss = ob->sculpt;
-  ImBuf *image_buffer = ss->mode.texture_paint.drawing_target;
   const Brush *brush = data->brush;
   PBVHNode *node = data->nodes[n];
   NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
@@ -314,27 +313,55 @@ static void do_task_cb_ex(void *__restrict userdata,
 
   const int thread_id = BLI_task_parallel_thread_id(tls);
   MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
-  PaintingKernelType kernel(ss, brush, thread_id, mvert);
+  PaintingKernel<ImageBufferFloat4> kernel_float4(ss, brush, thread_id, mvert);
+  PaintingKernel<ImageBufferByte4> kernel_byte4(ss, brush, thread_id, mvert);
 
-  int packages_clipped = 0;
-  for (const PixelsPackage &encoded_pixels : node_data->encoded_pixels) {
-    if (!triangle_brush_test_results[encoded_pixels.triangle_index]) {
-      packages_clipped += 1;
+  Image *image = ss->mode.texture_paint.image;
+  ImageUser image_user = *ss->mode.texture_paint.image_user;
+
+  /* TODO: should we lock? */
+  void *image_lock;
+  LISTBASE_FOREACH (ImageTile *, tile, &image->tiles) {
+    imbuf::ImageTileWrapper image_tile(tile);
+    image_user.tile = image_tile.get_tile_number();
+    TileData *tile_data = node_data->find_tile_data(image_tile);
+    if (tile_data == nullptr) {
+      /* This node doesn't paint on this tile. */
       continue;
     }
-    const Triangle &triangle = node_data->triangles[encoded_pixels.triangle_index];
-    const bool pixels_painted = kernel.paint(triangle, encoded_pixels, image_buffer);
 
-    if (pixels_painted) {
-      BLI_rcti_do_minmax_v(&node_data->dirty_region, encoded_pixels.start_image_coordinate);
-      BLI_rcti_do_minmax_v(
-          &node_data->dirty_region,
-          int2(encoded_pixels.start_image_coordinate.x + encoded_pixels.num_pixels + 1,
-               encoded_pixels.start_image_coordinate.y));
-      node_data->flags.dirty = true;
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &image_user, &image_lock);
+    if (image_buffer == nullptr) {
+      continue;
     }
+
+    for (const PixelsPackage &encoded_pixels : tile_data->encoded_pixels) {
+      if (!triangle_brush_test_results[encoded_pixels.triangle_index]) {
+        continue;
+      }
+      const Triangle &triangle = node_data->triangles[encoded_pixels.triangle_index];
+      bool pixels_painted = false;
+      if (image_buffer->rect_float != nullptr) {
+        pixels_painted = kernel_float4.paint(triangle, encoded_pixels, image_buffer);
+      }
+      else {
+        pixels_painted = kernel_byte4.paint(triangle, encoded_pixels, image_buffer);
+      }
+
+      if (pixels_painted) {
+        BLI_rcti_do_minmax_v(&tile_data->dirty_region, encoded_pixels.start_image_coordinate);
+        BLI_rcti_do_minmax_v(
+            &tile_data->dirty_region,
+            int2(encoded_pixels.start_image_coordinate.x + encoded_pixels.num_pixels + 1,
+                 encoded_pixels.start_image_coordinate.y));
+        node_data->flags.dirty = true;
+      }
+    }
+
+    BKE_image_release_ibuf(image, image_buffer, image_lock);
+
+    node_data->flags.dirty |= tile_data->flags.dirty;
   }
-  printf("%d of %ld pixel packages clipped\n", packages_clipped, node_data->encoded_pixels.size());
 }
 }  // namespace painting
 
@@ -342,11 +369,9 @@ struct ImageData {
   void *lock = nullptr;
   Image *image = nullptr;
   ImageUser *image_user = nullptr;
-  ImBuf *image_buffer = nullptr;
 
   ~ImageData()
   {
-    BKE_image_release_ibuf(image, image_buffer, lock);
   }
 
   static bool init_active_image(Object *ob, ImageData *r_image_data)
@@ -354,11 +379,6 @@ struct ImageData {
     ED_object_get_active_image(
         ob, 1, &r_image_data->image, &r_image_data->image_user, nullptr, nullptr);
     if (r_image_data->image == nullptr) {
-      return false;
-    }
-    r_image_data->image_buffer = BKE_image_acquire_ibuf(
-        r_image_data->image, r_image_data->image_user, &r_image_data->lock);
-    if (r_image_data->image_buffer == nullptr) {
       return false;
     }
     return true;
@@ -376,7 +396,8 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
     return;
   }
 
-  ss->mode.texture_paint.drawing_target = image_data.image_buffer;
+  ss->mode.texture_paint.image = image_data.image;
+  ss->mode.texture_paint.image_user = image_data.image_user;
 
   Mesh *mesh = (Mesh *)ob->data;
 
@@ -392,25 +413,11 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
 
   TIMEIT_START(texture_painting);
   BLI_task_parallel_range(0, totnode, &data, painting::do_vertex_brush_test, &settings);
-  if (image_data.image_buffer->rect_float) {
-    BLI_task_parallel_range(
-        0,
-        totnode,
-        &data,
-        painting::do_task_cb_ex<painting::PaintingKernel<painting::ImageBufferFloat4>>,
-        &settings);
-  }
-  else {
-    BLI_task_parallel_range(
-        0,
-        totnode,
-        &data,
-        painting::do_task_cb_ex<painting::PaintingKernel<painting::ImageBufferByte4>>,
-        &settings);
-  }
+  BLI_task_parallel_range(0, totnode, &data, painting::do_task_cb_ex, &settings);
   TIMEIT_END(texture_painting);
 
-  ss->mode.texture_paint.drawing_target = nullptr;
+  ss->mode.texture_paint.image = nullptr;
+  ss->mode.texture_paint.image_user = nullptr;
 }
 
 void SCULPT_init_texture_paint(Object *ob)
@@ -420,15 +427,17 @@ void SCULPT_init_texture_paint(Object *ob)
   if (!ImageData::init_active_image(ob, &image_data)) {
     return;
   }
-  ss->mode.texture_paint.drawing_target = image_data.image_buffer;
+  ss->mode.texture_paint.image = image_data.image;
+  ss->mode.texture_paint.image_user = image_data.image_user;
+
   PBVHNode **nodes;
   int totnode;
   BKE_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
   SCULPT_extract_pixels(ob, nodes, totnode);
-
   MEM_freeN(nodes);
 
-  ss->mode.texture_paint.drawing_target = nullptr;
+  ss->mode.texture_paint.image = nullptr;
+  ss->mode.texture_paint.image_user = nullptr;
 }
 
 void SCULPT_flush_texture_paint(Object *ob)
@@ -450,8 +459,21 @@ void SCULPT_flush_texture_paint(Object *ob)
     }
 
     if (data->flags.dirty) {
-      data->mark_region(*image_data.image, *image_data.image_buffer);
-      data->flags.dirty = false;
+      Image *image = image_data.image;
+      ImageUser image_user = *image_data.image_user;
+      void *image_lock;
+      LISTBASE_FOREACH (ImageTile *, tile, &image_data.image->tiles) {
+        imbuf::ImageTileWrapper image_tile(tile);
+        image_user.tile = image_tile.get_tile_number();
+        ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &image_user, &image_lock);
+        if (image_buffer == nullptr) {
+          continue;
+        }
+
+        data->mark_region(*image_data.image, image_tile, *image_buffer);
+        data->flags.dirty = false;
+        BKE_image_release_ibuf(image, image_buffer, image_lock);
+      }
     }
   }
 

@@ -39,8 +39,6 @@
 
 namespace blender::ed::sculpt_paint::texture_paint::packed_pixels {
 
-enum class ExtractionMethod { BarycentricEdges, BarycentricPixels };
-
 /* Express co as term of movement along 2 edges of a triangle. */
 static float3 barycentric_weights(const float2 v1,
                                   const float2 v2,
@@ -64,72 +62,7 @@ static bool has_been_visited(std::vector<bool> &visited_polygons, const int poly
   return visited;
 }
 
-static void extract_barycentric_edges(NodeData *node_data,
-                                      const ImBuf *image_buffer,
-                                      Triangle &triangle,
-                                      const int triangle_index,
-                                      const float2 uvs[3],
-                                      const int minx,
-                                      const int miny,
-                                      const int maxx,
-                                      const int maxy,
-                                      const float minu,
-                                      const float minv)
-{
-  const float add_u = 1.0 / image_buffer->x;
-  const float add_v = 1.0 / image_buffer->y;
-
-  float2 min_uv(minu, minv);
-  float3 start_barycentric_coord = barycentric_weights(uvs[0], uvs[1], uvs[2], min_uv);
-  float3 add_barycentric_coord_x = barycentric_weights(
-                                uvs[0], uvs[1], uvs[2], min_uv + float2(add_u, 0.0)) -
-                            start_barycentric_coord;
-  float3 add_edge_coord_y = barycentric_weights(
-                                uvs[0], uvs[1], uvs[2], min_uv + float2(0.0, add_v)) -
-                            start_barycentric_coord;
-
-  triangle.add_barycentric_coord_x = add_barycentric_coord_x;
-
-  for (int y = miny; y < maxy; y++) {
-    float3 start_y_edge_coord = start_barycentric_coord + add_edge_coord_y * (y - miny);
-    float3 edge_coord = start_y_edge_coord;
-
-    int start_x = -1;
-    int end_x = -1;
-    int x;
-    for (x = minx; x < maxx; x++) {
-      if (is_inside_triangle(edge_coord)) {
-        start_x = x;
-        break;
-      }
-      edge_coord += add_barycentric_coord_x;
-    }
-    edge_coord += add_barycentric_coord_x;
-    x += 1;
-    for (; x < maxx; x++) {
-      if (!is_inside_triangle(edge_coord)) {
-        break;
-      }
-      edge_coord += add_barycentric_coord_x;
-    }
-    end_x = x;
-
-    if (start_x == -1 || end_x == -1) {
-      continue;
-    }
-
-    int num_pixels = end_x - start_x;
-
-    PixelsPackage package;
-    package.start_image_coordinate = int2(start_x, y);
-    package.start_barycentric_coord = start_y_edge_coord + add_barycentric_coord_x * (start_x - minx);
-    package.triangle_index = triangle_index;
-    package.num_pixels = num_pixels;
-    node_data->encoded_pixels.append(package);
-  }
-}
-
-static void extract_barycentric_pixels(NodeData *node_data,
+static void extract_barycentric_pixels(TileData &tile_data,
                                        const ImBuf *image_buffer,
                                        Triangle &triangle,
                                        const int triangle_index,
@@ -167,10 +100,11 @@ static void extract_barycentric_pixels(NodeData *node_data,
     }
     package.num_pixels = x - package.start_image_coordinate.x;
     if (package.num_pixels > best_num_pixels) {
-      triangle.add_barycentric_coord_x = (barycentric - package.start_barycentric_coord) / package.num_pixels;
+      triangle.add_barycentric_coord_x = (barycentric - package.start_barycentric_coord) /
+                                         package.num_pixels;
       best_num_pixels = package.num_pixels;
     }
-    node_data->encoded_pixels.append(package);
+    tile_data.encoded_pixels.append(package);
   }
 }
 
@@ -204,10 +138,10 @@ static void init_triangles(SculptSession *ss,
 }
 
 struct EncodePixelsUserData {
-  ImBuf *image_buffer;
+  Image *image;
+  ImageUser *image_user;
   Vector<PBVHNode *> *nodes;
   MLoopUV *ldata_uv;
-  ExtractionMethod method;
 };
 
 static void do_encode_pixels(void *__restrict userdata,
@@ -215,54 +149,56 @@ static void do_encode_pixels(void *__restrict userdata,
                              const TaskParallelTLS *__restrict UNUSED(tls))
 {
   EncodePixelsUserData *data = static_cast<EncodePixelsUserData *>(userdata);
+  Image *image = data->image;
+  ImageUser image_user = *data->image_user;
 
   PBVHNode *node = (*data->nodes)[n];
   NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
-  int triangle_index = 0;
-  for (Triangle &triangle : node_data->triangles) {
-    float2 uvs[3] = {
-        data->ldata_uv[triangle.loop_indices[0]].uv,
-        data->ldata_uv[triangle.loop_indices[1]].uv,
-        data->ldata_uv[triangle.loop_indices[2]].uv,
-    };
-
-    const float minv = min_fff(uvs[0].y, uvs[1].y, uvs[2].y);
-    const int miny = floor(minv * data->image_buffer->y);
-    const float maxv = max_fff(uvs[0].y, uvs[1].y, uvs[2].y);
-    const int maxy = ceil(maxv * data->image_buffer->y);
-    const float minu = min_fff(uvs[0].x, uvs[1].x, uvs[2].x);
-    const int minx = floor(minu * data->image_buffer->x);
-    const float maxu = max_fff(uvs[0].x, uvs[1].x, uvs[2].x);
-    const int maxx = ceil(maxu * data->image_buffer->x);
-
-    switch (data->method) {
-      case ExtractionMethod::BarycentricEdges: {
-        extract_barycentric_edges(node_data,
-                                  data->image_buffer,
-                                  triangle,
-                                  triangle_index,
-                                  uvs,
-                                  minx,
-                                  miny,
-                                  maxx,
-                                  maxy,
-                                  minu,
-                                  minv);
-        break;
-      }
-
-      case ExtractionMethod::BarycentricPixels: {
-        extract_barycentric_pixels(
-            node_data, data->image_buffer, triangle, triangle_index, uvs, minx, miny, maxx, maxy);
-        break;
-      }
+  LISTBASE_FOREACH (ImageTile *, tile, &data->image->tiles) {
+    imbuf::ImageTileWrapper image_tile(tile);
+    image_user.tile = image_tile.get_tile_number();
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &image_user, nullptr);
+    if (image_buffer == nullptr) {
+      continue;
     }
 
-    triangle_index += 1;
+    float2 tile_offset = float2(image_tile.get_tile_offset());
+    TileData tile_data;
+
+    int triangle_index = 0;
+    for (Triangle &triangle : node_data->triangles) {
+      float2 uvs[3] = {
+          float2(data->ldata_uv[triangle.loop_indices[0]].uv) - tile_offset,
+          float2(data->ldata_uv[triangle.loop_indices[1]].uv) - tile_offset,
+          float2(data->ldata_uv[triangle.loop_indices[2]].uv) - tile_offset,
+      };
+
+      const float minv = clamp_f(min_fff(uvs[0].y, uvs[1].y, uvs[2].y), 0.0f, 1.0f);
+      const int miny = floor(minv * image_buffer->y);
+      const float maxv = clamp_f(max_fff(uvs[0].y, uvs[1].y, uvs[2].y), 0.0f, 1.0f);
+      const int maxy = min_ii(ceil(maxv * image_buffer->y), image_buffer->y);
+      const float minu = clamp_f(min_fff(uvs[0].x, uvs[1].x, uvs[2].x), 0.0f, 1.0f);
+      const int minx = floor(minu * image_buffer->x);
+      const float maxu = clamp_f(max_fff(uvs[0].x, uvs[1].x, uvs[2].x), 0.0f, 1.0f);
+      const int maxx = min_ii(ceil(maxu * image_buffer->x), image_buffer->x);
+
+      extract_barycentric_pixels(
+          tile_data, image_buffer, triangle, triangle_index, uvs, minx, miny, maxx, maxy);
+      triangle_index += 1;
+    }
+
+    BKE_image_release_ibuf(image, image_buffer, nullptr);
+
+    if (tile_data.encoded_pixels.is_empty()) {
+      continue;
+    }
+
+    tile_data.tile_number = image_tile.get_tile_number();
+    node_data->tiles.append(tile_data);
   }
 }
 
-static void init(const Object *ob, int totnode, PBVHNode **nodes, const ExtractionMethod method)
+static void init(const Object *ob, int totnode, PBVHNode **nodes)
 {
   Vector<PBVHNode *> nodes_to_initialize;
   for (int n = 0; n < totnode; n++) {
@@ -286,7 +222,6 @@ static void init(const Object *ob, int totnode, PBVHNode **nodes, const Extracti
     return;
   }
   SculptSession *ss = ob->sculpt;
-  ImBuf *image_buffer = ss->mode.texture_paint.drawing_target;
   std::vector<bool> visited_polygons(mesh->totpoly);
 
   for (int n = 0; n < nodes_to_initialize.size(); n++) {
@@ -296,9 +231,9 @@ static void init(const Object *ob, int totnode, PBVHNode **nodes, const Extracti
   }
 
   EncodePixelsUserData user_data;
-  user_data.image_buffer = image_buffer;
+  user_data.image = ss->mode.texture_paint.image;
+  user_data.image_user = ss->mode.texture_paint.image_user;
   user_data.ldata_uv = ldata_uv;
-  user_data.method = method;
   user_data.nodes = &nodes_to_initialize;
 
   TaskParallelSettings settings;
@@ -312,10 +247,11 @@ static void init(const Object *ob, int totnode, PBVHNode **nodes, const Extracti
       PBVHNode *node = nodes[n];
       NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
       compressed_data_len += node_data->triangles.size() * sizeof(Triangle);
-      compressed_data_len += node_data->encoded_pixels.size() * sizeof(PixelsPackage);
-
-      for (PixelsPackage &encoded_pixels : node_data->encoded_pixels) {
-        num_pixels += encoded_pixels.num_pixels;
+      for (const TileData &tile_data : node_data->tiles) {
+        compressed_data_len += tile_data.encoded_pixels.size() * sizeof(PixelsPackage);
+        for (const PixelsPackage &encoded_pixels : tile_data.encoded_pixels) {
+          num_pixels += encoded_pixels.num_pixels;
+        }
       }
     }
     printf("Encoded %ld pixels in %ld bytes (%f bytes per pixel)\n",
@@ -349,7 +285,7 @@ void SCULPT_extract_pixels(Object *ob, PBVHNode **nodes, int totnode)
 {
   using namespace blender::ed::sculpt_paint::texture_paint::packed_pixels;
   TIMEIT_START(extract_pixels);
-  init(ob, totnode, nodes, ExtractionMethod::BarycentricPixels);
+  init(ob, totnode, nodes);
   TIMEIT_END(extract_pixels);
 }
 }

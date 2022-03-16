@@ -622,7 +622,8 @@ typedef struct SculptSession {
     } wpaint;
 
     struct {
-      struct ImBuf *drawing_target;
+      struct Image *image;
+      struct ImageUser *image_user;
     } texture_paint;
 
     /* TODO: identify sculpt-only fields */

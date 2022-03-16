@@ -1,3 +1,5 @@
+#include "IMB_imbuf_wrappers.hh"
+
 namespace blender::ed::sculpt_paint::texture_paint {
 
 struct Polygon {
@@ -135,49 +137,64 @@ struct Pixels {
     dirty.push_back(false);
   }
 };
+struct TileData {
+  short tile_number;
+  struct {
+    bool dirty : 1;
+  } flags;
 
+  /* Dirty region of the tile in image space. */
+  rcti dirty_region;
+
+  Vector<PixelsPackage> encoded_pixels;
+
+  TileData()
+  {
+    flags.dirty = false;
+    BLI_rcti_init_minmax(&dirty_region);
+  }
+
+  void mark_region(Image &image, const imbuf::ImageTileWrapper &image_tile, ImBuf &image_buffer)
+  {
+    print_rcti_id(&dirty_region);
+    BKE_image_partial_update_mark_region(
+        &image, image_tile.image_tile, &image_buffer, &dirty_region);
+    BLI_rcti_init_minmax(&dirty_region);
+  }
+};
 struct NodeData {
   struct {
     bool dirty : 1;
   } flags;
 
-  // Vector<PixelData> pixels;
-  Pixels pixels;
-  rcti dirty_region;
   rctf uv_region;
 
+  Vector<TileData> tiles;
   Vector<Triangle> triangles;
-  Vector<PixelsPackage> encoded_pixels;
 
   NodeData()
   {
     flags.dirty = false;
-    BLI_rcti_init_minmax(&dirty_region);
   }
 
   void init_pixels_rasterization(Object *ob, PBVHNode *node, ImBuf *image_buffer);
 
-  void flush(ImBuf &image_buffer)
+  TileData *find_tile_data(const imbuf::ImageTileWrapper &image_tile)
   {
-    flags.dirty = false;
-    for (int i = 0; i < pixels.size(); i++) {
-
-      if (pixels.is_dirty(i)) {
-        const int2 &image_coord = pixels.image_coord(i);
-        const int pixel_offset = (image_coord[1] * image_buffer.x + image_coord[0]);
-        const float4 &color = pixels.color(i);
-        copy_v4_v4(&image_buffer.rect_float[pixel_offset * 4], color);
+    for (TileData &tile : tiles) {
+      if (tile.tile_number == image_tile.get_tile_number()) {
+        return &tile;
       }
     }
-    pixels.clear_dirty();
+    return nullptr;
   }
 
-  void mark_region(Image &image, ImBuf &image_buffer)
+  void mark_region(Image &image, const imbuf::ImageTileWrapper &image_tile, ImBuf &image_buffer)
   {
-    print_rcti_id(&dirty_region);
-    BKE_image_partial_update_mark_region(
-        &image, static_cast<ImageTile *>(image.tiles.first), &image_buffer, &dirty_region);
-    BLI_rcti_init_minmax(&dirty_region);
+    TileData *tile = find_tile_data(image_tile);
+    if (tile) {
+      tile->mark_region(image, image_tile, image_buffer);
+    }
   }
 
   static void free_func(void *instance)
