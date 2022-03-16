@@ -7,20 +7,52 @@ struct Triangle {
   int3 loop_indices;
   int3 vert_indices;
   int poly_index;
-  float3 add_edge_coord_x;
+  float3 add_barycentric_coord_x;
   float automasking_factor;
 };
 
+/**
+ * Encode multiple sequential pixels to reduce memory footprint.
+ * 
+ * Memory footprint can be reduced more.
+ * - Only store 2 barycentric coordinates. the third one can be extracted
+ *   from the 2 known ones.
+ * - start_image_coordinate can be a delta encoded with the previous package.
+ *   initial coordinate could be at the triangle level or pbvh.
+ * - num_pixels could be delta encoded or at least be a short.
+ * - triangle index could be delta encoded.
+ * - encode everything in using variable bits per structure.
+ *   first byte would indicate the number of bytes used per element.
+ */
 struct PixelsPackage {
+  /** Image coordinate starting of the first encoded pixel. */
   int2 start_image_coordinate;
-  float3 start_edge_coord;
+  /** Barycentric coordinate of the first encoded pixel. */
+  float3 start_barycentric_coord;
+  /** Number of sequetial pixels encoded in this package. */
   int num_pixels;
+  /** Reference to the pbvh triangle index. */
   int triangle_index;
 };
 
 struct Pixel {
   float3 pos;
   float2 uv;
+
+  Pixel &operator+=(const Pixel &other)
+  {
+    pos += other.pos;
+    uv += other.uv;
+    return *this;
+  }
+
+  Pixel operator-(const Pixel &other)
+  {
+    Pixel result;
+    result.pos = pos - other.pos;
+    result.uv = uv - other.uv;
+    return result;
+  }
 };
 
 struct PixelData {

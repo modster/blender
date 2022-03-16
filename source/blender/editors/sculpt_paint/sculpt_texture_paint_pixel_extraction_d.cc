@@ -80,18 +80,18 @@ static void extract_barycentric_edges(NodeData *node_data,
   const float add_v = 1.0 / image_buffer->y;
 
   float2 min_uv(minu, minv);
-  float3 start_edge_coord = barycentric_weights(uvs[0], uvs[1], uvs[2], min_uv);
-  float3 add_edge_coord_x = barycentric_weights(
+  float3 start_barycentric_coord = barycentric_weights(uvs[0], uvs[1], uvs[2], min_uv);
+  float3 add_barycentric_coord_x = barycentric_weights(
                                 uvs[0], uvs[1], uvs[2], min_uv + float2(add_u, 0.0)) -
-                            start_edge_coord;
+                            start_barycentric_coord;
   float3 add_edge_coord_y = barycentric_weights(
                                 uvs[0], uvs[1], uvs[2], min_uv + float2(0.0, add_v)) -
-                            start_edge_coord;
+                            start_barycentric_coord;
 
-  triangle.add_edge_coord_x = add_edge_coord_x;
+  triangle.add_barycentric_coord_x = add_barycentric_coord_x;
 
   for (int y = miny; y < maxy; y++) {
-    float3 start_y_edge_coord = start_edge_coord + add_edge_coord_y * (y - miny);
+    float3 start_y_edge_coord = start_barycentric_coord + add_edge_coord_y * (y - miny);
     float3 edge_coord = start_y_edge_coord;
 
     int start_x = -1;
@@ -102,15 +102,15 @@ static void extract_barycentric_edges(NodeData *node_data,
         start_x = x;
         break;
       }
-      edge_coord += add_edge_coord_x;
+      edge_coord += add_barycentric_coord_x;
     }
-    edge_coord += add_edge_coord_x;
+    edge_coord += add_barycentric_coord_x;
     x += 1;
     for (; x < maxx; x++) {
       if (!is_inside_triangle(edge_coord)) {
         break;
       }
-      edge_coord += add_edge_coord_x;
+      edge_coord += add_barycentric_coord_x;
     }
     end_x = x;
 
@@ -122,7 +122,7 @@ static void extract_barycentric_edges(NodeData *node_data,
 
     PixelsPackage package;
     package.start_image_coordinate = int2(start_x, y);
-    package.start_edge_coord = start_y_edge_coord + add_edge_coord_x * (start_x - minx);
+    package.start_barycentric_coord = start_y_edge_coord + add_barycentric_coord_x * (start_x - minx);
     package.triangle_index = triangle_index;
     package.num_pixels = num_pixels;
     node_data->encoded_pixels.append(package);
@@ -155,7 +155,7 @@ static void extract_barycentric_pixels(NodeData *node_data,
       if (!start_detected && is_inside) {
         start_detected = true;
         package.start_image_coordinate = int2(x, y);
-        package.start_edge_coord = barycentric;
+        package.start_barycentric_coord = barycentric;
       }
       else if (start_detected && !is_inside) {
         break;
@@ -167,7 +167,7 @@ static void extract_barycentric_pixels(NodeData *node_data,
     }
     package.num_pixels = x - package.start_image_coordinate.x;
     if (package.num_pixels > best_num_pixels) {
-      triangle.add_edge_coord_x = (barycentric - package.start_edge_coord) / package.num_pixels;
+      triangle.add_barycentric_coord_x = (barycentric - package.start_barycentric_coord) / package.num_pixels;
       best_num_pixels = package.num_pixels;
     }
     node_data->encoded_pixels.append(package);

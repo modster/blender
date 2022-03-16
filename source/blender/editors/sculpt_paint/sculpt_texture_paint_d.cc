@@ -64,7 +64,7 @@ static Pixel get_start_pixel(const PixelsPackage &encoded_pixels,
                              const MVert *mvert,
                              const MLoopUV *ldata_uv)
 {
-  return init_pixel(triangle, encoded_pixels.start_edge_coord, mvert, ldata_uv);
+  return init_pixel(triangle, encoded_pixels.start_barycentric_coord, mvert, ldata_uv);
 }
 
 static Pixel get_delta_pixel(const PixelsPackage &encoded_pixels,
@@ -76,16 +76,8 @@ static Pixel get_delta_pixel(const PixelsPackage &encoded_pixels,
 )
 {
   Pixel result = init_pixel(
-      triangle, encoded_pixels.start_edge_coord + triangle.add_edge_coord_x, mvert, ldata_uv);
-  result.pos -= start_pixel.pos;
-  result.uv -= start_pixel.uv;
-  return result;
-}
-
-static void add(Pixel &dst, const Pixel &lh)
-{
-  dst.pos += lh.pos;
-  dst.uv += lh.uv;
+      triangle, encoded_pixels.start_barycentric_coord + triangle.add_barycentric_coord_x, mvert, ldata_uv);
+  return result - start_pixel;
 }
 
 static void do_vertex_brush_test(void *__restrict userdata,
@@ -184,13 +176,13 @@ static void do_task_cb_ex(void *__restrict userdata,
     Triangle &triangle = node_data->triangles[encoded_pixels.triangle_index];
     int pixel_offset = encoded_pixels.start_image_coordinate.y * image_buffer->x +
                        encoded_pixels.start_image_coordinate.x;
-    float3 edge_coord = encoded_pixels.start_edge_coord;
+    float3 edge_coord = encoded_pixels.start_barycentric_coord;
     Pixel pixel = get_start_pixel(encoded_pixels, triangle, mvert, ldata_uv);
     const Pixel add_pixel = get_delta_pixel(encoded_pixels, triangle, pixel, mvert, ldata_uv);
     bool pixels_painted = false;
     for (int x = 0; x < encoded_pixels.num_pixels; x++) {
       if (!sculpt_brush_test_sq_fn(&test, pixel.pos)) {
-        add(pixel, add_pixel);
+        pixel += add_pixel;
         pixel_offset += 1;
         continue;
       }
@@ -213,8 +205,8 @@ static void do_task_cb_ex(void *__restrict userdata,
       blend_color_interpolate_float(color, color, brush_linear, falloff_strength * brush_strength);
       pixels_painted = true;
 
-      edge_coord += triangle.add_edge_coord_x;
-      add(pixel, add_pixel);
+      edge_coord += triangle.add_barycentric_coord_x;
+      pixel += add_pixel;
       pixel_offset++;
     }
 
