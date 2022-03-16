@@ -23,10 +23,13 @@
 #include "PIL_time_utildefines.h"
 
 #include "BLI_math_color_blend.h"
+#include "BLI_math_vec_types.hh"
+#include "BLI_string_ref.hh"
 #include "BLI_task.h"
 #include "BLI_vector.hh"
 
-#include "IMB_rasterizer.hh"
+#include "IMB_colormanagement.h"
+#include "IMB_imbuf_types.h"
 
 #include "WM_types.h"
 
@@ -65,6 +68,48 @@ class ImageBufferFloat4 {
   {
     copy_v4_v4(&image_buffer->rect_float[pixel_offset * 4], pixel_data);
   }
+
+  const char *get_colorspace_name(ImBuf *image_buffer)
+  {
+    return IMB_colormanagement_get_float_colorspace(image_buffer);
+  }
+};
+
+/** Reading and writing to image buffer with 4 byte channels. */
+class ImageBufferByte4 {
+ private:
+  int pixel_offset;
+
+ public:
+  void set_image_position(ImBuf *image_buffer, int2 image_pixel_position)
+  {
+    pixel_offset = image_pixel_position.y * image_buffer->x + image_pixel_position.x;
+  }
+
+  void goto_next_pixel()
+  {
+    pixel_offset += 1;
+  }
+
+  float4 read_pixel(ImBuf *image_buffer) const
+  {
+    float4 result;
+    rgba_uchar_to_float(result,
+                        static_cast<const uchar *>(
+                            static_cast<const void *>(&(image_buffer->rect[pixel_offset]))));
+    return result;
+  }
+
+  void store_pixel(ImBuf *image_buffer, const float4 pixel_data) const
+  {
+    rgba_float_to_uchar(
+        static_cast<uchar *>(static_cast<void *>(&image_buffer->rect[pixel_offset])), pixel_data);
+  }
+
+  const char *get_colorspace_name(ImBuf *image_buffer)
+  {
+    return IMB_colormanagement_get_rect_colorspace(image_buffer);
+  }
 };
 
 template<typename ImagePixelAccessor> class PaintingKernel {
@@ -80,6 +125,9 @@ template<typename ImagePixelAccessor> class PaintingKernel {
 
   SculptBrushTestFn brush_test_fn;
   SculptBrushTest test;
+  /* Pointer to the last used image buffer to detect when buffers are switched. */
+  void *last_used_image_buffer_ptr = nullptr;
+  const char *last_used_color_space = nullptr;
 
  public:
   explicit PaintingKernel(SculptSession *ss,
@@ -88,13 +136,16 @@ template<typename ImagePixelAccessor> class PaintingKernel {
                           const MVert *mvert)
       : ss(ss), brush(brush), thread_id(thread_id), mvert(mvert)
   {
-    init_brush_color();
     init_brush_strength();
     init_brush_test();
   }
 
   bool paint(const Triangle &triangle, const PixelsPackage &encoded_pixels, ImBuf *image_buffer)
   {
+    if (image_buffer != last_used_image_buffer_ptr) {
+      last_used_image_buffer_ptr = image_buffer;
+      init_brush_color(image_buffer);
+    }
     image_accessor.set_image_position(image_buffer, encoded_pixels.start_image_coordinate);
     Pixel pixel = get_start_pixel(triangle, encoded_pixels);
     const Pixel add_pixel = get_delta_pixel(triangle, encoded_pixels, pixel);
@@ -132,11 +183,23 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   }
 
  private:
-  void init_brush_color()
+  void init_brush_color(ImBuf *image_buffer)
   {
-    float3 brush_srgb(brush->rgb[0], brush->rgb[1], brush->rgb[2]);
-    srgb_to_linearrgb_v3_v3(brush_color, brush_srgb);
-    brush_color[3] = 1.0f;
+    /* TODO: use StringRefNull. */
+    const char *to_colorspace = image_accessor.get_colorspace_name(image_buffer);
+    if (last_used_color_space == to_colorspace) {
+      return;
+    }
+
+    copy_v4_fl4(brush_color, brush->rgb[0], brush->rgb[1], brush->rgb[2], 1.0);
+    /* TODO: unsure. brush color is stored in float sRGB. */
+    const char *from_colorspace = IMB_colormanagement_role_colorspace_name_get(
+        COLOR_ROLE_COLOR_PICKING);
+    ColormanageProcessor *cm_processor = IMB_colormanagement_colorspace_processor_new(
+        from_colorspace, to_colorspace);
+    IMB_colormanagement_processor_apply_v4(cm_processor, brush_color);
+    IMB_colormanagement_processor_free(cm_processor);
+    last_used_color_space = to_colorspace;
   }
 
   void init_brush_strength()
@@ -329,12 +392,22 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
 
   TIMEIT_START(texture_painting);
   BLI_task_parallel_range(0, totnode, &data, painting::do_vertex_brush_test, &settings);
-  BLI_task_parallel_range(
-      0,
-      totnode,
-      &data,
-      painting::do_task_cb_ex<painting::PaintingKernel<painting::ImageBufferFloat4>>,
-      &settings);
+  if (image_data.image_buffer->rect_float) {
+    BLI_task_parallel_range(
+        0,
+        totnode,
+        &data,
+        painting::do_task_cb_ex<painting::PaintingKernel<painting::ImageBufferFloat4>>,
+        &settings);
+  }
+  else {
+    BLI_task_parallel_range(
+        0,
+        totnode,
+        &data,
+        painting::do_task_cb_ex<painting::PaintingKernel<painting::ImageBufferByte4>>,
+        &settings);
+  }
   TIMEIT_END(texture_painting);
 
   ss->mode.texture_paint.drawing_target = nullptr;
