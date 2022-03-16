@@ -35,6 +35,7 @@
 
 #include "ED_curve.h"
 #include "ED_screen.h"
+#include "ED_select_utils.h"
 #include "ED_view3d.h"
 
 #include "BKE_object.h"
@@ -1493,6 +1494,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   BPoint *bp = NULL;
   Nurb *nu = NULL;
 
+  const struct SelectPick_Params params = {
+      .sel_op = ED_select_op_from_booleans(false, false, false),
+      .deselect_all = false,
+  };
+
   int ret = OPERATOR_RUNNING_MODAL;
 
   /* Distance threshold for mouse clicks to affect the spline or its points */
@@ -1644,8 +1650,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
     else if (event->val == KM_RELEASE) {
       if (delete_point && !cpd->new_point && !cpd->dragging) {
-        if (ED_curve_editnurb_select_pick_thresholded(
-                C, event->mval, SEL_DIST, false, false, false)) {
+        if (ED_curve_editnurb_select_pick_thresholded(C, event->mval, SEL_DIST, &params)) {
           cpd->acted = delete_point_under_mouse(&vc, event);
         }
       }
@@ -1706,7 +1711,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           }
         }
         else if (select_point) {
-          ED_curve_editnurb_select_pick_thresholded(C, event->mval, SEL_DIST, false, false, false);
+          ED_curve_editnurb_select_pick_thresholded(C, event->mval, SEL_DIST, &params);
         }
       }
 
