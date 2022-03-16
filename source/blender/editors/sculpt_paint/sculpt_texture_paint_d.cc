@@ -41,7 +41,7 @@ namespace blender::ed::sculpt_paint::texture_paint {
 namespace painting {
 
 /** Reading and writing to image buffer with 4 float channels. */
-class ImagePixelAccessorFloat4 {
+class ImageBufferFloat4 {
  private:
   int pixel_offset;
 
@@ -201,6 +201,7 @@ static void do_vertex_brush_test(void *__restrict userdata,
   BKE_pbvh_vertex_iter_end;
 }
 
+template<typename PaintingKernelType>
 static void do_task_cb_ex(void *__restrict userdata,
                           const int n,
                           const TaskParallelTLS *__restrict tls)
@@ -250,7 +251,7 @@ static void do_task_cb_ex(void *__restrict userdata,
 
   const int thread_id = BLI_task_parallel_thread_id(tls);
   MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
-  PaintingKernel<ImagePixelAccessorFloat4> kernel(ss, brush, thread_id, mvert);
+  PaintingKernelType kernel(ss, brush, thread_id, mvert);
 
   int packages_clipped = 0;
   for (const PixelsPackage &encoded_pixels : node_data->encoded_pixels) {
@@ -328,7 +329,12 @@ void SCULPT_do_texture_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int
 
   TIMEIT_START(texture_painting);
   BLI_task_parallel_range(0, totnode, &data, painting::do_vertex_brush_test, &settings);
-  BLI_task_parallel_range(0, totnode, &data, painting::do_task_cb_ex, &settings);
+  BLI_task_parallel_range(
+      0,
+      totnode,
+      &data,
+      painting::do_task_cb_ex<painting::PaintingKernel<painting::ImageBufferFloat4>>,
+      &settings);
   TIMEIT_END(texture_painting);
 
   ss->mode.texture_paint.drawing_target = nullptr;
