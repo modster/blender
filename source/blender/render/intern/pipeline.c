@@ -166,7 +166,7 @@ static void result_nothing(void *UNUSED(arg), RenderResult *UNUSED(rr))
 }
 static void result_rcti_nothing(void *UNUSED(arg),
                                 RenderResult *UNUSED(rr),
-                                volatile struct rcti *UNUSED(rect))
+                                struct rcti *UNUSED(rect))
 {
 }
 static void current_scene_nothing(void *UNUSED(arg), Scene *UNUSED(scene))
@@ -262,7 +262,7 @@ void RE_FreeRenderResult(RenderResult *rr)
   render_result_free(rr);
 }
 
-float *RE_RenderLayerGetPass(volatile RenderLayer *rl, const char *name, const char *viewname)
+float *RE_RenderLayerGetPass(RenderLayer *rl, const char *name, const char *viewname)
 {
   RenderPass *rpass = RE_pass_find_by_name(rl, name, viewname);
   return rpass ? rpass->rect : NULL;
@@ -890,7 +890,7 @@ void RE_display_clear_cb(Render *re, void *handle, void (*f)(void *handle, Rende
 }
 void RE_display_update_cb(Render *re,
                           void *handle,
-                          void (*f)(void *handle, RenderResult *rr, volatile rcti *rect))
+                          void (*f)(void *handle, RenderResult *rr, rcti *rect))
 {
   re->display_update = f;
   re->duh = handle;
@@ -1844,7 +1844,8 @@ void RE_RenderFrame(Render *re,
                     Scene *scene,
                     ViewLayer *single_layer,
                     Object *camera_override,
-                    int frame,
+                    const int frame,
+                    const float subframe,
                     const bool write_still)
 {
   render_callback_exec_id(re, re->main, &scene->id, BKE_CB_EVT_RENDER_INIT);
@@ -1854,6 +1855,7 @@ void RE_RenderFrame(Render *re,
   G.is_rendering = true;
 
   scene->r.cfra = frame;
+  scene->r.subframe = subframe;
 
   if (render_init_from_main(re, &scene->r, bmain, scene, single_layer, camera_override, 0, 0)) {
     const RenderData rd = scene->r;
@@ -2305,7 +2307,8 @@ void RE_RenderAnim(Render *re,
 
   const RenderData rd = scene->r;
   bMovieHandle *mh = NULL;
-  const int cfrao = rd.cfra;
+  const int cfra_old = rd.cfra;
+  const float subframe_old = rd.subframe;
   int nfra, totrendered = 0, totskipped = 0;
   const int totvideos = BKE_scene_multiview_num_videos_get(&rd);
   const bool is_movie = BKE_imtype_is_movie(rd.im_format.imtype);
@@ -2373,6 +2376,7 @@ void RE_RenderAnim(Render *re,
   re->flag |= R_ANIMATION;
 
   {
+    scene->r.subframe = 0.0f;
     for (nfra = sfra, scene->r.cfra = sfra; scene->r.cfra <= efra; scene->r.cfra++) {
       char name[FILE_MAX];
 
@@ -2481,6 +2485,7 @@ void RE_RenderAnim(Render *re,
       }
 
       re->r.cfra = scene->r.cfra; /* weak.... */
+      re->r.subframe = scene->r.subframe;
 
       /* run callbacks before rendering, before the scene is updated */
       render_callback_exec_id(re, re->main, &scene->id, BKE_CB_EVT_RENDER_PRE);
@@ -2549,7 +2554,8 @@ void RE_RenderAnim(Render *re,
     BKE_report(re->reports, RPT_INFO, "No frames rendered, skipped to not overwrite");
   }
 
-  scene->r.cfra = cfrao;
+  scene->r.cfra = cfra_old;
+  scene->r.subframe = subframe_old;
 
   re->flag &= ~R_ANIMATION;
 
@@ -2737,7 +2743,7 @@ bool RE_passes_have_name(struct RenderLayer *rl)
   return false;
 }
 
-RenderPass *RE_pass_find_by_name(volatile RenderLayer *rl, const char *name, const char *viewname)
+RenderPass *RE_pass_find_by_name(RenderLayer *rl, const char *name, const char *viewname)
 {
   RenderPass *rp = NULL;
 
@@ -2754,7 +2760,7 @@ RenderPass *RE_pass_find_by_name(volatile RenderLayer *rl, const char *name, con
   return rp;
 }
 
-RenderPass *RE_pass_find_by_type(volatile RenderLayer *rl, int passtype, const char *viewname)
+RenderPass *RE_pass_find_by_type(RenderLayer *rl, int passtype, const char *viewname)
 {
 #define CHECK_PASS(NAME) \
   if (passtype == SCE_PASS_##NAME) { \
