@@ -54,8 +54,9 @@ bool ED_curve_editnurb_select_pick_thresholded(struct bContext *C,
 /**
  * \return True when pick finds an element or the selection changed.
  */
-bool ED_curve_editnurb_select_pick(
-    struct bContext *C, const int mval[2], const struct SelectPick_Params *params);
+bool ED_curve_editnurb_select_pick(struct bContext *C,
+                                   const int mval[2],
+                                   const struct SelectPick_Params *params);
 
 struct Nurb *ED_curve_add_nurbs_primitive(
     struct bContext *C, struct Object *obedit, float mat[4][4], int type, int newob);
