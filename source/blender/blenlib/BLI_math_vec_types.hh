@@ -563,6 +563,8 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
   }
 };
 
+using ushort2 = vec_base<int16_t, 2>;
+
 using int2 = vec_base<int32_t, 2>;
 using int3 = vec_base<int32_t, 3>;
 using int4 = vec_base<int32_t, 4>;

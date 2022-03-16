@@ -50,9 +50,9 @@ class ImageBufferFloat4 {
   int pixel_offset;
 
  public:
-  void set_image_position(ImBuf *image_buffer, int2 image_pixel_position)
+  void set_image_position(ImBuf *image_buffer, ushort2 image_pixel_position)
   {
-    pixel_offset = image_pixel_position.y * image_buffer->x + image_pixel_position.x;
+    pixel_offset = int(image_pixel_position.y) * image_buffer->x + int(image_pixel_position.x);
   }
 
   void goto_next_pixel()
@@ -82,9 +82,9 @@ class ImageBufferByte4 {
   int pixel_offset;
 
  public:
-  void set_image_position(ImBuf *image_buffer, int2 image_pixel_position)
+  void set_image_position(ImBuf *image_buffer, ushort2 image_pixel_position)
   {
-    pixel_offset = image_pixel_position.y * image_buffer->x + image_pixel_position.x;
+    pixel_offset = int(image_pixel_position.y) * image_buffer->x + int(image_pixel_position.x);
   }
 
   void goto_next_pixel()
@@ -215,7 +215,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   /** Extract the staring pixel from the given encoded_pixels belonging to the triangle. */
   Pixel get_start_pixel(const Triangle &triangle, const PixelsPackage &encoded_pixels) const
   {
-    return init_pixel(triangle, encoded_pixels.start_barycentric_coord);
+    return init_pixel(triangle, encoded_pixels.start_barycentric_coord.decode());
   }
 
   /**
@@ -224,8 +224,9 @@ template<typename ImagePixelAccessor> class PaintingKernel {
                         const PixelsPackage &encoded_pixels,
                         const Pixel &start_pixel) const
   {
-    Pixel result = init_pixel(
-        triangle, encoded_pixels.start_barycentric_coord + triangle.add_barycentric_coord_x);
+    Pixel result = init_pixel(triangle,
+                              encoded_pixels.start_barycentric_coord.decode() +
+                                  triangle.add_barycentric_coord_x);
     return result - start_pixel;
   }
 
@@ -349,11 +350,11 @@ static void do_task_cb_ex(void *__restrict userdata,
       }
 
       if (pixels_painted) {
-        BLI_rcti_do_minmax_v(&tile_data->dirty_region, encoded_pixels.start_image_coordinate);
-        BLI_rcti_do_minmax_v(
-            &tile_data->dirty_region,
-            int2(encoded_pixels.start_image_coordinate.x + encoded_pixels.num_pixels + 1,
-                 encoded_pixels.start_image_coordinate.y));
+        int2 start_image_coord(encoded_pixels.start_image_coordinate.x,
+                               encoded_pixels.start_image_coordinate.y);
+        BLI_rcti_do_minmax_v(&tile_data->dirty_region, start_image_coord);
+        BLI_rcti_do_minmax_v(&tile_data->dirty_region,
+                             start_image_coord + int2(encoded_pixels.num_pixels + 1, 0));
         node_data->flags.dirty = true;
       }
     }

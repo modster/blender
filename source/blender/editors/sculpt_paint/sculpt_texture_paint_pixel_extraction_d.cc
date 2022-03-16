@@ -87,7 +87,7 @@ static void extract_barycentric_pixels(TileData &tile_data,
       const bool is_inside = is_inside_triangle(barycentric);
       if (!start_detected && is_inside) {
         start_detected = true;
-        package.start_image_coordinate = int2(x, y);
+        package.start_image_coordinate = ushort2(x, y);
         package.start_barycentric_coord = barycentric;
       }
       else if (start_detected && !is_inside) {
@@ -100,7 +100,7 @@ static void extract_barycentric_pixels(TileData &tile_data,
     }
     package.num_pixels = x - package.start_image_coordinate.x;
     if (package.num_pixels > best_num_pixels) {
-      triangle.add_barycentric_coord_x = (barycentric - package.start_barycentric_coord) /
+      triangle.add_barycentric_coord_x = (barycentric - package.start_barycentric_coord.decode()) /
                                          package.num_pixels;
       best_num_pixels = package.num_pixels;
     }
@@ -127,7 +127,7 @@ static void init_triangles(SculptSession *ss,
       const MLoop *loopstart = &ss->mloop[p->loopstart];
       for (int l = 0; l < p->totloop - 2; l++) {
         Triangle triangle;
-        triangle.loop_indices = int3(p->loopstart, p->loopstart + l + 1, p->loopstart + l + 2);
+        triangle.loop_indices = int2(p->loopstart, p->loopstart + l + 1);
         triangle.vert_indices = int3(loopstart[0].v, loopstart[l + 1].v, loopstart[l + 2].v);
         triangle.poly_index = poly_index;
         node_data->triangles.append(triangle);
@@ -170,7 +170,7 @@ static void do_encode_pixels(void *__restrict userdata,
       float2 uvs[3] = {
           float2(data->ldata_uv[triangle.loop_indices[0]].uv) - tile_offset,
           float2(data->ldata_uv[triangle.loop_indices[1]].uv) - tile_offset,
-          float2(data->ldata_uv[triangle.loop_indices[2]].uv) - tile_offset,
+          float2(data->ldata_uv[triangle.loop_indices[1] + 1].uv) - tile_offset,
       };
 
       const float minv = clamp_f(min_fff(uvs[0].y, uvs[1].y, uvs[2].y), 0.0f, 1.0f);

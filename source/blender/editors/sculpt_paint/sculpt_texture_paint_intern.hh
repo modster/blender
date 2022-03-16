@@ -5,12 +5,28 @@ namespace blender::ed::sculpt_paint::texture_paint {
 struct Polygon {
 };
 
+/* Stores a barycentric coordinate in a float2. */
+struct EncodedBarycentricCoord {
+  float2 encoded;
+
+  EncodedBarycentricCoord &operator=(const float3 decoded)
+  {
+    encoded = float2(decoded.x, decoded.y);
+    return *this;
+  }
+
+  float3 decode() const
+  {
+    return float3(encoded.x, encoded.y, 1.0 - encoded.x - encoded.y);
+  }
+};
+
 struct Triangle {
   /**
-   *  Loop incides. can be reduced by storing only 2 the third one is always `loop_indices[1] + 1`.
+   * Loop incides. Only stores 2 indices, the third one is always `loop_indices[1] + 1`.
    * Second could be delta encoded with the first loop index.
    */
-  int3 loop_indices;
+  int2 loop_indices;
   int3 vert_indices;
   int poly_index;
   float3 add_barycentric_coord_x;
@@ -21,25 +37,25 @@ struct Triangle {
  * Encode multiple sequential pixels to reduce memory footprint.
  *
  * Memory footprint can be reduced more.
- * - Only store 2 barycentric coordinates. the third one can be extracted
+ * v Only store 2 barycentric coordinates. the third one can be extracted
  *   from the 2 known ones.
  * - start_image_coordinate can be a delta encoded with the previous package.
  *   initial coordinate could be at the triangle level or pbvh.
- * - num_pixels could be delta encoded or at least be a short.
- * - triangle index could be delta encoded.
+ * v num_pixels could be delta encoded or at least be a short.
+ * X triangle index could be delta encoded.
  * - encode everything in using variable bits per structure.
  *   first byte would indicate the number of bytes used per element.
  * - only store triangle index when it changes.
  */
 struct PixelsPackage {
-  /** Image coordinate starting of the first encoded pixel. */
-  int2 start_image_coordinate;
   /** Barycentric coordinate of the first encoded pixel. */
-  float3 start_barycentric_coord;
+  EncodedBarycentricCoord start_barycentric_coord;
+  /** Image coordinate starting of the first encoded pixel. */
+  ushort2 start_image_coordinate;
   /** Number of sequetial pixels encoded in this package. */
-  int num_pixels;
+  ushort num_pixels;
   /** Reference to the pbvh triangle index. */
-  int triangle_index;
+  ushort triangle_index;
 };
 
 struct Pixel {
