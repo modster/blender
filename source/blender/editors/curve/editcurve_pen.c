@@ -1346,7 +1346,7 @@ static bool make_cyclic_if_endpoints(
           (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
       View3D *v3d = CTX_wm_view3d(C);
       ListBase *nurbs = object_editcurve_get(vc->obedit);
-      ed_curve_toggle_cyclic(v3d, nurbs, 0);
+      curve_toggle_cyclic(v3d, nurbs, 0);
       return true;
     }
   }

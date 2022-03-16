@@ -4748,7 +4748,8 @@ bool ED_curve_editnurb_select_pick_thresholded(bContext *C,
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
   copy_v2_v2_int(vc.mval, mval);
 
-  const bool found = ED_curve_pick_vert_thresholded(&vc, 1, sel_dist_mul, &nu, &bezt, &bp, &hand, &basact);
+  const bool found = ED_curve_pick_vert_thresholded(
+      &vc, 1, sel_dist_mul, &nu, &bezt, &bp, &hand, &basact);
 
   if ((params->sel_op == SEL_OP_SET) && (found || params->deselect_all)) {
     /* Deselect everything. */
@@ -5718,7 +5719,7 @@ void CURVE_OT_extrude(wmOperatorType *ot)
 /** \name Make Cyclic Operator
  * \{ */
 
-bool ed_curve_toggle_cyclic(View3D *v3d, ListBase *editnurb, int direction)
+bool curve_toggle_cyclic(View3D *v3d, ListBase *editnurb, int direction)
 {
   BezTriple *bezt;
   BPoint *bp;
@@ -5815,7 +5816,7 @@ static int toggle_cyclic_exec(bContext *C, wmOperator *op)
     }
 
     ListBase *editnurb = object_editcurve_get(obedit);
-    if (ed_curve_toggle_cyclic(v3d, editnurb, direction)) {
+    if (curve_toggle_cyclic(v3d, editnurb, direction)) {
       changed_multi = true;
       WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
       DEG_id_tag_update(obedit->data, 0);
