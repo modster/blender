@@ -74,7 +74,6 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   const Brush *brush;
   const int thread_id;
   const MVert *mvert;
-  const MLoopUV *ldata_uv;
 
   float4 brush_color;
   float brush_strength;
@@ -86,9 +85,8 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   explicit PaintingKernel(SculptSession *ss,
                           const Brush *brush,
                           const int thread_id,
-                          const MVert *mvert,
-                          const MLoopUV *ldata_uv)
-      : ss(ss), brush(brush), thread_id(thread_id), mvert(mvert), ldata_uv(ldata_uv)
+                          const MVert *mvert)
+      : ss(ss), brush(brush), thread_id(thread_id), mvert(mvert)
   {
     init_brush_color();
     init_brush_strength();
@@ -150,6 +148,23 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     brush_test_fn = SCULPT_brush_test_init_with_falloff_shape(ss, &test, brush->falloff_shape);
   }
 
+  /** Extract the staring pixel from the given encoded_pixels belonging to the triangle. */
+  Pixel get_start_pixel(const Triangle &triangle, const PixelsPackage &encoded_pixels) const
+  {
+    return init_pixel(triangle, encoded_pixels.start_barycentric_coord);
+  }
+
+  /**
+   * Extract the delta pixel that will be used to advance a Pixel instance to the next pixel. */
+  Pixel get_delta_pixel(const Triangle &triangle,
+                        const PixelsPackage &encoded_pixels,
+                        const Pixel &start_pixel) const
+  {
+    Pixel result = init_pixel(
+        triangle, encoded_pixels.start_barycentric_coord + triangle.add_barycentric_coord_x);
+    return result - start_pixel;
+  }
+
   Pixel init_pixel(const Triangle &triangle, const float3 weights) const
   {
     Pixel result;
@@ -158,26 +173,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
                      mvert[triangle.vert_indices[1]].co,
                      mvert[triangle.vert_indices[2]].co,
                      weights);
-    interp_v3_v3v3v3(result.uv,
-                     ldata_uv[triangle.loop_indices[0]].uv,
-                     ldata_uv[triangle.loop_indices[1]].uv,
-                     ldata_uv[triangle.loop_indices[2]].uv,
-                     weights);
     return result;
-  }
-
-  Pixel get_start_pixel(const Triangle &triangle, const PixelsPackage &encoded_pixels) const
-  {
-    return init_pixel(triangle, encoded_pixels.start_barycentric_coord);
-  }
-
-  Pixel get_delta_pixel(const Triangle &triangle,
-                        const PixelsPackage &encoded_pixels,
-                        const Pixel &start_pixel) const
-  {
-    Pixel result = init_pixel(
-        triangle, encoded_pixels.start_barycentric_coord + triangle.add_barycentric_coord_x);
-    return result - start_pixel;
   }
 };
 
@@ -254,9 +250,7 @@ static void do_task_cb_ex(void *__restrict userdata,
 
   const int thread_id = BLI_task_parallel_thread_id(tls);
   MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
-  Mesh *mesh = static_cast<Mesh *>(ob->data);
-  MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
-  PaintingKernel<ImagePixelAccessorFloat4> kernel(ss, brush, thread_id, mvert, ldata_uv);
+  PaintingKernel<ImagePixelAccessorFloat4> kernel(ss, brush, thread_id, mvert);
 
   int packages_clipped = 0;
   for (const PixelsPackage &encoded_pixels : node_data->encoded_pixels) {

@@ -41,13 +41,12 @@ struct PixelsPackage {
 };
 
 struct Pixel {
+  /** object local position of the pixel on the surface. */
   float3 pos;
-  float2 uv;
 
   Pixel &operator+=(const Pixel &other)
   {
     pos += other.pos;
-    uv += other.uv;
     return *this;
   }
 
@@ -55,7 +54,6 @@ struct Pixel {
   {
     Pixel result;
     result.pos = pos - other.pos;
-    result.uv = uv - other.uv;
     return result;
   }
 };
