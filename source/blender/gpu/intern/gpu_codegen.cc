@@ -595,6 +595,8 @@ GPUPass *GPU_generate_pass(GPUMaterial *material,
   /* Cache lookup: Reuse shaders already compiled. */
   GPUPass *pass_hash = gpu_pass_cache_lookup(codegen.hash_get());
 
+  /* XXX: This is preventing any pre-compilation optimization from the engine based on the
+   * GPUMaterialFlags. But not doing this makes shader update slower. */
   /* FIXME(fclem): This is broken. Since we only check for the hash and not the full source
    * there is no way to have a collision currently. Some advocated to only use a bigger hash. */
   if (pass_hash && (pass_hash->next == nullptr || pass_hash->next->hash != codegen.hash_get())) {
