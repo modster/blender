@@ -47,13 +47,13 @@ void ED_curve_editnurb_load(struct Main *bmain, struct Object *obedit);
 void ED_curve_editnurb_make(struct Object *obedit);
 void ED_curve_editnurb_free(struct Object *obedit);
 
+/**
+ * \return True when pick finds an element or the selection changed.
+ */
 bool ED_curve_editnurb_select_pick_thresholded(struct bContext *C,
                                                const int mval[2],
                                                const float sel_dist_mul,
                                                const struct SelectPick_Params *params);
-/**
- * \return True when pick finds an element or the selection changed.
- */
 bool ED_curve_editnurb_select_pick(struct bContext *C,
                                    const int mval[2],
                                    const struct SelectPick_Params *params);
