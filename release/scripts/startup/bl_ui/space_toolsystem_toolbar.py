@@ -1211,7 +1211,7 @@ class _defs_edit_curve:
             idname="builtin.pen",
             label="Curve Pen",
             cursor='CROSSHAIR',
-            icon="ops.curve.draw",
+            icon="ops.curve.pen",
             widget=None,
             keymap=(),
             draw_settings=draw_settings,
@@ -2897,6 +2897,7 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
             *_tools_default,
             None,
             _defs_edit_curve.draw,
+            _defs_edit_curve.pen,
             (
                 _defs_edit_curve.extrude,
                 _defs_edit_curve.extrude_cursor,
@@ -2907,8 +2908,6 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
             None,
             _defs_transform.shear,
             _defs_edit_curve.curve_vertex_randomize,
-            None,
-            _defs_edit_curve.pen,
         ],
         'EDIT_SURFACE': [
             *_tools_default,
