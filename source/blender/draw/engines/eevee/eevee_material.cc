@@ -148,11 +148,6 @@ MaterialModule::~MaterialModule()
 {
   for (Material *mat : material_map_.values()) {
     delete mat;
-    mat = nullptr;
-  }
-  for (DRWShadingGroup **shgroup : shader_map_.values()) {
-    delete shgroup;
-    shgroup = nullptr;
   }
   BKE_id_free(nullptr, glossy_mat_);
   BKE_id_free(nullptr, diffuse_mat_);
@@ -166,9 +161,7 @@ void MaterialModule::begin_sync(void)
   for (Material *mat : material_map_.values()) {
     mat->init = false;
   }
-  for (DRWShadingGroup **shgroup : shader_map_.values()) {
-    *shgroup = nullptr;
-  }
+  shader_map_.clear();
 }
 
 MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
@@ -219,14 +212,11 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
   else {
     ShaderKey shader_key(matpass.gpumat, geometry_type, pipeline_type);
 
-    /* TODO(fclem) allocate in blocks to avoid memory fragmentation. */
-    auto add_cb = [&]() { return new DRWShadingGroup *(); };
-    DRWShadingGroup *&grp = *shader_map_.lookup_or_add_cb(shader_key, add_cb);
-
-    if (grp == nullptr) {
+    auto add_cb = [&]() -> DRWShadingGroup * {
       /* First time encountering this shader. Create a shading group. */
-      grp = inst_.shading_passes.material_add(blender_mat, matpass.gpumat, pipeline_type);
-    }
+      return inst_.shading_passes.material_add(blender_mat, matpass.gpumat, pipeline_type);
+    };
+    DRWShadingGroup *grp = shader_map_.lookup_or_add_cb(shader_key, add_cb);
 
     if (grp != nullptr) {
       /* Shading group for this shader already exists. Create a sub one for this material. */

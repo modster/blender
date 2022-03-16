@@ -18,6 +18,7 @@
 #include "GPU_material.h"
 
 #include "eevee_engine.h"
+#include "eevee_gbuffer.hh"
 
 namespace blender::eevee {
 
@@ -247,6 +248,7 @@ struct ShaderKey {
   {
     shader = GPU_material_get_shader(gpumat);
     options = shader_uuid_from_material_type(pipeline, geometry);
+    options = (options << 16u) | extract_closure_mask(gpumat);
   }
 
   uint64_t hash(void) const
@@ -256,7 +258,7 @@ struct ShaderKey {
 
   bool operator<(const ShaderKey &k) const
   {
-    return (shader < k.shader) || (options < k.options);
+    return (shader == k.shader) ? (options < k.options) : (shader < k.shader);
   }
 
   bool operator==(const ShaderKey &k) const
