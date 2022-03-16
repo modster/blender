@@ -160,6 +160,7 @@ struct TileData {
     BKE_image_partial_update_mark_region(
         &image, image_tile.image_tile, &image_buffer, &dirty_region);
     BLI_rcti_init_minmax(&dirty_region);
+    flags.dirty = false;
   }
 };
 struct NodeData {

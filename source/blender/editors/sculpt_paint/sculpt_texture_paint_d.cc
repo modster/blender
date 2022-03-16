@@ -471,9 +471,9 @@ void SCULPT_flush_texture_paint(Object *ob)
         }
 
         data->mark_region(*image_data.image, image_tile, *image_buffer);
-        data->flags.dirty = false;
         BKE_image_release_ibuf(image, image_buffer, image_lock);
       }
+      data->flags.dirty = false;
     }
   }
 
