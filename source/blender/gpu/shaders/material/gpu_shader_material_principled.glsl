@@ -109,6 +109,7 @@ void node_bsdf_principled_eval(vec4 base_color,
                                vec3 T,
                                float weight,
                                const float do_multiscatter,
+                               float do_sss,
                                float diffuse_weight,
                                float specular_weight,
                                float glass_reflection_weight,
@@ -133,7 +134,7 @@ void node_bsdf_principled_eval(vec4 base_color,
     g_diffuse_data.color *= diffuse_weight;
     g_diffuse_data.N = N;
     g_diffuse_data.sss_radius = subsurface_radius * subsurface;
-    g_diffuse_data.sss_id = 1u;
+    g_diffuse_data.sss_id = uint(do_sss);
   }
 
   /* Reflection. */
