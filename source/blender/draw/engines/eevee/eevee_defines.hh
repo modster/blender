@@ -35,3 +35,6 @@
 #define HIZ_MIP_COUNT 6u
 /* Group size is 2x smaller because we simply copy the level 0. */
 #define HIZ_GROUP_SIZE 1u << (HIZ_MIP_COUNT - 2u)
+
+#define RAYTRACE_GROUP_SIZE 16
+#define RAYTRACE_MAX_TILES (16384 / RAYTRACE_GROUP_SIZE) * (16384 / RAYTRACE_GROUP_SIZE)

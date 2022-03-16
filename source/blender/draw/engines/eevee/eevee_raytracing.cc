@@ -31,9 +31,7 @@ void RaytracingModule::sync(void)
   reflection_data.brightness_clamp = (sce_eevee.ssr_firefly_fac < 1e-8f) ?
                                          FLT_MAX :
                                          sce_eevee.ssr_firefly_fac;
-  reflection_data.max_roughness = sce_eevee.ssr_max_roughness + 0.01f;
   reflection_data.quality = 1.0f - 0.95f * sce_eevee.ssr_quality;
-  reflection_data.bias = 0.8f + sce_eevee.ssr_quality * 0.15f;
   reflection_data.pool_offset = inst_.sampling.sample_get() / 5;
 
   refraction_data = static_cast<RaytraceData>(reflection_data);
@@ -41,9 +39,6 @@ void RaytracingModule::sync(void)
   /* TODO(fclem): Clamp option for refraction. */
   /* TODO(fclem): bias option for refraction. */
   /* TODO(fclem): bias option for refraction. */
-
-  diffuse_data = static_cast<RaytraceData>(reflection_data);
-  diffuse_data.max_roughness = 1.01f;
 
   reflection_data.push_update();
   refraction_data.push_update();
@@ -61,231 +56,179 @@ void RaytracingModule::sync(void)
 
 void RaytraceBuffer::sync(int2 extent)
 {
-  extent_ = extent;
-  dispatch_size_.x = divide_ceil_u(extent.x, 8);
-  dispatch_size_.y = divide_ceil_u(extent.y, 8);
-  dispatch_size_.z = 1;
+  ray_data_diffuse_tx_.sync();
+  ray_data_reflect_tx_.sync();
+  ray_data_refract_tx_.sync();
+  ray_radiance_diffuse_tx_.sync();
+  ray_radiance_reflect_tx_.sync();
+  ray_radiance_refract_tx_.sync();
 
-  /* Make sure the history matrix is up to date. */
-  data_.push_update();
-
-  LightProbeModule &lightprobes = inst_.lightprobes;
-  eGPUSamplerState no_interp = GPU_SAMPLER_DEFAULT;
-
-  /* The raytracing buffer contains the draw passes since it is stored per view and we need to
-   * dispatch compute shaders with the right workgroup size. */
-
-  {
-    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL;
-    std::array<DRWShadingGroup *, 3> grps;
-    bool do_rt = inst_.raytracing.enabled();
-    {
-      trace_reflection_ps_ = DRW_pass_create("TraceReflection", state);
-      GPUShader *sh = inst_.shaders.static_shader_get(do_rt ? RAYTRACE_REFLECTION :
-                                                              RAYTRACE_REFLECTION_FALLBACK);
-      grps[0] = DRW_shgroup_create(sh, trace_reflection_ps_);
-      DRW_shgroup_uniform_block(grps[0], "raytrace_buf", inst_.raytracing.reflection_data);
-      DRW_shgroup_stencil_set(grps[0], 0x0, 0x0, CLOSURE_REFLECTION);
-    }
-    {
-      trace_refraction_ps_ = DRW_pass_create("TraceRefraction", state);
-      GPUShader *sh = inst_.shaders.static_shader_get(do_rt ? RAYTRACE_REFRACTION :
-                                                              RAYTRACE_REFRACTION_FALLBACK);
-      grps[1] = DRW_shgroup_create(sh, trace_refraction_ps_);
-      DRW_shgroup_uniform_block(grps[1], "raytrace_buf", inst_.raytracing.refraction_data);
-      DRW_shgroup_stencil_set(grps[1], 0x0, 0x0, CLOSURE_REFRACTION);
-    }
-    {
-      trace_diffuse_ps_ = DRW_pass_create("TraceDiffuse", state);
-      GPUShader *sh = inst_.shaders.static_shader_get(do_rt ? RAYTRACE_DIFFUSE :
-                                                              RAYTRACE_DIFFUSE_FALLBACK);
-      grps[2] = DRW_shgroup_create(sh, trace_diffuse_ps_);
-      DRW_shgroup_uniform_block(grps[2], "raytrace_buf", inst_.raytracing.diffuse_data);
-      DRW_shgroup_stencil_set(grps[2], 0x0, 0x0, CLOSURE_DIFFUSE);
-    }
-
-    for (DRWShadingGroup *grp : grps) {
-      DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
-      DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
-      DRW_shgroup_uniform_block(grp, "cubes_buf", lightprobes.cube_ubo_get());
-      DRW_shgroup_uniform_block(grp, "probes_buf", lightprobes.info_ubo_get());
-      DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
-      DRW_shgroup_uniform_texture_ref(grp, "hiz_front_tx", &input_hiz_front_tx_);
-      DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
-      DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_radiance_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "combined_tx", &input_combined_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "cl_color_tx", &input_cl_color_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "cl_normal_tx", &input_cl_normal_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "cl_data_tx", &input_cl_data_tx_, no_interp);
-      DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
-      DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
-    }
-  }
-
-  {
-    /* Compute stage. No state needed. */
-    DRWState state = (DRWState)0;
-    std::array<DRWShadingGroup *, 3> grps;
-    {
-      denoise_reflection_ps_ = DRW_pass_create("DenoiseReflection", state);
-      GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_DENOISE_REFLECTION);
-      grps[0] = DRW_shgroup_create(sh, denoise_reflection_ps_);
-    }
-    {
-      denoise_refraction_ps_ = DRW_pass_create("DenoiseRefraction", state);
-      GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_DENOISE_REFRACTION);
-      grps[1] = DRW_shgroup_create(sh, denoise_refraction_ps_);
-    }
-    {
-      denoise_diffuse_ps_ = DRW_pass_create("DenoiseDiffuse", state);
-      GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_DENOISE_DIFFUSE);
-      grps[2] = DRW_shgroup_create(sh, denoise_diffuse_ps_);
-    }
-
-    for (DRWShadingGroup *grp : grps) {
-      /* Does not matter which raytrace_block we use. */
-      DRW_shgroup_uniform_block(grp, "raytrace_buf", inst_.raytracing.diffuse_data);
-      DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
-      DRW_shgroup_uniform_block(grp, "rtbuf_buf", data_);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "ray_data_tx", &input_ray_data_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "ray_radiance_tx", &input_ray_color_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "hiz_tx", &input_hiz_front_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "cl_color_tx", &input_cl_color_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "cl_normal_tx", &input_cl_normal_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "cl_data_tx", &input_cl_data_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref(grp, "ray_history_tx", &input_history_tx_);
-      DRW_shgroup_uniform_texture_ref(grp, "ray_variance_tx", &input_variance_tx_);
-      DRW_shgroup_uniform_image_ref(grp, "out_history_img", &output_history_tx_);
-      DRW_shgroup_uniform_image_ref(grp, "out_variance_img", &output_variance_tx_);
-      DRW_shgroup_call_compute_ref(grp, dispatch_size_);
-      DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
-    }
-  }
-
-  {
-    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL | DRW_STATE_BLEND_ADD_FULL;
-    std::array<DRWShadingGroup *, 3> grps;
-    {
-      resolve_reflection_ps_ = DRW_pass_create("ResolveReflection", state);
-      GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_RESOLVE_REFLECTION);
-      grps[0] = DRW_shgroup_create(sh, resolve_reflection_ps_);
-      DRW_shgroup_stencil_set(grps[0], 0x0, 0x0, CLOSURE_REFLECTION);
-    }
-    {
-      resolve_refraction_ps_ = DRW_pass_create("ResolveRefraction", state);
-      GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_RESOLVE_REFRACTION);
-      grps[1] = DRW_shgroup_create(sh, resolve_refraction_ps_);
-      DRW_shgroup_stencil_set(grps[1], 0x0, 0x0, CLOSURE_REFRACTION);
-    }
-    {
-      resolve_diffuse_ps_ = DRW_pass_create("ResolveDiffuse", state);
-      GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_RESOLVE_DIFFUSE);
-      grps[2] = DRW_shgroup_create(sh, resolve_diffuse_ps_);
-      DRW_shgroup_stencil_set(grps[2], 0x0, 0x0, CLOSURE_DIFFUSE);
-    }
-
-    for (DRWShadingGroup *grp : grps) {
-      DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
-      DRW_shgroup_uniform_texture_ref_ex(grp, "ray_radiance_tx", &output_history_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "ray_variance_tx", &output_variance_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "cl_color_tx", &input_cl_color_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "cl_normal_tx", &input_cl_normal_tx_, no_interp);
-      DRW_shgroup_uniform_texture_ref_ex(grp, "cl_data_tx", &input_cl_data_tx_, no_interp);
-      // DRW_shgroup_call_compute_ref(grp, dispatch_size_);
-      // DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
-      DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
-    }
-  }
-}
-
-void RaytraceBuffer::trace(eClosureBits UNUSED(closure_type),
-                           GBuffer &UNUSED(gbuffer),
-                           HiZBuffer &UNUSED(hiz),
-                           HiZBuffer &UNUSED(hiz_front))
-{
-#if 0
-  input_hiz_tx_ = hiz.texture_get();
-  input_hiz_front_tx_ = hiz_front.texture_get();
-  if (closure_type == CLOSURE_REFLECTION) {
-    input_cl_color_tx_ = gbuffer.reflect_color_tx;
-    input_cl_normal_tx_ = gbuffer.reflect_normal_tx;
-    input_cl_data_tx_ = gbuffer.reflect_normal_tx;
+  /* WORKAROUND(@fclem): Really stupid workaround to avoid the temp texture being the same
+   * as the gbuffer ones. Change the extent by adding one pixel border. This is really bad
+   * and we should rewrite the temp texture logic instead. */
+  extent_ = extent + 1;
+  if (false /* halfres */) {
+    extent_.x = divide_ceil_u(extent_.x, 2);
+    extent_.y = divide_ceil_u(extent_.y, 2);
+    data_.res_scale = 2;
   }
   else {
-    input_cl_color_tx_ = gbuffer.transmit_color_tx;
-    input_cl_normal_tx_ = gbuffer.transmit_normal_tx;
-    input_cl_data_tx_ = gbuffer.transmit_data_tx;
+    data_.res_scale = 1;
   }
 
-  switch (closure_type) {
-    default:
-    case CLOSURE_REFLECTION:
-      input_radiance_tx_ = gbuffer.combined_tx;
-      DRW_draw_pass(trace_reflection_ps_);
-      break;
-    case CLOSURE_REFRACTION:
-      input_radiance_tx_ = gbuffer.combined_tx;
-      DRW_draw_pass(trace_refraction_ps_);
-      break;
-    case CLOSURE_DIFFUSE:
-      input_radiance_tx_ = gbuffer.diffuse_tx;
-      input_combined_tx_ = gbuffer.combined_tx;
-      DRW_draw_pass(trace_diffuse_ps_);
-      break;
+  raygen_dispatch_size_.x = divide_ceil_u(extent_.x, RAYTRACE_GROUP_SIZE);
+  raygen_dispatch_size_.y = divide_ceil_u(extent_.y, RAYTRACE_GROUP_SIZE);
+  raygen_dispatch_size_.z = 1;
+
+  GBuffer &gbuf = inst_.gbuffer;
+
+  {
+    /* Output rays and tile lists. */
+    raygen_ps_ = DRW_pass_create("Raygen", (DRWState)0);
+    GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_RAYGEN);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, raygen_ps_);
+    DRW_shgroup_storage_block(grp, "dispatch_diffuse_buf", dispatch_diffuse_buf_);
+    DRW_shgroup_storage_block(grp, "dispatch_reflect_buf", dispatch_reflect_buf_);
+    DRW_shgroup_storage_block(grp, "dispatch_refract_buf", dispatch_refract_buf_);
+    DRW_shgroup_storage_block(grp, "tiles_diffuse_buf", tiles_diffuse_buf_);
+    DRW_shgroup_storage_block(grp, "tiles_reflect_buf", tiles_reflect_buf_);
+    DRW_shgroup_storage_block(grp, "tiles_refract_buf", tiles_refract_buf_);
+    DRW_shgroup_uniform_texture_ref(grp, "gbuf_transmit_data_tx", &gbuf.transmit_data_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "gbuf_transmit_normal_tx", &gbuf.transmit_normal_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "gbuf_reflection_normal_tx", &gbuf.reflect_normal_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &depth_view_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "stencil_tx", &stencil_view_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_ray_data_diffuse", &ray_data_diffuse_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_ray_data_reflect", &ray_data_reflect_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_ray_data_refract", &ray_data_refract_tx_);
+    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
+    DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "raytrace_buffer_buf", data_);
+    DRW_shgroup_call_compute_ref(grp, raygen_dispatch_size_);
   }
 
-  input_ray_data_tx_ = gbuffer.ray_data_tx;
-  input_ray_color_tx_ = gbuffer.ray_radiance_tx;
-#endif
+  trace_diffuse_ps_ = sync_raytrace_pass("RayDiff",
+                                         RAYTRACE_SCREEN_REFLECT,
+                                         inst_.hiz_front,
+                                         ray_data_diffuse_tx_,
+                                         ray_radiance_diffuse_tx_,
+                                         dispatch_diffuse_buf_,
+                                         tiles_diffuse_buf_);
+
+  trace_reflect_ps_ = sync_raytrace_pass("RayRefl",
+                                         RAYTRACE_SCREEN_REFLECT,
+                                         inst_.hiz_front,
+                                         ray_data_reflect_tx_,
+                                         ray_radiance_reflect_tx_,
+                                         dispatch_reflect_buf_,
+                                         tiles_reflect_buf_);
+
+  trace_refract_ps_ = sync_raytrace_pass("RayRefr",
+                                         RAYTRACE_SCREEN_REFRACT,
+                                         inst_.hiz_back,
+                                         ray_data_refract_tx_,
+                                         ray_radiance_refract_tx_,
+                                         dispatch_refract_buf_,
+                                         tiles_refract_buf_);
 }
 
-void RaytraceBuffer::denoise(eClosureBits UNUSED(closure_type))
+DRWPass *RaytraceBuffer::sync_raytrace_pass(const char *name,
+                                            eShaderType screen_trace_sh,
+                                            HiZBuffer &hiz_tracing,
+                                            TextureFromPool &ray_data_tx,
+                                            TextureFromPool &ray_radiance_tx,
+                                            RaytraceIndirectBuf &dispatch_buf,
+                                            RaytraceTileBuf &tile_buf)
 {
-#if 0
-  switch (closure_type) {
-    default:
-    case CLOSURE_REFLECTION:
-      input_history_tx_ = reflection_radiance_history_get();
-      input_variance_tx_ = reflection_variance_history_get();
-      output_history_tx_ = reflection_radiance_get();
-      output_variance_tx_ = reflection_variance_get();
-      DRW_draw_pass(denoise_reflection_ps_);
-      break;
-    case CLOSURE_REFRACTION:
-      input_history_tx_ = refraction_radiance_history_get();
-      input_variance_tx_ = refraction_variance_history_get();
-      output_history_tx_ = refraction_radiance_get();
-      output_variance_tx_ = refraction_variance_get();
-      DRW_draw_pass(denoise_refraction_ps_);
-      break;
-    case CLOSURE_DIFFUSE:
-      input_history_tx_ = diffuse_radiance_history_get();
-      input_variance_tx_ = diffuse_variance_history_get();
-      output_history_tx_ = diffuse_radiance_get();
-      output_variance_tx_ = diffuse_variance_get();
-      DRW_draw_pass(denoise_diffuse_ps_);
-      break;
+  LightProbeModule &lightprobes = inst_.lightprobes;
+
+  DRWPass *pass = DRW_pass_create(name, (DRWState)0);
+  /* Workaround when the tracing dispatch size can be higher than the max work group count in the
+   * X dimension. */
+  if ((raygen_dispatch_size_.x * raygen_dispatch_size_.y) > GPU_max_work_group_count(0)) {
+    GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_DISPATCH);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, pass);
+    DRW_shgroup_storage_block(grp, "dispatch_buf", dispatch_buf);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_STORAGE);
+    DRW_shgroup_call_compute(grp, 1, 1, 1);
   }
-#endif
+  {
+    GPUShader *sh = inst_.shaders.static_shader_get(screen_trace_sh);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, pass);
+    DRW_shgroup_storage_block(grp, "dispatch_buf", dispatch_buf);
+    DRW_shgroup_storage_block(grp, "tiles_buf", tile_buf);
+    DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_block(grp, "raytrace_buffer_buf", data_);
+    DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", hiz_tracing.texture_ref_get());
+    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &depth_view_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "inout_ray_data", &ray_data_tx);
+    DRW_shgroup_uniform_image_ref(grp, "out_ray_radiance", &ray_radiance_tx);
+    DRW_shgroup_uniform_block(grp, "grids_buf", lightprobes.grid_ubo_get());
+    DRW_shgroup_uniform_block(grp, "cubes_buf", lightprobes.cube_ubo_get());
+    DRW_shgroup_uniform_block(grp, "probes_buf", lightprobes.info_ubo_get());
+    DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
+    DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
+    DRW_shgroup_call_compute_indirect(grp, dispatch_buf);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
+  }
+  return pass;
 }
 
-void RaytraceBuffer::resolve(eClosureBits UNUSED(closure_type), GBuffer &UNUSED(gbuffer))
+void RaytraceBuffer::trace(eClosureBits closure_type,
+                           Texture &depth_buffer,
+                           DeferredPass &deferred_pass)
 {
-#if 0
-  gbuffer.bind_radiance();
-  switch (closure_type) {
-    default:
-    case CLOSURE_REFLECTION:
-      DRW_draw_pass(resolve_reflection_ps_);
-      break;
-    case CLOSURE_REFRACTION:
-      DRW_draw_pass(resolve_refraction_ps_);
-      break;
-    case CLOSURE_DIFFUSE:
-      DRW_draw_pass(resolve_diffuse_ps_);
-      break;
+  GPU_storagebuf_clear_to_zero(dispatch_diffuse_buf_);
+  GPU_storagebuf_clear_to_zero(dispatch_reflect_buf_);
+  GPU_storagebuf_clear_to_zero(dispatch_refract_buf_);
+
+  /* TODO(fclem): Rotate depending on sample. */
+  data_.res_bias = int2(0);
+  data_.push_update();
+
+  bool do_diffuse = bool(closure_type & CLOSURE_DIFFUSE);
+  bool do_reflect = bool(closure_type & CLOSURE_REFLECTION);
+  bool do_refract = bool(closure_type & CLOSURE_REFRACTION);
+  ray_data_diffuse_tx_.acquire(do_diffuse ? extent_ : int2(1), GPU_RGBA16F, (void *)this);
+  ray_data_reflect_tx_.acquire(do_reflect ? extent_ : int2(1), GPU_RGBA16F, (void *)this);
+  ray_data_refract_tx_.acquire(do_refract ? extent_ : int2(1), GPU_RGBA16F, (void *)this);
+  ray_radiance_diffuse_tx_.acquire(do_diffuse ? extent_ : int2(1), GPU_RGBA16F, (void *)this);
+  ray_radiance_reflect_tx_.acquire(do_reflect ? extent_ : int2(1), GPU_RGBA16F, (void *)this);
+  ray_radiance_refract_tx_.acquire(do_refract ? extent_ : int2(1), GPU_RGBA16F, (void *)this);
+
+  depth_view_tx_ = depth_buffer;
+  stencil_view_tx_ = depth_buffer.stencil_view();
+
+  DRW_draw_pass(raygen_ps_);
+  if (do_diffuse) {
+    DRW_draw_pass(trace_diffuse_ps_);
   }
-#endif
+  if (do_reflect) {
+    DRW_draw_pass(trace_reflect_ps_);
+  }
+  if (do_refract) {
+    DRW_draw_pass(trace_refract_ps_);
+  }
+
+  /* Pass deferred pass arguments. */
+  deferred_pass.ray_buffer_ubo_ = data_;
+  deferred_pass.ray_data_diffuse_tx_ = ray_data_diffuse_tx_;
+  deferred_pass.ray_data_reflect_tx_ = ray_data_reflect_tx_;
+  deferred_pass.ray_data_refract_tx_ = ray_data_refract_tx_;
+  deferred_pass.ray_radiance_diffuse_tx_ = ray_radiance_diffuse_tx_;
+  deferred_pass.ray_radiance_reflect_tx_ = ray_radiance_reflect_tx_;
+  deferred_pass.ray_radiance_refract_tx_ = ray_radiance_refract_tx_;
+}
+
+void RaytraceBuffer::release_tmp()
+{
+  ray_data_diffuse_tx_.release();
+  ray_data_reflect_tx_.release();
+  ray_data_refract_tx_.release();
+  ray_radiance_diffuse_tx_.release();
+  ray_radiance_reflect_tx_.release();
+  ray_radiance_refract_tx_.release();
 }
 
 /** \} */

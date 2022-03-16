@@ -48,9 +48,9 @@ target_include_directories(eevee_build PRIVATE ${INC})
 
 add_custom_command(
   OUTPUT
-    ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl
+    ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_denoise_lib.glsl
   COMMAND
-    "$<TARGET_FILE:eevee_build>" --resolve_sample_table ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl
+    "$<TARGET_FILE:eevee_build>" --resolve_sample_table ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_denoise_lib.glsl
   DEPENDS eevee_build
 )
 
@@ -318,9 +318,11 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_motion_blur_tiles_flatten_frag.glsl
   engines/eevee/shaders/eevee_nodetree_eval_lib.glsl
   engines/eevee/shaders/eevee_raytrace_denoise_comp.glsl
-  engines/eevee/shaders/eevee_raytrace_raygen_frag.glsl
+  engines/eevee/shaders/eevee_raytrace_dispatch_comp.glsl
+  engines/eevee/shaders/eevee_raytrace_raygen_comp.glsl
   engines/eevee/shaders/eevee_raytrace_raygen_lib.glsl
-  engines/eevee/shaders/eevee_raytrace_resolve_frag.glsl
+  engines/eevee/shaders/eevee_raytrace_resolve_lib.glsl
+  engines/eevee/shaders/eevee_raytrace_screen_comp.glsl
   engines/eevee/shaders/eevee_raytrace_trace_lib.glsl
   engines/eevee/shaders/eevee_sampling_lib.glsl
   engines/eevee/shaders/eevee_shadow_debug_frag.glsl
@@ -561,10 +563,10 @@ endforeach()
 
 # Generated shader files
 # TODO(@fclem): Clean that by wrapping it into a function.
-data_to_c(${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl.c GLSL_C)
+data_to_c(${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_denoise_lib.glsl ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_denoise_lib.glsl.c GLSL_C)
 
 list(APPEND GLSL_SRC
-  ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl
+  ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_denoise_lib.glsl
 )
 
 blender_add_lib(bf_draw_shaders "${GLSL_C}" "" "" "")

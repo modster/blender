@@ -67,7 +67,7 @@ void main(void)
   vec2 sample_scale = vec2(ProjectionMatrix[0][0], ProjectionMatrix[1][1]) *
                       (0.5 * max_radius / homcoord);
 
-  float pixel_footprint = sample_scale.x * float(textureSize(radiance_tx, 0).x);
+  float pixel_footprint = sample_scale.x * drw_view.viewport_size.x;
   if (pixel_footprint <= 1.0) {
     /* Early out. */
     out_combined = vec4(texture(radiance_tx, center_uv).rgb * diffuse.color, 0.0);

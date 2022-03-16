@@ -35,14 +35,19 @@ vec2 gbuffer_encode_normal(vec3 normal)
   return (neg) ? -packed_normal : packed_normal;
 }
 
-vec3 gbuffer_decode_normal(vec2 packed_normal)
+vec3 gbuffer_decode_normal_view(vec2 packed_normal)
 {
   bool neg = packed_normal.y < 0.0;
   vec3 vN = normal_decode(abs(packed_normal));
   if (neg) {
     vN.z = -vN.z;
   }
-  return normal_view_to_world(vN);
+  return vN;
+}
+
+vec3 gbuffer_decode_normal(vec2 packed_normal)
+{
+  return normal_view_to_world(gbuffer_decode_normal_view(packed_normal));
 }
 
 /* Note: does not handle negative colors. */

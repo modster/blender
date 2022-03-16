@@ -14,13 +14,23 @@ void main(void)
 {
   g_data = init_globals();
 
-  float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_CLOSURE);
   float noise = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
+  float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_CLOSURE);
   g_data.closure_rand = fract(noise + noise_offset);
-  /* TODO(fclem) other RNG. */
-  g_data.transmit_rand = fract(g_data.closure_rand * 6.1803398875);
+  g_data.transmit_rand = -1.0;
+
+#if 0 /* TODO. */
+  nodetree_volume();
+
+  output_renderpass(rpass_volume_light, vec4(, 0.0));
+#endif
 
   float thickness = nodetree_thickness();
+
+  /* TODO(fclem) other RNG. */
+  /* NOTE(fclem): This needs to be just before nodetree_surface in order to not be ovewritten by
+   * other nodetree evaluations. */
+  g_data.transmit_rand = fract(g_data.closure_rand * 6.1803398875);
 
   nodetree_surface();
 
@@ -44,13 +54,7 @@ void main(void)
 #endif
   out_radiance = vec4(g_emission_data.emission, g_transparency_data.holdout);
 
-#ifdef MATERIAL_EMISSION
-  output_renderpass(rpass_emission, transmittance, vec4(g_emission_data.emission, 0.0));
-#endif
-
-#ifdef MATERIAL_VOLUME
-  output_renderpass(rpass_volume_light, transmittance, vec4(, 0.0));
-#endif
+  output_renderpass(rpass_emission, vec4(g_emission_data.emission, 0.0));
 
   if (gl_FrontFacing) {
     g_refraction_data.ior = safe_rcp(g_refraction_data.ior);
@@ -60,6 +64,10 @@ void main(void)
   g_reflection_data.N = ensure_valid_reflection(g_data.Ng, V, g_reflection_data.N);
 
   ivec2 out_texel = ivec2(gl_FragCoord.xy);
+
+  if (true) {
+    imageStore(gbuff_emission, out_texel, vec4(g_emission_data.emission, 0.0));
+  }
 
   if (true) {
     vec4 out_color;

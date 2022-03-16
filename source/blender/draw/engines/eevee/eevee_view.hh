@@ -60,10 +60,10 @@ class ShadingView {
 
   /** Owned resources. */
   Framebuffer view_fb_;
+  Texture depth_tx_;
   /** Draw resources. Not owned. */
-  GPUTexture *combined_tx_ = nullptr;
-  GPUTexture *depth_tx_ = nullptr;
-  GPUTexture *postfx_tx_ = nullptr;
+  TextureFromPool combined_tx_;
+  TextureFromPool postfx_tx_;
 
   /** Main views is created from the camera (or is from the viewport). It is not jittered. */
   DRWView *main_view_ = nullptr;
@@ -148,7 +148,7 @@ class LightProbeView {
             const float4x4 &viewmat,
             bool is_only_background);
 
-  void render(GPUTexture *depth_tx);
+  void render(Texture &depth_tx);
 };
 
 /** \} */

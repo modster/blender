@@ -10,8 +10,9 @@
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_light_eval_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_raytrace_resolve_lib.glsl)
 
-void main(void)
+void main()
 {
   ivec2 texel = ivec2(gl_FragCoord.xy);
   float gbuffer_depth = texelFetch(hiz_tx, texel, 0).r;
@@ -27,31 +28,42 @@ void main(void)
   vec4 ref_nor_in = texelFetch(reflect_normal_tx, texel, 0);
 
   ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
+  ClosureRefraction refraction = gbuffer_load_refraction_data(tra_col_in, tra_nor_in, tra_dat_in);
   ClosureReflection reflection = gbuffer_load_reflection_data(ref_col_in, ref_nor_in);
 
   float thickness;
   gbuffer_load_global_data(tra_nor_in, thickness);
 
-  float noise_offset = sampling_rng_1D_get(sampling_buf, SAMPLING_LIGHTPROBE);
-  float noise = utility_tx_fetch(utility_tx, gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
-  float random_probe = fract(noise + noise_offset);
-
   vec3 radiance_diffuse = vec3(0);
-  vec3 radiance_reflection = vec3(0);
-  vec3 R = -reflect(V, reflection.N);
+  vec3 radiance_reflect = vec3(0);
+  vec3 radiance_refract = vec3(0);
 
-  light_eval(diffuse, reflection, P, V, vP.z, thickness, radiance_diffuse, radiance_reflection);
+  light_eval(diffuse, reflection, P, V, vP.z, thickness, radiance_diffuse, radiance_reflect);
+
+  if (tra_nor_in.z != -1.0) {
+    radiance_diffuse += raytrace_resolve(
+        texel, 3, 1.5, transmit_normal_tx, ray_data_diffuse_tx, ray_radiance_diffuse_tx);
+  }
+  else {
+    radiance_refract += raytrace_resolve(
+        texel, 1, 0.64, transmit_normal_tx, ray_data_refract_tx, ray_radiance_refract_tx);
+  }
+  if (true) {
+    radiance_reflect += raytrace_resolve(
+        texel, 1, 0.65, reflect_normal_tx, ray_data_reflect_tx, ray_radiance_reflect_tx);
+  }
 
   out_combined = vec4(0.0);
-  out_combined.xyz += radiance_reflection * reflection.color;
+  out_combined.xyz += radiance_reflect * reflection.color;
+  out_combined.xyz += radiance_refract * refraction.color;
+
+  // output_renderpass(rpass_specular_light, vec3(1.0), out_combined);
+  // output_renderpass(rpass_diffuse_light, vec3(1.0), vec4(radiance_diffuse, 0.0));
 
   if (diffuse.sss_id != 0u) {
-    // imageStore(sss_radiance, texel, vec4(radiance_diffuse, float(diffuse.sss_id % 1024)));
+    imageStore(sss_radiance, texel, vec4(radiance_diffuse, float(diffuse.sss_id % 1024)));
   }
   else {
     out_combined.xyz += radiance_diffuse * diffuse.color;
   }
-
-  // output_renderpass(rpass_diffuse_light, vec3(1.0), vec4(radiance_diffuse, 0.0));
-  // output_renderpass(rpass_specular_light, vec3(1.0), vec4(radiance_reflection, 0.0));
 }

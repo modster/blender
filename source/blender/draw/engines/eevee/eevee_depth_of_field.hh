@@ -136,6 +136,11 @@ class DepthOfField {
    * is in intput_tx. */
   void render(GPUTexture *depth_tx, GPUTexture **input_tx, GPUTexture **output_tx);
 
+  bool postfx_enabled() const
+  {
+    return fx_radius_ > 0.0f;
+  }
+
  private:
   void bokeh_lut_pass_sync(void);
   void bokeh_lut_pass_render(void);

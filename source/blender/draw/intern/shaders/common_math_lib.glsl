@@ -121,6 +121,8 @@ void set_flag_from_test(inout int value, bool test, int flag) { if (test) { valu
   (all(greaterThanEqual(val, min_v)) && all(lessThanEqual(val, max_v)))
 #define in_range_exclusive(val, min_v, max_v) \
   (all(greaterThan(val, min_v)) && all(lessThan(val, max_v)))
+#define in_texture_range(texel, tex) \
+  (all(greaterThanEqual(texel, ivec2(0))) && all(lessThan(texel, textureSize(tex, 0).xy)))
 
 uint divide_ceil_u(uint visible_count, uint divisor)
 {

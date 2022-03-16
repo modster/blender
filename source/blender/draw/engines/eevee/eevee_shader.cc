@@ -172,30 +172,14 @@ const char *ShaderModule::static_shader_create_info_name_get(eShaderType shader_
     case MOTION_BLUR_TILE_FLATTEN:
       return "eevee_motion_blur_tiles_flatten";
 
-    case RAYTRACE_DIFFUSE:
-      return "eevee_raytrace_raygen_diffuse";
-    case RAYTRACE_REFLECTION:
-      return "eevee_raytrace_raygen_reflection";
-    case RAYTRACE_REFRACTION:
-      return "eevee_raytrace_raygen_refraction";
-    case RAYTRACE_DIFFUSE_FALLBACK:
-      return "eevee_raytrace_raygen_fallback_diffuse";
-    case RAYTRACE_REFLECTION_FALLBACK:
-      return "eevee_raytrace_raygen_fallback_reflection";
-    case RAYTRACE_REFRACTION_FALLBACK:
-      return "eevee_raytrace_raygen_fallback_refraction";
-    case RAYTRACE_DENOISE_DIFFUSE:
-      return "eevee_raytrace_denoise_diffuse";
-    case RAYTRACE_DENOISE_REFLECTION:
-      return "eevee_raytrace_denoise_reflection";
-    case RAYTRACE_DENOISE_REFRACTION:
-      return "eevee_raytrace_denoise_refraction";
-    case RAYTRACE_RESOLVE_DIFFUSE:
-      return "eevee_raytrace_resolve_diffuse";
-    case RAYTRACE_RESOLVE_REFLECTION:
-      return "eevee_raytrace_resolve_reflection";
-    case RAYTRACE_RESOLVE_REFRACTION:
-      return "eevee_raytrace_resolve_refraction";
+    case RAYTRACE_RAYGEN:
+      return "eevee_raytrace_raygen";
+    case RAYTRACE_DISPATCH:
+      return "eevee_raytrace_dispatch";
+    case RAYTRACE_SCREEN_REFLECT:
+      return "eevee_raytrace_screen_reflect";
+    case RAYTRACE_SCREEN_REFRACT:
+      return "eevee_raytrace_screen_refract";
 
     case SHADOW_DEBUG:
       return "eevee_shadow_debug";

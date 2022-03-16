@@ -133,10 +133,10 @@ void main(void)
   vec3 radiance_accum = vec3(0.0);
   float weight_accum = 0.0;
   for (int i = 0; i < sample_count; i++, sample_id++) {
-    vec2 sample_uv = uv + resolve_sample_offsets[sample_id] * texel_size;
+    ivec2 sample_texel = texel + resolve_sample_offsets[sample_id];
 
-    vec4 ray_data = texture(ray_data_tx, sample_uv);
-    vec4 ray_radiance = texture(ray_radiance_tx, sample_uv);
+    vec4 ray_data = texelFetch(ray_data_tx, sample_texel, 0);
+    vec4 ray_radiance = texelFetch(ray_radiance_tx, sample_texel, 0);
 
     vec3 vR = normalize(ray_data.xyz);
     float ray_pdf_inv = ray_data.w;
@@ -147,7 +147,7 @@ void main(void)
 
     /* Slide 54. */
 #if defined(DIFFUSE)
-    float bsdf = saturate(dot(vN, vR));
+    float bsdf = bsdf_lambert(vN, vR);
 #elif defined(REFRACTION)
     float bsdf = btdf_ggx(vN, vR, vV, roughness_sqr, refraction.ior);
 #else

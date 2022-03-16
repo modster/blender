@@ -740,13 +740,33 @@ BLI_STATIC_ASSERT_ALIGN(HiZData, 16)
 /** \name Raytracing
  * \{ */
 
+/** NOTE: Theses are used as stencil bits. So we are limited to 8bits. */
+enum eClosureBits : uint32_t {
+  CLOSURE_DIFFUSE = (1u << 0u),
+  CLOSURE_SSS = (1u << 1u),
+  CLOSURE_REFLECTION = (1u << 2u),
+  CLOSURE_REFRACTION = (1u << 3u),
+  CLOSURE_AMBIENT_OCCLUSION = (1u << 5u),
+  /* Non-stencil bits. */
+  CLOSURE_TRANSPARENCY = (1u << 8u),
+  CLOSURE_EMISSION = (1u << 9u),
+  CLOSURE_HOLDOUT = (1u << 10u),
+  CLOSURE_VOLUME = (1u << 11u),
+};
+
+struct DispatchIndirectCommand {
+  uint num_groups_x;
+  uint num_groups_y;
+  uint num_groups_z;
+  /** Used as general purpose counter. */
+  uint tile_count;
+};
+
 struct RaytraceData {
   /** View space thickness the objects.  */
   float thickness;
   /** Determine how fast the sample steps are getting bigger. */
   float quality;
-  /** Importance sample bias. Lower values will make the render less noisy. */
-  float bias;
   /** Maximum brightness during lighting evaluation. */
   float brightness_clamp;
   /** Maximum roughness for which we will trace a ray. */
@@ -755,6 +775,7 @@ struct RaytraceData {
   int pool_offset;
   int _pad0;
   int _pad1;
+  int _pad2;
 };
 BLI_STATIC_ASSERT_ALIGN(RaytraceData, 16)
 
@@ -765,9 +786,13 @@ struct RaytraceBufferData {
   bool1 valid_history_diffuse;
   bool1 valid_history_reflection;
   bool1 valid_history_refraction;
+  /** Scale and bias to go from raytrace resolution to input resolution. */
+  int res_scale;
+  int2 res_bias;
   int _pad0;
+  int _pad1;
 };
-BLI_STATIC_ASSERT_ALIGN(RaytraceData, 16)
+BLI_STATIC_ASSERT_ALIGN(RaytraceBufferData, 16)
 
 /** \} */
 
@@ -850,6 +875,8 @@ using LightProbeFilterDataBuf = draw::UniformBuffer<LightProbeFilterData>;
 using LightProbeInfoDataBuf = draw::UniformBuffer<LightProbeInfoData>;
 using RaytraceBufferDataBuf = draw::UniformBuffer<RaytraceBufferData>;
 using RaytraceDataBuf = draw::UniformBuffer<RaytraceData>;
+using RaytraceIndirectBuf = draw::StorageBuffer<DispatchIndirectCommand>;
+using RaytraceTileBuf = draw::StorageArrayBuffer<uint, RAYTRACE_MAX_TILES, true>;
 using ShadowDataBuf = draw::StorageArrayBuffer<ShadowData, CULLING_BATCH_SIZE>;
 using ShadowDebugDataBuf = draw::UniformBuffer<ShadowDebugData>;
 using ShadowPagesInfoDataBuf = draw::StorageBuffer<ShadowPagesInfoData, true>;

@@ -762,14 +762,23 @@ class TextureFromPool : public Texture, NonMovable {
   /* Always use `release()` after rendering and `sync()` in sync phase. */
   void acquire(int2 extent, eGPUTextureFormat format, void *owner_)
   {
-    if (this->tx_ == nullptr) {
-      if (tx_tmp_saved_ != nullptr) {
+    BLI_assert(this->tx_ == nullptr);
+    if (this->tx_ != nullptr) {
+      return;
+    }
+    if (tx_tmp_saved_ != nullptr) {
+      if (GPU_texture_width(tx_tmp_saved_) != extent.x ||
+          GPU_texture_height(tx_tmp_saved_) != extent.y ||
+          GPU_texture_format(tx_tmp_saved_) != format) {
+        this->tx_tmp_saved_ = nullptr;
+      }
+      else {
         this->tx_ = tx_tmp_saved_;
         return;
       }
-      DrawEngineType *owner = (DrawEngineType *)owner_;
-      this->tx_ = DRW_texture_pool_query_2d(UNPACK2(extent), format, owner);
     }
+    DrawEngineType *owner = (DrawEngineType *)owner_;
+    this->tx_ = DRW_texture_pool_query_2d(UNPACK2(extent), format, owner);
   }
 
   void release(void)
@@ -800,6 +809,9 @@ class TextureFromPool : public Texture, NonMovable {
   bool ensure_cube_array(int, int, int, eGPUTextureFormat, float *) = delete;
   void filter_mode(bool) = delete;
   void free() = delete;
+  GPUTexture *mip_view(int) = delete;
+  GPUTexture *layer_view(int) = delete;
+  GPUTexture *stencil_view() = delete;
 };
 
 /** \} */

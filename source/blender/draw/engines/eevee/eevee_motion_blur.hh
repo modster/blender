@@ -138,6 +138,11 @@ class MotionBlur {
               GPUTexture *velocity_tx,
               GPUTexture **input_tx,
               GPUTexture **output_tx);
+
+  bool enabled() const
+  {
+    return enabled_;
+  }
 };
 
 /** \} */

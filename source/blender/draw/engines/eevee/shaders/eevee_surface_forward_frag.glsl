@@ -64,7 +64,10 @@ void main(void)
   {
     float pdf; /* UNUSED */
     bool hit = false;
-    Ray ray = raytrace_create_diffuse_ray(sampling_buf, noise_rt.xy, g_diffuse_data, P, pdf);
+
+    Ray ray;
+    ray.origin = P;
+    ray.direction = raytrace_diffuse_direction(sampling_buf, noise_rt.xy, g_diffuse_data, pdf);
     ray = raytrace_world_ray_to_view(ray);
 #ifdef SCREEN_RAYTRACE
     /* Extend the ray to cover the whole view. */
@@ -86,15 +89,17 @@ void main(void)
     float pdf; /* UNUSED */
     bool hit = false;
     float roughness = g_reflection_data.roughness;
-    Ray ray = raytrace_create_reflection_ray(
-        sampling_buf, noise_rt.xy, g_reflection_data, V, P, pdf);
+    Ray ray;
+    ray.origin = P;
+    ray.direction = raytrace_reflection_direction(
+        sampling_buf, noise_rt.xy, g_reflection_data, V, pdf);
     ray = raytrace_world_ray_to_view(ray);
 #ifdef SCREEN_RAYTRACE
-    if (roughness - noise_rt.z * 0.2 < raytrace_reflection.max_roughness) {
+    if (roughness - noise_rt.z * 0.2 < raytrace_reflect_buf.max_roughness) {
       /* Extend the ray to cover the whole view. */
       ray.direction *= 1e16;
       hit = raytrace_screen(
-          raytrace_reflection, hiz_buf, hiz_tx, noise_rt.w, roughness, false, true, ray);
+          raytrace_reflect_buf, hiz_buf, hiz_tx, noise_rt.w, roughness, false, true, ray);
     }
     if (hit) {
       vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);
@@ -113,16 +118,18 @@ void main(void)
     float pdf; /* UNUSED */
     bool hit = false;
     float roughness = g_refraction_data.roughness;
-    Ray ray = raytrace_create_refraction_ray(
-        sampling_buf, noise_rt.xy, g_refraction_data, V, P, pdf);
+    Ray ray;
+    ray.origin = P;
+    ray.direction = raytrace_refraction_direction(
+        sampling_buf, noise_rt.xy, g_refraction_data, V, pdf);
     ray = raytrace_world_ray_to_view(ray);
 #ifdef SCREEN_RAYTRACE
-    if (roughness - noise_rt.z * 0.2 < raytrace_refraction.max_roughness) {
+    if (roughness - noise_rt.z * 0.2 < raytrace_refract_buf.max_roughness) {
       /* Extend the ray to cover the whole view. */
       ray.direction *= 1e16;
       /* TODO(fclem): Take IOR into account in the roughness LOD bias. */
       hit = raytrace_screen(
-          raytrace_refraction, hiz_buf, hiz_tx, noise_rt.w, roughness, false, true, ray);
+          raytrace_refract_buf, hiz_buf, hiz_tx, noise_rt.w, roughness, false, true, ray);
     }
     if (hit) {
       vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);

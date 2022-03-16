@@ -9,8 +9,8 @@
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 
 /* Returns viewspace ray. */
-Ray raytrace_create_reflection_ray(
-    SamplingData data, vec2 noise, ClosureReflection reflection, vec3 V, vec3 P, out float pdf)
+vec3 raytrace_reflection_direction(
+    SamplingData data, vec2 noise, ClosureReflection reflection, vec3 V, out float pdf)
 {
   vec2 noise_offset = sampling_rng_2D_get(data, SAMPLING_RAYTRACE_U);
   vec3 Xi = sample_cylinder(fract(noise_offset + noise));
@@ -23,15 +23,11 @@ Ray raytrace_create_reflection_ray(
 
   vec3 T, B, N = reflection.N;
   make_orthonormal_basis(N, T, B);
-
-  Ray ray;
-  ray.origin = P;
-  ray.direction = sample_ggx_reflect(Xi, roughness_sqr, V, N, T, B, pdf);
-  return ray;
+  return sample_ggx_reflect(Xi, roughness_sqr, V, N, T, B, pdf);
 }
 
-Ray raytrace_create_refraction_ray(
-    SamplingData data, vec2 noise, ClosureRefraction refraction, vec3 V, vec3 P, out float pdf)
+vec3 raytrace_refraction_direction(
+    SamplingData data, vec2 noise, ClosureRefraction refraction, vec3 V, out float pdf)
 {
   vec2 noise_offset = sampling_rng_2D_get(data, SAMPLING_RAYTRACE_U);
   vec3 Xi = sample_cylinder(fract(noise_offset + noise));
@@ -41,17 +37,16 @@ Ray raytrace_create_refraction_ray(
   if (refraction.roughness < 0.0016) {
     Xi = vec3(0.0);
   }
+
   vec3 T, B, N = refraction.N;
   make_orthonormal_basis(N, T, B);
-
-  Ray ray;
-  ray.origin = P;
-  ray.direction = sample_ggx_refract(Xi, roughness_sqr, refraction.ior, V, N, T, B, pdf);
-  return ray;
+  return sample_ggx_refract(Xi, roughness_sqr, refraction.ior, V, N, T, B, pdf);
 }
 
-Ray raytrace_create_diffuse_ray(
-    SamplingData data, vec2 noise, ClosureDiffuse diffuse, vec3 P, out float pdf)
+vec3 raytrace_diffuse_direction(SamplingData data,
+                                vec2 noise,
+                                ClosureDiffuse diffuse,
+                                out float pdf)
 {
   vec2 noise_offset = sampling_rng_2D_get(data, SAMPLING_RAYTRACE_U);
   vec3 Xi = sample_cylinder(fract(noise_offset + noise));
@@ -62,10 +57,7 @@ Ray raytrace_create_diffuse_ray(
   vec3 T, B, N = diffuse.N;
   make_orthonormal_basis(N, T, B);
 
-  Ray ray;
-  ray.origin = P;
-  ray.direction = sample_cosine_hemisphere(Xi, N, T, B, pdf);
-  return ray;
+  return sample_cosine_hemisphere(Xi, N, T, B, pdf);
 }
 
 Ray raytrace_world_ray_to_view(Ray ray)

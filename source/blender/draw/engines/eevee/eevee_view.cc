@@ -85,19 +85,8 @@ void ShadingView::sync(int2 render_extent_)
   inst_.hiz_front.view_sync(extent_);
   inst_.gbuffer.view_sync(extent_);
 
-  {
-    /* Query temp textures and create framebuffers. */
-    /* HACK: View name should be unique and static.
-     * With this, we can reuse the same texture across views. */
-    DrawEngineType *owner = (DrawEngineType *)name_;
-
-    depth_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_DEPTH24_STENCIL8, owner);
-    combined_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
-    /* TODO(fclem) Only allocate if needed. */
-    postfx_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
-
-    view_fb_.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx_), GPU_ATTACHMENT_TEXTURE(combined_tx_));
-  }
+  combined_tx_.sync();
+  postfx_tx_.sync();
 }
 
 void ShadingView::render(void)
@@ -106,15 +95,24 @@ void ShadingView::render(void)
     return;
   }
 
-  float color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+  /* Query temp textures and create framebuffers. */
+  /* HACK: View name should be unique and static.
+   * With this, we can reuse the same texture across views. */
+  DrawEngineType *owner = (DrawEngineType *)name_;
+
+  depth_tx_.ensure_2d(GPU_DEPTH24_STENCIL8, extent_);
+  combined_tx_.acquire(extent_, GPU_RGBA16F, owner);
+  view_fb_.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx_), GPU_ATTACHMENT_TEXTURE(combined_tx_));
 
   update_view();
 
   DRW_stats_group_start(name_);
   DRW_view_set_active(render_view_);
 
+  /* Alpha stores transmittance. So start at 1. */
+  float clear_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
   GPU_framebuffer_bind(view_fb_);
-  GPU_framebuffer_clear_color_depth(view_fb_, color, 1.0f);
+  GPU_framebuffer_clear_color_depth(view_fb_, clear_color, 1.0f);
 
   if (inst_.lookdev.render_background() == false) {
     inst_.shading_passes.background.render();
@@ -149,12 +147,23 @@ void ShadingView::render(void)
   }
 
   DRW_stats_group_end();
+
+  combined_tx_.release();
+  postfx_tx_.release();
 }
 
 GPUTexture *ShadingView::render_post(GPUTexture *input_tx)
 {
+  if (!dof_.postfx_enabled() && !mb_.enabled()) {
+    return input_tx;
+  }
+  /* HACK: View name should be unique and static.
+   * With this, we can reuse the same texture across views. */
+  postfx_tx_.acquire(extent_, GPU_RGBA16F, (void *)name_);
+
   GPUTexture *velocity_tx = velocity_.view_vectors_get();
   GPUTexture *output_tx = postfx_tx_;
+
   /* Swapping is done internally. Actual output is set to the next input. */
   dof_.render(depth_tx_, &input_tx, &output_tx);
   mb_.render(depth_tx_, velocity_tx, &input_tx, &output_tx);
@@ -213,7 +222,7 @@ void LightProbeView::sync(Texture &color_tx,
   }
 }
 
-void LightProbeView::render(GPUTexture *depth_tx)
+void LightProbeView::render(Texture &depth_tx)
 {
   if (!is_only_background_) {
     inst_.lightprobes.set_view(view_, extent_);

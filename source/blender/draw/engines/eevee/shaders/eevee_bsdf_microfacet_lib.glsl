@@ -57,3 +57,16 @@ float btdf_ggx(vec3 N, vec3 L, vec3 V, float roughness, float eta)
 }
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Lambert
+ *
+ * Not really a microfacet model but fits this file.
+ * \{ */
+
+float bsdf_lambert(vec3 N, vec3 L)
+{
+  return saturate(dot(N, L));
+}
+
+/** \} */

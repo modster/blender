@@ -1,92 +1,75 @@
 
+/* FIXME(@fclem): This file is included inside the gpu module. We have to workaround to include
+ * eevee header. */
+#include "../../draw/engines/eevee/eevee_defines.hh"
+
 #include "gpu_shader_create_info.hh"
 
 /* -------------------------------------------------------------------- */
-/** \name Variations
+/** \name Ray Generation
  * \{ */
 
-GPU_SHADER_CREATE_INFO(eevee_raytrace_diffuse).define("DIFFUSE");
-GPU_SHADER_CREATE_INFO(eevee_raytrace_reflection).define("REFLECTION");
-GPU_SHADER_CREATE_INFO(eevee_raytrace_refraction).define("REFRACTION");
-GPU_SHADER_CREATE_INFO(eevee_raytrace_fallback).define("SKIP_TRACE");
-
-#define EEVEE_RAYTRACE_FINAL_VARIATION(name, ...) \
-  GPU_SHADER_CREATE_INFO(name).additional_info(__VA_ARGS__).do_static_compilation(true);
-
-#define EEVEE_RAYTRACE_BSDF_VARIATIONS(prefix, ...) \
-  EEVEE_RAYTRACE_FINAL_VARIATION(prefix##_diffuse, "eevee_raytrace_diffuse", __VA_ARGS__) \
-  EEVEE_RAYTRACE_FINAL_VARIATION(prefix##_reflection, "eevee_raytrace_reflection", __VA_ARGS__) \
-  EEVEE_RAYTRACE_FINAL_VARIATION(prefix##_refraction, "eevee_raytrace_refraction", __VA_ARGS__)
-
-#define EEVEE_RAYTRACE_SKIP_VARIATIONS(prefix, ...) \
-  EEVEE_RAYTRACE_BSDF_VARIATIONS(prefix##_fallback, "eevee_raytrace_fallback", __VA_ARGS__) \
-  EEVEE_RAYTRACE_BSDF_VARIATIONS(prefix, __VA_ARGS__)
+GPU_SHADER_CREATE_INFO(eevee_raytrace_raygen)
+    .do_static_compilation(true)
+    .local_group_size(RAYTRACE_GROUP_SIZE, RAYTRACE_GROUP_SIZE)
+    .additional_info("eevee_shared")
+    .storage_buf(0, Qualifier::READ_WRITE, "DispatchIndirectCommand", "dispatch_diffuse_buf")
+    .storage_buf(1, Qualifier::READ_WRITE, "DispatchIndirectCommand", "dispatch_reflect_buf")
+    .storage_buf(2, Qualifier::READ_WRITE, "DispatchIndirectCommand", "dispatch_refract_buf")
+    .storage_buf(4, Qualifier::WRITE, "uint", "tiles_diffuse_buf[]")
+    .storage_buf(5, Qualifier::WRITE, "uint", "tiles_reflect_buf[]")
+    .storage_buf(6, Qualifier::WRITE, "uint", "tiles_refract_buf[]")
+    .uniform_buf(3, "RaytraceBufferData", "raytrace_buffer_buf")
+    .sampler(0, ImageType::FLOAT_2D, "gbuf_transmit_data_tx")
+    .sampler(1, ImageType::FLOAT_2D, "gbuf_transmit_normal_tx")
+    .sampler(2, ImageType::FLOAT_2D, "gbuf_reflection_normal_tx")
+    .sampler(3, ImageType::FLOAT_2D, "depth_tx")
+    .sampler(4, ImageType::UINT_2D, "stencil_tx")
+    .image(0, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "out_ray_data_diffuse")
+    .image(1, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "out_ray_data_reflect")
+    .image(2, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "out_ray_data_refract")
+    .compute_source("eevee_raytrace_raygen_comp.glsl")
+    .additional_info("draw_view", "eevee_utility_texture", "eevee_sampling_data");
 
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Raytracing
+/** \name Screen Space Raytracing
  * \{ */
 
-GPU_SHADER_CREATE_INFO(eevee_raytrace_raygen)
+GPU_SHADER_CREATE_INFO(eevee_raytrace_dispatch)
+    .do_static_compilation(true)
+    .local_group_size(1)
     .additional_info("eevee_shared")
-    .uniform_buf(4, "RaytraceData", "raytrace_buf")
-    .uniform_buf(1, "HiZData", "hiz_buf")
-    .uniform_buf(2, "CubemapData", "cubes_buf[CULLING_ITEM_BATCH]")
-    .uniform_buf(3, "LightProbeInfoData", "probes_buf")
-    .sampler(2, ImageType::FLOAT_CUBE_ARRAY, "lightprobe_cube_tx")
-    .sampler(3, ImageType::FLOAT_2D, "radiance_tx")
-    .sampler(4, ImageType::FLOAT_2D, "combined_tx")
-    .sampler(5, ImageType::FLOAT_2D, "cl_color_tx")
-    .sampler(6, ImageType::FLOAT_2D, "cl_normal_tx")
-    .sampler(7, ImageType::FLOAT_2D, "cl_data_tx")
-    .sampler(9, ImageType::FLOAT_2D, "hiz_tx")
-    .sampler(10, ImageType::FLOAT_2D, "hiz_front_tx")
-    .fragment_out(0, Type::VEC4, "out_ray_data")
-    .fragment_out(1, Type::VEC4, "out_ray_radiance")
-    .fragment_source("eevee_raytrace_raygen_frag.glsl")
-    .additional_info("draw_fullscreen",
-                     "draw_view",
-                     "eevee_utility_texture",
-                     "eevee_sampling_data");
+    .storage_buf(0, Qualifier::READ_WRITE, "DispatchIndirectCommand", "dispatch_buf")
+    .compute_source("eevee_raytrace_dispatch_comp.glsl");
 
-EEVEE_RAYTRACE_SKIP_VARIATIONS(eevee_raytrace_raygen, "eevee_raytrace_raygen");
-
-GPU_SHADER_CREATE_INFO(eevee_raytrace_denoise)
+GPU_SHADER_CREATE_INFO(eevee_raytrace_screen)
+    .local_group_size(RAYTRACE_GROUP_SIZE, RAYTRACE_GROUP_SIZE)
     .additional_info("eevee_shared", "draw_view")
-    .local_group_size(8, 8)
-    .uniform_buf(4, "RaytraceData", "raytrace_buf")
-    .uniform_buf(1, "HiZData", "hiz_buf")
-    .uniform_buf(2, "RaytraceBufferData", "rtbuf_buf")
-    .sampler(1, ImageType::FLOAT_2D, "ray_data_tx")
-    .sampler(2, ImageType::FLOAT_2D, "ray_radiance_tx")
-    .sampler(3, ImageType::FLOAT_2D, "cl_color_tx")
-    .sampler(4, ImageType::FLOAT_2D, "cl_normal_tx")
-    .sampler(5, ImageType::FLOAT_2D, "cl_data_tx")
-    .sampler(6, ImageType::FLOAT_2D, "ray_history_tx")
-    .sampler(7, ImageType::FLOAT_2D, "ray_variance_tx")
-    .sampler(8, ImageType::FLOAT_2D, "hiz_tx")
-    .image(0, GPU_RGBA16F, Qualifier::READ_WRITE, ImageType::FLOAT_2D, "out_history_img")
-    .image(1, GPU_R8, Qualifier::READ_WRITE, ImageType::FLOAT_2D, "out_variance_img")
-    .compute_source("eevee_raytrace_denoise_comp.glsl");
+    .storage_buf(0, Qualifier::READ, "DispatchIndirectCommand", "dispatch_buf")
+    .storage_buf(2, Qualifier::READ, "uint", "tiles_buf[]")
+    .uniform_buf(4, "HiZData", "hiz_buf")
+    .uniform_buf(5, "RaytraceBufferData", "raytrace_buffer_buf")
+    .sampler(0, ImageType::FLOAT_2D, "radiance_tx")
+    .sampler(1, ImageType::FLOAT_2D, "hiz_tx")
+    .sampler(2, ImageType::FLOAT_2D, "depth_tx")
+    .image(0, GPU_RGBA16F, Qualifier::READ_WRITE, ImageType::FLOAT_2D, "inout_ray_data")
+    .image(1, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "out_ray_radiance")
+    .compute_source("eevee_raytrace_screen_comp.glsl")
+    .additional_info("eevee_lightprobe_data", "eevee_sampling_data");
 
-EEVEE_RAYTRACE_BSDF_VARIATIONS(eevee_raytrace_denoise, "eevee_raytrace_denoise");
+GPU_SHADER_CREATE_INFO(eevee_raytrace_screen_reflect)
+    .do_static_compilation(true)
+    .define("DO_REFLECTION", "true")
+    .define("DO_REFRACTION", "false")
+    .additional_info("eevee_raytrace_screen");
 
-GPU_SHADER_CREATE_INFO(eevee_raytrace_resolve)
-    .additional_info("eevee_shared", "draw_view")
-    .uniform_buf(1, "HiZData", "hiz_buf")
-    .sampler(2, ImageType::FLOAT_2D, "ray_radiance_tx")
-    .sampler(3, ImageType::FLOAT_2D, "cl_color_tx")
-    .sampler(4, ImageType::FLOAT_2D, "cl_normal_tx")
-    .sampler(5, ImageType::FLOAT_2D, "cl_data_tx")
-    .sampler(7, ImageType::FLOAT_2D, "ray_variance_tx")
-    .fragment_out(0, Type::VEC4, "out_combined")
-    .fragment_out(1, Type::VEC4, "out_diffuse")
-    .fragment_out(2, Type::VEC3, "out_specular")
-    .fragment_source("eevee_raytrace_resolve_frag.glsl")
-    .additional_info("draw_fullscreen");
-
-EEVEE_RAYTRACE_BSDF_VARIATIONS(eevee_raytrace_resolve, "eevee_raytrace_resolve");
+GPU_SHADER_CREATE_INFO(eevee_raytrace_screen_refract)
+    .do_static_compilation(true)
+    .define("DO_REFLECTION", "false")
+    .define("DO_REFRACTION", "true")
+    .additional_info("eevee_raytrace_screen");
 
 /** \} */
 
@@ -96,9 +79,7 @@ EEVEE_RAYTRACE_BSDF_VARIATIONS(eevee_raytrace_resolve, "eevee_raytrace_resolve")
 
 GPU_SHADER_CREATE_INFO(eevee_raytrace_data)
     .define("SCREEN_RAYTRACE")
-    .uniform_buf(4, "RaytraceData", "raytrace_diffuse")
-    .uniform_buf(1, "RaytraceData", "raytrace_reflection")
-    .uniform_buf(2, "RaytraceData", "raytrace_refraction")
+    .uniform_buf(0, "RaytraceData", "raytrace_info_buf")
     .uniform_buf(3, "HiZData", "hiz_buf")
     .sampler(0, ImageType::FLOAT_2D, "hiz_tx")
     .sampler(1, ImageType::FLOAT_2D, "radiance_tx");

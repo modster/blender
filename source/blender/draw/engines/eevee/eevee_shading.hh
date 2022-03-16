@@ -119,8 +119,8 @@ class DeferredLayer {
   void volume_add(Object *ob);
   void render(const DRWView *view,
               RaytraceBuffer *rt_buffer,
-              GPUTexture *depth_tx,
-              GPUTexture *combined_tx);
+              Texture &depth_tx,
+              GPUTexture *combined_tx = nullptr);
 
  private:
   void deferred_shgroup_resources(DRWShadingGroup *grp);
@@ -128,6 +128,7 @@ class DeferredLayer {
 
 class DeferredPass {
   friend DeferredLayer;
+  friend RaytraceBuffer;
 
  private:
   Instance &inst_;
@@ -142,7 +143,13 @@ class DeferredPass {
   DRWPass *eval_subsurface_ps_ = nullptr;
 
   /* References only. */
-  GPUTexture *input_combined_tx_ = nullptr;
+  GPUTexture *ray_data_diffuse_tx_ = nullptr;
+  GPUTexture *ray_data_refract_tx_ = nullptr;
+  GPUTexture *ray_data_reflect_tx_ = nullptr;
+  GPUTexture *ray_radiance_diffuse_tx_ = nullptr;
+  GPUTexture *ray_radiance_refract_tx_ = nullptr;
+  GPUTexture *ray_radiance_reflect_tx_ = nullptr;
+  GPUUniformBuf *ray_buffer_ubo_ = nullptr;
 
  public:
   DeferredPass(Instance &inst)
@@ -155,8 +162,8 @@ class DeferredPass {
   void render(const DRWView *drw_view,
               RaytraceBuffer &rtbuffer_opaque,
               RaytraceBuffer &rtbuffer_refract,
-              GPUTexture *depth_tx,
-              GPUTexture *combined_tx);
+              Texture &depth_tx,
+              GPUTexture *combined_tx = nullptr);
 };
 
 /** \} */

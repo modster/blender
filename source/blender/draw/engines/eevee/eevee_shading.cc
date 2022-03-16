@@ -242,6 +242,7 @@ void DeferredPass::sync(void)
     DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_ps_);
     lights.shgroup_resources(grp);
     DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block_ref(grp, "raytrace_buffer_buf", &ray_buffer_ubo_);
     DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", hiz.texture_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
@@ -251,6 +252,18 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref(grp, "transmit_data_tx", &gbuf.transmit_data_tx);
     DRW_shgroup_uniform_texture_ref(grp, "reflect_color_tx", &gbuf.reflect_color_tx);
     DRW_shgroup_uniform_texture_ref(grp, "reflect_normal_tx", &gbuf.reflect_normal_tx);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "ray_data_diffuse_tx", &ray_data_diffuse_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "ray_data_reflect_tx", &ray_data_reflect_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "ray_data_refract_tx", &ray_data_refract_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "ray_radiance_diffuse_tx", &ray_radiance_diffuse_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "ray_radiance_reflect_tx", &ray_radiance_reflect_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "ray_radiance_refract_tx", &ray_radiance_refract_tx_, no_interp);
     DRW_shgroup_uniform_image_ref(grp, "rpass_diffuse_light", &gbuf.rpass_diffuse_light_tx);
     DRW_shgroup_uniform_image_ref(grp, "rpass_specular_light", &gbuf.rpass_specular_light_tx);
     // DRW_shgroup_uniform_image_ref(grp, "ray_data", &gbuf.rpass_specular_light_tx);
@@ -309,7 +322,7 @@ void DeferredPass::volume_add(Object *ob)
 void DeferredPass::render(const DRWView *drw_view,
                           RaytraceBuffer &rt_buffer_opaque_,
                           RaytraceBuffer &rt_buffer_refract_,
-                          GPUTexture *depth_tx,
+                          Texture &depth_tx,
                           GPUTexture *combined_tx)
 {
   DRW_stats_group_start("OpaqueLayer");
@@ -318,10 +331,6 @@ void DeferredPass::render(const DRWView *drw_view,
 
   DRW_stats_group_start("RefractionLayer");
   refraction_layer_.render(drw_view, &rt_buffer_refract_, depth_tx, combined_tx);
-  DRW_stats_group_end();
-
-  DRW_stats_group_start("VolumetricLayer");
-  volumetric_layer_.render(drw_view, nullptr, depth_tx, combined_tx);
   DRW_stats_group_end();
 
   rt_buffer_opaque_.render_end(drw_view);
@@ -343,8 +352,8 @@ void DeferredLayer::deferred_shgroup_resources(DRWShadingGroup *grp)
   DRW_shgroup_uniform_image_ref(grp, "gbuff_transmit_normal", &gbuf.transmit_normal_tx);
   DRW_shgroup_uniform_image_ref(grp, "gbuff_reflection_color", &gbuf.reflect_color_tx);
   DRW_shgroup_uniform_image_ref(grp, "gbuff_reflection_normal", &gbuf.reflect_normal_tx);
+  DRW_shgroup_uniform_image_ref(grp, "gbuff_emission", &gbuf.emission_tx);
   /* Renderpasses. */
-  DRW_shgroup_uniform_image_ref(grp, "rpass_emission", &gbuf.rpass_emission_tx);
   DRW_shgroup_uniform_image_ref(grp, "rpass_volume_light", &gbuf.rpass_volume_light_tx);
 }
 
@@ -362,7 +371,9 @@ void DeferredLayer::sync(void)
     DRW_pass_link(prepass_ps_, prepass_culled_ps_);
   }
   {
-    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_EQUAL | DRW_STATE_STENCIL_ALWAYS |
+    /* Only need one fragment to pass per pixel in order to use arbitrary load/store.
+     * Use a combination of depth and stencil testing to achieve this. */
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_EQUAL | DRW_STATE_STENCIL_NEQUAL |
                      DRW_STATE_WRITE_STENCIL | DRW_STATE_BLEND_CUSTOM;
     gbuffer_ps_ = DRW_pass_create("Gbuffer", state);
 
@@ -387,7 +398,7 @@ DRWShadingGroup *DeferredLayer::material_add(::Material *blender_mat, GPUMateria
   DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
   DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
   deferred_shgroup_resources(grp);
-  DRW_shgroup_stencil_set(grp, (uint)closure_bits & 0xFF, 0xFF, 0xFF);
+  DRW_shgroup_stencil_set(grp, (uint)closure_bits & 0xFF, 0xFF, (uint)closure_bits & 0xFF);
 
   closure_bits_ |= closure_bits;
   return grp;
@@ -419,8 +430,8 @@ void DeferredLayer::volume_add(Object *ob)
 }
 
 void DeferredLayer::render(const DRWView *view,
-                           RaytraceBuffer *UNUSED(rt_buffer),
-                           GPUTexture *depth_tx,
+                           RaytraceBuffer *rt_buffer,
+                           Texture &depth_tx,
                            GPUTexture *UNUSED(combined_tx))
 {
   DeferredPass &deferred_pass = inst_.shading_passes.deferred;
@@ -439,7 +450,7 @@ void DeferredLayer::render(const DRWView *view,
   gbuffer.acquire(closure_bits_);
 
   if (use_refraction) {
-    // rt_buffer->radiance_copy(view_fb);
+    // rt_buffer->radiance_copy(combined_tx);
   }
 
   if (use_refraction) {
@@ -466,14 +477,14 @@ void DeferredLayer::render(const DRWView *view,
   }
 
   if (!no_surfaces) {
-    // DRW_draw_pass(deferred_pass.raygen_ps_);
-
-    // rt_buffer->trace(closure_bits_, gbuffer, hiz_back, hiz_front, radiance_copy_tx);
+    rt_buffer->trace(closure_bits_, depth_tx, deferred_pass);
 
     DRW_draw_pass(deferred_pass.eval_ps_);
 
+    rt_buffer->release_tmp();
+
     if (use_subsurface) {
-      // DRW_draw_pass(deferred_pass.eval_subsurface_ps_);
+      DRW_draw_pass(deferred_pass.eval_subsurface_ps_);
     }
   }
 
