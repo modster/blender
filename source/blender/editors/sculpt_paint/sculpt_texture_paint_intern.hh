@@ -4,6 +4,10 @@ struct Polygon {
 };
 
 struct Triangle {
+  /**
+   *  Loop incides. can be reduced by storing only 2 the third one is always `loop_indices[1] + 1`.
+   * Second could be delta encoded with the first loop index.
+   */
   int3 loop_indices;
   int3 vert_indices;
   int poly_index;
@@ -13,7 +17,7 @@ struct Triangle {
 
 /**
  * Encode multiple sequential pixels to reduce memory footprint.
- * 
+ *
  * Memory footprint can be reduced more.
  * - Only store 2 barycentric coordinates. the third one can be extracted
  *   from the 2 known ones.
@@ -23,6 +27,7 @@ struct Triangle {
  * - triangle index could be delta encoded.
  * - encode everything in using variable bits per structure.
  *   first byte would indicate the number of bytes used per element.
+ * - only store triangle index when it changes.
  */
 struct PixelsPackage {
   /** Image coordinate starting of the first encoded pixel. */
@@ -46,7 +51,7 @@ struct Pixel {
     return *this;
   }
 
-  Pixel operator-(const Pixel &other)
+  Pixel operator-(const Pixel &other) const
   {
     Pixel result;
     result.pos = pos - other.pos;

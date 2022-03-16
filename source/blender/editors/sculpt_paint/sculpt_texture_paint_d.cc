@@ -40,45 +40,146 @@
 namespace blender::ed::sculpt_paint::texture_paint {
 namespace painting {
 
-static Pixel init_pixel(const Triangle &triangle,
-                        const float3 weights,
-                        const MVert *mvert,
-                        const MLoopUV *ldata_uv)
-{
-  Pixel result;
-  interp_v3_v3v3v3(result.pos,
-                   mvert[triangle.vert_indices[0]].co,
-                   mvert[triangle.vert_indices[1]].co,
-                   mvert[triangle.vert_indices[2]].co,
-                   weights);
-  interp_v3_v3v3v3(result.uv,
-                   ldata_uv[triangle.loop_indices[0]].uv,
-                   ldata_uv[triangle.loop_indices[1]].uv,
-                   ldata_uv[triangle.loop_indices[2]].uv,
-                   weights);
-  return result;
-}
+/** Reading and writing to image buffer with 4 float channels. */
+class ImagePixelAccessorFloat4 {
+ private:
+  int pixel_offset;
 
-static Pixel get_start_pixel(const PixelsPackage &encoded_pixels,
-                             const Triangle &triangle,
-                             const MVert *mvert,
-                             const MLoopUV *ldata_uv)
-{
-  return init_pixel(triangle, encoded_pixels.start_barycentric_coord, mvert, ldata_uv);
-}
+ public:
+  void set_image_position(ImBuf *image_buffer, int2 image_pixel_position)
+  {
+    pixel_offset = image_pixel_position.y * image_buffer->x + image_pixel_position.x;
+  }
 
-static Pixel get_delta_pixel(const PixelsPackage &encoded_pixels,
-                             const Triangle &triangle,
-                             const Pixel &start_pixel,
-                             const MVert *mvert,
-                             const MLoopUV *ldata_uv
+  void goto_next_pixel()
+  {
+    pixel_offset += 1;
+  }
 
-)
-{
-  Pixel result = init_pixel(
-      triangle, encoded_pixels.start_barycentric_coord + triangle.add_barycentric_coord_x, mvert, ldata_uv);
-  return result - start_pixel;
-}
+  float4 read_pixel(ImBuf *image_buffer) const
+  {
+    return &image_buffer->rect_float[pixel_offset * 4];
+  }
+
+  void store_pixel(ImBuf *image_buffer, const float4 pixel_data) const
+  {
+    copy_v4_v4(&image_buffer->rect_float[pixel_offset * 4], pixel_data);
+  }
+};
+
+template<typename ImagePixelAccessor> class PaintingKernel {
+  ImagePixelAccessor image_accessor;
+
+  SculptSession *ss;
+  const Brush *brush;
+  const int thread_id;
+  const MVert *mvert;
+  const MLoopUV *ldata_uv;
+
+  float4 brush_color;
+  float brush_strength;
+
+  SculptBrushTestFn brush_test_fn;
+  SculptBrushTest test;
+
+ public:
+  explicit PaintingKernel(SculptSession *ss,
+                          const Brush *brush,
+                          const int thread_id,
+                          const MVert *mvert,
+                          const MLoopUV *ldata_uv)
+      : ss(ss), brush(brush), thread_id(thread_id), mvert(mvert), ldata_uv(ldata_uv)
+  {
+    init_brush_color();
+    init_brush_strength();
+    init_brush_test();
+  }
+
+  bool paint(const Triangle &triangle, const PixelsPackage &encoded_pixels, ImBuf *image_buffer)
+  {
+    image_accessor.set_image_position(image_buffer, encoded_pixels.start_image_coordinate);
+    Pixel pixel = get_start_pixel(triangle, encoded_pixels);
+    const Pixel add_pixel = get_delta_pixel(triangle, encoded_pixels, pixel);
+    bool pixels_painted = false;
+    for (int x = 0; x < encoded_pixels.num_pixels; x++) {
+      if (!brush_test_fn(&test, pixel.pos)) {
+        pixel += add_pixel;
+        image_accessor.goto_next_pixel();
+        continue;
+      }
+
+      float4 color = image_accessor.read_pixel(image_buffer);
+      const float3 normal(0.0f, 0.0f, 0.0f);
+      const float3 face_normal(0.0f, 0.0f, 0.0f);
+      const float mask = 0.0f;
+      const float falloff_strength = SCULPT_brush_strength_factor_custom_automask(
+          ss,
+          brush,
+          pixel.pos,
+          sqrtf(test.dist),
+          normal,
+          face_normal,
+          mask,
+          triangle.automasking_factor,
+          thread_id);
+
+      blend_color_interpolate_float(color, color, brush_color, falloff_strength * brush_strength);
+      image_accessor.store_pixel(image_buffer, color);
+      pixels_painted = true;
+
+      image_accessor.goto_next_pixel();
+      pixel += add_pixel;
+    }
+    return pixels_painted;
+  }
+
+ private:
+  void init_brush_color()
+  {
+    float3 brush_srgb(brush->rgb[0], brush->rgb[1], brush->rgb[2]);
+    srgb_to_linearrgb_v3_v3(brush_color, brush_srgb);
+    brush_color[3] = 1.0f;
+  }
+
+  void init_brush_strength()
+  {
+    brush_strength = ss->cache->bstrength;
+  }
+  void init_brush_test()
+  {
+    brush_test_fn = SCULPT_brush_test_init_with_falloff_shape(ss, &test, brush->falloff_shape);
+  }
+
+  Pixel init_pixel(const Triangle &triangle, const float3 weights) const
+  {
+    Pixel result;
+    interp_v3_v3v3v3(result.pos,
+                     mvert[triangle.vert_indices[0]].co,
+                     mvert[triangle.vert_indices[1]].co,
+                     mvert[triangle.vert_indices[2]].co,
+                     weights);
+    interp_v3_v3v3v3(result.uv,
+                     ldata_uv[triangle.loop_indices[0]].uv,
+                     ldata_uv[triangle.loop_indices[1]].uv,
+                     ldata_uv[triangle.loop_indices[2]].uv,
+                     weights);
+    return result;
+  }
+
+  Pixel get_start_pixel(const Triangle &triangle, const PixelsPackage &encoded_pixels) const
+  {
+    return init_pixel(triangle, encoded_pixels.start_barycentric_coord);
+  }
+
+  Pixel get_delta_pixel(const Triangle &triangle,
+                        const PixelsPackage &encoded_pixels,
+                        const Pixel &start_pixel) const
+  {
+    Pixel result = init_pixel(
+        triangle, encoded_pixels.start_barycentric_coord + triangle.add_barycentric_coord_x);
+    return result - start_pixel;
+  }
+};
 
 static void do_vertex_brush_test(void *__restrict userdata,
                                  const int n,
@@ -117,20 +218,6 @@ static void do_task_cb_ex(void *__restrict userdata,
   NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
   BLI_assert(node_data != nullptr);
 
-  const int thread_id = BLI_task_parallel_thread_id(tls);
-
-  SculptBrushTest test;
-  SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
-      ss, &test, brush->falloff_shape);
-
-  float3 brush_srgb(brush->rgb[0], brush->rgb[1], brush->rgb[2]);
-  float4 brush_linear;
-  srgb_to_linearrgb_v3_v3(brush_linear, brush_srgb);
-  brush_linear[3] = 1.0f;
-  MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
-  Mesh *mesh = static_cast<Mesh *>(ob->data);
-  MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
-
   /* Propagate vertex brush test to triangle. This should be extended with brush overlapping edges
    * and faces only. */
   std::vector<bool> triangle_brush_test_results(node_data->triangles.size());
@@ -165,50 +252,20 @@ static void do_task_cb_ex(void *__restrict userdata,
     triangle_index += 1;
   }
 
-  const float brush_strength = ss->cache->bstrength;
-  int packages_clipped = 0;
+  const int thread_id = BLI_task_parallel_thread_id(tls);
+  MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
+  Mesh *mesh = static_cast<Mesh *>(ob->data);
+  MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
+  PaintingKernel<ImagePixelAccessorFloat4> kernel(ss, brush, thread_id, mvert, ldata_uv);
 
-  for (PixelsPackage &encoded_pixels : node_data->encoded_pixels) {
+  int packages_clipped = 0;
+  for (const PixelsPackage &encoded_pixels : node_data->encoded_pixels) {
     if (!triangle_brush_test_results[encoded_pixels.triangle_index]) {
       packages_clipped += 1;
       continue;
     }
-    Triangle &triangle = node_data->triangles[encoded_pixels.triangle_index];
-    int pixel_offset = encoded_pixels.start_image_coordinate.y * image_buffer->x +
-                       encoded_pixels.start_image_coordinate.x;
-    float3 edge_coord = encoded_pixels.start_barycentric_coord;
-    Pixel pixel = get_start_pixel(encoded_pixels, triangle, mvert, ldata_uv);
-    const Pixel add_pixel = get_delta_pixel(encoded_pixels, triangle, pixel, mvert, ldata_uv);
-    bool pixels_painted = false;
-    for (int x = 0; x < encoded_pixels.num_pixels; x++) {
-      if (!sculpt_brush_test_sq_fn(&test, pixel.pos)) {
-        pixel += add_pixel;
-        pixel_offset += 1;
-        continue;
-      }
-
-      float *color = &image_buffer->rect_float[pixel_offset * 4];
-      const float3 normal(0.0f, 0.0f, 0.0f);
-      const float3 face_normal(0.0f, 0.0f, 0.0f);
-      const float mask = 0.0f;
-      const float falloff_strength = SCULPT_brush_strength_factor_custom_automask(
-          ss,
-          brush,
-          pixel.pos,
-          sqrtf(test.dist),
-          normal,
-          face_normal,
-          mask,
-          triangle.automasking_factor,
-          thread_id);
-
-      blend_color_interpolate_float(color, color, brush_linear, falloff_strength * brush_strength);
-      pixels_painted = true;
-
-      edge_coord += triangle.add_barycentric_coord_x;
-      pixel += add_pixel;
-      pixel_offset++;
-    }
+    const Triangle &triangle = node_data->triangles[encoded_pixels.triangle_index];
+    const bool pixels_painted = kernel.paint(triangle, encoded_pixels, image_buffer);
 
     if (pixels_painted) {
       BLI_rcti_do_minmax_v(&node_data->dirty_region, encoded_pixels.start_image_coordinate);
