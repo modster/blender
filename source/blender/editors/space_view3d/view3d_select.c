@@ -2052,7 +2052,7 @@ static Base *mouse_select_eval_buffer(ViewContext *vc,
 
   if (do_nearest) {
     uint min = 0xFFFFFFFF;
-    int selcol = 0, notcol = 0;
+    int selcol = 0;
 
     if (has_bones) {
       /* we skip non-bone hits */
@@ -2065,17 +2065,50 @@ static Base *mouse_select_eval_buffer(ViewContext *vc,
       }
     }
     else {
-      /* only exclude active object when it is selected... */
+      int select_id_exclude = 0;
+      /* Only exclude active object when it is selected. */
       if (BASACT(view_layer) && (BASACT(view_layer)->flag & BASE_SELECTED) && hits > 1) {
-        notcol = BASACT(view_layer)->object->runtime.select_id;
+        select_id_exclude = BASACT(view_layer)->object->runtime.select_id;
       }
 
+      /* Find the best active & non-active hits.
+       * NOTE(@campbellbarton): Checking if `hits > 1` isn't a reliable way to know
+       * if there are multiple objects selected since it's possible the same object
+       * generates multiple hits, either from:
+       * - Multiple sub-components (bones & camera tracks).
+       * - Multiple selectable elements such as the object center and the geometry.
+       *
+       * For this reason, keep track of the best hit as well as the best hit that
+       * excludes the selected & active object, using this value when it's valid. */
+
+      uint min_not_active = min;
+      int hit_index = -1, hit_index_not_active = -1;
+
       for (a = 0; a < hits; a++) {
-        if (min > buffer[a].depth && notcol != (buffer[a].id & 0xFFFF)) {
+        /* Any object. */
+        if (min > buffer[a].depth) {
           min = buffer[a].depth;
-          selcol = buffer[a].id & 0xFFFF;
-          sub_selection_id = (buffer[a].id & 0xFFFF0000) >> 16;
+          hit_index = a;
         }
+        /* Any object other than the active-selected. */
+        if (select_id_exclude != 0) {
+          if (min_not_active > buffer[a].depth && select_id_exclude != (buffer[a].id & 0xFFFF)) {
+            min_not_active = buffer[a].depth;
+            hit_index_not_active = a;
+          }
+        }
+      }
+
+      /* When the active was selected, first try to use the index
+       * for the best non-active hit that was found. */
+      if (hit_index_not_active != -1) {
+        hit_index = hit_index_not_active;
+      }
+
+      if (hit_index != -1) {
+        selcol = buffer[hit_index].id & 0xFFFF;
+        sub_selection_id = (buffer[hit_index].id & 0xFFFF0000) >> 16;
+        /* No need to set `min` to `buffer[hit_index].depth`, it's not used from now on. */
       }
     }
 
@@ -2377,6 +2410,8 @@ static bool ed_object_select_pick(bContext *C,
       basact = object_mouse_select_menu(C, &vc, NULL, 0, mval, params);
     }
     else {
+      /* Put the active object at a disadvantage to cycle through other objects. */
+      const float penalty_dist = 10.0f * U.dpi_fac;
       base = startbase;
       while (base) {
         if (BASE_SELECTABLE(v3d, base)) {
@@ -2384,12 +2419,12 @@ static bool ed_object_select_pick(bContext *C,
           if (ED_view3d_project_float_global(
                   region, base->object->obmat[3], screen_co, V3D_PROJ_TEST_CLIP_DEFAULT) ==
               V3D_PROJ_RET_OK) {
-            float dist_temp = len_manhattan_v2v2(mval_fl, screen_co);
+            float dist_test = len_manhattan_v2v2(mval_fl, screen_co);
             if (base == oldbasact) {
-              dist_temp += 10.0f;
+              dist_test += penalty_dist;
             }
-            if (dist_temp < dist) {
-              dist = dist_temp;
+            if (dist_test < dist) {
+              dist = dist_test;
               basact = base;
             }
           }
@@ -2832,13 +2867,16 @@ static int view3d_select_exec(bContext *C, wmOperator *op)
     changed = ed_object_select_pick(C, mval, &params, center, enumerate, object);
   }
 
+  /* Pass-through flag may be cleared, see #WM_operator_flag_only_pass_through_on_press. */
+
   /* Pass-through allows tweaks
    * FINISHED to signal one operator worked */
   if (changed) {
     WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
     return OPERATOR_PASS_THROUGH | OPERATOR_FINISHED;
   }
-  return OPERATOR_PASS_THROUGH; /* nothing selected, just passthrough */
+  /* Nothing selected, just passthrough. */
+  return OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED;
 }
 
 static int view3d_select_invoke(bContext *C, wmOperator *op, const wmEvent *event)
