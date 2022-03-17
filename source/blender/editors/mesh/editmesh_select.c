@@ -2034,19 +2034,24 @@ bool EDBM_select_pick(bContext *C, const int mval[2], const struct SelectPick_Pa
   Base **bases = BKE_view_layer_array_from_bases_in_edit_mode(vc.view_layer, vc.v3d, &bases_len);
 
   bool changed = false;
-  const bool found = unified_findnearest(
-      &vc, bases, bases_len, &base_index_active, &eve, &eed, &efa);
+  bool found = unified_findnearest(&vc, bases, bases_len, &base_index_active, &eve, &eed, &efa);
 
-  if ((params->sel_op == SEL_OP_SET) && (found || params->deselect_all)) {
-    /* Deselect everything. */
-    for (uint base_index = 0; base_index < bases_len; base_index++) {
-      Base *base_iter = bases[base_index];
-      Object *ob_iter = base_iter->object;
-      EDBM_flag_disable_all(BKE_editmesh_from_object(ob_iter), BM_ELEM_SELECT);
-      DEG_id_tag_update(ob_iter->data, ID_RECALC_SELECT);
-      WM_event_add_notifier(C, NC_GEOM | ND_SELECT, ob_iter->data);
+  if (params->sel_op == SEL_OP_SET) {
+    BMElem *ele = efa ? (BMElem *)efa : (eed ? (BMElem *)eed : (BMElem *)eve);
+    if ((found && params->select_passthrough) && BM_elem_flag_test(ele, BM_ELEM_SELECT)) {
+      found = false;
     }
-    changed = true;
+    else if (found || params->deselect_all) {
+      /* Deselect everything. */
+      for (uint base_index = 0; base_index < bases_len; base_index++) {
+        Base *base_iter = bases[base_index];
+        Object *ob_iter = base_iter->object;
+        EDBM_flag_disable_all(BKE_editmesh_from_object(ob_iter), BM_ELEM_SELECT);
+        DEG_id_tag_update(ob_iter->data, ID_RECALC_SELECT);
+        WM_event_add_notifier(C, NC_GEOM | ND_SELECT, ob_iter->data);
+      }
+      changed = true;
+    }
   }
 
   if (found) {
@@ -2126,9 +2131,9 @@ bool EDBM_select_pick(bContext *C, const int mval[2], const struct SelectPick_Pa
           break;
         }
         case SEL_OP_SET: {
-          if (!BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
-            BM_select_history_store(vc.em->bm, eve);
-            BM_vert_select_set(vc.em->bm, eve, true);
+          if (!BM_elem_flag_test(eed, BM_ELEM_SELECT)) {
+            BM_select_history_store(vc.em->bm, eed);
+            BM_edge_select_set(vc.em->bm, eed, true);
           }
           break;
         }
