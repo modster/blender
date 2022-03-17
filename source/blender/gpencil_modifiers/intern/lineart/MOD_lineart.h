@@ -208,12 +208,14 @@ enum eLineArtTileRecursiveLimit {
 
 struct MLoopTri;
 struct MLoop;
+struct LineartRenderBuffer;
 typedef struct LineartPointArrayFinal {
   float *points;
   int numpoints;
   struct MLoopTri *looptri; /* Refernce to original_me->runtime->looptri; */
   struct MLoop *loop;       /* Refernce to original_me->mloop; */
   LineartElementLinkNode *eln_triangle;
+  struct LineartRenderBuffer *rb;
 } LineartPointArrayFinal;
 
 typedef struct LineartMeshRecord {

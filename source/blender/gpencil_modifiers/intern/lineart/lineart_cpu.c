@@ -58,6 +58,8 @@ static void lineart_bounding_area_link_edge(LineartRenderBuffer *rb,
                                             LineartBoundingArea *root_ba,
                                             LineartEdge *e);
 
+static bool lineart_triangle_share_edge(const LineartTriangle *l, const LineartTriangle *r);
+
 static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this,
                                                        LineartEdge *e,
                                                        double x,
@@ -1910,6 +1912,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
 
 #ifdef LINEART_USE_EMBREE
   RTCGeometry geom = rtcGetGeometry(rb->rtcscene_geom, obi->embree_geom_id);
+  rtcSetGeometryUserPrimitiveCount(geom, eln->element_count);
   rb->mesh_record.array[obi->embree_geom_id].eln_triangle = eln;
 #endif
 
@@ -2268,9 +2271,16 @@ static void lineart_embree_init_mesh_record(LineartRenderBuffer *rb)
 static void lineart_embree_mesh_bounds_func(const struct RTCBoundsFunctionArguments *args)
 {
   LineartPointArrayFinal *rec = args->geometryUserPtr;
-  float *p0 = &rec->points[rec->loop[rec->looptri[args->primID].tri[0]].v * 3];
-  float *p1 = &rec->points[rec->loop[rec->looptri[args->primID].tri[1]].v * 3];
-  float *p2 = &rec->points[rec->loop[rec->looptri[args->primID].tri[2]].v * 3];
+  LineartTriangle *tri = rec->eln_triangle->pointer;
+  LineartTriangle *prim_triangle = (void *)(((uchar *)tri) +
+                                            rec->rb->triangle_size * args->primID);
+  /* Just change from here and see if it helps any. */
+  double *p0 = prim_triangle->v[0]->gloc;
+  double *p1 = prim_triangle->v[1]->gloc;
+  double *p2 = prim_triangle->v[2]->gloc;
+  // float *p0 = &rec->points[rec->loop[rec->looptri[args->primID].tri[0]].v * 3];
+  // float *p1 = &rec->points[rec->loop[rec->looptri[args->primID].tri[1]].v * 3];
+  // float *p2 = &rec->points[rec->loop[rec->looptri[args->primID].tri[2]].v * 3];
   struct RTCBounds *o = args->bounds_o;
   o->lower_x = MIN3(p0[0], p1[0], p2[0]);
   o->upper_x = MAX3(p0[0], p1[0], p2[0]);
@@ -2321,6 +2331,7 @@ static void lineart_embree_transform_point_array(LineartRenderBuffer *rb,
    * array index for convenience of lookup. */
   LineartPointArrayFinal *rec = &rb->mesh_record.array[geom_id];
   rb->mesh_record.next = geom_id + 1;
+  rec->rb = rb;
 
   if (!me->runtime.looptris.array) {
     BKE_mesh_runtime_looptri_recalc(me);
@@ -2335,7 +2346,7 @@ static void lineart_embree_transform_point_array(LineartRenderBuffer *rb,
   }
 
   /* Only user typed geometry supports rtcCollide(). */
-  rtcSetGeometryUserPrimitiveCount(geom, me->runtime.looptris.len);
+  // rtcSetGeometryUserPrimitiveCount(geom, me->runtime.looptris.len);
   /* Reduce the geom user count to 1, and when scene is destroyed the geom is destroyed
    * automatically. */
   rtcReleaseGeometry(geom);
@@ -2626,20 +2637,22 @@ IntersectionCollideFunc(void *userPtr,
     }
     LineartPointArrayFinal *geoma = &rb->mesh_record.array[collisions[i].geomID0];
     LineartPointArrayFinal *geomb = &rb->mesh_record.array[collisions[i].geomID1];
-    float *pa = geoma->points;
-    float *pb = geomb->points;
-    uint32_t *ta = geoma->looptri[collisions[i].primID0].tri;
-    uint32_t *tb = geomb->looptri[collisions[i].primID1].tri;
+    float pa0[3], pa1[3], pa2[3], pb0[3], pb1[3], pb2[3];
+    LineartTriangle *tap = geoma->eln_triangle->pointer;
+    LineartTriangle *tbp = geomb->eln_triangle->pointer;
+    LineartTriangle *ta = (void *)(((uchar *)tap) + rb->triangle_size * collisions[i].primID0);
+    LineartTriangle *tb = (void *)(((uchar *)tbp) + rb->triangle_size * collisions[i].primID1);
+    if (lineart_triangle_share_edge(ta, tb)) {
+      continue;
+    }
+    copy_v3fl_v3db(pa0, ta->v[0]->gloc);
+    copy_v3fl_v3db(pa1, ta->v[1]->gloc);
+    copy_v3fl_v3db(pa2, ta->v[2]->gloc);
+    copy_v3fl_v3db(pb0, tb->v[0]->gloc);
+    copy_v3fl_v3db(pb1, tb->v[1]->gloc);
+    copy_v3fl_v3db(pb2, tb->v[2]->gloc);
     float i1[3], i2[3];
-    if (lineart_isect_tri_tri_v3_check_overlap(&pa[geoma->loop[ta[0]].v * 3],
-                                               &pa[geoma->loop[ta[1]].v * 3],
-                                               &pa[geoma->loop[ta[2]].v * 3],
-                                               &pb[geomb->loop[tb[0]].v * 3],
-                                               &pb[geomb->loop[tb[1]].v * 3],
-                                               &pb[geomb->loop[tb[2]].v * 3],
-                                               i1,
-                                               i2)) {
-
+    if (lineart_isect_tri_tri_v3_check_overlap(pa0, pa1, pa2, pb0, pb1, pb2, i1, i2)) {
       lineart_add_intersection_record_thread(rb, i1, i2);
     }
   }
@@ -2674,25 +2687,22 @@ OcclusionCollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned in
     LineartTriangle *tri = eln_triangle->pointer;
     LineartTriangle *prim_triangle = (void *)(((uchar *)tri) +
                                               rb->triangle_size * collisions[i].primID1);
-    LineartPointArrayFinal *geom_triangle = &rb->mesh_record.array[collisions[i].geomID1];
+    // LineartPointArrayFinal *geom_triangle = &rb->mesh_record.array[collisions[i].geomID1];
 
-    float pa[9];
-    float *pb = geom_triangle->points;
+    float pa[9], pb[9];
+    // float *pb = geom_triangle->points;
 
     copy_v3fl_v3db(&pa[0], prim_edge->v1->gloc);
     copy_v3fl_v3db(&pa[3], prim_edge->v2->gloc);
     copy_v3fl_v3db(&pa[6], eln_edge->cam_pos);
+    copy_v3fl_v3db(&pb[0], prim_triangle->v[0]->gloc);
+    copy_v3fl_v3db(&pb[3], prim_triangle->v[1]->gloc);
+    copy_v3fl_v3db(&pb[6], prim_triangle->v[2]->gloc);
 
-    uint32_t *tb = geom_triangle->looptri[collisions[i].primID1].tri;
+    // uint32_t *tb = geom_triangle->looptri[collisions[i].primID1].tri;
     float i1[3], i2[3];
-    if (lineart_isect_tri_tri_v3_check_overlap(&pa[0],
-                                               &pa[3],
-                                               &pa[6],
-                                               &pb[geom_triangle->loop[tb[0]].v * 3],
-                                               &pb[geom_triangle->loop[tb[1]].v * 3],
-                                               &pb[geom_triangle->loop[tb[2]].v * 3],
-                                               i1,
-                                               i2)) {
+    if (lineart_isect_tri_tri_v3_check_overlap(
+            &pa[0], &pa[3], &pa[6], &pb[0], &pb[3], &pb[6], i1, i2)) {
       lineart_add_occlusion_pair_thread(rb, eln_edge, eln_triangle, prim_edge, prim_triangle);
     }
   }
@@ -2749,8 +2759,8 @@ static void lineart_embree_do_intersections(LineartRenderBuffer *rb)
     rtcCommitGeometry(geom);
   }
   rtcCommitScene(rb->rtcscene_geom);
-  rtcCollide(rb->rtcscene_geom, rb->rtcscene_geom, IntersectionCollideFunc, rb);
-  lineart_intersection_lines_from_record(rb);
+  // rtcCollide(rb->rtcscene_geom, rb->rtcscene_geom, IntersectionCollideFunc, rb);
+  // lineart_intersection_lines_from_record(rb);
 }
 
 /**
