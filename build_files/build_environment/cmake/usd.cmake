@@ -1,45 +1,59 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-if(WIN32)
-  set(USD_PLATFORM_ARGS
-    -DBUILD_SHARED_LIBS=On
-    -DTBB_ROOT_DIR=${LIBDIR}/tbb/
-  )
-else()
-  set(USD_PLATFORM_ARGS
-    -DBUILD_SHARED_LIBS=Off
-    # USD is hellbound on making a shared lib, unless you point this variable to a valid cmake file
-    # doesn't have to make sense, but as long as it points somewhere valid it will skip the shared lib.
-    -DPXR_MONOLITHIC_IMPORT=${BUILD_DIR}/usd/src/external_usd/cmake/defaults/Version.cmake
-    -DTBB_LIBRARIES=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
-    -DTbb_TBB_LIBRARY=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
-    # USD wants the tbb debug lib set even when you are doing a release build
-    # Otherwise it will error out during the cmake configure phase.
-    -DTBB_LIBRARIES_DEBUG=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
+if(WIN32 AND BUILD_MODE STREQUAL Debug)
+  # There is something wonky in the ctor of the USD Trace class
+  # It will gobble up all ram and derefs a nullptr once it runs
+  # out...so...thats fun... I lack the time to debug this currently
+  # so disabling the trace will have to suffice.
+  set(USD_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DTRACE_DISABLE")
+  # USD does not look for debug libs, nor does it link them
+  # when building static, so this is just to keep find_package happy
+  # if we ever link dynamically on windows util will need to be linked.
+  set(USD_PLATFORM_FLAGS
+    -DOIIO_LIBRARIES=${LIBDIR}/openimageio/lib/OpenImageIO_d${LIBEXT}
+    -DCMAKE_CXX_FLAGS=${USD_CXX_FLAGS}
   )
 endif()
 
 set(USD_EXTRA_ARGS
   ${DEFAULT_BOOST_FLAGS}
-  -DTBB_INCLUDE_DIRS=${LIBDIR}/tbb/include
-
+  ${USD_PLATFORM_FLAGS}
   # This is a preventative measure that avoids possible conflicts when add-ons
   # try to load another USD library into the same process space.
   -DPXR_SET_INTERNAL_NAMESPACE=usdBlender
-
+  -DOPENSUBDIV_ROOT_DIR=${LIBDIR}/opensubdiv
+  -DOpenImageIO_ROOT=${LIBDIR}/openimageio
+  -DOPENEXR_LIBRARIES=${LIBDIR}/imath/lib/imath${OPENEXR_VERSION_POSTFIX}${LIBEXT}
+  -DOPENEXR_INCLUDE_DIR=${LIBDIR}/imath/include
+  -DOSL_ROOT=${LIBDIR}/osl
   -DPXR_ENABLE_PYTHON_SUPPORT=OFF
-  -DPXR_BUILD_IMAGING=OFF
+  -DPXR_BUILD_IMAGING=ON
   -DPXR_BUILD_TESTS=OFF
   -DPXR_BUILD_EXAMPLES=OFF
+  -DPXR_BUILD_TUTORIALS=OFF
+  -DPXR_ENABLE_HDF5_SUPPORT=OFF
+  -DPXR_ENABLE_MATERIALX_SUPPORT=OFF
+  -DPXR_ENABLE_OPENVDB_SUPPORT=OFF
   -DPYTHON_EXECUTABLE=${PYTHON_BINARY}
   -DPXR_BUILD_MONOLITHIC=ON
-
-  # The PXR_BUILD_USD_TOOLS argument is patched-in by usd.diff. An upstream pull request
-  # can be found at https://github.com/PixarAnimationStudios/USD/pull/1048.
+  -DPXR_ENABLE_OSL_SUPPORT=ON
+  -DPXR_BUILD_OPENIMAGEIO_PLUGIN=ON
+  # USD 22.03 does not support OCIO 2.x
+  # Tracking ticket https://github.com/PixarAnimationStudios/USD/issues/1386
+  -DPXR_BUILD_OPENCOLORIO_PLUGIN=OFF
+  -DPXR_ENABLE_PTEX_SUPPORT=OFF
   -DPXR_BUILD_USD_TOOLS=OFF
-
   -DCMAKE_DEBUG_POSTFIX=_d
-  ${USD_PLATFORM_ARGS}
+  -DBUILD_SHARED_LIBS=Off
+  # USD is hellbound on making a shared lib, unless you point this variable to a valid cmake file
+  # doesn't have to make sense, but as long as it points somewhere valid it will skip the shared lib.
+  -DPXR_MONOLITHIC_IMPORT=${BUILD_DIR}/usd/src/external_usd/cmake/defaults/Version.cmake
+  -DTBB_INCLUDE_DIRS=${LIBDIR}/tbb/include
+  -DTBB_LIBRARIES=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
+  -DTbb_TBB_LIBRARY=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
+  # USD wants the tbb debug lib set even when you are doing a release build
+  # Otherwise it will error out during the cmake configure phase.
+  -DTBB_LIBRARIES_DEBUG=${LIBDIR}/tbb/lib/${LIBPREFIX}${TBB_LIBRARY}${LIBEXT}
 )
 
 ExternalProject_Add(external_usd
@@ -66,22 +80,24 @@ if(WIN32)
   # on windows.
   add_dependencies(
     external_usd
-    external_python
+    external_openimageio
+    external_opensubdiv
+    external_osl
   )
   if(BUILD_MODE STREQUAL Release)
     ExternalProject_Add_Step(external_usd after_install
       COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/usd/include ${HARVEST_TARGET}/usd/include
       COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/usd/plugin ${HARVEST_TARGET}/usd/plugin
       COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/usd/lib/usd ${HARVEST_TARGET}/usd/lib/usd
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/usd/lib/usd_usd_ms.lib ${HARVEST_TARGET}/usd/lib/usd_usd_ms.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/usd/lib/usd_usd_ms.dll ${HARVEST_TARGET}/usd/lib/usd_usd_ms.dll
+      # See comment below about the monolithic lib on linux, same applies here.
+      COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/usd/src/external_usd-build/pxr/release/usd_usd_m.lib ${HARVEST_TARGET}/usd/lib/usd_usd_m.lib
       DEPENDEES install
     )
   endif()
   if(BUILD_MODE STREQUAL Debug)
     ExternalProject_Add_Step(external_usd after_install
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/usd/lib/usd_usd_ms_d.lib ${HARVEST_TARGET}/usd/lib/usd_usd_ms_d.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/usd/lib/usd_usd_ms_d.dll ${HARVEST_TARGET}/usd/lib/usd_usd_ms_d.dll
+      # See comment below about the monolithic lib on linux, same applies here.
+      COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/usd/src/external_usd-build/pxr/debug/usd_usd_m_d.lib ${HARVEST_TARGET}/usd/lib/usd_usd_m_d.lib
       DEPENDEES install
     )
   endif()

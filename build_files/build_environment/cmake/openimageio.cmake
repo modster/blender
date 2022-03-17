@@ -115,6 +115,8 @@ add_dependencies(
   external_boost
   external_tiff
   external_pugixml
+  external_fmt
+  external_robinmap
   external_openjpeg${OPENJPEG_POSTFIX}
   ${WEBP_DEP}
 )

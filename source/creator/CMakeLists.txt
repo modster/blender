@@ -792,19 +792,6 @@ elseif(WIN32)
       )
   endif()
 
-  if(WITH_USD)
-      install(
-        FILES ${LIBDIR}/usd/lib/usd_usd_ms.dll
-        DESTINATION "."
-        CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
-      )
-      install(
-        FILES ${LIBDIR}/usd/lib/usd_usd_ms_d.dll
-        DESTINATION "."
-        CONFIGURATIONS Debug
-      )
-  endif()
-
   if(WITH_PYTHON)
     string(REPLACE "." "" _PYTHON_VERSION_NO_DOTS ${PYTHON_VERSION})
 

@@ -810,8 +810,8 @@ if(WITH_USD)
   if(NOT USD_FOUND)
     set(USD_FOUND ON)
     set(USD_INCLUDE_DIRS ${LIBDIR}/usd/include)
-    set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/usd_usd_ms.lib)
-    set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/usd_usd_ms_d.lib)
+    set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/usd_usd_m.lib)
+    set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/usd_usd_m_d.lib)
     set(USD_LIBRARY_DIR ${LIBDIR}/usd/lib)
     # Older USD had different filenames, if the new ones are
     # not found see if the older ones exist, to ease the

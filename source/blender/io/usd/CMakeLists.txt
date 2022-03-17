@@ -10,16 +10,9 @@ if(UNIX AND NOT APPLE)
 endif()
 if(WIN32)
   add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
-  # The existance of this header really doesn't influence wither USD is
-  # a static or dynamic lib, however, when this header got introduced
-  # we switched from static -> dynamic. To ease the trasition period
-  # deal with both options.
-  if (NOT EXISTS "${USD_INCLUDE_DIRS}/pxr/usd/usdLux/boundableLightBase.h")
-    add_definitions(-DPXR_STATIC)
-  endif()
-else()
-  add_definitions(-DPXR_STATIC)
 endif()
+
+add_definitions(-DPXR_STATIC)
 
 # USD headers use deprecated TBB headers, silence warning.
 add_definitions(-DTBB_SUPPRESS_DEPRECATED_MESSAGES=1)
