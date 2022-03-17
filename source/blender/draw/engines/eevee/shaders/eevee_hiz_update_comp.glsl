@@ -59,6 +59,9 @@ void main()
     max_depth = max_v4(samp); \
     dst_px = ivec2((kernel_origin >> (lod_ - 1u)) + local_px); \
     imageStore(out_lvl_, dst_px, vec4(max_depth)); \
+  } \
+  barrier(); \
+  if (all(lessThan(local_px, uvec2(gl_WorkGroupSize.xy >> (lod_ - 1u))))) { \
     store_local_depth(local_px, max_depth); \
   }
 
