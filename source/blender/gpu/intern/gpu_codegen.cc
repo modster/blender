@@ -304,6 +304,10 @@ void GPUCodegen::generate_attribs()
   StageInterfaceInfo &iface = *info.interface_generated;
   info.vertex_out(iface);
 
+  if (GPU_material_flag_get(&mat, GPU_MATFLAG_OBJECT_INFO)) {
+    info.additional_info("draw_object_infos");
+  }
+
   /* Input declaration, loading / assignment to interface and geometry shader passthrough. */
   std::stringstream decl_ss, iface_ss, load_ss;
 
