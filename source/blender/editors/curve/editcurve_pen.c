@@ -161,7 +161,7 @@ typedef enum eClose_opt {
   ON_CLICK = 2,
 } eClose_opt;
 
-static const EnumPropertyItem prop_close_spline_opts[] = {
+static const EnumPropertyItem prop_close_spline_method[] = {
     {OFF, "OFF", 0, "None", ""},
     {ON_PRESS, "ON_PRESS", 0, "On Press", "Move handles after closing the spline"},
     {ON_CLICK, "ON_CLICK", 0, "On Click", "Spline closes on release if not dragged"},
@@ -1513,7 +1513,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
   const bool toggle_vector = RNA_boolean_get(op->ptr, "toggle_vector");
   const bool cycle_handle_type = RNA_boolean_get(op->ptr, "cycle_handle_type");
-  const int close_spline_opts = RNA_enum_get(op->ptr, "close_spline_opts");
+  const int close_spline_method = RNA_enum_get(op->ptr, "close_spline_method");
   const int extrude_handle = RNA_enum_get(op->ptr, "extrude_handle");
 
   CurvePenData *cpd;
@@ -1625,7 +1625,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
       if (cpd->found_point) {
         /* Close the spline on press. */
-        if (close_spline && close_spline_opts == ON_PRESS && cpd->nu && !is_cyclic(cpd->nu)) {
+        if (close_spline && close_spline_method == ON_PRESS && cpd->nu && !is_cyclic(cpd->nu)) {
           copy_v2_v2_int(vc.mval, event->mval);
           cpd->new_point = cpd->acted = cpd->link_handles = make_cyclic_if_endpoints(
               cpd->nu, cpd->bezt, cpd->bp, &vc, C);
@@ -1656,7 +1656,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
 
       /* Close spline on Click, if enabled. */
-      if (!cpd->acted && close_spline && close_spline_opts == ON_CLICK && cpd->found_point &&
+      if (!cpd->acted && close_spline && close_spline_method == ON_CLICK && cpd->found_point &&
           !cpd->dragging) {
         if (cpd->nu && !is_cyclic(cpd->nu)) {
           copy_v2_v2_int(vc.mval, event->mval);
@@ -1785,8 +1785,8 @@ void CURVE_OT_pen(wmOperatorType *ot)
                          "Close Spline",
                          "Make a spline cyclic by clicking endpoints");
   prop = RNA_def_enum(ot->srna,
-                      "close_spline_opts",
-                      prop_close_spline_opts,
+                      "close_spline_method",
+                      prop_close_spline_method,
                       OFF,
                       "Close Spline Method",
                       "The condition for close spline to activate");

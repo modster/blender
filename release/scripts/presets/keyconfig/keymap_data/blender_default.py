@@ -7046,7 +7046,7 @@ def km_3d_view_tool_edit_curve_pen(params):
                  ("move_segment", True),
                  ("select_point", True),
                  ("move_point", True),
-                 ("close_spline_opts", "ON_CLICK"),
+                 ("close_spline_method", "ON_CLICK"),
                 ]}),
             ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
              {"properties": [("delete_point", True),]}),
