@@ -547,7 +547,7 @@ void ShadowModule::init(void)
     /* TODO(fclem) Make allocation safe. */
     atlas_tx_.ensure_2d(GPU_R32F, atlas_extent);
     atlas_tx_.filter_mode(false);
-#if DEBUG
+#ifdef DEBUG
     atlas_tx_.clear(float4(0.0f));
 #endif
     /* Temporary render buffer. */

@@ -109,11 +109,11 @@ static void raytrace_sample_reuse_table(string &output_name, bool debug)
 
   table_out << "\n/* Sample table generated at build time. */\n";
   table_out << "const int resolve_sample_max = " << samples_per_pool << ";\n";
-  table_out << "const float2 resolve_sample_offsets[" << total << "] = float2[" << total << "](\n";
+  table_out << "const ivec2 resolve_sample_offsets[" << total << "] = ivec2[" << total << "](\n";
   for (int pool_id = 0; pool_id < 4; pool_id++) {
     auto &pool = pools[poolmap[pool_id]];
     for (int i = 0; i < samples_per_pool; i++) {
-      table_out << "  float2(" << pool[i].x << ", " << pool[i].y << ")";
+      table_out << "  ivec2(" << pool[i].x << ", " << pool[i].y << ")";
       if (i < samples_per_pool - 1) {
         table_out << ",\n";
       }

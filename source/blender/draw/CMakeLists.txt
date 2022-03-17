@@ -315,13 +315,14 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_motion_blur_tiles_dilate_frag.glsl
   engines/eevee/shaders/eevee_motion_blur_tiles_flatten_frag.glsl
   engines/eevee/shaders/eevee_nodetree_eval_lib.glsl
+  engines/eevee/shaders/eevee_raytrace_common_lib.glsl
   engines/eevee/shaders/eevee_raytrace_denoise_comp.glsl
   engines/eevee/shaders/eevee_raytrace_dispatch_comp.glsl
   engines/eevee/shaders/eevee_raytrace_raygen_comp.glsl
   engines/eevee/shaders/eevee_raytrace_raygen_lib.glsl
   engines/eevee/shaders/eevee_raytrace_resolve_lib.glsl
   engines/eevee/shaders/eevee_raytrace_screen_comp.glsl
-  engines/eevee/shaders/eevee_raytrace_trace_lib.glsl
+  engines/eevee/shaders/eevee_raytrace_screen_lib.glsl
   engines/eevee/shaders/eevee_sampling_lib.glsl
   engines/eevee/shaders/eevee_shadow_debug_frag.glsl
   engines/eevee/shaders/eevee_shadow_lib.glsl

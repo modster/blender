@@ -42,15 +42,15 @@ void main()
 
   if (tra_nor_in.z != -1.0) {
     radiance_diffuse += raytrace_resolve(
-        texel, 3, 1.5, transmit_normal_tx, ray_data_diffuse_tx, ray_radiance_diffuse_tx);
+        texel, 3, 1.5, transmit_normal_tx, ray_radiance_diffuse_tx);
   }
   else {
     radiance_refract += raytrace_resolve(
-        texel, 1, 0.64, transmit_normal_tx, ray_data_refract_tx, ray_radiance_refract_tx);
+        texel, 1, 0.64, transmit_normal_tx, ray_radiance_refract_tx);
   }
   if (true) {
     radiance_reflect += raytrace_resolve(
-        texel, 1, 0.65, reflect_normal_tx, ray_data_reflect_tx, ray_radiance_reflect_tx);
+        texel, 1, 0.65, reflect_normal_tx, ray_radiance_reflect_tx);
   }
 
   out_combined = vec4(0.0);

@@ -18,9 +18,10 @@
 #pragma BLENDER_REQUIRE(eevee_bsdf_microfacet_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_raytrace_resolve_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_raytrace_denoise_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 
-//#define USE_HISTORY
+// #define USE_HISTORY
 
 void history_weigh_and_accumulate(vec3 rgb_history,
                                   vec3 rgb_min,
@@ -46,77 +47,89 @@ void history_weigh_and_accumulate(vec3 rgb_history,
 
 void main(void)
 {
-  ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
-  ivec2 img_size = textureSize(ray_data_tx, 0).xy;
+  uint tile_id = gl_WorkGroupID.y * gl_WorkGroupSize.x + gl_WorkGroupID.x;
+  /* The dispatch may bigger than necessary. */
+  if (dispatch_buf.tile_count != 0u && tile_id >= dispatch_buf.tile_count) {
+    return;
+  }
+
+  uvec2 tile = unpackUvec2x16(tiles_buf[tile_id]);
+  ivec2 texel = ivec2(tile * gl_WorkGroupSize.xy + gl_LocalInvocationID.xy);
+  ivec2 texel_fullres = texel * raytrace_buffer_buf.res_scale + raytrace_buffer_buf.res_bias;
+
+  ivec2 img_size = textureSize(depth_tx, 0).xy;
 
   if (any(greaterThan(texel, img_size))) {
     return;
   }
 
   /* Skip pixels that have not been raytraced. */
-  if (texelFetch(ray_data_tx, texel, 0).w == 0.0) {
+  uint local_closure_bits = texelFetch(stencil_tx, texel_fullres, 0).r;
+  if (!flag_test(local_closure_bits, CLOSURE_FLAG)) {
     imageStore(out_history_img, texel, vec4(0.0));
     imageStore(out_variance_img, texel, vec4(0.0));
     return;
   }
 
-  vec2 uv = vec2(texel) / vec2(img_size);
-  float gbuffer_depth = texelFetch(hiz_tx, texel, 0).r;
-  vec3 vP = get_view_space_from_depth(uv, gbuffer_depth);
-  vec3 vV = viewCameraVec(vP);
-  vec2 texel_size = hiz_buf.pixel_to_ndc * 0.5;
+  float gbuffer_depth = texelFetch(depth_tx, texel_fullres, 0).r;
+  vec2 uv = vec2(texel_fullres) * drw_view.viewport_size_inverse;
+  vec3 P = get_world_space_from_depth(uv, gbuffer_depth);
+  vec3 V = cameraVec(P);
 
   int sample_count = resolve_sample_max;
-#if defined(DIFFUSE)
-  vec4 tra_col_in = texture(cl_color_tx, uv);
-  vec4 tra_nor_in = texture(cl_normal_tx, uv);
-  vec4 tra_dat_in = vec4(0.0); /* UNUSED */
+  vec4 col_in = vec4(0.0); /* UNUSED */
+  vec4 nor_in = texelFetch(gbuf_normal_tx, texel_fullres, 0);
 
-  ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
+#if defined(DENOISE_DIFFUSE)
+  vec4 dat_in = texelFetch(gbuf_data_tx, texel_fullres, 0);
+
+  ClosureDiffuse diffuse = gbuffer_load_diffuse_data(col_in, nor_in, dat_in);
 
   if (diffuse.sss_radius.r < 0.0) {
     /* Refraction pixel. */
-    imageStore(out_history_img, texel, vec4(0.0));
-    imageStore(out_variance_img, texel, vec4(0.0));
+    imageStore(out_history_img, texel_fullres, vec4(0.0));
+    imageStore(out_variance_img, texel_fullres, vec4(0.0));
     return;
   }
 
-  vec3 vN = transform_direction(ViewMatrix, diffuse.N);
-  vec3 color = diffuse.color;
+#  define BSDF_EVAL(R) bsdf_lambert(diffuse.N, R)
+#  define VALID_HISTORY raytrace_buffer_buf.valid_history_diffuse
 
-#elif defined(REFRACTION)
-  vec4 tra_col_in = texture(cl_color_tx, uv);
-  vec4 tra_nor_in = texture(cl_normal_tx, uv);
-  vec4 tra_dat_in = texture(cl_data_tx, uv);
+#elif defined(DENOISE_REFRACTION)
+  vec4 dat_in = texelFetch(gbuf_data_tx, texel_fullres, 0);
 
-  ClosureRefraction refraction = gbuffer_load_refraction_data(tra_col_in, tra_nor_in, tra_dat_in);
+  ClosureRefraction refraction = gbuffer_load_refraction_data(col_in, nor_in, dat_in);
 
   if (refraction.ior == -1.0) {
     /* Diffuse/SSS pixel. */
-    imageStore(out_history_img, texel, vec4(0.0));
-    imageStore(out_variance_img, texel, vec4(0.0));
+    imageStore(out_history_img, texel_fullres, vec4(0.0));
+    imageStore(out_variance_img, texel_fullres, vec4(0.0));
     return;
   }
-  float thickness;
-  gbuffer_load_global_data(tra_nor_in, thickness);
 
-  vec3 vN = transform_direction(ViewMatrix, refraction.N);
   float roughness_sqr = max(1e-3, sqr(refraction.roughness));
-  vec3 color = refraction.color;
 
   /* TODO(fclem): Unfortunately Refraction ray reuse does not work great for some reasons.
    * To investigate. */
-  sample_count = 1;
-#else
-  ClosureReflection reflection = gbuffer_load_reflection_data(cl_color_tx, cl_normal_tx, uv);
+  if (roughness_sqr == 1e-3) {
+    sample_count = 1;
+  }
 
-  vec3 vN = transform_direction(ViewMatrix, reflection.N);
+#  define BSDF_EVAL(R) btdf_ggx(refraction.N, R, V, roughness_sqr, refraction.ior)
+#  define VALID_HISTORY raytrace_buffer_buf.valid_history_refraction
+
+#elif defined(DENOISE_REFLECTION)
+  ClosureReflection reflection = gbuffer_load_reflection_data(col_in, nor_in);
+
   float roughness_sqr = max(1e-3, sqr(reflection.roughness));
-  vec3 color = reflection.color;
 
   if (roughness_sqr == 1e-3) {
     sample_count = 1;
   }
+
+#  define BSDF_EVAL(R) bsdf_ggx(reflection.N, R, V, roughness_sqr)
+#  define VALID_HISTORY raytrace_buffer_buf.valid_history_reflection
+
 #endif
 
   /* ----- SPATIAL DENOISE ----- */
@@ -138,7 +151,7 @@ void main(void)
     vec4 ray_data = texelFetch(ray_data_tx, sample_texel, 0);
     vec4 ray_radiance = texelFetch(ray_radiance_tx, sample_texel, 0);
 
-    vec3 vR = normalize(ray_data.xyz);
+    vec3 R = normalize(ray_data.xyz);
     float ray_pdf_inv = ray_data.w;
     /* Skip invalid pixels. */
     if (ray_pdf_inv == 0.0) {
@@ -146,21 +159,8 @@ void main(void)
     }
 
     /* Slide 54. */
-#if defined(DIFFUSE)
-    float bsdf = bsdf_lambert(vN, vR);
-#elif defined(REFRACTION)
-    float bsdf = btdf_ggx(vN, vR, vV, roughness_sqr, refraction.ior);
-#else
-    float bsdf = bsdf_ggx(vN, vR, vV, roughness_sqr);
-#endif
-    float weight = bsdf * ray_pdf_inv;
+    float weight = BSDF_EVAL(R) * ray_pdf_inv;
 
-#ifdef REFRACTION
-    /* Transmit twice if thickness is set and ray is longer than thickness. */
-    if (thickness > 0.0 && length(ray_data.xyz) > thickness) {
-      ray_radiance.rgb *= color;
-    }
-#endif
     radiance_accum += ray_radiance.rgb * weight;
     weight_accum += weight;
 
@@ -184,38 +184,30 @@ void main(void)
   radiance_accum *= safe_rcp(weight_accum);
   weight_accum = 1.0;
 
-#if defined(DIFFUSE)
-  if (rtbuf_buf.valid_history_diffuse) {
-#elif defined(REFRACTION)
-  if (rtbuf_buf.valid_history_refraction) {
-#else
-  if (rtbuf_buf.valid_history_reflection) {
-#endif
-
+  if (VALID_HISTORY) {
     vec3 rgb_min = rgb_mean - rgb_deviation;
     vec3 rgb_max = rgb_mean + rgb_deviation;
 
     /* Surface reprojection. */
-    vec3 P_surf = transform_point(ViewMatrixInverse, vP);
-    vec2 uv_surf = project_point(rtbuf_buf.history_persmat, P_surf).xy * 0.5 + 0.5;
-    ivec2 texel_surf = ivec2(uv_surf * vec2(img_size));
-    if (all(lessThan(texel_surf, img_size)) && all(greaterThan(texel_surf, ivec2(0)))) {
-      vec3 radiance = texelFetch(ray_history_tx, texel_surf, 0).rgb;
+    vec2 uv_surf = project_point(raytrace_buffer_buf.history_persmat, P).xy * 0.5 + 0.5;
+    ivec2 texel_surf = ivec2(uv_surf * vec2(img_size) + 0.5);
+    if (in_texture_range(texel_surf, ray_history_tx)) {
+      vec3 radiance = texture(ray_history_tx, uv_surf).rgb;
       history_weigh_and_accumulate(
           radiance, rgb_min, rgb_max, rgb_mean, rgb_deviation, radiance_accum, weight_accum);
 
       /* Variance estimate (slide 41). */
-      float variance_history = texelFetch(ray_variance_tx, texel_surf, 0).r;
+      float variance_history = texture(ray_variance_tx, uv_surf).r;
       variance = mix(variance, variance_history, 0.5);
     }
 
-#if !defined(DIFFUSE)
-    /* Reflexion reprojection. */
+#if CLOSURE_FLAG != CLOSURE_DIFFUSE
+    /* Reflection reprojection. */
     vec3 P_hit = get_world_space_from_depth(uv, hit_depth_mean);
-    vec2 uv_hit = project_point(rtbuf_buf.history_persmat, P_hit).xy * 0.5 + 0.5;
-    ivec2 texel_hit = ivec2(uv_hit * vec2(img_size));
-    if (all(lessThan(texel_hit, img_size)) && all(greaterThan(texel_hit, ivec2(0)))) {
-      vec3 radiance = texelFetch(ray_history_tx, texel_hit, 0).rgb;
+    vec2 uv_hit = project_point(raytrace_buffer_buf.history_persmat, P_hit).xy * 0.5 + 0.5;
+    ivec2 texel_hit = ivec2(uv_hit * vec2(img_size) + 0.5);
+    if (in_texture_range(texel_hit, ray_history_tx)) {
+      vec3 radiance = texture(ray_history_tx, uv_hit).rgb;
       history_weigh_and_accumulate(
           radiance, rgb_min, rgb_max, rgb_mean, rgb_deviation, radiance_accum, weight_accum);
     }
@@ -225,6 +217,6 @@ void main(void)
   }
 
   /* Save linear depth in alpha to speed-up the bilateral filter. */
-  imageStore(out_history_img, texel, vec4(radiance_accum, -vP.z));
+  imageStore(out_history_img, texel, vec4(radiance_accum, dot(cameraForward, P)));
   imageStore(out_variance_img, texel, vec4(variance, 0.0, 0.0, 0.0));
 }

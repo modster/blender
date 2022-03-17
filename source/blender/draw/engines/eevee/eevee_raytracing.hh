@@ -71,6 +71,14 @@ struct RaytraceBuffer {
   TextureFromPool ray_radiance_reflect_tx_ = {"RayReflRadiance"};
   TextureFromPool ray_radiance_refract_tx_ = {"RayRefrRadiance"};
 
+  /* Persistent buffers. */
+  Texture ray_history_diffuse_tx_[2] = {"RayDiffHistory1", "RayDiffHistory2"};
+  Texture ray_history_reflect_tx_[2] = {"RayReflHistory1", "RayReflHistory2"};
+  Texture ray_history_refract_tx_[2] = {"RayRefrHistory1", "RayRefrHistory2"};
+  Texture ray_variance_diffuse_tx_[2] = {"RayDiffVariance1", "RayDiffVariance2"};
+  Texture ray_variance_reflect_tx_[2] = {"RayReflVariance1", "RayReflVariance2"};
+  Texture ray_variance_refract_tx_[2] = {"RayRefrVariance1", "RayRefrVariance2"};
+
   int2 extent_ = int2(0);
   int3 raygen_dispatch_size_ = int3(1);
 
@@ -91,12 +99,12 @@ struct RaytraceBuffer {
   {
     using draw::Texture;
     DRW_view_persmat_get(view, data_.history_persmat.ptr(), false);
-    // Texture::swap(diffuse_radiance_tx_, diffuse_radiance_history_tx_);
-    // Texture::swap(diffuse_variance_tx_, diffuse_variance_history_tx_);
-    // Texture::swap(reflection_radiance_tx_, reflection_radiance_history_tx_);
-    // Texture::swap(reflection_variance_tx_, reflection_variance_history_tx_);
-    // Texture::swap(refraction_radiance_tx_, refraction_radiance_history_tx_);
-    // Texture::swap(refraction_variance_tx_, refraction_variance_history_tx_);
+    Texture::swap(ray_history_diffuse_tx_[0], ray_history_diffuse_tx_[1]);
+    Texture::swap(ray_history_reflect_tx_[0], ray_history_reflect_tx_[1]);
+    Texture::swap(ray_history_refract_tx_[0], ray_history_refract_tx_[1]);
+    Texture::swap(ray_variance_diffuse_tx_[0], ray_variance_diffuse_tx_[1]);
+    Texture::swap(ray_variance_reflect_tx_[0], ray_variance_reflect_tx_[1]);
+    Texture::swap(ray_variance_refract_tx_[0], ray_variance_refract_tx_[1]);
   }
 
  private:
@@ -113,13 +121,21 @@ struct RaytraceBuffer {
     }
   }
 
-  DRWPass *sync_raytrace_pass(const char *name,
-                              eShaderType screen_trace_sh,
-                              HiZBuffer &hiz_tracing,
-                              TextureFromPool &ray_data_tx,
-                              TextureFromPool &ray_radiance_tx,
-                              RaytraceIndirectBuf &dispatch_buf,
-                              RaytraceTileBuf &tile_buf);
+  DRWPass *sync_raytrace_passes(const char *name,
+                                eShaderType screen_trace_sh,
+                                eShaderType denoise_sh,
+                                HiZBuffer &hiz_tracing,
+                                TextureFromPool &ray_data_tx,
+                                TextureFromPool &ray_radiance_tx,
+                                Texture &ray_history_src_tx,
+                                Texture &ray_history_dst_tx,
+                                Texture &ray_variance_src_tx,
+                                Texture &ray_variance_dst_tx,
+                                TextureFromPool &gbuf_data_tx,
+                                TextureFromPool &gbuf_normal_tx,
+                                RaytraceDataBuf &ray_data_buf,
+                                RaytraceIndirectBuf &dispatch_buf,
+                                RaytraceTileBuf &tile_buf);
 };
 
 /** \} */

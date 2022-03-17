@@ -8,27 +8,10 @@
  * Many modifications were made for our own usage.
  */
 
+#pragma BLENDER_REQUIRE(common_debug_print_lib.glsl)
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-
-/**
- * As input to the tracing function, direction is premultiplied by its maximum length.
- * As output, direction is scaled to hit point or to latest step.
- */
-struct Ray {
-  vec3 origin;
-  vec3 direction;
-};
-
-/**
- * Screenspace ray ([0..1] "uv" range) where direction is normalize to be as small as one
- * full-resolution pixel. The ray is also clipped to all frustum sides.
- */
-struct ScreenSpaceRay {
-  vec4 origin;
-  vec4 direction;
-  float max_time;
-};
+#pragma BLENDER_REQUIRE(eevee_raytrace_common_lib.glsl)
 
 /* Inputs expected to be in viewspace. */
 void raytrace_clip_ray_to_near_plane(inout Ray ray)
@@ -39,7 +22,7 @@ void raytrace_clip_ray_to_near_plane(inout Ray ray)
   }
 }
 
-void raytrace_screenspace_ray_finalize(HiZData data, inout ScreenSpaceRay ray)
+void raytrace_screenspace_ray_finalize(inout ScreenSpaceRay ray)
 {
   /* Constant bias (due to depth buffer precision). Helps with self intersection. */
   /* Magic numbers for 24bits of precision.
@@ -58,7 +41,8 @@ void raytrace_screenspace_ray_finalize(HiZData data, inout ScreenSpaceRay ray)
   /* Make ray.direction cover one pixel. */
   bool is_more_vertical = abs(ray.direction.x) < abs(ray.direction.y);
   ray.direction /= (is_more_vertical) ? abs(ray.direction.y) : abs(ray.direction.x);
-  ray.direction *= (is_more_vertical) ? data.pixel_to_ndc.y : data.pixel_to_ndc.x;
+  ray.direction *= 2.0 * ((is_more_vertical) ? drw_view.viewport_size_inverse.y :
+                                               drw_view.viewport_size_inverse.x);
   /* Clip to segment's end. */
   ray.max_time = sqrt(ray_len_sqr * safe_rcp(len_squared(ray.direction.xyz)));
   /* Clipping to frustum sides. */
@@ -69,21 +53,21 @@ void raytrace_screenspace_ray_finalize(HiZData data, inout ScreenSpaceRay ray)
   ray.direction *= 0.5;
 }
 
-ScreenSpaceRay raytrace_screenspace_ray_create(HiZData data, Ray ray)
+ScreenSpaceRay raytrace_screenspace_ray_create(Ray ray)
 {
   ScreenSpaceRay ssray;
-  ssray.origin.xyz = project_point(ProjectionMatrix, ray.origin);
-  ssray.direction.xyz = project_point(ProjectionMatrix, ray.origin + ray.direction);
+  ssray.origin.xyz = project_point(ViewProjectionMatrix, ray.origin);
+  ssray.direction.xyz = project_point(ViewProjectionMatrix, ray.origin + ray.direction);
 
-  raytrace_screenspace_ray_finalize(data, ssray);
+  raytrace_screenspace_ray_finalize(ssray);
   return ssray;
 }
 
-ScreenSpaceRay raytrace_screenspace_ray_create(HiZData data, Ray ray, float thickness)
+ScreenSpaceRay raytrace_screenspace_ray_create(Ray ray, float thickness)
 {
   ScreenSpaceRay ssray;
-  ssray.origin.xyz = project_point(ProjectionMatrix, ray.origin);
-  ssray.direction.xyz = project_point(ProjectionMatrix, ray.origin + ray.direction);
+  ssray.origin.xyz = project_point(ViewProjectionMatrix, ray.origin);
+  ssray.direction.xyz = project_point(ViewProjectionMatrix, ray.origin + ray.direction);
   /* Interpolate thickness in screen space.
    * Calculate thickness further away to avoid near plane clipping issues. */
   ssray.origin.w = get_depth_from_view_z(ray.origin.z - thickness);
@@ -91,9 +75,11 @@ ScreenSpaceRay raytrace_screenspace_ray_create(HiZData data, Ray ray, float thic
   ssray.origin.w = ssray.origin.w * 2.0 - 1.0;
   ssray.direction.w = ssray.direction.w * 2.0 - 1.0;
 
-  raytrace_screenspace_ray_finalize(data, ssray);
+  raytrace_screenspace_ray_finalize(ssray);
   return ssray;
 }
+
+ivec2 ssray_debug_pixel = ivec2(-1);
 
 /**
  * Raytrace against the given hizbuffer heightfield.
@@ -110,7 +96,7 @@ ScreenSpaceRay raytrace_screenspace_ray_create(HiZData data, Ray ray, float thic
  * \return True if there is a valid intersection.
  */
 bool raytrace_screen(RaytraceData rt_data,
-                     HiZData data,
+                     HiZData hiz_data,
                      sampler2D hiz_tx,
                      float stride_rand,
                      float roughness,
@@ -123,12 +109,13 @@ bool raytrace_screen(RaytraceData rt_data,
     raytrace_clip_ray_to_near_plane(ray);
   }
 
-  ScreenSpaceRay ssray = raytrace_screenspace_ray_create(data, ray, rt_data.thickness);
+  ScreenSpaceRay ssray = raytrace_screenspace_ray_create(ray, rt_data.thickness);
+
   /* Avoid no iteration. */
   if (!allow_self_intersection && ssray.max_time < 1.1) {
     /* Still output the clipped ray. */
     vec3 hit_ssP = ssray.origin.xyz + ssray.direction.xyz * ssray.max_time;
-    vec3 hit_P = get_view_space_from_depth(hit_ssP.xy, saturate(hit_ssP.z));
+    vec3 hit_P = get_world_space_from_depth(hit_ssP.xy, saturate(hit_ssP.z));
     ray.direction = hit_P - ray.origin;
     return false;
   }
@@ -156,7 +143,7 @@ bool raytrace_screen(RaytraceData rt_data,
     t += stride;
 
     vec4 ss_p = ssray.origin + ssray.direction * time;
-    depth_sample = textureLod(hiz_tx, ss_p.xy * data.uv_scale, floor(lod)).r;
+    depth_sample = textureLod(hiz_tx, ss_p.xy * hiz_data.uv_scale, floor(lod)).r;
 
     delta = depth_sample - ss_p.z;
     /* Check if the ray is below the surface ... */
@@ -174,7 +161,7 @@ bool raytrace_screen(RaytraceData rt_data,
 
   vec3 hit_ssP = ssray.origin.xyz + ssray.direction.xyz * time;
   /* Set ray to where tracing ended. */
-  vec3 hit_P = get_view_space_from_depth(hit_ssP.xy, saturate(hit_ssP.z));
+  vec3 hit_P = get_world_space_from_depth(hit_ssP.xy, saturate(hit_ssP.z));
   ray.direction = hit_P - ray.origin;
 
   return hit;

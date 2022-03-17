@@ -253,12 +253,6 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref(grp, "reflect_color_tx", &gbuf.reflect_color_tx);
     DRW_shgroup_uniform_texture_ref(grp, "reflect_normal_tx", &gbuf.reflect_normal_tx);
     DRW_shgroup_uniform_texture_ref_ex(
-        grp, "ray_data_diffuse_tx", &ray_data_diffuse_tx_, no_interp);
-    DRW_shgroup_uniform_texture_ref_ex(
-        grp, "ray_data_reflect_tx", &ray_data_reflect_tx_, no_interp);
-    DRW_shgroup_uniform_texture_ref_ex(
-        grp, "ray_data_refract_tx", &ray_data_refract_tx_, no_interp);
-    DRW_shgroup_uniform_texture_ref_ex(
         grp, "ray_radiance_diffuse_tx", &ray_radiance_diffuse_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "ray_radiance_reflect_tx", &ray_radiance_reflect_tx_, no_interp);
@@ -329,11 +323,12 @@ void DeferredPass::render(const DRWView *drw_view,
   opaque_layer_.render(drw_view, &rt_buffer_opaque_, depth_tx, combined_tx);
   DRW_stats_group_end();
 
+  rt_buffer_opaque_.render_end(drw_view);
+
   DRW_stats_group_start("RefractionLayer");
   refraction_layer_.render(drw_view, &rt_buffer_refract_, depth_tx, combined_tx);
   DRW_stats_group_end();
 
-  rt_buffer_opaque_.render_end(drw_view);
   rt_buffer_refract_.render_end(drw_view);
 }
 

@@ -143,9 +143,6 @@ class DeferredPass {
   DRWPass *eval_subsurface_ps_ = nullptr;
 
   /* References only. */
-  GPUTexture *ray_data_diffuse_tx_ = nullptr;
-  GPUTexture *ray_data_refract_tx_ = nullptr;
-  GPUTexture *ray_data_reflect_tx_ = nullptr;
   GPUTexture *ray_radiance_diffuse_tx_ = nullptr;
   GPUTexture *ray_radiance_refract_tx_ = nullptr;
   GPUTexture *ray_radiance_reflect_tx_ = nullptr;

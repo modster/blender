@@ -5,7 +5,7 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_bsdf_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_raytrace_trace_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_raytrace_common_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 
 /* Returns viewspace ray. */

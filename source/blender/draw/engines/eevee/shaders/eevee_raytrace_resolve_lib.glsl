@@ -32,7 +32,6 @@ vec3 raytrace_resolve(ivec2 texel_origin,
                       const int kernel_radius,
                       const float sigma_pixel,
                       sampler2D closure_normal_tx,
-                      sampler2D ray_data_tx,
                       sampler2D ray_radiance_tx)
 {
   /* Convert to half res pixel. */

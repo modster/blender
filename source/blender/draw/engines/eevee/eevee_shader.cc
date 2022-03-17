@@ -170,10 +170,16 @@ const char *ShaderModule::static_shader_create_info_name_get(eShaderType shader_
     case MOTION_BLUR_TILE_FLATTEN:
       return "eevee_motion_blur_tiles_flatten";
 
-    case RAYTRACE_RAYGEN:
-      return "eevee_raytrace_raygen";
     case RAYTRACE_DISPATCH:
       return "eevee_raytrace_dispatch";
+    case RAYTRACE_DENOISE_DIFFUSE:
+      return "eevee_raytrace_denoise_diffuse";
+    case RAYTRACE_DENOISE_REFLECT:
+      return "eevee_raytrace_denoise_reflect";
+    case RAYTRACE_DENOISE_REFRACT:
+      return "eevee_raytrace_denoise_refract";
+    case RAYTRACE_RAYGEN:
+      return "eevee_raytrace_raygen";
     case RAYTRACE_SCREEN_REFLECT:
       return "eevee_raytrace_screen_reflect";
     case RAYTRACE_SCREEN_REFRACT:

@@ -14,7 +14,7 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_surface_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_raytrace_raygen_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_raytrace_trace_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_raytrace_screen_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_light_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_lightprobe_eval_cubemap_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_lightprobe_eval_grid_lib.glsl)

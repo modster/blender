@@ -46,11 +46,12 @@ GPU_SHADER_CREATE_INFO(eevee_raytrace_dispatch)
 
 GPU_SHADER_CREATE_INFO(eevee_raytrace_screen)
     .local_group_size(RAYTRACE_GROUP_SIZE, RAYTRACE_GROUP_SIZE)
-    .additional_info("eevee_shared", "draw_view")
+    .additional_info("eevee_shared", "draw_view", "draw_debug_print")
     .storage_buf(0, Qualifier::READ, "DispatchIndirectCommand", "dispatch_buf")
     .storage_buf(2, Qualifier::READ, "uint", "tiles_buf[]")
     .uniform_buf(4, "HiZData", "hiz_buf")
     .uniform_buf(5, "RaytraceBufferData", "raytrace_buffer_buf")
+    .uniform_buf(6, "RaytraceData", "raytrace_buf")
     .sampler(0, ImageType::FLOAT_2D, "radiance_tx")
     .sampler(1, ImageType::FLOAT_2D, "hiz_tx")
     .sampler(2, ImageType::FLOAT_2D, "depth_tx")
@@ -70,6 +71,49 @@ GPU_SHADER_CREATE_INFO(eevee_raytrace_screen_refract)
     .define("DO_REFLECTION", "false")
     .define("DO_REFRACTION", "true")
     .additional_info("eevee_raytrace_screen");
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name De-noising
+ * \{ */
+
+GPU_SHADER_CREATE_INFO(eevee_raytrace_denoise)
+    .local_group_size(RAYTRACE_GROUP_SIZE, RAYTRACE_GROUP_SIZE)
+    .additional_info("eevee_shared", "draw_view")
+    .storage_buf(0, Qualifier::READ, "DispatchIndirectCommand", "dispatch_buf")
+    .storage_buf(2, Qualifier::READ, "uint", "tiles_buf[]")
+    .uniform_buf(1, "RaytraceBufferData", "raytrace_buffer_buf")
+    .uniform_buf(2, "RaytraceData", "raytrace_buf")
+    .sampler(0, ImageType::FLOAT_2D, "gbuf_data_tx")
+    .sampler(1, ImageType::FLOAT_2D, "gbuf_normal_tx")
+    .sampler(2, ImageType::DEPTH_2D, "depth_tx")
+    .sampler(3, ImageType::UINT_2D, "stencil_tx")
+    .sampler(4, ImageType::FLOAT_2D, "ray_data_tx")
+    .sampler(5, ImageType::FLOAT_2D, "ray_radiance_tx")
+    .sampler(6, ImageType::FLOAT_2D, "ray_history_tx")
+    .sampler(7, ImageType::FLOAT_2D, "ray_variance_tx")
+    .image(0, GPU_R11F_G11F_B10F, Qualifier::READ_WRITE, ImageType::FLOAT_2D, "out_history_img")
+    .image(1, GPU_R8, Qualifier::READ_WRITE, ImageType::FLOAT_2D, "out_variance_img")
+    .compute_source("eevee_raytrace_denoise_comp.glsl");
+
+GPU_SHADER_CREATE_INFO(eevee_raytrace_denoise_diffuse)
+    .do_static_compilation(true)
+    .define("CLOSURE_FLAG", "CLOSURE_DIFFUSE")
+    .define("DENOISE_DIFFUSE")
+    .additional_info("eevee_raytrace_denoise");
+
+GPU_SHADER_CREATE_INFO(eevee_raytrace_denoise_reflect)
+    .do_static_compilation(true)
+    .define("CLOSURE_FLAG", "CLOSURE_REFLECTION")
+    .define("DENOISE_REFLECTION")
+    .additional_info("eevee_raytrace_denoise");
+
+GPU_SHADER_CREATE_INFO(eevee_raytrace_denoise_refract)
+    .do_static_compilation(true)
+    .define("CLOSURE_FLAG", "CLOSURE_REFRACTION")
+    .define("DENOISE_REFRACTION")
+    .additional_info("eevee_raytrace_denoise");
 
 /** \} */
 

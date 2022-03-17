@@ -35,7 +35,7 @@ void RaytracingModule::sync(void)
   reflection_data.pool_offset = inst_.sampling.sample_get() / 5;
 
   refraction_data = static_cast<RaytraceData>(reflection_data);
-  // refraction_data.thickness = 1e16;
+  refraction_data.thickness = 1e16;
   /* TODO(fclem): Clamp option for refraction. */
   /* TODO(fclem): bias option for refraction. */
   /* TODO(fclem): bias option for refraction. */
@@ -107,38 +107,70 @@ void RaytraceBuffer::sync(int2 extent)
     DRW_shgroup_call_compute_ref(grp, raygen_dispatch_size_);
   }
 
-  trace_diffuse_ps_ = sync_raytrace_pass("RayDiff",
-                                         RAYTRACE_SCREEN_REFLECT,
-                                         inst_.hiz_front,
-                                         ray_data_diffuse_tx_,
-                                         ray_radiance_diffuse_tx_,
-                                         dispatch_diffuse_buf_,
-                                         tiles_diffuse_buf_);
+  trace_diffuse_ps_ = sync_raytrace_passes("RayDiff",
+                                           RAYTRACE_SCREEN_REFLECT,
+                                           RAYTRACE_DENOISE_DIFFUSE,
+                                           inst_.hiz_front,
+                                           ray_data_diffuse_tx_,
+                                           ray_radiance_diffuse_tx_,
+                                           ray_history_diffuse_tx_[0],
+                                           ray_history_diffuse_tx_[1],
+                                           ray_variance_diffuse_tx_[0],
+                                           ray_variance_diffuse_tx_[1],
+                                           gbuf.transmit_data_tx,
+                                           gbuf.transmit_normal_tx,
+                                           inst_.raytracing.diffuse_data,
+                                           dispatch_diffuse_buf_,
+                                           tiles_diffuse_buf_);
 
-  trace_reflect_ps_ = sync_raytrace_pass("RayRefl",
-                                         RAYTRACE_SCREEN_REFLECT,
-                                         inst_.hiz_front,
-                                         ray_data_reflect_tx_,
-                                         ray_radiance_reflect_tx_,
-                                         dispatch_reflect_buf_,
-                                         tiles_reflect_buf_);
+  trace_reflect_ps_ = sync_raytrace_passes("RayRefl",
+                                           RAYTRACE_SCREEN_REFLECT,
+                                           RAYTRACE_DENOISE_REFLECT,
+                                           inst_.hiz_front,
+                                           ray_data_reflect_tx_,
+                                           ray_radiance_reflect_tx_,
+                                           ray_history_reflect_tx_[0],
+                                           ray_history_reflect_tx_[1],
+                                           ray_variance_reflect_tx_[0],
+                                           ray_variance_reflect_tx_[1],
+                                           gbuf.transmit_data_tx, /* UNUSED, Placeholder. */
+                                           gbuf.reflect_normal_tx,
+                                           inst_.raytracing.reflection_data,
+                                           dispatch_reflect_buf_,
+                                           tiles_reflect_buf_);
 
-  trace_refract_ps_ = sync_raytrace_pass("RayRefr",
-                                         RAYTRACE_SCREEN_REFRACT,
-                                         inst_.hiz_back,
-                                         ray_data_refract_tx_,
-                                         ray_radiance_refract_tx_,
-                                         dispatch_refract_buf_,
-                                         tiles_refract_buf_);
+  trace_refract_ps_ = sync_raytrace_passes("RayRefr",
+                                           RAYTRACE_SCREEN_REFRACT,
+                                           RAYTRACE_DENOISE_REFRACT,
+                                           inst_.hiz_back,
+                                           ray_data_refract_tx_,
+                                           ray_radiance_refract_tx_,
+                                           ray_history_refract_tx_[0],
+                                           ray_history_refract_tx_[1],
+                                           ray_variance_refract_tx_[0],
+                                           ray_variance_refract_tx_[1],
+                                           gbuf.transmit_data_tx,
+                                           gbuf.transmit_normal_tx,
+                                           inst_.raytracing.refraction_data,
+                                           dispatch_refract_buf_,
+                                           tiles_refract_buf_);
 }
 
-DRWPass *RaytraceBuffer::sync_raytrace_pass(const char *name,
-                                            eShaderType screen_trace_sh,
-                                            HiZBuffer &hiz_tracing,
-                                            TextureFromPool &ray_data_tx,
-                                            TextureFromPool &ray_radiance_tx,
-                                            RaytraceIndirectBuf &dispatch_buf,
-                                            RaytraceTileBuf &tile_buf)
+DRWPass *RaytraceBuffer::sync_raytrace_passes(const char *name,
+                                              eShaderType screen_trace_sh,
+                                              eShaderType denoise_sh,
+                                              HiZBuffer &hiz_tracing,
+                                              TextureFromPool &ray_data_tx,
+                                              TextureFromPool &ray_radiance_tx,
+                                              Texture &ray_history_src_tx,
+                                              Texture &ray_history_dst_tx,
+                                              Texture &ray_variance_src_tx,
+                                              Texture &ray_variance_dst_tx,
+                                              TextureFromPool &gbuf_data_tx,
+                                              TextureFromPool &gbuf_normal_tx,
+                                              RaytraceDataBuf &ray_data_buf,
+                                              RaytraceIndirectBuf &dispatch_buf,
+                                              RaytraceTileBuf &tile_buf)
 {
   LightProbeModule &lightprobes = inst_.lightprobes;
 
@@ -159,6 +191,7 @@ DRWPass *RaytraceBuffer::sync_raytrace_pass(const char *name,
     DRW_shgroup_storage_block(grp, "tiles_buf", tile_buf);
     DRW_shgroup_uniform_block(grp, "hiz_buf", inst_.hiz.ubo_get());
     DRW_shgroup_uniform_block(grp, "raytrace_buffer_buf", data_);
+    DRW_shgroup_uniform_block(grp, "raytrace_buf", ray_data_buf);
     DRW_shgroup_uniform_block(grp, "sampling_buf", inst_.sampling.ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", hiz_tracing.texture_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &depth_view_tx_);
@@ -169,6 +202,26 @@ DRWPass *RaytraceBuffer::sync_raytrace_pass(const char *name,
     DRW_shgroup_uniform_block(grp, "probes_buf", lightprobes.info_ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
+    DRW_shgroup_call_compute_indirect(grp, dispatch_buf);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
+  }
+  {
+    GPUShader *sh = inst_.shaders.static_shader_get(denoise_sh);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, pass);
+    DRW_shgroup_storage_block(grp, "dispatch_buf", dispatch_buf);
+    DRW_shgroup_storage_block(grp, "tiles_buf", tile_buf);
+    DRW_shgroup_uniform_block(grp, "raytrace_buffer_buf", data_);
+    DRW_shgroup_uniform_block(grp, "raytrace_buf", ray_data_buf);
+    DRW_shgroup_uniform_texture_ref(grp, "gbuf_data_tx", &gbuf_data_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "gbuf_normal_tx", &gbuf_normal_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &depth_view_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "stencil_tx", &stencil_view_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "ray_data_tx", &ray_data_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "ray_radiance_tx", &ray_radiance_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "ray_history_tx", &ray_history_src_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "ray_variance_tx", &ray_variance_src_tx);
+    DRW_shgroup_uniform_image_ref(grp, "out_history_img", &ray_history_dst_tx);
+    DRW_shgroup_uniform_image_ref(grp, "out_variance_img", &ray_variance_dst_tx);
     DRW_shgroup_call_compute_indirect(grp, dispatch_buf);
     DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
   }
@@ -183,10 +236,6 @@ void RaytraceBuffer::trace(eClosureBits closure_type,
   GPU_storagebuf_clear_to_zero(dispatch_reflect_buf_);
   GPU_storagebuf_clear_to_zero(dispatch_refract_buf_);
 
-  /* TODO(fclem): Rotate depending on sample. */
-  data_.res_bias = int2(0);
-  data_.push_update();
-
   bool do_diffuse = bool(closure_type & CLOSURE_DIFFUSE);
   bool do_reflect = bool(closure_type & CLOSURE_REFLECTION);
   bool do_refract = bool(closure_type & CLOSURE_REFRACTION);
@@ -197,28 +246,62 @@ void RaytraceBuffer::trace(eClosureBits closure_type,
   ray_radiance_reflect_tx_.acquire(do_reflect ? extent_ : int2(1), GPU_RGBA16F, (void *)this);
   ray_radiance_refract_tx_.acquire(do_refract ? extent_ : int2(1), GPU_RGBA16F, (void *)this);
 
+  data_.valid_history_diffuse = true;
+  data_.valid_history_reflection = true;
+  data_.valid_history_refraction = true;
+
+  for (int i = 0; i < 2; i++) {
+    if (ray_history_diffuse_tx_[i].ensure_2d(GPU_R11F_G11F_B10F, do_diffuse ? extent_ : int2(1))) {
+      data_.valid_history_diffuse = false;
+    }
+    if (ray_history_reflect_tx_[i].ensure_2d(GPU_R11F_G11F_B10F, do_reflect ? extent_ : int2(1))) {
+      data_.valid_history_reflection = false;
+    }
+    if (ray_history_refract_tx_[i].ensure_2d(GPU_R11F_G11F_B10F, do_refract ? extent_ : int2(1))) {
+      data_.valid_history_refraction = false;
+    }
+    if (ray_variance_diffuse_tx_[i].ensure_2d(GPU_R8, do_diffuse ? extent_ : int2(1))) {
+      data_.valid_history_diffuse = false;
+    }
+    if (ray_variance_reflect_tx_[i].ensure_2d(GPU_R8, do_reflect ? extent_ : int2(1))) {
+      data_.valid_history_reflection = false;
+    }
+    if (ray_variance_refract_tx_[i].ensure_2d(GPU_R8, do_refract ? extent_ : int2(1))) {
+      data_.valid_history_refraction = false;
+    }
+  }
+
+  /* TODO(fclem): Rotate depending on sample. */
+  data_.res_bias = int2(0);
+  data_.push_update();
+
   depth_view_tx_ = depth_buffer;
   stencil_view_tx_ = depth_buffer.stencil_view();
 
+  float4 clear_color(0.0f);
+
   DRW_draw_pass(raygen_ps_);
   if (do_diffuse) {
+    GPU_texture_clear(ray_history_diffuse_tx_[1], GPU_DATA_FLOAT, &clear_color);
+    GPU_texture_clear(ray_radiance_diffuse_tx_, GPU_DATA_FLOAT, &clear_color);
     DRW_draw_pass(trace_diffuse_ps_);
   }
   if (do_reflect) {
+    GPU_texture_clear(ray_history_reflect_tx_[1], GPU_DATA_FLOAT, &clear_color);
+    GPU_texture_clear(ray_radiance_reflect_tx_, GPU_DATA_FLOAT, &clear_color);
     DRW_draw_pass(trace_reflect_ps_);
   }
   if (do_refract) {
+    GPU_texture_clear(ray_history_refract_tx_[1], GPU_DATA_FLOAT, &clear_color);
+    GPU_texture_clear(ray_radiance_refract_tx_, GPU_DATA_FLOAT, &clear_color);
     DRW_draw_pass(trace_refract_ps_);
   }
 
   /* Pass deferred pass arguments. */
   deferred_pass.ray_buffer_ubo_ = data_;
-  deferred_pass.ray_data_diffuse_tx_ = ray_data_diffuse_tx_;
-  deferred_pass.ray_data_reflect_tx_ = ray_data_reflect_tx_;
-  deferred_pass.ray_data_refract_tx_ = ray_data_refract_tx_;
-  deferred_pass.ray_radiance_diffuse_tx_ = ray_radiance_diffuse_tx_;
-  deferred_pass.ray_radiance_reflect_tx_ = ray_radiance_reflect_tx_;
-  deferred_pass.ray_radiance_refract_tx_ = ray_radiance_refract_tx_;
+  deferred_pass.ray_radiance_diffuse_tx_ = ray_history_diffuse_tx_[1];
+  deferred_pass.ray_radiance_reflect_tx_ = ray_history_reflect_tx_[1];
+  deferred_pass.ray_radiance_refract_tx_ = ray_history_refract_tx_[1];
 }
 
 void RaytraceBuffer::release_tmp()
