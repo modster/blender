@@ -1,11 +1,19 @@
 void dfdx_v3(vec3 v, out vec3 dy)
 {
+#ifdef GPU_FRAGMENT_SHADER
   dy = v + DFDX_SIGN * dFdx(v);
+#else
+  dy = v;
+#endif
 }
 
 void dfdy_v3(vec3 v, out vec3 dy)
 {
+#ifdef GPU_FRAGMENT_SHADER
   dy = v + DFDY_SIGN * dFdy(v);
+#else
+  dy = v;
+#endif
 }
 
 void node_bump(float strength,
