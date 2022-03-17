@@ -39,27 +39,31 @@ class LightProbeModule {
   Texture cube_color_tx_ = {"CubemapColor"};
   LightProbeView probe_views_[6];
 
-  Framebuffer cube_downsample_fb_ = {"cube_downsample"};
-  Framebuffer filter_cube_fb_ = {"filter_cube"};
-  Framebuffer filter_grid_fb_ = {"filter_grid"};
-
   std::array<DRWView *, 6> face_view_ = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
-  DRWPass *cube_downsample_ps_ = nullptr;
-  DRWPass *filter_glossy_ps_ = nullptr;
+  DRWPass *filter_cubemap_ps_ = nullptr;
   DRWPass *filter_diffuse_ps_ = nullptr;
   DRWPass *filter_visibility_ps_ = nullptr;
 
   DRWPass *display_ps_ = nullptr;
 
-  /** Input texture to downsample cube pass. */
-  GPUTexture *cube_downsample_input_tx_ = nullptr;
+  /** Input texture view to filter pass. */
+  GPUTexture *filter_input_tx_ = nullptr;
+  /** Output texture view to filter pass. */
+  GPUTexture *dst_view_lvl0_tx_ = nullptr;
+  GPUTexture *dst_view_lvl1_tx_ = nullptr;
+  GPUTexture *dst_view_lvl2_tx_ = nullptr;
+  GPUTexture *dst_view_lvl3_tx_ = nullptr;
+  GPUTexture *dst_view_lvl4_tx_ = nullptr;
+  GPUTexture *dst_view_lvl5_tx_ = nullptr;
   /** Copy of actual textures from the lightcache_. */
   GPUTexture *active_grid_tx_ = nullptr;
   GPUTexture *active_cube_tx_ = nullptr;
   /** Constant values during baking. */
   float glossy_clamp_ = 0.0;
   float filter_quality_ = 0.0;
+  /** Dispatch size for cubemap downsampling (filter). */
+  int3 cube_dispatch_;
 
  public:
   LightProbeModule(Instance &inst)
@@ -148,11 +152,6 @@ class LightProbeModule {
   {
     float target_size_sq = square_f(GPU_texture_width(cube_color_tx_));
     return 0.5f * logf(target_size_sq / filter_data_.sample_count) / logf(2);
-  }
-
-  static void cube_downsample_cb(void *thunk, int UNUSED(level))
-  {
-    DRW_draw_pass(reinterpret_cast<LightProbeModule *>(thunk)->cube_downsample_ps_);
   }
 
   void cubemap_render(void);

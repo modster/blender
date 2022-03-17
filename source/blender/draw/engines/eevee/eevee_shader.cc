@@ -153,10 +153,8 @@ const char *ShaderModule::static_shader_create_info_name_get(eShaderType shader_
       return "eevee_lightprobe_display_cubemap";
     case LIGHTPROBE_DISPLAY_IRRADIANCE:
       return "eevee_lightprobe_display_grid";
-    case LIGHTPROBE_FILTER_DOWNSAMPLE_CUBE:
-      return "eevee_lightprobe_filter_downsample";
-    case LIGHTPROBE_FILTER_GLOSSY:
-      return "eevee_lightprobe_filter_glossy";
+    case LIGHTPROBE_FILTER_CUBEMAP:
+      return "eevee_lightprobe_filter_cubemap";
     case LIGHTPROBE_FILTER_DIFFUSE:
       return "eevee_lightprobe_filter_diffuse";
     case LIGHTPROBE_FILTER_VISIBILITY:

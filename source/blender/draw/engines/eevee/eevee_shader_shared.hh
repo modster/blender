@@ -606,6 +606,17 @@ struct LightProbeFilterData {
   float visibility_range;
   /** Target layer to render the fullscreen triangle to. */
   int target_layer;
+  /** Offset in the destination texture. In pixels. */
+  int2 dst_offset;
+  /** Skip mip 0 copy during cubemap filter. */
+  bool1 skip_mip_0;
+  /** Number of lod to populate during cubemap filter. */
+  uint out_lod_max;
+  /** Visibility map size in the irradiance cache. In pixels. */
+  int visibility_size;
+  int _pad0;
+  int _pad1;
+  int _pad2;
 };
 BLI_STATIC_ASSERT_ALIGN(LightProbeFilterData, 16)
 

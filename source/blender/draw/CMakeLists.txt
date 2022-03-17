@@ -305,11 +305,9 @@ set(GLSL_SRC
   engines/eevee/shaders/eevee_lightprobe_display_grid_vert.glsl
   engines/eevee/shaders/eevee_lightprobe_eval_cubemap_lib.glsl
   engines/eevee/shaders/eevee_lightprobe_eval_grid_lib.glsl
-  engines/eevee/shaders/eevee_lightprobe_filter_diffuse_frag.glsl
-  engines/eevee/shaders/eevee_lightprobe_filter_downsample_frag.glsl
-  engines/eevee/shaders/eevee_lightprobe_filter_glossy_frag.glsl
-  engines/eevee/shaders/eevee_lightprobe_filter_vert.glsl
-  engines/eevee/shaders/eevee_lightprobe_filter_visibility_frag.glsl
+  engines/eevee/shaders/eevee_lightprobe_filter_cubemap_comp.glsl
+  engines/eevee/shaders/eevee_lightprobe_filter_diffuse_comp.glsl
+  engines/eevee/shaders/eevee_lightprobe_filter_visibility_comp.glsl
   engines/eevee/shaders/eevee_lookdev_background_frag.glsl
   engines/eevee/shaders/eevee_ltc_lib.glsl
   engines/eevee/shaders/eevee_motion_blur_gather_frag.glsl

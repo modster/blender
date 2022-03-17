@@ -210,8 +210,6 @@ bool LightCache::create_reflection_texture(void)
 
   if (cube_tx.tex != nullptr) {
     GPU_texture_mipmap_mode(cube_tx.tex, true, true);
-    /* TODO(fclem) This fixes incomplete texture. Fix the GPU module instead. */
-    GPU_texture_generate_mipmap(cube_tx.tex);
   }
   else {
     flag |= LIGHTCACHE_NOT_USABLE;

@@ -64,6 +64,16 @@ struct LightCache : public ::LightCache {
   void readback_irradiance(void);
   void readback_reflections(void);
 
+  eGPUTextureFormat irradiance_format_get(void) const
+  {
+    return irradiance_format;
+  }
+
+  eGPUTextureFormat reflection_format_get(void) const
+  {
+    return reflection_format;
+  }
+
  private:
   bool version_check(void) const;
   bool can_be_saved(void) const;

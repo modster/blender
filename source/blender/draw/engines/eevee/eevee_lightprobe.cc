@@ -78,41 +78,45 @@ void LightProbeModule::init()
 
 void LightProbeModule::begin_sync()
 {
-  {
-    cube_downsample_ps_ = DRW_pass_create("Downsample.Cube", DRW_STATE_WRITE_COLOR);
+  int vis_dispatch = info_data_.grids_info.visibility_size / LIGHTPROBE_FILTER_VIS_GROUP_SIZE;
 
-    GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DOWNSAMPLE_CUBE);
-    DRWShadingGroup *grp = DRW_shgroup_create(sh, cube_downsample_ps_);
-    DRW_shgroup_uniform_texture_ref(grp, "input_tx", &cube_downsample_input_tx_);
+  {
+    filter_cubemap_ps_ = DRW_pass_create("Filter.Cubemap", (DRWState)0);
+
+    GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_CUBEMAP);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_cubemap_ps_);
+    DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &filter_input_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_lvl0", &dst_view_lvl0_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_lvl1", &dst_view_lvl1_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_lvl2", &dst_view_lvl2_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_lvl3", &dst_view_lvl3_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_lvl4", &dst_view_lvl4_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_lvl5", &dst_view_lvl5_tx_);
     DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
-    DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
+    DRW_shgroup_call_compute_ref(grp, cube_dispatch_);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
   }
   {
-    filter_glossy_ps_ = DRW_pass_create("Filter.GlossyMip", DRW_STATE_WRITE_COLOR);
-
-    GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_GLOSSY);
-    DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_glossy_ps_);
-    DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
-    DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
-  }
-  {
-    filter_diffuse_ps_ = DRW_pass_create("Filter.Diffuse", DRW_STATE_WRITE_COLOR);
+    filter_diffuse_ps_ = DRW_pass_create("Filter.Diffuse", (DRWState)0);
 
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DIFFUSE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_diffuse_ps_);
-    DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &filter_input_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_irradiance_cache_img", &dst_view_lvl0_tx_);
     DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
-    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+    DRW_shgroup_call_compute(grp, 1, 1, 1);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
   }
   {
-    filter_visibility_ps_ = DRW_pass_create("Filter.Visibility", DRW_STATE_WRITE_COLOR);
+    filter_visibility_ps_ = DRW_pass_create("Filter.Visibility", (DRWState)0);
 
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_VISIBILITY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_visibility_ps_);
-    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &cube_downsample_input_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &filter_input_tx_);
+    DRW_shgroup_uniform_image_ref(grp, "out_visibility_img", &dst_view_lvl0_tx_);
     DRW_shgroup_uniform_block(grp, "filter_buf", filter_data_);
-    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+    DRW_shgroup_call_compute(grp, vis_dispatch, vis_dispatch, 1);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
   }
 
   display_ps_ = nullptr;
@@ -183,21 +187,17 @@ void LightProbeModule::cubemap_prepare(float3 position,
 {
   SceneEEVEE &sce_eevee = inst_.scene->eevee;
   int cube_res = sce_eevee.gi_cubemap_resolution;
-  int cube_mip_count = (int)log2_ceil_u(cube_res);
 
   float4x4 viewmat = float4x4::identity();
   negate_v3_v3(viewmat[3], position);
 
   /* TODO(fclem) We might want to have theses as temporary textures. */
-  cube_depth_tx_.ensure_cube(GPU_DEPTH24_STENCIL8, cube_res, nullptr, cube_mip_count);
-  cube_color_tx_.ensure_cube(GPU_RGBA16F, cube_res, nullptr, cube_mip_count);
+  cube_depth_tx_.ensure_cube(GPU_DEPTH24_STENCIL8, cube_res, nullptr, 1);
+  cube_color_tx_.ensure_cube(GPU_RGBA16F, cube_res, nullptr, 6);
   GPU_texture_mipmap_mode(cube_color_tx_, true, true);
 
-  cube_downsample_fb_.ensure(GPU_ATTACHMENT_TEXTURE(cube_depth_tx_),
-                             GPU_ATTACHMENT_TEXTURE(cube_color_tx_));
-
-  filter_cube_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(lightcache_->cube_tx.tex));
-  filter_grid_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(lightcache_->grid_tx.tex));
+  cube_depth_tx_.ensure_mip_views(true);
+  cube_color_tx_.ensure_mip_views(true);
 
   float4x4 winmat;
   cubeface_winmat_get(winmat, near, far);
@@ -214,65 +214,62 @@ void LightProbeModule::cubemap_render(void)
     probe_views_[i].render(cube_depth_tx_);
   }
   DRW_stats_group_end();
-
-  /* Update mipchain. */
-  filter_data_.target_layer = 0;
-  filter_data_.push_update();
-  cube_downsample_input_tx_ = cube_color_tx_;
-
-  DRW_stats_group_start("Cubemap Downsample");
-  GPU_framebuffer_recursive_downsample(cube_downsample_fb_, 7, cube_downsample_cb, this);
-  DRW_stats_group_end();
 }
 
 void LightProbeModule::filter_glossy(int cube_index, float intensity)
 {
+  SceneEEVEE &sce_eevee = inst_.scene->eevee;
+
   DRW_stats_group_start("Filter.Glossy");
 
   filter_data_.instensity_fac = intensity;
-  filter_data_.target_layer = cube_index * 6;
+  filter_data_.luma_max = (glossy_clamp_ > 0.0f) ? glossy_clamp_ : 1e16f;
+  filter_data_.skip_mip_0 = false;
 
-  int level_max = lightcache_->mips_len;
-  for (int level = 0; level <= level_max; level++) {
-    filter_data_.luma_max = (glossy_clamp_ > 0.0f) ? glossy_clamp_ : 1e16f;
-    /* Disney Roughness. */
-    filter_data_.roughness = square_f(level / (float)level_max);
-    /* Distribute Roughness across lod more evenly. */
-    filter_data_.roughness = square_f(filter_data_.roughness);
-    /* Avoid artifacts. */
-    filter_data_.roughness = clamp_f(filter_data_.roughness, 1e-4f, 0.9999f);
-    /* Variable sample count and bias to make first levels faster. */
-    switch (level) {
-      case 0:
-        filter_data_.sample_count = 1.0f;
-        filter_data_.lod_bias = -1.0f;
-        break;
-      case 1:
-        filter_data_.sample_count = filter_quality_ * 32.0f;
-        filter_data_.lod_bias = 1.0f;
-        break;
-      case 2:
-        filter_data_.sample_count = filter_quality_ * 40.0f;
-        filter_data_.lod_bias = 2.0f;
-        break;
-      case 3:
-        filter_data_.sample_count = filter_quality_ * 64.0f;
-        filter_data_.lod_bias = 2.0f;
-        break;
-      default:
-        filter_data_.sample_count = filter_quality_ * 128.0f;
-        filter_data_.lod_bias = 2.0f;
-        break;
+  filter_input_tx_ = cube_color_tx_.mip_view(0);
+
+  GPUTexture *dst = lightcache_->cube_tx.tex;
+  eGPUTextureFormat format = lightcache_->reflection_format_get();
+
+  int base_mip = 0;
+  while (base_mip < lightcache_->mips_len + 1) {
+    int base_view_mip = max_ii(0, base_mip - 1);
+
+    dst_view_lvl0_tx_ = GPU_texture_create_view(
+        "lvl0", dst, format, base_view_mip + 0, 1, cube_index * 6, 6, true);
+    dst_view_lvl1_tx_ = GPU_texture_create_view(
+        "lvl1", dst, format, base_view_mip + 1, 1, cube_index * 6, 6, true);
+    dst_view_lvl2_tx_ = GPU_texture_create_view(
+        "lvl2", dst, format, base_view_mip + 2, 1, cube_index * 6, 6, true);
+    dst_view_lvl3_tx_ = GPU_texture_create_view(
+        "lvl3", dst, format, base_view_mip + 3, 1, cube_index * 6, 6, true);
+    dst_view_lvl4_tx_ = GPU_texture_create_view(
+        "lvl4", dst, format, base_view_mip + 4, 1, cube_index * 6, 6, true);
+    dst_view_lvl5_tx_ = GPU_texture_create_view(
+        "lvl5", dst, format, base_view_mip + 5, 1, cube_index * 6, 6, true);
+
+    if (base_mip != 0) {
+      /* WATCH(@fclem): This could trigger undefined behavior even if we skip_mip_0. */
+      filter_input_tx_ = dst_view_lvl0_tx_;
+      filter_data_.skip_mip_0 = true;
     }
-    /* Add automatic LOD bias (based on target size). */
-    filter_data_.lod_bias += lod_bias_from_cubemap();
 
+    filter_data_.out_lod_max = lightcache_->mips_len - base_view_mip;
     filter_data_.push_update();
 
-    filter_cube_fb_.ensure(GPU_ATTACHMENT_NONE,
-                           GPU_ATTACHMENT_TEXTURE_MIP(lightcache_->cube_tx.tex, level));
-    GPU_framebuffer_bind(filter_cube_fb_);
-    DRW_draw_pass(filter_glossy_ps_);
+    cube_dispatch_ = int3(
+        math::max(int2(1), int2((sce_eevee.gi_cubemap_resolution / 16) >> base_mip)), 6);
+
+    DRW_draw_pass(filter_cubemap_ps_);
+
+    GPU_TEXTURE_FREE_SAFE(dst_view_lvl0_tx_);
+    GPU_TEXTURE_FREE_SAFE(dst_view_lvl1_tx_);
+    GPU_TEXTURE_FREE_SAFE(dst_view_lvl2_tx_);
+    GPU_TEXTURE_FREE_SAFE(dst_view_lvl3_tx_);
+    GPU_TEXTURE_FREE_SAFE(dst_view_lvl4_tx_);
+    GPU_TEXTURE_FREE_SAFE(dst_view_lvl5_tx_);
+
+    base_mip += (base_mip == 0) ? 6 : 5;
   }
 
   DRW_stats_group_end();
@@ -280,23 +277,59 @@ void LightProbeModule::filter_glossy(int cube_index, float intensity)
 
 void LightProbeModule::filter_diffuse(int sample_index, float intensity)
 {
-  filter_data_.instensity_fac = intensity;
-  filter_data_.target_layer = 0;
-  filter_data_.luma_max = 1e16f;
-  filter_data_.sample_count = 1024.0f;
-  filter_data_.lod_bias = lod_bias_from_cubemap();
+  SceneEEVEE &sce_eevee = inst_.scene->eevee;
 
+  DRW_stats_group_start("Filter.Diffuse");
+
+  /* Update mipchain. */
+  filter_data_.target_layer = 0;
+  filter_data_.skip_mip_0 = true;
+  filter_data_.luma_max = 1e16f;
   filter_data_.push_update();
+
+  filter_input_tx_ = cube_color_tx_.mip_view(0);
+
+  /* WATCH(@fclem): This could trigger undefined behavior even if we skip_mip_0. */
+  dst_view_lvl0_tx_ = cube_color_tx_.mip_view(0);
+  dst_view_lvl1_tx_ = cube_color_tx_.mip_view(1);
+  dst_view_lvl2_tx_ = cube_color_tx_.mip_view(2);
+  dst_view_lvl3_tx_ = cube_color_tx_.mip_view(3);
+  dst_view_lvl4_tx_ = cube_color_tx_.mip_view(4);
+  dst_view_lvl5_tx_ = cube_color_tx_.mip_view(5);
+
+  cube_dispatch_ = int3(int2(sce_eevee.gi_cubemap_resolution / 16), 6);
+
+  DRW_draw_pass(filter_cubemap_ps_);
+
+  /* -------------------------- */
 
   int2 extent = int2(3, 2);
   int2 offset = extent;
   offset.x *= sample_index % info_data_.grids_info.irradiance_cells_per_row;
   offset.y *= sample_index / info_data_.grids_info.irradiance_cells_per_row;
 
-  GPU_framebuffer_bind(filter_grid_fb_);
-  GPU_framebuffer_viewport_set(filter_grid_fb_, UNPACK2(offset), UNPACK2(extent));
+  filter_data_.instensity_fac = intensity;
+  filter_data_.target_layer = 0;
+  filter_data_.luma_max = 1e16f;
+  filter_data_.sample_count = 1024.0f;
+  filter_data_.lod_bias = lod_bias_from_cubemap();
+  filter_data_.dst_offset = offset;
+
+  filter_data_.push_update();
+
+  /* Use texture with full mipchain. */
+  filter_input_tx_ = cube_color_tx_;
+
+  GPUTexture *dst = lightcache_->grid_tx.tex;
+  eGPUTextureFormat format = lightcache_->irradiance_format_get();
+
+  dst_view_lvl0_tx_ = GPU_texture_create_view("lvl0", dst, format, 0, 1, 0, 1, false);
+
   DRW_draw_pass(filter_diffuse_ps_);
-  GPU_framebuffer_viewport_reset(filter_grid_fb_);
+
+  GPU_TEXTURE_FREE_SAFE(dst_view_lvl0_tx_);
+
+  DRW_stats_group_end();
 }
 
 void LightProbeModule::filter_visibility(int sample_index,
@@ -309,17 +342,23 @@ void LightProbeModule::filter_visibility(int sample_index,
   offset.y *= (sample_index / info_data_.grids_info.visibility_cells_per_row) %
               info_data_.grids_info.visibility_cells_per_layer;
 
-  filter_data_.target_layer = 1 + sample_index / info_data_.grids_info.visibility_cells_per_layer;
   filter_data_.sample_count = 512.0f; /* TODO refine */
   filter_data_.visibility_blur = visibility_blur;
   filter_data_.visibility_range = visibility_range;
+  filter_data_.visibility_size = info_data_.grids_info.visibility_size;
+  filter_data_.dst_offset = offset;
 
   filter_data_.push_update();
 
-  GPU_framebuffer_bind(filter_grid_fb_);
-  GPU_framebuffer_viewport_set(filter_grid_fb_, UNPACK2(offset), UNPACK2(extent));
+  int layer = 1 + sample_index / info_data_.grids_info.visibility_cells_per_layer;
+  GPUTexture *dst = lightcache_->grid_tx.tex;
+  eGPUTextureFormat format = lightcache_->irradiance_format_get();
+
+  dst_view_lvl0_tx_ = GPU_texture_create_view("lvl0", dst, format, 0, 1, layer, 1, false);
+
   DRW_draw_pass(filter_visibility_ps_);
-  GPU_framebuffer_viewport_reset(filter_grid_fb_);
+
+  GPU_TEXTURE_FREE_SAFE(dst_view_lvl0_tx_);
 }
 
 void LightProbeModule::update_world_cache()

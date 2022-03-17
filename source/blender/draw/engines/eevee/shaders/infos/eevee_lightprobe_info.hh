@@ -38,56 +38,37 @@ GPU_SHADER_CREATE_INFO(eevee_lightprobe_display_grid)
 /* -------------------------------------------------------------------- */
 /** \name Lightprobe filter
  * \{ */
-
-GPU_SHADER_INTERFACE_INFO(eevee_lightprobe_filter_iface, "interp")
-    .smooth(Type::VEC3, "coord")
-    .flat(Type::INT, "layer");
+GPU_SHADER_CREATE_INFO(eevee_lightprobe_filter_cubemap)
+    .do_static_compilation(true)
+    .local_group_size(16, 16)
+    .uniform_buf(1, "LightProbeFilterData", "filter_buf")
+    .sampler(0, ImageType::FLOAT_2D_ARRAY, "radiance_tx")
+    .image(0, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D_ARRAY, "out_lvl0")
+    .image(1, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D_ARRAY, "out_lvl1")
+    .image(2, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D_ARRAY, "out_lvl2")
+    .image(3, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D_ARRAY, "out_lvl3")
+    .image(4, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D_ARRAY, "out_lvl4")
+    .image(5, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D_ARRAY, "out_lvl5")
+    .additional_info("eevee_shared")
+    .compute_source("eevee_lightprobe_filter_cubemap_comp.glsl");
 
 GPU_SHADER_CREATE_INFO(eevee_lightprobe_filter_diffuse)
     .do_static_compilation(true)
-    .builtins(BuiltinBits::LAYER)
+    .local_group_size(3, 2)
     .uniform_buf(1, "LightProbeFilterData", "filter_buf")
     .sampler(0, ImageType::FLOAT_CUBE, "radiance_tx")
-    .fragment_out(0, Type::VEC4, "out_irradiance")
-    .vertex_out(eevee_lightprobe_filter_iface)
+    .image(0, GPU_RGBA8, Qualifier::WRITE, ImageType::FLOAT_2D_ARRAY, "out_irradiance_cache_img")
     .additional_info("eevee_shared")
-    .vertex_source("eevee_lightprobe_filter_vert.glsl")
-    .fragment_source("eevee_lightprobe_filter_diffuse_frag.glsl");
-
-GPU_SHADER_CREATE_INFO(eevee_lightprobe_filter_glossy)
-    .do_static_compilation(true)
-    .builtins(BuiltinBits::LAYER)
-    .define("CUBEMAP")
-    .uniform_buf(1, "LightProbeFilterData", "filter_buf")
-    .sampler(0, ImageType::FLOAT_CUBE, "radiance_tx")
-    .fragment_out(0, Type::VEC4, "out_irradiance")
-    .vertex_out(eevee_lightprobe_filter_iface)
-    .additional_info("eevee_shared")
-    .vertex_source("eevee_lightprobe_filter_vert.glsl")
-    .fragment_source("eevee_lightprobe_filter_glossy_frag.glsl");
+    .compute_source("eevee_lightprobe_filter_diffuse_comp.glsl");
 
 GPU_SHADER_CREATE_INFO(eevee_lightprobe_filter_visibility)
     .do_static_compilation(true)
-    .builtins(BuiltinBits::LAYER)
+    .local_group_size(LIGHTPROBE_FILTER_VIS_GROUP_SIZE, LIGHTPROBE_FILTER_VIS_GROUP_SIZE)
     .uniform_buf(1, "LightProbeFilterData", "filter_buf")
     .sampler(0, ImageType::DEPTH_CUBE, "depth_tx")
-    .fragment_out(0, Type::VEC4, "out_visibility")
-    .vertex_out(eevee_lightprobe_filter_iface)
+    .image(0, GPU_RGBA8, Qualifier::WRITE, ImageType::FLOAT_2D_ARRAY, "out_visibility_img")
     .additional_info("eevee_shared", "draw_view")
-    .vertex_source("eevee_lightprobe_filter_vert.glsl")
-    .fragment_source("eevee_lightprobe_filter_visibility_frag.glsl");
-
-GPU_SHADER_CREATE_INFO(eevee_lightprobe_filter_downsample)
-    .do_static_compilation(true)
-    .builtins(BuiltinBits::LAYER)
-    .define("CUBEMAP")
-    .uniform_buf(1, "LightProbeFilterData", "filter_buf")
-    .sampler(0, ImageType::FLOAT_CUBE, "input_tx")
-    .fragment_out(0, Type::VEC4, "out_color")
-    .vertex_out(eevee_lightprobe_filter_iface)
-    .additional_info("eevee_shared")
-    .vertex_source("eevee_lightprobe_filter_vert.glsl")
-    .fragment_source("eevee_lightprobe_filter_downsample_frag.glsl");
+    .compute_source("eevee_lightprobe_filter_visibility_comp.glsl");
 
 /** \} */
 

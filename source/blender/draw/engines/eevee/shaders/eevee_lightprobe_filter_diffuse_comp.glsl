@@ -14,8 +14,8 @@
 
 void main()
 {
-  int x = int(gl_FragCoord.x) % 3;
-  int y = int(gl_FragCoord.y) % 2;
+  int x = int(gl_LocalInvocationID.x);
+  int y = int(gl_LocalInvocationID.y);
 
   vec3 N, T, B;
   switch (x) {
@@ -58,5 +58,7 @@ void main()
     }
   }
 
-  out_irradiance = irradiance_encode(filter_buf.instensity_fac * radiance / weight);
+  vec4 out_irradiance = irradiance_encode(filter_buf.instensity_fac * radiance / weight);
+  ivec2 out_texel = filter_buf.dst_offset + ivec2(x, y);
+  imageStore(out_irradiance_cache_img, ivec3(out_texel, 0), out_irradiance);
 }

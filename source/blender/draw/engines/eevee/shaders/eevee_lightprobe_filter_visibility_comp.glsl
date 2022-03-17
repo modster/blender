@@ -36,8 +36,8 @@ float get_world_distance(float depth, vec3 coords)
 
 void main()
 {
-  vec2 uv = interp.coord.xy;
-  vec2 stored_texel_size = dFdx(uv);
+  vec2 uv = vec2(gl_GlobalInvocationID.xy) / float(filter_buf.visibility_size);
+  vec2 stored_texel_size = 1.0 / imageSize(out_visibility_img).xy;
   /* Add a 1 pixel border all around the octahedral map to ensure filtering is correct. */
   uv = (uv - stored_texel_size) / (1.0 - 2.0 * stored_texel_size);
   /* Edge mirroring : only mirror if directly adjacent (not diagonally adjacent). */
@@ -63,6 +63,9 @@ void main()
     accum += vec2(depth, depth * depth);
   }
 
-  out_visibility = visibility_encode(abs(accum / filter_buf.sample_count),
-                                     filter_buf.visibility_range);
+  vec4 out_visibility = visibility_encode(abs(accum / filter_buf.sample_count),
+                                          filter_buf.visibility_range);
+
+  ivec2 out_texel = filter_buf.dst_offset + ivec2(gl_GlobalInvocationID.xy);
+  imageStore(out_visibility_img, ivec3(out_texel, 0), out_visibility);
 }
