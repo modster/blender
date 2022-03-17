@@ -123,8 +123,8 @@ typedef struct RenderResult {
   ListBase views; /* RenderView */
 
   /* allowing live updates: */
-  volatile rcti renrect;
-  volatile RenderLayer *renlay;
+  rcti renrect;
+  RenderLayer *renlay;
 
   /* for render results in Image, verify validity for sequences */
   int framenr;
@@ -248,9 +248,7 @@ void RE_render_result_rect_from_ibuf(struct RenderResult *rr,
                                      int view_id);
 
 struct RenderLayer *RE_GetRenderLayer(struct RenderResult *rr, const char *name);
-float *RE_RenderLayerGetPass(volatile struct RenderLayer *rl,
-                             const char *name,
-                             const char *viewname);
+float *RE_RenderLayerGetPass(struct RenderLayer *rl, const char *name, const char *viewname);
 
 bool RE_HasSingleLayer(struct Render *re);
 
@@ -322,19 +320,24 @@ bool RE_WriteRenderViewsMovie(struct ReportList *reports,
                               bool preview);
 
 /**
- * Only #RE_NewRender() needed, main Blender render calls.
- *
  * General Blender frame render call.
+ *
+ * \note Only #RE_NewRender() needed, main Blender render calls.
+ *
+ * \param write_still: Saves frames to disk (typically disabled). Useful for batch-operations
+ * (rendering from Python for e.g.) when an additional save action for is inconvenient.
+ * This is the default behavior for #RE_RenderAnim.
  */
 void RE_RenderFrame(struct Render *re,
                     struct Main *bmain,
                     struct Scene *scene,
                     struct ViewLayer *single_layer,
                     struct Object *camera_override,
-                    int frame,
+                    const int frame,
+                    const float subframe,
                     bool write_still);
 /**
- * Saves images to disk.
+ * A version of #RE_RenderFrame that saves images to disk.
  */
 void RE_RenderAnim(struct Render *re,
                    struct Main *bmain,
@@ -395,7 +398,7 @@ void RE_display_clear_cb(struct Render *re,
                          void (*f)(void *handle, RenderResult *rr));
 void RE_display_update_cb(struct Render *re,
                           void *handle,
-                          void (*f)(void *handle, RenderResult *rr, volatile struct rcti *rect));
+                          void (*f)(void *handle, RenderResult *rr, struct rcti *rect));
 void RE_stats_draw_cb(struct Render *re, void *handle, void (*f)(void *handle, RenderStats *rs));
 void RE_progress_cb(struct Render *re, void *handle, void (*f)(void *handle, float));
 void RE_draw_lock_cb(struct Render *re, void *handle, void (*f)(void *handle, bool lock));
@@ -424,13 +427,13 @@ int RE_seq_render_active(struct Scene *scene, struct RenderData *rd);
 bool RE_layers_have_name(struct RenderResult *result);
 bool RE_passes_have_name(struct RenderLayer *rl);
 
-struct RenderPass *RE_pass_find_by_name(volatile struct RenderLayer *rl,
+struct RenderPass *RE_pass_find_by_name(struct RenderLayer *rl,
                                         const char *name,
                                         const char *viewname);
 /**
  * Only provided for API compatibility, don't use this in new code!
  */
-struct RenderPass *RE_pass_find_by_type(volatile struct RenderLayer *rl,
+struct RenderPass *RE_pass_find_by_type(struct RenderLayer *rl,
                                         int passtype,
                                         const char *viewname);
 

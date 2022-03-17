@@ -116,14 +116,20 @@
  * - save file or append in movie
  */
 
-/* ********* globals ******** */
+/* -------------------------------------------------------------------- */
+/** \name Globals
+ * \{ */
 
 /* here we store all renders */
 static struct {
   ListBase renderlist;
 } RenderGlobal = {{NULL, NULL}};
 
-/* ********* callbacks ******** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Callbacks
+ * \{ */
 
 static void render_callback_exec_null(Render *re, Main *bmain, eCbEvent evt)
 {
@@ -141,7 +147,11 @@ static void render_callback_exec_id(Render *re, Main *bmain, ID *id, eCbEvent ev
   BKE_callback_exec_id(bmain, id, evt);
 }
 
-/* ********* alloc and free ******** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Allocation & Free
+ * \{ */
 
 static int do_write_image_or_movie(Render *re,
                                    Main *bmain,
@@ -156,7 +166,7 @@ static void result_nothing(void *UNUSED(arg), RenderResult *UNUSED(rr))
 }
 static void result_rcti_nothing(void *UNUSED(arg),
                                 RenderResult *UNUSED(rr),
-                                volatile struct rcti *UNUSED(rect))
+                                struct rcti *UNUSED(rect))
 {
 }
 static void current_scene_nothing(void *UNUSED(arg), Scene *UNUSED(scene))
@@ -252,7 +262,7 @@ void RE_FreeRenderResult(RenderResult *rr)
   render_result_free(rr);
 }
 
-float *RE_RenderLayerGetPass(volatile RenderLayer *rl, const char *name, const char *viewname)
+float *RE_RenderLayerGetPass(RenderLayer *rl, const char *name, const char *viewname)
 {
   RenderPass *rpass = RE_pass_find_by_name(rl, name, viewname);
   return rpass ? rpass->rect : NULL;
@@ -308,7 +318,11 @@ static bool render_scene_has_layers_to_render(Scene *scene, ViewLayer *single_la
   return false;
 }
 
-/* *************************************************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Public Render API
+ * \{ */
 
 Render *RE_GetRender(const char *name)
 {
@@ -686,18 +700,20 @@ void RE_FreePersistentData(const Scene *scene)
   }
 }
 
-/* ********* initialize state ******** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Initialize State
+ * \{ */
 
 static void re_init_resolution(Render *re, Render *source, int winx, int winy, rcti *disprect)
 {
   re->winx = winx;
   re->winy = winy;
   if (source && (source->r.mode & R_BORDER)) {
-    /* eeh, doesn't seem original bordered disprect is storing anywhere
-     * after insertion on black happening in do_render_engine(),
-     * so for now simply re-calculate disprect using border from source
-     * renderer (sergey)
-     */
+    /* NOTE(@sergey): doesn't seem original bordered `disprect` is storing anywhere
+     * after insertion on black happening in #do_render_engine(),
+     * so for now simply re-calculate `disprect` using border from source renderer. */
 
     re->disprect.xmin = source->r.border.xmin * winx;
     re->disprect.xmax = source->r.border.xmax * winx;
@@ -872,7 +888,7 @@ void RE_display_clear_cb(Render *re, void *handle, void (*f)(void *handle, Rende
 }
 void RE_display_update_cb(Render *re,
                           void *handle,
-                          void (*f)(void *handle, RenderResult *rr, volatile rcti *rect))
+                          void (*f)(void *handle, RenderResult *rr, rcti *rect))
 {
   re->display_update = f;
   re->duh = handle;
@@ -905,7 +921,11 @@ void RE_test_break_cb(Render *re, void *handle, int (*f)(void *handle))
   re->tbh = handle;
 }
 
-/* ********* GL Context ******** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name OpenGL Context
+ * \{ */
 
 void RE_gl_context_create(Render *re)
 {
@@ -943,6 +963,16 @@ void *RE_gpu_context_get(Render *re)
   }
   return re->gpu_context;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Render & Composite Scenes (Implementation & Public API)
+ *
+ * Main high-level functions defined here are:
+ * - #RE_RenderFrame
+ * - #RE_RenderAnim
+ * \{ */
 
 /* ************  This part uses API, for rendering Blender scenes ********** */
 
@@ -1106,6 +1136,8 @@ static void do_render_compositor_scenes(Render *re)
     return;
   }
 
+  bool changed_scene = false;
+
   /* now foreach render-result node we do a full render */
   /* results are stored in a way compositor will find it */
   GSet *scenes_rendered = BLI_gset_ptr_new(__func__);
@@ -1118,11 +1150,20 @@ static void do_render_compositor_scenes(Render *re)
           do_render_compositor_scene(re, scene, cfra);
           BLI_gset_add(scenes_rendered, scene);
           node->typeinfo->updatefunc(restore_scene->nodetree, node);
+
+          if (scene != re->scene) {
+            changed_scene = true;
+          }
         }
       }
     }
   }
   BLI_gset_free(scenes_rendered, NULL);
+
+  if (changed_scene) {
+    /* If rendered another scene, switch back to the current scene with compositing nodes. */
+    re->current_scene_update(re->suh, re->scene);
+  }
 }
 
 /* bad call... need to think over proper method still */
@@ -1801,7 +1842,8 @@ void RE_RenderFrame(Render *re,
                     Scene *scene,
                     ViewLayer *single_layer,
                     Object *camera_override,
-                    int frame,
+                    const int frame,
+                    const float subframe,
                     const bool write_still)
 {
   render_callback_exec_id(re, re->main, &scene->id, BKE_CB_EVT_RENDER_INIT);
@@ -1811,6 +1853,7 @@ void RE_RenderFrame(Render *re,
   G.is_rendering = true;
 
   scene->r.cfra = frame;
+  scene->r.subframe = subframe;
 
   if (render_init_from_main(re, &scene->r, bmain, scene, single_layer, camera_override, 0, 0)) {
     const RenderData rd = scene->r;
@@ -1928,6 +1971,12 @@ void RE_RenderFreestyleExternal(Render *re)
   }
 }
 #endif
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Read/Write Render Result (Images & Movies)
+ * \{ */
 
 bool RE_WriteRenderViewsImage(
     ReportList *reports, RenderResult *rr, Scene *scene, const bool stamp, char *name)
@@ -2256,7 +2305,8 @@ void RE_RenderAnim(Render *re,
 
   const RenderData rd = scene->r;
   bMovieHandle *mh = NULL;
-  const int cfrao = rd.cfra;
+  const int cfra_old = rd.cfra;
+  const float subframe_old = rd.subframe;
   int nfra, totrendered = 0, totskipped = 0;
   const int totvideos = BKE_scene_multiview_num_videos_get(&rd);
   const bool is_movie = BKE_imtype_is_movie(rd.im_format.imtype);
@@ -2324,6 +2374,7 @@ void RE_RenderAnim(Render *re,
   re->flag |= R_ANIMATION;
 
   {
+    scene->r.subframe = 0.0f;
     for (nfra = sfra, scene->r.cfra = sfra; scene->r.cfra <= efra; scene->r.cfra++) {
       char name[FILE_MAX];
 
@@ -2432,6 +2483,7 @@ void RE_RenderAnim(Render *re,
       }
 
       re->r.cfra = scene->r.cfra; /* weak.... */
+      re->r.subframe = scene->r.subframe;
 
       /* run callbacks before rendering, before the scene is updated */
       render_callback_exec_id(re, re->main, &scene->id, BKE_CB_EVT_RENDER_PRE);
@@ -2500,7 +2552,8 @@ void RE_RenderAnim(Render *re,
     BKE_report(re->reports, RPT_INFO, "No frames rendered, skipped to not overwrite");
   }
 
-  scene->r.cfra = cfrao;
+  scene->r.cfra = cfra_old;
+  scene->r.subframe = subframe_old;
 
   re->flag &= ~R_ANIMATION;
 
@@ -2587,11 +2640,6 @@ bool RE_ReadRenderResult(Scene *scene, Scene *scenode)
   render_result_uncrop(re);
 
   return success;
-}
-
-void RE_init_threadcount(Render *re)
-{
-  re->r.threads = BKE_render_num_threads(&re->r);
 }
 
 void RE_layer_load_from_file(
@@ -2693,7 +2741,7 @@ bool RE_passes_have_name(struct RenderLayer *rl)
   return false;
 }
 
-RenderPass *RE_pass_find_by_name(volatile RenderLayer *rl, const char *name, const char *viewname)
+RenderPass *RE_pass_find_by_name(RenderLayer *rl, const char *name, const char *viewname)
 {
   RenderPass *rp = NULL;
 
@@ -2710,7 +2758,7 @@ RenderPass *RE_pass_find_by_name(volatile RenderLayer *rl, const char *name, con
   return rp;
 }
 
-RenderPass *RE_pass_find_by_type(volatile RenderLayer *rl, int passtype, const char *viewname)
+RenderPass *RE_pass_find_by_type(RenderLayer *rl, int passtype, const char *viewname)
 {
 #define CHECK_PASS(NAME) \
   if (passtype == SCE_PASS_##NAME) { \
@@ -2774,6 +2822,12 @@ RenderPass *RE_create_gp_pass(RenderResult *rr, const char *layername, const cha
   return render_layer_add_pass(rr, rl, 4, RE_PASSNAME_COMBINED, viewname, "RGBA", true);
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Miscellaneous Public Render API
+ * \{ */
+
 bool RE_allow_render_generic_object(Object *ob)
 {
   /* override not showing object when duplis are used with particles */
@@ -2785,3 +2839,10 @@ bool RE_allow_render_generic_object(Object *ob)
   }
   return true;
 }
+
+void RE_init_threadcount(Render *re)
+{
+  re->r.threads = BKE_render_num_threads(&re->r);
+}
+
+/** \} */

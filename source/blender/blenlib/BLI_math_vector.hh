@@ -39,6 +39,16 @@ template<typename T, int Size> inline bool is_zero(const vec_base<T, Size> &a)
   return true;
 }
 
+template<typename T, int Size> inline bool is_any_zero(const vec_base<T, Size> &a)
+{
+  for (int i = 0; i < Size; i++) {
+    if (a[i] == T(0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 template<typename T, int Size> inline vec_base<T, Size> abs(const vec_base<T, Size> &a)
 {
   vec_base<T, Size> result;
@@ -69,13 +79,13 @@ inline vec_base<T, Size> max(const vec_base<T, Size> &a, const vec_base<T, Size>
 }
 
 template<typename T, int Size>
-inline T clamp(const vec_base<T, Size> &a,
-               const vec_base<T, Size> &min,
-               const vec_base<T, Size> &max)
+inline vec_base<T, Size> clamp(const vec_base<T, Size> &a,
+                               const vec_base<T, Size> &min,
+                               const vec_base<T, Size> &max)
 {
   vec_base<T, Size> result = a;
   for (int i = 0; i < Size; i++) {
-    std::clamp(result[i], min[i], max[i]);
+    result[i] = std::clamp(result[i], min[i], max[i]);
   }
   return result;
 }
@@ -85,7 +95,7 @@ inline vec_base<T, Size> clamp(const vec_base<T, Size> &a, const T &min, const T
 {
   vec_base<T, Size> result = a;
   for (int i = 0; i < Size; i++) {
-    std::clamp(result[i], min, max);
+    result[i] = std::clamp(result[i], min, max);
   }
   return result;
 }

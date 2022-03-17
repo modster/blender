@@ -423,7 +423,7 @@ template<typename T> std::ostream &operator<<(std::ostream &os, const CDT_state<
       os << " merge to " << vertname(cdt_state.cdt.verts[v->merge_to_index]) << "\n";
     }
     const SymEdge<T> *se = v->symedge;
-    int cnt = 0;
+    int count = 0;
     constexpr int print_count_limit = 25;
     if (se) {
       os << "  edges out:\n";
@@ -440,8 +440,8 @@ template<typename T> std::ostream &operator<<(std::ostream &os, const CDT_state<
         os << "    " << vertname(vother) << "(e=" << trunc_ptr(se->edge)
            << ", se=" << trunc_ptr(se) << ")\n";
         se = se->rot;
-        cnt++;
-      } while (se != v->symedge && cnt < print_count_limit);
+        count++;
+      } while (se != v->symedge && count < print_count_limit);
       os << "\n";
     }
   }
@@ -2557,9 +2557,9 @@ template<typename T> void detect_holes(CDT_state<T> *cdt_state)
             continue; /* Don't count hits on edges between faces in same region. */
           }
           auto isect = isect_seg_seg(ray_end.exact,
-                                              mid.exact,
-                                              e->symedges[0].vert->co.exact,
-                                              e->symedges[1].vert->co.exact);
+                                     mid.exact,
+                                     e->symedges[0].vert->co.exact,
+                                     e->symedges[1].vert->co.exact);
           switch (isect.kind) {
             case isect_result<vec2<T>>::LINE_LINE_CROSS: {
               hits++;
