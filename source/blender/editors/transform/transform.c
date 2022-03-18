@@ -177,8 +177,8 @@ void convertViewVec(TransInfo *t, float r_vec[3], double dx, double dy)
       r_vec[1] = dy;
     }
     else {
-      const float mval_f[2] = {(float)dx, (float)dy};
-      ED_view3d_win_to_delta(t->region, mval_f, r_vec, t->zfac);
+      const float xy_delta[2] = {(float)dx, (float)dy};
+      ED_view3d_win_to_delta(t->region, xy_delta, t->zfac, r_vec);
     }
   }
   else if (t->spacetype == SPACE_IMAGE) {
@@ -1150,7 +1150,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
   else if (event->val == KM_PRESS) {
     switch (event->type) {
       case EVT_CKEY:
-        if (event->is_repeat) {
+        if (event->flag & WM_EVENT_IS_REPEAT) {
           break;
         }
         if (event->modifier & KM_ALT) {
@@ -1164,7 +1164,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
         }
         break;
       case EVT_OKEY:
-        if (event->is_repeat) {
+        if (event->flag & WM_EVENT_IS_REPEAT) {
           break;
         }
         if ((t->flag & T_PROP_EDIT) && (event->modifier & KM_SHIFT)) {
@@ -1202,7 +1202,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
         }
         break;
       case EVT_NKEY:
-        if (event->is_repeat) {
+        if (event->flag & WM_EVENT_IS_REPEAT) {
           break;
         }
         if (ELEM(t->mode, TFM_ROTATION)) {
@@ -1513,14 +1513,36 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
   if (t->flag & T_MODAL) {
     /* do we check for parameter? */
     if (transformModeUseSnap(t)) {
-      if (!(t->modifiers & MOD_SNAP) != !(ts->snap_flag & SCE_SNAP)) {
-        if (t->modifiers & MOD_SNAP) {
-          ts->snap_flag |= SCE_SNAP;
+      if (!(t->modifiers & MOD_SNAP) != !(t->tsnap.flag & SCE_SNAP)) {
+        char *snap_flag_ptr;
+
+        wmMsgParams_RNA msg_key_params = {{0}};
+        RNA_pointer_create(&t->scene->id, &RNA_ToolSettings, ts, &msg_key_params.ptr);
+
+        if (t->spacetype == SPACE_NODE) {
+          snap_flag_ptr = &ts->snap_flag_node;
+          msg_key_params.prop = &rna_ToolSettings_use_snap_node;
+        }
+        else if (t->spacetype == SPACE_IMAGE) {
+          snap_flag_ptr = &ts->snap_uv_flag;
+          msg_key_params.prop = &rna_ToolSettings_use_snap_uv;
+        }
+        else if (t->spacetype == SPACE_SEQ) {
+          snap_flag_ptr = &ts->snap_flag_seq;
+          msg_key_params.prop = &rna_ToolSettings_use_snap_sequencer;
         }
         else {
-          ts->snap_flag &= ~SCE_SNAP;
+          snap_flag_ptr = &ts->snap_flag;
+          msg_key_params.prop = &rna_ToolSettings_use_snap;
         }
-        WM_msg_publish_rna_prop(t->mbus, &t->scene->id, ts, ToolSettings, use_snap);
+
+        if (t->modifiers & MOD_SNAP) {
+          *snap_flag_ptr |= SCE_SNAP;
+        }
+        else {
+          *snap_flag_ptr &= ~SCE_SNAP;
+        }
+        WM_msg_publish_rna_params(t->mbus, &msg_key_params);
       }
     }
   }
@@ -1697,7 +1719,7 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
   /* Needed to translate tweak events to mouse buttons. */
   t->launch_event = event ? WM_userdef_event_type_from_keymap_type(event->type) : -1;
-  t->is_launch_event_tweak = event ? ISTWEAK(event->type) : false;
+  t->is_launch_event_drag = event ? (event->val == KM_CLICK_DRAG) : false;
 
   /* XXX Remove this when wm_operator_call_internal doesn't use window->eventstate
    * (which can have type = 0) */
@@ -1819,7 +1841,15 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
         use_accurate = true;
       }
     }
-    initMouseInput(t, &t->mouse, t->center2d, event->mval, use_accurate);
+
+    int mval[2];
+    if (t->flag & T_EVENT_DRAG_START) {
+      WM_event_drag_start_mval(event, t->region, mval);
+    }
+    else {
+      copy_v2_v2_int(mval, event->mval);
+    }
+    initMouseInput(t, &t->mouse, t->center2d, mval, use_accurate);
   }
 
   transform_mode_init(t, op, mode);

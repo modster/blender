@@ -77,6 +77,10 @@ static bool is_subdivision_evaluation_possible_on_gpu(void)
     return false;
   }
 
+  if (GPU_max_shader_storage_buffer_bindings() < MAX_GPU_SUBDIV_SSBOS) {
+    return false;
+  }
+
   const int available_evaluators = openSubdiv_getAvailableEvaluators();
   if ((available_evaluators & OPENSUBDIV_EVALUATOR_GLSL_COMPUTE) == 0) {
     return false;
@@ -89,7 +93,7 @@ bool BKE_subsurf_modifier_force_disable_gpu_evaluation_for_mesh(const SubsurfMod
                                                                 const Mesh *mesh)
 {
   if ((U.gpu_flag & USER_GPU_FLAG_SUBDIVISION_EVALUATION) == 0) {
-    /* GPU subdivision is explicitely disabled, so we don't force it. */
+    /* GPU subdivision is explicitly disabled, so we don't force it. */
     return false;
   }
 

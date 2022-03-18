@@ -212,7 +212,7 @@ class GeometryComponent {
                                             const AttributeDomain domain,
                                             const T &default_value) const
   {
-    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
+    const blender::CPPType &cpp_type = blender::CPPType::get<T>();
     const CustomDataType type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
     return this->attribute_get_for_read(attribute_id, domain, type, &default_value)
         .template typed<T>();
@@ -240,7 +240,7 @@ class GeometryComponent {
       const AttributeDomain domain,
       const T default_value)
   {
-    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
+    const blender::CPPType &cpp_type = blender::CPPType::get<T>();
     const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
     return this->attribute_try_get_for_output(attribute_id, domain, data_type, &default_value);
   }
@@ -260,7 +260,7 @@ class GeometryComponent {
   blender::bke::OutputAttribute_Typed<T> attribute_try_get_for_output_only(
       const blender::bke::AttributeIDRef &attribute_id, const AttributeDomain domain)
   {
-    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
+    const blender::CPPType &cpp_type = blender::CPPType::get<T>();
     const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
     return this->attribute_try_get_for_output_only(attribute_id, domain, data_type);
   }
@@ -500,8 +500,8 @@ struct GeometrySet {
   /**
    * Clear the existing curves data-block and replace it with the given one.
    */
-  void replace_curve(Curves *curves,
-                     GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+  void replace_curves(Curves *curves,
+                      GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
 
  private:
   /**
@@ -678,7 +678,7 @@ class CurveComponentLegacy : public GeometryComponent {
 };
 
 /**
- * A geometry component that stores a group of curves, corresponding the the #Curves and
+ * A geometry component that stores a group of curves, corresponding the #Curves and
  * #CurvesGeometry types.
  */
 class CurveComponent : public GeometryComponent {

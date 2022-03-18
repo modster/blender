@@ -46,6 +46,7 @@
 #include "BKE_scene.h"
 
 #include "RNA_access.h"
+#include "RNA_prototypes.h"
 
 #include "BLO_read_write.h"
 
@@ -206,7 +207,7 @@ IDTypeInfo IDType_ID_KE = {
     .foreach_id = shapekey_foreach_id,
     .foreach_cache = NULL,
     .foreach_path = NULL,
-    /* A bit weird, due to shapekeys not being strictly speaking embedded data... But they also
+    /* A bit weird, due to shape-keys not being strictly speaking embedded data... But they also
      * share a lot with those (non linkable, only ever used by one owner ID, etc.). */
     .owner_get = shapekey_owner_get,
 

@@ -93,6 +93,7 @@
 
 #include "ED_armature.h"
 #include "ED_curve.h"
+#include "ED_curves.h"
 #include "ED_gpencil.h"
 #include "ED_mball.h"
 #include "ED_mesh.h"
@@ -1899,6 +1900,8 @@ static bool object_hair_curves_add_poll(bContext *C)
 
 static int object_hair_curves_add_exec(bContext *C, wmOperator *op)
 {
+  using namespace blender;
+
   ushort local_view_bits;
   float loc[3], rot[3];
   if (!ED_object_add_generic_get_opts(
@@ -1908,6 +1911,9 @@ static int object_hair_curves_add_exec(bContext *C, wmOperator *op)
 
   Object *object = ED_object_add_type(C, OB_CURVES, nullptr, loc, rot, false, local_view_bits);
   object->dtx |= OB_DRAWBOUNDOX; /* TODO: remove once there is actual drawing. */
+
+  Curves *curves_id = static_cast<Curves *>(object->data);
+  bke::CurvesGeometry::wrap(curves_id->geometry) = ed::curves::primitive_random_sphere(500, 8);
 
   return OPERATOR_FINISHED;
 }
@@ -2573,7 +2579,7 @@ static void object_data_convert_ensure_curve_cache(Depsgraph *depsgraph, Scene *
      * (all its caches have been nuked then).
      */
     if (ELEM(ob->type, OB_SURF, OB_CURVES_LEGACY, OB_FONT)) {
-      /* We need 'for render' ON here, to enable computing bevel dipslist if needed.
+      /* We need 'for render' ON here, to enable computing bevel #DispList if needed.
        * Also makes sense anyway, we would not want e.g. to lose hidden parts etc. */
       BKE_displist_make_curveTypes(depsgraph, scene, ob, true);
     }
@@ -2650,8 +2656,8 @@ static Base *duplibase_for_convert(
 
   /* XXX: An ugly hack needed because if we re-run depsgraph with some new meta-ball objects
    * having same 'family name' as orig ones, they will affect end result of meta-ball computation.
-   * For until we get rid of that name-based thingy in MBalls, that should do the trick
-   * (this is weak, but other solution (to change name of `obn`) is even worse imho).
+   * For until we get rid of that name-based thingy in meta-balls, that should do the trick
+   * (this is weak, but other solution (to change name of `obn`) is even worse IMHO).
    * See T65996. */
   const bool is_meta_ball = (obn->type == OB_MBALL);
   void *obdata = obn->data;
@@ -3204,7 +3210,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
   }
 
   // XXX  ED_object_editmode_enter(C, 0);
-  // XXX  exit_editmode(C, EM_FREEDATA|); /* freedata, but no undo */
+  // XXX  exit_editmode(C, EM_FREEDATA|); /* free data, but no undo */
 
   if (basact) {
     /* active base was changed */
@@ -3302,16 +3308,11 @@ void OBJECT_OT_convert(wmOperatorType *ot)
 /** \name Duplicate Object Operator
  * \{ */
 
-/*
- * dupflag: a flag made from constants declared in DNA_userdef_types.h
- * The flag tells adduplicate() whether to copy data linked to the object,
- * or to reference the existing data.
- * U.dupflag for default operations or you can construct a flag as python does
- * if the dupflag is 0 then no data will be copied (linked duplicate). */
-
-/* used below, assumes id.new is correct */
-/* leaves selection of base/object unaltered */
-/* Does set ID->newid pointers. */
+/**
+ * - Assumes `id.new` is correct.
+ * - Leaves selection of base/object unaltered.
+ * - Sets #ID.newid pointers.
+ */
 static Base *object_add_duplicate_internal(Main *bmain,
                                            Scene *scene,
                                            ViewLayer *view_layer,
@@ -3384,7 +3385,8 @@ Base *ED_object_add_duplicate(
   const int remap_flag = BKE_object_is_in_editmode(ob) ? ID_REMAP_FORCE_OBDATA_IN_EDITMODE : 0;
   BKE_libblock_relink_to_newid(bmain, &ob->id, remap_flag);
 
-  /* DAG_relations_tag_update(bmain); */ /* caller must do */
+  /* Correct but the caller must do this. */
+  // DAG_relations_tag_update(bmain);
 
   if (ob->data != nullptr) {
     DEG_id_tag_update_ex(bmain, (ID *)ob->data, ID_RECALC_EDITORS);
