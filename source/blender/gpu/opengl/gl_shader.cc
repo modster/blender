@@ -179,7 +179,7 @@ static const char *to_string(const eGPUTextureFormat &type)
     case GPU_RGB10_A2:
       return "rgb10_a2";
     default:
-      return "unkown";
+      return "unknown";
   }
 }
 

@@ -1450,6 +1450,21 @@ static bool layerValidate_propfloat2(void *data, const uint totitems, const bool
   return has_errors;
 }
 
+static void layerInterp_propbool(const void **sources,
+                                 const float *weights,
+                                 const float *UNUSED(sub_weights),
+                                 int count,
+                                 void *dest)
+{
+  bool result = false;
+  for (int i = 0; i < count; i++) {
+    const float interp_weight = weights[i];
+    const bool src = *(const bool *)sources[i];
+    result |= src && (interp_weight > 0.0f);
+  }
+  *(bool *)dest = result;
+}
+
 static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
     /* 0: CD_MVERT */
     {sizeof(MVert), "MVert", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
@@ -1777,7 +1792,7 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
     /* 44: CD_RADIUS */
     {sizeof(float), "MFloatProperty", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
     /* 45: CD_PROP_INT8 */
-    {sizeof(int8_t), "MInt8Property", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
+    {sizeof(int8_t), "MInt8Property", 1, N_("Int8"), nullptr, nullptr, nullptr, nullptr, nullptr},
     /* 46: CD_HAIRMAPPING */ /* UNUSED */
     {-1, "", 1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
     /* 47: CD_PROP_COLOR */
@@ -1838,7 +1853,7 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
      N_("Boolean"),
      nullptr,
      nullptr,
-     nullptr,
+     layerInterp_propbool,
      nullptr,
      nullptr,
      nullptr,

@@ -1239,7 +1239,7 @@ static bool contract_shape(ImBuf *ibuf)
   const float clear[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   const int max_size = (ibuf->x * ibuf->y) - 1;
 
-  /* Detect if pixel is near of no green pixels and mark green to be cleared. */
+  /* Detect if pixel is near of no green pixels and mark green pixel to be cleared. */
   for (int row = 0; row < ibuf->y; row++) {
     if (!is_row_filled(ibuf, row)) {
       continue;
@@ -1387,6 +1387,15 @@ static void gpencil_get_outline_points(tGPDfill *tgpf, const bool dilate)
       current_check_co[1] = boundary_co[1] + offset[offset_idx][1];
 
       int image_idx = ibuf->x * current_check_co[1] + current_check_co[0];
+      /* Check if the index is inside the image. If the index is outside is
+       * because the algorithm is unable to find the outline of the figure. This is
+       * possible for negative filling when click inside a figure instead of
+       * clicking outside.
+       * If the index is out of range, finish the filling. */
+      if (image_idx > imagesize - 1) {
+        start_found = false;
+        break;
+      }
       get_pixel(ibuf, image_idx, rgba);
 
       /* find next boundary pixel */
@@ -2172,7 +2181,8 @@ static int gpencil_fill_modal(bContext *C, wmOperator *op, const wmEvent *event)
   tgpf->on_back = RNA_boolean_get(op->ptr, "on_back");
 
   const bool is_brush_inv = brush_settings->fill_direction == BRUSH_DIR_IN;
-  const bool is_inverted = (is_brush_inv && !event->ctrl) || (!is_brush_inv && event->ctrl);
+  const bool is_inverted = (is_brush_inv && (event->modifier & KM_CTRL) == 0) ||
+                           (!is_brush_inv && (event->modifier & KM_CTRL) != 0);
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(tgpf->gpd);
   const bool do_extend = (tgpf->fill_extend_fac > 0.0f);
   const bool help_lines = ((tgpf->flag & GP_BRUSH_FILL_SHOW_HELPLINES) ||
@@ -2313,7 +2323,7 @@ static int gpencil_fill_modal(bContext *C, wmOperator *op, const wmEvent *event)
     case EVT_PAGEUPKEY:
     case WHEELUPMOUSE:
       if (tgpf->oldkey == 1) {
-        tgpf->fill_extend_fac -= (event->shift) ? 0.01f : 0.1f;
+        tgpf->fill_extend_fac -= (event->modifier & KM_SHIFT) ? 0.01f : 0.1f;
         CLAMP_MIN(tgpf->fill_extend_fac, 0.0f);
         gpencil_update_extend(tgpf);
       }
@@ -2321,7 +2331,7 @@ static int gpencil_fill_modal(bContext *C, wmOperator *op, const wmEvent *event)
     case EVT_PAGEDOWNKEY:
     case WHEELDOWNMOUSE:
       if (tgpf->oldkey == 1) {
-        tgpf->fill_extend_fac += (event->shift) ? 0.01f : 0.1f;
+        tgpf->fill_extend_fac += (event->modifier & KM_SHIFT) ? 0.01f : 0.1f;
         CLAMP_MAX(tgpf->fill_extend_fac, 100.0f);
         gpencil_update_extend(tgpf);
       }

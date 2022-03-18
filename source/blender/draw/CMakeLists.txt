@@ -147,6 +147,7 @@ set(SRC
   engines/eevee/eevee_velocity.cc
   engines/eevee/eevee_view.cc
   engines/eevee/eevee_world.cc
+  engines/eevee_next/eevee_engine.cc
   engines/workbench/workbench_data.c
   engines/workbench/workbench_effect_antialiasing.c
   engines/workbench/workbench_effect_cavity.c
@@ -231,6 +232,7 @@ set(SRC
   engines/eevee/eevee_light.hh
   engines/eevee/eevee_depth_of_field.hh
   engines/eevee/eevee_lut.h
+  engines/eevee_next/eevee_engine.h
   engines/external/external_engine.h
   engines/image/image_batches.hh
   engines/image/image_drawing_mode.hh

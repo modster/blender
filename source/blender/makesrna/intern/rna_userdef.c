@@ -638,7 +638,7 @@ static void rna_userdef_autosave_update(Main *bmain, Scene *scene, PointerRNA *p
   wmWindowManager *wm = bmain->wm.first;
 
   if (wm) {
-    WM_autosave_init(wm);
+    WM_file_autosave_init(wm);
   }
   rna_userdef_update(bmain, scene, ptr);
 }
@@ -5134,6 +5134,7 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
                            "New Interpolation Type",
                            "Interpolation mode used for first keyframe on newly added F-Curves "
                            "(subsequent keyframes take interpolation from preceding keyframe)");
+  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_ACTION);
 
   prop = RNA_def_property(srna, "keyframe_new_handle_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_keyframe_handle_type_items);
@@ -5898,20 +5899,20 @@ static void rna_def_userdef_input(BlenderRNA *brna)
   RNA_def_property_ui_range(prop, 0.1f, 2.0f, 0.01f, 2);
   RNA_def_property_ui_text(prop, "Orbit Sensitivity", "Scale trackball orbit sensitivity");
 
-  /* tweak tablet & mouse preset */
+  /* Click-drag threshold for tablet & mouse. */
   prop = RNA_def_property(srna, "drag_threshold_mouse", PROP_INT, PROP_PIXEL);
   RNA_def_property_range(prop, 1, 255);
   RNA_def_property_ui_text(prop,
                            "Mouse Drag Threshold",
-                           "Number of pixels to drag before a tweak/drag event is triggered "
-                           "for mouse/trackpad input "
+                           "Number of pixels to drag before a drag event is triggered "
+                           "for mouse/track-pad input "
                            "(otherwise click events are detected)");
 
   prop = RNA_def_property(srna, "drag_threshold_tablet", PROP_INT, PROP_PIXEL);
   RNA_def_property_range(prop, 1, 255);
   RNA_def_property_ui_text(prop,
                            "Tablet Drag Threshold",
-                           "Number of pixels to drag before a tweak/drag event is triggered "
+                           "Number of pixels to drag before a drag event is triggered "
                            "for tablet input "
                            "(otherwise click events are detected)");
 
@@ -6436,10 +6437,15 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Override Templates", "Enable library override template in the python API");
 
-  prop = RNA_def_property(srna, "use_geometry_nodes_legacy", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "use_geometry_nodes_legacy", 1);
-  RNA_def_property_ui_text(
-      prop, "Geometry Nodes Legacy", "Enable legacy geometry nodes in the menu");
+  prop = RNA_def_property(srna, "use_named_attribute_nodes", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "use_named_attribute_nodes", 1);
+  RNA_def_property_ui_text(prop,
+                           "Named Attribute Nodes",
+                           "Enable named attribute nodes in the geometry nodes add menu");
+
+  prop = RNA_def_property(srna, "enable_eevee_next", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "enable_eevee_next", 1);
+  RNA_def_property_ui_text(prop, "EEVEE Next", "Enable the new EEVEE codebase, requires restart");
 }
 
 static void rna_def_userdef_addon_collection(BlenderRNA *brna, PropertyRNA *cprop)

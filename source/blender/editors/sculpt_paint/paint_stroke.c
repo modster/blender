@@ -792,7 +792,7 @@ static int paint_space_stroke(bContext *C,
   Paint *paint = BKE_paint_get_active_from_context(C);
   ePaintMode mode = BKE_paintmode_get_active_from_context(C);
   Brush *brush = BKE_paint_brush(paint);
-  int cnt = 0;
+  int count = 0;
 
   const bool use_scene_spacing = paint_stroke_use_scene_spacing(brush, mode);
   float d_world_space_position[3] = {0.0f};
@@ -855,14 +855,14 @@ static int paint_space_stroke(bContext *C,
       pressure = stroke->last_pressure;
       dpressure = final_pressure - stroke->last_pressure;
 
-      cnt++;
+      count++;
     }
     else {
       break;
     }
   }
 
-  return cnt;
+  return count;
 }
 
 /**** Public API ****/
@@ -998,6 +998,10 @@ bool paint_space_stroke_enabled(Brush *br, ePaintMode mode)
      * whether the simulation runs constantly or only when the brush moves when using the cloth
      * grab brushes. */
     return true;
+  }
+
+  if (mode == PAINT_MODE_SCULPT_CURVES) {
+    return false;
   }
 
   return paint_supports_dynamic_size(br, mode);
@@ -1496,7 +1500,7 @@ int paint_stroke_modal(bContext *C, wmOperator *op, const wmEvent *event, PaintS
     return OPERATOR_FINISHED;
   }
   else if (br->flag & BRUSH_LINE) {
-    if (event->alt) {
+    if (event->modifier & KM_ALT) {
       stroke->constrain_line = true;
     }
     else {

@@ -39,6 +39,8 @@ set(INC
 
   # dna_type_offsets.h
   ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
+  # RNA_prototypes.h
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
@@ -105,10 +107,13 @@ set(SRC
   intern/curves.cc
   intern/curves_geometry.cc
   intern/curve_bevel.c
+  intern/curve_bezier.cc
+  intern/curve_catmull_rom.cc
   intern/curve_convert.c
   intern/curve_decimate.c
   intern/curve_deform.c
   intern/curve_eval.cc
+  intern/curve_nurbs.cc
   intern/curve_to_mesh_convert.cc
   intern/curveprofile.cc
   intern/customdata.cc
@@ -131,6 +136,7 @@ set(SRC
   intern/fmodifier.c
   intern/freestyle.c
   intern/geometry_component_curve.cc
+  intern/geometry_component_curves.cc
   intern/geometry_component_instances.cc
   intern/geometry_component_mesh.cc
   intern/geometry_component_pointcloud.cc
@@ -149,7 +155,7 @@ set(SRC
   intern/idprop_serialize.cc
   intern/idprop_utils.c
   intern/idtype.c
-  intern/image.c
+  intern/image.cc
   intern/image_partial_update.cc
   intern/image_gen.c
   intern/image_gpu.cc
@@ -200,7 +206,7 @@ set(SRC
   intern/mesh_sample.cc
   intern/mesh_tangent.c
   intern/mesh_tessellate.c
-  intern/mesh_validate.c
+  intern/mesh_validate.cc
   intern/mesh_wrapper.c
   intern/modifier.c
   intern/movieclip.c
@@ -793,6 +799,8 @@ blender_add_lib(bf_blenkernel "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
 # Needed so we can use dna_type_offsets.h for defaults initialization.
 add_dependencies(bf_blenkernel bf_dna)
+# RNA_prototypes.h
+add_dependencies(bf_blenkernel bf_rna)
 
 
 if(WITH_GTESTS)
@@ -806,6 +814,7 @@ if(WITH_GTESTS)
     intern/asset_test.cc
     intern/bpath_test.cc
     intern/cryptomatte_test.cc
+    intern/curves_geometry_test.cc
     intern/fcurve_test.cc
     intern/idprop_serialize_test.cc
     intern/image_partial_update_test.cc
@@ -821,4 +830,7 @@ if(WITH_GTESTS)
   )
   include(GTestTesting)
   blender_add_test_lib(bf_blenkernel_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB}")
+
+  # RNA_prototypes.h
+  add_dependencies(bf_blenkernel_tests bf_rna)
 endif()
