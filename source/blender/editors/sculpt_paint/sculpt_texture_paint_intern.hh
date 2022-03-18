@@ -22,6 +22,7 @@ struct EncodedBarycentricCoord {
   }
 };
 #else
+/* Alternative approach. Half the memory footprint. */
 struct EncodedBarycentricCoord {
   ushort2 encoded;
 
