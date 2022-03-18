@@ -64,7 +64,7 @@ static bool has_been_visited(std::vector<bool> &visited_polygons, const int poly
 
 static void extract_barycentric_pixels(TileData &tile_data,
                                        const ImBuf *image_buffer,
-                                       Triangle &triangle,
+                                       Triangles &triangles,
                                        const int triangle_index,
                                        const float2 uvs[3],
                                        const int minx,
@@ -100,8 +100,9 @@ static void extract_barycentric_pixels(TileData &tile_data,
     }
     package.num_pixels = x - package.start_image_coordinate.x;
     if (package.num_pixels > best_num_pixels) {
-      triangle.add_barycentric_coord_x = (barycentric - package.start_barycentric_coord.decode()) /
-                                         package.num_pixels;
+      triangles.set_add_barycentric_coord_x(
+          triangle_index,
+          (barycentric - package.start_barycentric_coord.decode()) / package.num_pixels);
       best_num_pixels = package.num_pixels;
     }
     tile_data.encoded_pixels.append(package);
@@ -127,7 +128,7 @@ static void init_triangles(SculptSession *ss,
       const MLoop *loopstart = &ss->mloop[p->loopstart];
       for (int l = 0; l < p->totloop - 2; l++) {
         Triangle triangle;
-        triangle.loop_indices = int2(p->loopstart, p->loopstart + l + 1);
+        triangle.loop_indices = int3(p->loopstart, p->loopstart + l + 1, p->loopstart + l + 2);
         triangle.vert_indices = int3(loopstart[0].v, loopstart[l + 1].v, loopstart[l + 2].v);
         triangle.poly_index = poly_index;
         node_data->triangles.append(triangle);
@@ -165,12 +166,13 @@ static void do_encode_pixels(void *__restrict userdata,
     float2 tile_offset = float2(image_tile.get_tile_offset());
     TileData tile_data;
 
-    int triangle_index = 0;
-    for (Triangle &triangle : node_data->triangles) {
+    Triangles &triangles = node_data->triangles;
+    for (int triangle_index = 0; triangle_index < triangles.size(); triangle_index++) {
+      int3 loop_indices = triangles.get_loop_indices(triangle_index);
       float2 uvs[3] = {
-          float2(data->ldata_uv[triangle.loop_indices[0]].uv) - tile_offset,
-          float2(data->ldata_uv[triangle.loop_indices[1]].uv) - tile_offset,
-          float2(data->ldata_uv[triangle.loop_indices[1] + 1].uv) - tile_offset,
+          float2(data->ldata_uv[loop_indices[0]].uv) - tile_offset,
+          float2(data->ldata_uv[loop_indices[1]].uv) - tile_offset,
+          float2(data->ldata_uv[loop_indices[2]].uv) - tile_offset,
       };
 
       const float minv = clamp_f(min_fff(uvs[0].y, uvs[1].y, uvs[2].y), 0.0f, 1.0f);
@@ -183,8 +185,7 @@ static void do_encode_pixels(void *__restrict userdata,
       const int maxx = min_ii(ceil(maxu * image_buffer->x), image_buffer->x);
 
       extract_barycentric_pixels(
-          tile_data, image_buffer, triangle, triangle_index, uvs, minx, miny, maxx, maxy);
-      triangle_index += 1;
+          tile_data, image_buffer, triangles, triangle_index, uvs, minx, miny, maxx, maxy);
     }
 
     BKE_image_release_ibuf(image, image_buffer, nullptr);
@@ -196,6 +197,7 @@ static void do_encode_pixels(void *__restrict userdata,
     tile_data.tile_number = image_tile.get_tile_number();
     node_data->tiles.append(tile_data);
   }
+  node_data->triangles.cleanup_after_init();
 }
 
 static void init(const Object *ob, int totnode, PBVHNode **nodes)
@@ -214,7 +216,7 @@ static void init(const Object *ob, int totnode, PBVHNode **nodes)
   if (nodes_to_initialize.size() == 0) {
     return;
   }
-  printf("%ld nodes to initialize\n", nodes_to_initialize.size());
+  printf("%lld nodes to initialize\n", nodes_to_initialize.size());
 
   Mesh *mesh = static_cast<Mesh *>(ob->data);
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
@@ -246,7 +248,7 @@ static void init(const Object *ob, int totnode, PBVHNode **nodes)
     for (int n = 0; n < totnode; n++) {
       PBVHNode *node = nodes[n];
       NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
-      compressed_data_len += node_data->triangles.size() * sizeof(Triangle);
+      compressed_data_len += node_data->triangles.mem_size();
       for (const TileData &tile_data : node_data->tiles) {
         compressed_data_len += tile_data.encoded_pixels.size() * sizeof(PixelsPackage);
         for (const PixelsPackage &encoded_pixels : tile_data.encoded_pixels) {
@@ -254,7 +256,7 @@ static void init(const Object *ob, int totnode, PBVHNode **nodes)
         }
       }
     }
-    printf("Encoded %ld pixels in %ld bytes (%f bytes per pixel)\n",
+    printf("Encoded %lld pixels in %lld bytes (%f bytes per pixel)\n",
            num_pixels,
            compressed_data_len,
            float(compressed_data_len) / num_pixels);

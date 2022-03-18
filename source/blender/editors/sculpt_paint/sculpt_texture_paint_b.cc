@@ -63,7 +63,6 @@ static void do_task_cb_ex(void *__restrict userdata,
   srgb_to_linearrgb_v3_v3(brush_linear, brush_srgb);
   brush_linear[3] = 1.0f;
   MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
-  
 
   const float brush_strength = ss->cache->bstrength;
 

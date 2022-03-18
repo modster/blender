@@ -141,15 +141,15 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     init_brush_test();
   }
 
-  bool paint(const Triangle &triangle, const PixelsPackage &encoded_pixels, ImBuf *image_buffer)
+  bool paint(const Triangles &triangles, const PixelsPackage &encoded_pixels, ImBuf *image_buffer)
   {
     if (image_buffer != last_used_image_buffer_ptr) {
       last_used_image_buffer_ptr = image_buffer;
       init_brush_color(image_buffer);
     }
     image_accessor.set_image_position(image_buffer, encoded_pixels.start_image_coordinate);
-    Pixel pixel = get_start_pixel(triangle, encoded_pixels);
-    const Pixel add_pixel = get_delta_pixel(triangle, encoded_pixels, pixel);
+    Pixel pixel = get_start_pixel(triangles, encoded_pixels);
+    const Pixel add_pixel = get_delta_pixel(triangles, encoded_pixels, pixel);
     bool pixels_painted = false;
     for (int x = 0; x < encoded_pixels.num_pixels; x++) {
       if (!brush_test_fn(&test, pixel.pos)) {
@@ -170,7 +170,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
           normal,
           face_normal,
           mask,
-          triangle.automasking_factor,
+          triangles.get_automasking_factor(encoded_pixels.triangle_index),
           thread_id);
 
       blend_color_interpolate_float(color, color, brush_color, falloff_strength * brush_strength);
@@ -213,30 +213,36 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   }
 
   /** Extract the staring pixel from the given encoded_pixels belonging to the triangle. */
-  Pixel get_start_pixel(const Triangle &triangle, const PixelsPackage &encoded_pixels) const
+  Pixel get_start_pixel(const Triangles &triangles, const PixelsPackage &encoded_pixels) const
   {
-    return init_pixel(triangle, encoded_pixels.start_barycentric_coord.decode());
+    return init_pixel(
+        triangles, encoded_pixels.triangle_index, encoded_pixels.start_barycentric_coord.decode());
   }
 
   /**
    * Extract the delta pixel that will be used to advance a Pixel instance to the next pixel. */
-  Pixel get_delta_pixel(const Triangle &triangle,
+  Pixel get_delta_pixel(const Triangles &triangles,
                         const PixelsPackage &encoded_pixels,
                         const Pixel &start_pixel) const
   {
-    Pixel result = init_pixel(triangle,
-                              encoded_pixels.start_barycentric_coord.decode() +
-                                  triangle.add_barycentric_coord_x);
+    Pixel result = init_pixel(
+        triangles,
+        encoded_pixels.triangle_index,
+        encoded_pixels.start_barycentric_coord.decode() +
+            triangles.get_add_barycentric_coord_x(encoded_pixels.triangle_index));
     return result - start_pixel;
   }
 
-  Pixel init_pixel(const Triangle &triangle, const float3 weights) const
+  Pixel init_pixel(const Triangles &triangles,
+                   const int triangle_index,
+                   const float3 weights) const
   {
+    int3 vert_indices = triangles.get_vert_indices(triangle_index);
     Pixel result;
     interp_v3_v3v3v3(result.pos,
-                     mvert[triangle.vert_indices[0]].co,
-                     mvert[triangle.vert_indices[1]].co,
-                     mvert[triangle.vert_indices[2]].co,
+                     mvert[vert_indices[0]].co,
+                     mvert[vert_indices[1]].co,
+                     mvert[vert_indices[2]].co,
                      weights);
     return result;
   }
@@ -281,35 +287,34 @@ static void do_task_cb_ex(void *__restrict userdata,
   /* Propagate vertex brush test to triangle. This should be extended with brush overlapping edges
    * and faces only. */
   std::vector<bool> triangle_brush_test_results(node_data->triangles.size());
-  int triangle_index = 0;
   int last_poly_index = -1;
-  for (Triangle &triangle : node_data->triangles) {
+
+  Triangles &triangles = node_data->triangles;
+  for (int triangle_index = 0; triangle_index < triangles.size(); triangle_index++) {
+    int3 vert_indices = triangles.get_vert_indices(triangle_index);
     for (int i = 0; i < 3; i++) {
-      triangle_brush_test_results[triangle_index] =
-          triangle_brush_test_results[triangle_index] ||
-          data->vertex_brush_tests[triangle.vert_indices[i]];
+      triangle_brush_test_results[triangle_index] = triangle_brush_test_results[triangle_index] ||
+                                                    data->vertex_brush_tests[vert_indices[i]];
     }
-    if (last_poly_index != triangle.poly_index) {
-      last_poly_index = triangle.poly_index;
+    const int poly_index = triangles.get_poly_index(triangle_index);
+    if (last_poly_index != poly_index) {
+      last_poly_index = poly_index;
+
       float automasking_factor = 1.0f;
       for (int t_index = triangle_index;
-           t_index < node_data->triangles.size() &&
-           node_data->triangles[t_index].poly_index == triangle.poly_index;
+           t_index < triangles.size() && triangles.get_poly_index(t_index) == poly_index;
            t_index++) {
         for (int i = 0; i < 3; i++) {
-          automasking_factor = min_ff(automasking_factor,
-                                      data->automask_factors[triangle.vert_indices[i]]);
+          automasking_factor = min_ff(automasking_factor, data->automask_factors[vert_indices[i]]);
         }
       }
 
       for (int t_index = triangle_index;
-           t_index < node_data->triangles.size() &&
-           node_data->triangles[t_index].poly_index == triangle.poly_index;
+           t_index < triangles.size() && triangles.get_poly_index(t_index) == poly_index;
            t_index++) {
-        node_data->triangles[t_index].automasking_factor = automasking_factor;
+        triangles.set_automasking_factor(t_index, automasking_factor);
       }
     }
-    triangle_index += 1;
   }
 
   const int thread_id = BLI_task_parallel_thread_id(tls);
@@ -340,13 +345,12 @@ static void do_task_cb_ex(void *__restrict userdata,
       if (!triangle_brush_test_results[encoded_pixels.triangle_index]) {
         continue;
       }
-      const Triangle &triangle = node_data->triangles[encoded_pixels.triangle_index];
       bool pixels_painted = false;
       if (image_buffer->rect_float != nullptr) {
-        pixels_painted = kernel_float4.paint(triangle, encoded_pixels, image_buffer);
+        pixels_painted = kernel_float4.paint(triangles, encoded_pixels, image_buffer);
       }
       else {
-        pixels_painted = kernel_byte4.paint(triangle, encoded_pixels, image_buffer);
+        pixels_painted = kernel_byte4.paint(triangles, encoded_pixels, image_buffer);
       }
 
       if (pixels_painted) {
