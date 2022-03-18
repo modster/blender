@@ -88,14 +88,15 @@ static void ED_curve_pick_vert__do_closest(void *userData,
   UNUSED_VARS_NDEBUG(handles_visible);
 }
 
-bool ED_curve_pick_vert_thresholded(ViewContext *vc,
-                                    short sel,
-                                    const float sel_dist_mul,
-                                    Nurb **r_nurb,
-                                    BezTriple **r_bezt,
-                                    BPoint **r_bp,
-                                    short *r_handle,
-                                    Base **r_base)
+/* \param sel_dist_mul: A multiplier on the default select distance. */
+bool ED_curve_pick_vert_ex(ViewContext *vc,
+                           short sel,
+                           const float sel_dist_mul,
+                           Nurb **r_nurb,
+                           BezTriple **r_bezt,
+                           BPoint **r_bp,
+                           short *r_handle,
+                           Base **r_base)
 {
   /* (sel == 1): selected gets a disadvantage */
   /* in nurb and bezt or bp the nearest is written */
@@ -152,7 +153,7 @@ bool ED_curve_pick_vert(ViewContext *vc,
                         short *r_handle,
                         Base **r_base)
 {
-  return ED_curve_pick_vert_thresholded(vc, 1, 1.0f, r_nurb, r_bezt, r_bp, r_handle, r_base);
+  return ED_curve_pick_vert_ex(vc, 1, 1.0f, r_nurb, r_bezt, r_bp, r_handle, r_base);
 }
 
 /** \} */
