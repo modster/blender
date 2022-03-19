@@ -218,12 +218,19 @@ typedef struct LineartPointArrayFinal {
   struct LineartRenderBuffer *rb;
 } LineartPointArrayFinal;
 
+typedef struct LineartIntersectionRecord {
+  float p1[3];
+  float p2[3];
+  struct LineartTriangle *t1;
+  struct LineartTriangle *t2;
+} LineartIntersectionRecord;
+
 typedef struct LineartMeshRecord {
   LineartPointArrayFinal *array;
   uint32_t next;
   uint32_t max_length;
 
-  float *intersection_record;
+  struct LineartIntersectionRecord *intersection_record;
   uint32_t intersection_pair_max;
   uint32_t intersection_pair_next;
 } LineartMeshRecord;
