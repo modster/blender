@@ -578,7 +578,7 @@ static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
     SET_FLAG_FROM_TEST(mat_options, use_ssrefract, VAR_MAT_REFRACT);
     SET_FLAG_FROM_TEST(mat_options, is_hair, VAR_MAT_HAIR);
     GPUMaterial *gpumat = EEVEE_material_get(vedata, scene, ma, NULL, mat_options);
-    const bool use_sss = GPU_material_flag_get(gpumat, GPU_MATFLAG_SSS);
+    const bool use_sss = GPU_material_flag_get(gpumat, GPU_MATFLAG_SUBSURFACE);
 
     int ssr_id = (((effects->enabled_effects & EFFECT_SSR) != 0) && !use_ssrefract) ? 1 : 0;
     int option = (use_ssrefract ? 0 : (use_sss ? 1 : 2)) * 2 + do_cull;

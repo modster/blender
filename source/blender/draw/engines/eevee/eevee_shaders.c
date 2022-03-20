@@ -1412,68 +1412,58 @@ static char *eevee_get_frag(int options)
   return str;
 }
 
-static void eevee_material_post_eval(GPUMaterial *mat,
-                                     int options,
-                                     const char **UNUSED(vert_code),
-                                     const char **geom_code,
-                                     const char **UNUSED(frag_lib),
-                                     const char **UNUSED(defines))
+static void eevee_material_post_eval(void *UNUSED(thunk),
+                                     GPUMaterial *mat,
+                                     GPUCodegenOutput *codegen)
 {
+  uint64_t options = GPU_material_uuid_get(mat);
   const bool is_hair = (options & VAR_MAT_HAIR) != 0;
   const bool is_mesh = (options & VAR_MAT_MESH) != 0;
 
-  /* Force geometry usage if GPU_BARYCENTRIC_DIST or GPU_BARYCENTRIC_TEXCO are used.
-   * NOTE: GPU_BARYCENTRIC_TEXCO only requires it if the shader is not drawing hairs. */
-  if (!is_hair && is_mesh && GPU_material_flag_get(mat, GPU_MATFLAG_BARYCENTRIC) &&
-      *geom_code == NULL) {
-    *geom_code = e_data.surface_geom_barycentric;
-  }
-}
-
-static struct GPUMaterial *eevee_material_get_ex(
-    struct Scene *scene, Material *ma, World *wo, int options, bool deferred)
-{
-  BLI_assert(ma || wo);
-  const bool is_volume = (options & VAR_MAT_VOLUME) != 0;
-  const bool is_default = (options & VAR_DEFAULT) != 0;
-  const void *engine = &DRW_engine_viewport_eevee_type;
-
-  GPUMaterial *mat = NULL;
-
-  if (ma) {
-    mat = DRW_shader_find_from_material(ma, engine, options, deferred);
-  }
-  else {
-    mat = DRW_shader_find_from_world(wo, engine, options, deferred);
-  }
-
-  if (mat) {
-    return mat;
-  }
-
-  char *defines = eevee_get_defines(options);
   char *vert = eevee_get_vert(options);
   char *geom = eevee_get_geom(options);
   char *frag = eevee_get_frag(options);
+  char *defines = eevee_get_defines(options);
 
-  if (ma) {
-    GPUMaterialEvalCallbackFn cbfn = &eevee_material_post_eval;
-
-    bNodeTree *ntree = !is_default ? ma->nodetree : EEVEE_shader_default_surface_nodetree(ma);
-    mat = DRW_shader_create_from_material(
-        scene, ma, ntree, engine, options, is_volume, vert, geom, frag, defines, deferred, cbfn);
+  /* Force geometry usage if GPU_BARYCENTRIC_DIST or GPU_BARYCENTRIC_TEXCO are used.
+   * NOTE: GPU_BARYCENTRIC_TEXCO only requires it if the shader is not drawing hairs. */
+  bool inject_geometry_shader = !is_hair && is_mesh &&
+                                GPU_material_flag_get(mat, GPU_MATFLAG_BARYCENTRIC) &&
+                                geom == NULL;
+  if (inject_geometry_shader) {
+    geom = e_data.surface_geom_barycentric;
   }
-  else {
-    bNodeTree *ntree = !is_default ? wo->nodetree : EEVEE_shader_default_world_nodetree(wo);
-    mat = DRW_shader_create_from_world(
-        scene, wo, ntree, engine, options, is_volume, vert, geom, frag, defines, deferred, NULL);
+
+  eevee_shader_material_create_info_amend(mat, codegen, frag, vert, geom, defines);
+
+  if (inject_geometry_shader) {
+    geom = NULL;
   }
 
   MEM_SAFE_FREE(defines);
   MEM_SAFE_FREE(vert);
   MEM_SAFE_FREE(geom);
   MEM_SAFE_FREE(frag);
+}
 
+static struct GPUMaterial *eevee_material_get_ex(
+    struct Scene *UNUSED(scene), Material *ma, World *wo, int options, bool deferred)
+{
+  BLI_assert(ma || wo);
+  const bool is_volume = (options & VAR_MAT_VOLUME) != 0;
+  const bool is_default = (options & VAR_DEFAULT) != 0;
+
+  GPUMaterial *mat = NULL;
+  GPUCodegenCallbackFn cbfn = &eevee_material_post_eval;
+
+  if (ma) {
+    bNodeTree *ntree = !is_default ? ma->nodetree : EEVEE_shader_default_surface_nodetree(ma);
+    mat = DRW_shader_from_material(ma, ntree, options, is_volume, deferred, cbfn, NULL);
+  }
+  else {
+    bNodeTree *ntree = !is_default ? wo->nodetree : EEVEE_shader_default_world_nodetree(wo);
+    mat = DRW_shader_from_world(wo, ntree, options, is_volume, deferred, cbfn, NULL);
+  }
   return mat;
 }
 

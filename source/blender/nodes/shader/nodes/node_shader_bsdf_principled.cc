@@ -182,7 +182,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
     flag |= GPU_MATFLAG_REFRACT;
   }
   if (use_subsurf) {
-    flag |= GPU_MATFLAG_SSS;
+    flag |= GPU_MATFLAG_SUBSURFACE;
   }
 
   float f_use_diffuse = use_diffuse ? 1.0f : 0.0f;

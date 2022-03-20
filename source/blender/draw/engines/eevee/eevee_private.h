@@ -1290,6 +1290,13 @@ struct GPUMaterial *EEVEE_material_get(
     EEVEE_Data *vedata, struct Scene *scene, Material *ma, World *wo, int options);
 void EEVEE_shaders_free(void);
 
+void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
+                                             GPUCodegenOutput *codegen,
+                                             char *frag,
+                                             char *vert,
+                                             char *geom,
+                                             char *defines);
+
 /* eevee_lightprobes.c */
 
 bool EEVEE_lightprobes_obj_visibility_cb(bool vis_in, void *user_data);

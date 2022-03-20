@@ -12,8 +12,14 @@
 #include "DNA_customdata_types.h"
 #include "DNA_listBase.h"
 
+#include "BLI_ghash.h"
+
 #include "GPU_material.h"
 #include "GPU_shader.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct GPUNode;
 struct GPUOutput;
@@ -25,7 +31,6 @@ typedef enum eGPUDataSource {
   GPU_SOURCE_UNIFORM,
   GPU_SOURCE_ATTR,
   GPU_SOURCE_UNIFORM_ATTR,
-  GPU_SOURCE_BUILTIN,
   GPU_SOURCE_STRUCT,
   GPU_SOURCE_TEX,
   GPU_SOURCE_TEX_TILED_MAPPING,
@@ -37,7 +42,6 @@ typedef enum {
   GPU_NODE_LINK_NONE = 0,
   GPU_NODE_LINK_ATTR,
   GPU_NODE_LINK_UNIFORM_ATTR,
-  GPU_NODE_LINK_BUILTIN,
   GPU_NODE_LINK_COLORBAND,
   GPU_NODE_LINK_CONSTANT,
   GPU_NODE_LINK_IMAGE,
@@ -49,13 +53,23 @@ typedef enum {
   GPU_NODE_LINK_UNIFORM,
 } GPUNodeLinkType;
 
+typedef enum {
+  GPU_NODE_TAG_NONE = 0,
+  GPU_NODE_TAG_SURFACE = (1 << 0),
+  GPU_NODE_TAG_VOLUME = (1 << 1),
+  GPU_NODE_TAG_DISPLACEMENT = (1 << 2),
+  GPU_NODE_TAG_THICKNESS = (1 << 3),
+  GPU_NODE_TAG_AOV = (1 << 4),
+  GPU_NODE_TAG_EVAL = (1 << 5),
+} eGPUNodeTag;
+
 struct GPUNode {
   struct GPUNode *next, *prev;
 
   const char *name;
 
   /* Internal flag to mark nodes during pruning */
-  bool tag;
+  eGPUNodeTag tag;
 
   ListBase inputs;
   ListBase outputs;
@@ -70,8 +84,6 @@ struct GPUNodeLink {
   union {
     /* GPU_NODE_LINK_CONSTANT | GPU_NODE_LINK_UNIFORM */
     const float *data;
-    /* GPU_NODE_LINK_BUILTIN */
-    eGPUBuiltin builtin;
     /* GPU_NODE_LINK_COLORBAND */
     struct GPUTexture **colorband;
     /* GPU_NODE_LINK_VOLUME_GRID */
@@ -110,8 +122,6 @@ typedef struct GPUInput {
   union {
     /* GPU_SOURCE_CONSTANT | GPU_SOURCE_UNIFORM */
     float vec[16]; /* vector data */
-    /* GPU_SOURCE_BUILTIN */
-    eGPUBuiltin builtin; /* builtin uniform */
     /* GPU_SOURCE_TEX | GPU_SOURCE_TEX_TILED_MAPPING */
     struct GPUMaterialTexture *texture;
     /* GPU_SOURCE_ATTR */
@@ -129,14 +139,25 @@ typedef struct GPUNodeGraphOutputLink {
   GPUNodeLink *outlink;
 } GPUNodeGraphOutputLink;
 
+typedef struct GPUNodeGraphEvalNode {
+  struct GPUNodeGraphEvalNode *next, *prev;
+  GPUNode *weight_node;
+  GPUNode *eval_node;
+} GPUNodeGraphEvalNode;
+
 typedef struct GPUNodeGraph {
   /* Nodes */
   ListBase nodes;
 
-  /* Main Output. */
-  GPUNodeLink *outlink;
+  /* Main Outputs. */
+  GPUNodeLink *outlink_surface;
+  GPUNodeLink *outlink_volume;
+  GPUNodeLink *outlink_displacement;
+  GPUNodeLink *outlink_thickness;
   /* List of GPUNodeGraphOutputLink */
   ListBase outlink_aovs;
+  /* List of GPUNodeGraphEvalNode. */
+  ListBase eval_nodes;
 
   /* Requested attributes and textures. */
   ListBase attributes;
@@ -145,6 +166,9 @@ typedef struct GPUNodeGraph {
 
   /* The list of uniform attributes. */
   GPUUniformAttrList uniform_attrs;
+
+  /** Set of all the GLSL lib code blocks . */
+  GSet *used_libraries;
 } GPUNodeGraph;
 
 /* Node Graph */
@@ -171,4 +195,6 @@ struct GPUTexture **gpu_material_ramp_texture_row_set(struct GPUMaterial *mat,
                                                       float *pixels,
                                                       float *row);
 
-struct GSet *gpu_material_used_libraries(struct GPUMaterial *material);
+#ifdef __cplusplus
+}
+#endif

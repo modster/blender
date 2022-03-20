@@ -16,6 +16,7 @@ set(INC
   ../editors/space_view3d
   ../functions
   ../gpu
+  ../gpu/intern
   ../imbuf
   ../makesdna
   ../makesrna
@@ -123,6 +124,7 @@ set(SRC
   engines/eevee/eevee_sampling.c
   engines/eevee/eevee_screen_raytrace.c
   engines/eevee/eevee_shaders.c
+  engines/eevee/eevee_shaders_extra.cc
   engines/eevee/eevee_shadows.c
   engines/eevee/eevee_shadows_cascade.c
   engines/eevee/eevee_shadows_cube.c

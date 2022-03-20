@@ -786,12 +786,6 @@ static void gpu_parse_material_library(GHash *hash, GPUMaterialLibrary *library)
         }
       }
 
-      if (!type && BLI_str_startswith(code, "samplerCube")) {
-        type = GPU_TEXCUBE;
-      }
-      if (!type && BLI_str_startswith(code, "sampler2DShadow")) {
-        type = GPU_SHADOW2D;
-      }
       if (!type && BLI_str_startswith(code, "sampler1DArray")) {
         type = GPU_TEX1D_ARRAY;
       }
