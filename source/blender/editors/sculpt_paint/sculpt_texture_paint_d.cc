@@ -160,6 +160,10 @@ template<typename ImagePixelAccessor> class PaintingKernel {
         continue;
       }
 
+      if (brush->mask_mtex.tex) {
+        SCULPT_brush_texture_eval(ss, brush, &brush->mask_mtex, pixel.pos, thread_id, brush_color);
+      }
+
       float4 color = image_accessor.read_pixel(image_buffer);
       const float3 normal(0.0f, 0.0f, 0.0f);
       const float3 face_normal(0.0f, 0.0f, 0.0f);

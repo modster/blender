@@ -633,8 +633,8 @@ class VIEW3D_PT_tools_brush_texture(Panel, View3DPaintPanel):
 
 # TODO, move to space_view3d.py
 class VIEW3D_PT_tools_mask_texture(Panel, View3DPaintPanel, TextureMaskPanel):
-    bl_category = "Tool"
-    bl_context = ".imagepaint"  # dot on purpose (access from topbar)
+    #bl_category = "Tool"
+    bl_context = ".paint_common"  # dot on purpose (access from topbar)
     bl_parent_id = "VIEW3D_PT_tools_brush_settings"
     bl_label = "Texture Mask"
     bl_options = {'DEFAULT_CLOSED'}
@@ -642,7 +642,12 @@ class VIEW3D_PT_tools_mask_texture(Panel, View3DPaintPanel, TextureMaskPanel):
     @classmethod
     def poll(cls, context):
         settings = cls.paint_settings(context)
-        return (settings and settings.brush and context.image_paint_object)
+        if settings is None:
+            return false
+        if context.image_paint_object:
+            return settings.brush
+        if context.sculpt_object:
+            return (settings.brush.sculpt_tool == 'TEXTURE_PAINT')
 
     def draw(self, context):
         layout = self.layout
