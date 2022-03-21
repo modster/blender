@@ -39,7 +39,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     set(WITH_WINDOWS_STRIPPED_PDB OFF)
   endif()
 else()
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.28.29921) # MSVC 2019 16.9.16
+  if(WITH_BLENDER AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.28.29921) # MSVC 2019 16.9.16
     message(FATAL_ERROR "Compiler is unsupported, MSVC 2019 16.9.16 or newer is required for building blender.")
   endif()
 endif()
@@ -252,6 +252,12 @@ if(NOT DEFINED LIBDIR)
   elseif(MSVC_VERSION GREATER 1919)
     message(STATUS "Visual Studio 2019 detected.")
     set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/${LIBDIR_BASE}_vc15)
+  elseif(MSVC_VERSION GREATER 1909)
+    message(STATUS "Visual Studio 2017 detected.")
+    set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/${LIBDIR_BASE}_vc15)
+  elseif(MSVC_VERSION EQUAL 1900)
+    message(STATUS "Visual Studio 2015 detected.")
+    set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/${LIBDIR_BASE}_vc15)
   endif()
 else()
   message(STATUS "Using pre-compiled LIBDIR: ${LIBDIR}")
@@ -403,10 +409,10 @@ if(WITH_CODEC_FFMPEG)
 endif()
 
 if(WITH_IMAGE_OPENEXR)
-  set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
-  set(OPENEXR_VERSION "2.1")
   windows_find_package(OPENEXR REQUIRED)
   if(NOT OPENEXR_FOUND)
+    set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
+    set(OPENEXR_VERSION "2.1")
     warn_hardcoded_paths(OpenEXR)
     set(OPENEXR ${LIBDIR}/openexr)
     set(OPENEXR_INCLUDE_DIR ${OPENEXR}/include)
@@ -462,15 +468,17 @@ if(WITH_PYTHON)
 endif()
 
 if(WITH_BOOST)
-  if(WITH_CYCLES AND WITH_CYCLES_OSL)
+  if(WITH_CYCLES_OSL)
     set(boost_extra_libs wave)
   endif()
-  if(WITH_INTERNATIONAL)
-    list(APPEND boost_extra_libs locale)
+  if(WITH_BLENDER)
+    if(WITH_INTERNATIONAL)
+      list(APPEND boost_extra_libs locale)
+    endif()
+    set(Boost_USE_STATIC_RUNTIME ON) # prefix lib
+    set(Boost_USE_MULTITHREADED ON) # suffix -mt
+    set(Boost_USE_STATIC_LIBS ON) # suffix -s
   endif()
-  set(Boost_USE_STATIC_RUNTIME ON) # prefix lib
-  set(Boost_USE_MULTITHREADED ON) # suffix -mt
-  set(Boost_USE_STATIC_LIBS ON) # suffix -s
   if(WITH_WINDOWS_FIND_MODULES)
     find_package(Boost COMPONENTS date_time filesystem thread regex system ${boost_extra_libs})
   endif()
@@ -505,7 +513,7 @@ if(WITH_BOOST)
       debug ${BOOST_LIBPATH}/libboost_thread-${BOOST_DEBUG_POSTFIX}
       debug ${BOOST_LIBPATH}/libboost_chrono-${BOOST_DEBUG_POSTFIX}
     )
-    if(WITH_CYCLES AND WITH_CYCLES_OSL)
+    if(WITH_CYCLES_OSL)
       set(BOOST_LIBRARIES ${BOOST_LIBRARIES}
         optimized ${BOOST_LIBPATH}/libboost_wave-${BOOST_POSTFIX}
         debug ${BOOST_LIBPATH}/libboost_wave-${BOOST_DEBUG_POSTFIX})
@@ -624,21 +632,23 @@ if(WITH_IMAGE_OPENJPEG)
 endif()
 
 if(WITH_OPENSUBDIV)
-  set(OPENSUBDIV_INCLUDE_DIRS ${LIBDIR}/opensubdiv/include)
-  set(OPENSUBDIV_LIBPATH ${LIBDIR}/opensubdiv/lib)
-  set(OPENSUBDIV_LIBRARIES
-    optimized ${OPENSUBDIV_LIBPATH}/osdCPU.lib
-    optimized ${OPENSUBDIV_LIBPATH}/osdGPU.lib
-    debug ${OPENSUBDIV_LIBPATH}/osdCPU_d.lib
-    debug ${OPENSUBDIV_LIBPATH}/osdGPU_d.lib
-  )
-  set(OPENSUBDIV_HAS_OPENMP TRUE)
-  set(OPENSUBDIV_HAS_TBB FALSE)
-  set(OPENSUBDIV_HAS_OPENCL TRUE)
-  set(OPENSUBDIV_HAS_CUDA FALSE)
-  set(OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK TRUE)
-  set(OPENSUBDIV_HAS_GLSL_COMPUTE TRUE)
   windows_find_package(OpenSubdiv)
+  if (NOT OpenSubdiv_FOUND)
+    set(OPENSUBDIV_INCLUDE_DIRS ${LIBDIR}/opensubdiv/include)
+    set(OPENSUBDIV_LIBPATH ${LIBDIR}/opensubdiv/lib)
+    set(OPENSUBDIV_LIBRARIES
+      optimized ${OPENSUBDIV_LIBPATH}/osdCPU.lib
+      optimized ${OPENSUBDIV_LIBPATH}/osdGPU.lib
+      debug ${OPENSUBDIV_LIBPATH}/osdCPU_d.lib
+      debug ${OPENSUBDIV_LIBPATH}/osdGPU_d.lib
+    )
+    set(OPENSUBDIV_HAS_OPENMP TRUE)
+    set(OPENSUBDIV_HAS_TBB FALSE)
+    set(OPENSUBDIV_HAS_OPENCL TRUE)
+    set(OPENSUBDIV_HAS_CUDA FALSE)
+    set(OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK TRUE)
+    set(OPENSUBDIV_HAS_GLSL_COMPUTE TRUE)
+  endif()
 endif()
 
 if(WITH_SDL)
@@ -659,12 +669,15 @@ if(WITH_SYSTEM_AUDASPACE)
 endif()
 
 if(WITH_TBB)
-  set(TBB_LIBRARIES optimized ${LIBDIR}/tbb/lib/tbb.lib debug ${LIBDIR}/tbb/lib/tbb_debug.lib)
-  set(TBB_INCLUDE_DIR ${LIBDIR}/tbb/include)
-  set(TBB_INCLUDE_DIRS ${TBB_INCLUDE_DIR})
-  if(WITH_TBB_MALLOC_PROXY)
-    set(TBB_MALLOC_LIBRARIES optimized ${LIBDIR}/tbb/lib/tbbmalloc.lib debug ${LIBDIR}/tbb/lib/tbbmalloc_debug.lib)
-    add_definitions(-DWITH_TBB_MALLOC)
+  windows_find_package(TBB)
+  if (NOT TBB_FOUND)
+    set(TBB_LIBRARIES optimized ${LIBDIR}/tbb/lib/tbb.lib debug ${LIBDIR}/tbb/lib/tbb_debug.lib)
+    set(TBB_INCLUDE_DIR ${LIBDIR}/tbb/include)
+    set(TBB_INCLUDE_DIRS ${TBB_INCLUDE_DIR})
+    if(WITH_TBB_MALLOC_PROXY)
+      set(TBB_MALLOC_LIBRARIES optimized ${LIBDIR}/tbb/lib/tbbmalloc.lib debug ${LIBDIR}/tbb/lib/tbbmalloc_debug.lib)
+      add_definitions(-DWITH_TBB_MALLOC)
+    endif()
   endif()
 endif()
 
@@ -693,7 +706,7 @@ if(WITH_CODEC_SNDFILE)
   set(LIBSNDFILE_LIBRARIES ${LIBSNDFILE_LIBPATH}/libsndfile-1.lib)
 endif()
 
-if(WITH_CYCLES AND WITH_CYCLES_OSL)
+if(WITH_CYCLES_OSL)
   set(CYCLES_OSL ${LIBDIR}/osl CACHE PATH "Path to OpenShadingLanguage installation")
   set(OSL_SHADER_DIR ${CYCLES_OSL}/shaders)
   # Shaders have moved around a bit between OSL versions, check multiple locations
@@ -726,7 +739,7 @@ if(WITH_CYCLES AND WITH_CYCLES_OSL)
   endif()
 endif()
 
-if(WITH_CYCLES AND WITH_CYCLES_EMBREE)
+if(WITH_CYCLES_EMBREE)
   windows_find_package(Embree)
   if(NOT EMBREE_FOUND)
     set(EMBREE_INCLUDE_DIRS ${LIBDIR}/embree/include)
@@ -754,17 +767,21 @@ if(WITH_CYCLES AND WITH_CYCLES_EMBREE)
 endif()
 
 if(WITH_USD)
-  windows_find_package(USD)
-  if(NOT USD_FOUND)
+  if(USD_INCLUDE_DIRS AND USD_LIBRARY_DIR)
     set(USD_FOUND ON)
-    set(USD_INCLUDE_DIRS ${LIBDIR}/usd/include)
-    set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/libusd_m.lib)
-    set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/libusd_m_d.lib)
-    set(USD_LIBRARY_DIR ${LIBDIR}/usd/lib)
-    set(USD_LIBRARIES
-      debug ${USD_DEBUG_LIB}
-      optimized ${USD_RELEASE_LIB}
-    )
+  else()
+    windows_find_package(USD)
+    if(NOT USD_FOUND)
+      set(USD_FOUND ON)
+      set(USD_INCLUDE_DIRS ${LIBDIR}/usd/include)
+      set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/libusd_m.lib)
+      set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/libusd_m_d.lib)
+      set(USD_LIBRARY_DIR ${LIBDIR}/usd/lib)
+      set(USD_LIBRARIES
+        debug ${USD_DEBUG_LIB}
+        optimized ${USD_RELEASE_LIB}
+      )
+    endif()
   endif()
 endif()
 
