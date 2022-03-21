@@ -33,6 +33,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR);
   b.add_input<decl::Vector>(N_("Clear Coat Normal")).hide_value();
   b.add_input<decl::Float>(N_("Ambient Occlusion")).hide_value();
+  b.add_input<decl::Float>(N_("Weight")).unavailable();
   b.add_output<decl::Shader>(N_("BSDF"));
 }
 
@@ -59,9 +60,10 @@ static int node_shader_gpu_eevee_specular(GPUMaterial *mat,
     GPU_link(mat, "set_value", GPU_constant(&one), &in[9].link);
   }
 
-  GPU_material_flag_set(mat, static_cast<eGPUMatFlag>(GPU_MATFLAG_DIFFUSE | GPU_MATFLAG_GLOSSY));
+  GPU_material_flag_set(mat, GPU_MATFLAG_DIFFUSE | GPU_MATFLAG_GLOSSY);
 
-  return GPU_stack_link(mat, node, "node_eevee_specular", in, out, GPU_constant(&node->ssr_id));
+  GPU_stack_link(mat, node, "node_eevee_specular", in, out);
+  return GPU_stack_eval_link(mat, node, "node_eevee_specular_eval", in, out);
 }
 
 }  // namespace blender::nodes::node_shader_eevee_specular_cc

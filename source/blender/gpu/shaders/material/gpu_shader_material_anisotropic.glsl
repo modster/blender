@@ -1,17 +1,20 @@
-#ifndef VOLUMETRICS
 void node_bsdf_anisotropic(vec4 color,
                            float roughness,
                            float anisotropy,
                            float rotation,
                            vec3 N,
                            vec3 T,
-                           const float use_multiscatter,
-                           const float ssr_id,
+                           float weight,
                            out Closure result)
 {
-  node_bsdf_glossy(color, roughness, N, use_multiscatter, ssr_id, result);
+  closure_weight_add(g_reflection_data, weight);
 }
-#else
-/* Stub anisotropic because it is not compatible with volumetrics. */
-#  define node_bsdf_anisotropic(a, b, c, d, e, f, g, h, result) (result = CLOSURE_DEFAULT)
-#endif
+
+void node_bsdf_anisotropic_eval(
+    vec4 color, float roughness, vec3 N, float weight, float use_multiscatter, out Closure result)
+{
+  if (closure_weight_threshold(g_reflection_data, weight)) {
+    g_reflection_data.color = color.rgb * weight;
+    g_reflection_data.N = N;
+  }
+}

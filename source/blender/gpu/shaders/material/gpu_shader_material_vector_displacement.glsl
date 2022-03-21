@@ -1,4 +1,4 @@
-void node_vector_displacement_tangent(vec4 vector,
+void node_vector_displacement_tangent(vec3 vector,
                                       float midlevel,
                                       float scale,
                                       vec4 tangent,
@@ -7,24 +7,23 @@ void node_vector_displacement_tangent(vec4 vector,
                                       mat4 viewmat,
                                       out vec3 result)
 {
-  /* TODO(fclem): this is broken. revisit latter. */
-  vec3 N_object = normalize(((vec4(normal, 0.0) * viewmat) * obmat).xyz);
-  vec3 T_object = normalize(((vec4(tangent.xyz, 0.0) * viewmat) * obmat).xyz);
-  vec3 B_object = tangent.w * normalize(cross(N_object, T_object));
+  vec3 oN = normalize(normal_world_to_object(normal));
+  vec3 oT = normalize(normal_world_to_object(tangent.xyz));
+  vec3 oB = tangent.w * normalize(cross(oN, oT));
 
-  vec3 offset = (vector.xyz - vec3(midlevel)) * scale;
-  result = offset.x * T_object + offset.y * N_object + offset.z * B_object;
-  result = (obmat * vec4(result, 0.0)).xyz;
+  result = (vector - midlevel) * scale;
+  result = result.x * oT + result.y * oN + result.z * oB;
+  result = transform_point(ModelMatrix, result);
 }
 
 void node_vector_displacement_object(
-    vec4 vector, float midlevel, float scale, mat4 obmat, out vec3 result)
+    vec3 vector, float midlevel, float scale, mat4 obmat, out vec3 result)
 {
-  result = (vector.xyz - vec3(midlevel)) * scale;
-  result = (obmat * vec4(result, 0.0)).xyz;
+  result = (vector - midlevel) * scale;
+  result = transform_point(ModelMatrix, result);
 }
 
-void node_vector_displacement_world(vec4 vector, float midlevel, float scale, out vec3 result)
+void node_vector_displacement_world(vec3 vector, float midlevel, float scale, out vec3 result)
 {
-  result = (vector.xyz - vec3(midlevel)) * scale;
+  result = (vector - midlevel) * scale;
 }

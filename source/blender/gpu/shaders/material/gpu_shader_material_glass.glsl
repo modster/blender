@@ -1,57 +1,49 @@
-#ifndef VOLUMETRICS
-
-CLOSURE_EVAL_FUNCTION_DECLARE_2(node_bsdf_glass, Glossy, Refraction)
 
 void node_bsdf_glass(vec4 color,
                      float roughness,
                      float ior,
                      vec3 N,
-                     const float do_multiscatter,
-                     const float ssr_id,
-                     out Closure result)
+                     float weight,
+                     float do_multiscatter,
+                     out Closure result,
+                     out float reflection_weight,
+                     out float refraction_weight)
 {
-  CLOSURE_VARS_DECLARE_2(Glossy, Refraction);
+  N = safe_normalize(N);
+  vec3 V = cameraVec(g_data.P);
+  float NV = dot(N, V);
 
-  in_Glossy_0.N = N; /* Normalized during eval. */
-  in_Glossy_0.roughness = roughness;
-
-  in_Refraction_1.N = N; /* Normalized during eval. */
-  in_Refraction_1.roughness = roughness;
-  in_Refraction_1.ior = ior;
-
-  CLOSURE_EVAL_FUNCTION_2(node_bsdf_glass, Glossy, Refraction);
-
-  result = CLOSURE_DEFAULT;
-
-  float NV = dot(in_Refraction_1.N, cameraVec(worldPosition));
-
-  float fresnel = (do_multiscatter != 0.0) ?
-                      btdf_lut(NV, in_Refraction_1.roughness, in_Refraction_1.ior).y :
-                      F_eta(in_Refraction_1.ior, NV);
-
-  vec2 split_sum = brdf_lut(NV, in_Glossy_0.roughness);
-  vec3 brdf = (do_multiscatter != 0.0) ? F_brdf_multi_scatter(vec3(1.0), vec3(1.0), split_sum) :
-                                         F_brdf_single_scatter(vec3(1.0), vec3(1.0), split_sum);
-
-  out_Glossy_0.radiance = closure_mask_ssr_radiance(out_Glossy_0.radiance, ssr_id);
-  out_Glossy_0.radiance *= brdf;
-  out_Glossy_0.radiance = render_pass_glossy_mask(vec3(1.0), out_Glossy_0.radiance);
-  out_Glossy_0.radiance *= color.rgb * fresnel;
-  closure_load_ssr_data(
-      out_Glossy_0.radiance, in_Glossy_0.roughness, in_Glossy_0.N, ssr_id, result);
-
-  float btdf = (do_multiscatter != 0.0) ?
-                   1.0 :
-                   btdf_lut(NV, in_Refraction_1.roughness, in_Refraction_1.ior).x;
-  out_Refraction_1.radiance *= btdf;
-  out_Refraction_1.radiance = render_pass_glossy_mask(vec3(1.0), out_Refraction_1.radiance);
-  out_Refraction_1.radiance *= color.rgb * (1.0 - fresnel);
-  /* Simulate 2nd absorption event. */
-  out_Refraction_1.radiance *= (refractionDepth > 0.0) ? color.rgb : vec3(1.0);
-  result.radiance += out_Refraction_1.radiance;
+  float fresnel = (do_multiscatter != 0.0) ? btdf_lut(NV, roughness, ior).y : F_eta(ior, NV);
+  reflection_weight = fresnel;
+  refraction_weight = 1.0 - fresnel;
+  closure_weight_add(g_reflection_data, reflection_weight);
+  closure_weight_add(g_refraction_data, refraction_weight);
 }
 
-#else
-/* Stub glass because it is not compatible with volumetrics. */
-#  define node_bsdf_glass(a, b, c, d, e, f, result) (result = CLOSURE_DEFAULT)
-#endif
+void node_bsdf_glass_eval(vec4 color,
+                          float roughness,
+                          float ior,
+                          vec3 N,
+                          float weight,
+                          float do_multiscatter,
+                          float reflection_weight,
+                          float refraction_weight,
+                          out Closure result)
+{
+  N = safe_normalize(N);
+  if (closure_weight_threshold(g_reflection_data, reflection_weight)) {
+    g_reflection_data.color = color.rgb * reflection_weight;
+    g_reflection_data.N = N;
+    g_reflection_data.roughness = roughness;
+  }
+  if (closure_weight_threshold(g_refraction_data, refraction_weight)) {
+    vec3 V = cameraVec(g_data.P);
+    float NV = dot(N, V);
+    float btdf = (do_multiscatter != 0.0) ? 1.0 : btdf_lut(NV, roughness, ior).x;
+
+    g_refraction_data.color = color.rgb * (refraction_weight * btdf);
+    g_refraction_data.N = N;
+    g_refraction_data.roughness = roughness;
+    g_refraction_data.ior = ior;
+  }
+}

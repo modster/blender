@@ -43,42 +43,43 @@ static void node_shader_init_vect_transform(bNodeTree *UNUSED(ntree), bNode *nod
   node->storage = vect;
 }
 
-static GPUNodeLink *get_gpulink_matrix_from_to(short from, short to)
+static const char *get_gpufn_name_from_to(short from, short to)
 {
   switch (from) {
     case SHD_VECT_TRANSFORM_SPACE_OBJECT:
       switch (to) {
         case SHD_VECT_TRANSFORM_SPACE_OBJECT:
-          return nullptr;
+          return NULL;
         case SHD_VECT_TRANSFORM_SPACE_WORLD:
-          return GPU_builtin(GPU_OBJECT_MATRIX);
+          return "object_to_world";
         case SHD_VECT_TRANSFORM_SPACE_CAMERA:
-          return GPU_builtin(GPU_LOC_TO_VIEW_MATRIX);
+          return "object_to_view";
       }
       break;
     case SHD_VECT_TRANSFORM_SPACE_WORLD:
       switch (to) {
         case SHD_VECT_TRANSFORM_SPACE_WORLD:
-          return nullptr;
+          return NULL;
         case SHD_VECT_TRANSFORM_SPACE_CAMERA:
-          return GPU_builtin(GPU_VIEW_MATRIX);
+          return "world_to_view";
         case SHD_VECT_TRANSFORM_SPACE_OBJECT:
-          return GPU_builtin(GPU_INVERSE_OBJECT_MATRIX);
+          return "world_to_object";
       }
       break;
     case SHD_VECT_TRANSFORM_SPACE_CAMERA:
       switch (to) {
         case SHD_VECT_TRANSFORM_SPACE_CAMERA:
-          return nullptr;
+          return NULL;
         case SHD_VECT_TRANSFORM_SPACE_WORLD:
-          return GPU_builtin(GPU_INVERSE_VIEW_MATRIX);
+          return "view_to_world";
         case SHD_VECT_TRANSFORM_SPACE_OBJECT:
-          return GPU_builtin(GPU_INVERSE_LOC_TO_VIEW_MATRIX);
+          return "view_to_object";
       }
       break;
   }
-  return nullptr;
+  return NULL;
 }
+
 static int gpu_shader_vect_transform(GPUMaterial *mat,
                                      bNode *node,
                                      bNodeExecData *UNUSED(execdata),
@@ -86,11 +87,6 @@ static int gpu_shader_vect_transform(GPUMaterial *mat,
                                      GPUNodeStack *out)
 {
   struct GPUNodeLink *inputlink;
-  struct GPUNodeLink *fromto;
-
-  const char *vtransform = "direction_transform_m4v3";
-  const char *ptransform = "point_transform_m4v3";
-  const char *func_name = nullptr;
 
   NodeShaderVectTransform *nodeprop = (NodeShaderVectTransform *)node->storage;
 
@@ -101,9 +97,10 @@ static int gpu_shader_vect_transform(GPUMaterial *mat,
     inputlink = GPU_constant(in[0].vec);
   }
 
-  fromto = get_gpulink_matrix_from_to(nodeprop->convert_from, nodeprop->convert_to);
+  const char *xform = (nodeprop->type == SHD_VECT_TRANSFORM_TYPE_POINT) ? "point_transform_" :
+                                                                          "direction_transform_";
+  const char *fromto = get_gpufn_name_from_to(nodeprop->convert_from, nodeprop->convert_to);
 
-  func_name = (nodeprop->type == SHD_VECT_TRANSFORM_TYPE_POINT) ? ptransform : vtransform;
   if (fromto) {
     /* For cycles we have inverted Z */
     /* TODO: pass here the correct matrices */
@@ -111,7 +108,11 @@ static int gpu_shader_vect_transform(GPUMaterial *mat,
         nodeprop->convert_to != SHD_VECT_TRANSFORM_SPACE_CAMERA) {
       GPU_link(mat, "invert_z", inputlink, &inputlink);
     }
-    GPU_link(mat, func_name, inputlink, fromto, &out[0].link);
+
+    char func_name[48];
+    SNPRINTF(func_name, "%s%s", xform, fromto);
+    GPU_link(mat, func_name, inputlink, &out[0].link);
+
     if (nodeprop->convert_to == SHD_VECT_TRANSFORM_SPACE_CAMERA &&
         nodeprop->convert_from != SHD_VECT_TRANSFORM_SPACE_CAMERA) {
       GPU_link(mat, "invert_z", out[0].link, &out[0].link);

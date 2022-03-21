@@ -1,11 +1,19 @@
 void dfdx_v3(vec3 v, out vec3 dy)
 {
+#ifdef GPU_FRAGMENT_SHADER
   dy = v + DFDX_SIGN * dFdx(v);
+#else
+  dy = v;
+#endif
 }
 
 void dfdy_v3(vec3 v, out vec3 dy)
 {
+#ifdef GPU_FRAGMENT_SHADER
   dy = v + DFDY_SIGN * dFdy(v);
+#else
+  dy = v;
+#endif
 }
 
 void node_bump(float strength,
@@ -14,15 +22,15 @@ void node_bump(float strength,
                float height_dx,
                float height_dy,
                vec3 N,
-               vec3 surf_pos,
                float invert,
                out vec3 result)
 {
-  N = mat3(ViewMatrix) * normalize(N);
-  dist *= gl_FrontFacing ? invert : -invert;
+  N = normalize(N);
+  dist *= FrontFacing ? invert : -invert;
 
-  vec3 dPdx = dFdx(surf_pos);
-  vec3 dPdy = dFdy(surf_pos);
+#ifdef GPU_FRAGMENT_SHADER
+  vec3 dPdx = dFdx(g_data.P);
+  vec3 dPdy = dFdy(g_data.P);
 
   /* Get surface tangents from normal. */
   vec3 Rx = cross(dPdy, N);
@@ -39,6 +47,7 @@ void node_bump(float strength,
 
   result = normalize(abs(det) * N - dist * sign(det) * surfgrad);
   result = normalize(mix(N, result, strength));
-
-  result = mat3(ViewMatrixInverse) * result;
+#else
+  result = N;
+#endif
 }

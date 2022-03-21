@@ -61,8 +61,7 @@ static int gpu_shader_bump(GPUMaterial *mat,
 
   float invert = (node->custom1) ? -1.0 : 1.0;
 
-  return GPU_stack_link(
-      mat, node, "node_bump", in, out, GPU_builtin(GPU_VIEW_POSITION), GPU_constant(&invert));
+  return GPU_stack_link(mat, node, "node_bump", in, out, GPU_constant(&invert));
 }
 
 }  // namespace blender::nodes::node_shader_bump_cc
