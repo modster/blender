@@ -11,3 +11,17 @@ diff -x .git -ur usd.orig/cmake/defaults/Packages.cmake external_usd/cmake/defau
  
  # --math
 
+diff -Naur usd_orig/cmake/defaults/msvcdefaults.cmake external_usd/cmake/defaults/msvcdefaults.cmake
+--- usd_orig/cmake/defaults/msvcdefaults.cmake	2022-02-18 14:49:09 -0700
++++ external_usd/cmake/defaults/msvcdefaults.cmake	2022-03-14 11:41:50 -0600
+@@ -120,9 +120,6 @@
+ # for all translation units.
+ set(_PXR_CXX_FLAGS "${_PXR_CXX_FLAGS} /bigobj")
+ 
+-# Enable PDB generation.
+-set(_PXR_CXX_FLAGS "${_PXR_CXX_FLAGS} /Zi")
+-
+ # Enable multiprocessor builds.
+ set(_PXR_CXX_FLAGS "${_PXR_CXX_FLAGS} /MP")
+ set(_PXR_CXX_FLAGS "${_PXR_CXX_FLAGS} /Gm-")
+
