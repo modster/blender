@@ -652,7 +652,7 @@ class VIEW3D_PT_tools_mask_texture(Panel, View3DPaintPanel, TextureMaskPanel):
     def draw(self, context):
         layout = self.layout
 
-        brush = context.tool_settings.image_paint.brush
+        brush = context.tool_settings.sculpt.brush
 
         col = layout.column()
         mask_tex_slot = brush.mask_texture_slot
