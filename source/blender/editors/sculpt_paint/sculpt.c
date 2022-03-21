@@ -2393,6 +2393,7 @@ float SCULPT_brush_texture_eval(SculptSession *ss,
 
 float SCULPT_brush_strength_factor_custom_automask(SculptSession *ss,
                                                    const Brush *br,
+                                                   const MTex *mtex,
                                                    const float brush_point[3],
                                                    const float len,
                                                    const float vno[3],
@@ -2402,7 +2403,6 @@ float SCULPT_brush_strength_factor_custom_automask(SculptSession *ss,
                                                    const int thread_id)
 {
   StrokeCache *cache = ss->cache;
-  const MTex *mtex = &br->mtex;
   float avg = 1.0f;
   float rgba[4];
 
@@ -2449,7 +2449,7 @@ float SCULPT_brush_strength_factor(SculptSession *ss,
   const float automask_factor = SCULPT_automasking_factor_get(
       ss->cache->automasking, ss, vertex_index);
   return SCULPT_brush_strength_factor_custom_automask(
-      ss, br, brush_point, len, vno, fno, mask, automask_factor, thread_id);
+      ss, br, &br->mtex, brush_point, len, vno, fno, mask, automask_factor, thread_id);
 }
 
 bool SCULPT_search_sphere_cb(PBVHNode *node, void *data_v)

@@ -1141,6 +1141,7 @@ float SCULPT_brush_strength_factor(struct SculptSession *ss,
                                    int thread_id);
 float SCULPT_brush_strength_factor_custom_automask(struct SculptSession *ss,
                                                    const struct Brush *br,
+                                                   const MTex *mtex,
                                                    const float point[3],
                                                    float len,
                                                    const float vno[3],

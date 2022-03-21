@@ -119,6 +119,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
 
   SculptSession *ss;
   const Brush *brush;
+  MTex mtex;
   const int thread_id;
   const MVert *mvert;
 
@@ -140,6 +141,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   {
     init_brush_strength();
     init_brush_test();
+    mtex = brush->mtex;
   }
 
   bool paint(const Triangles &triangles, const PixelsPackage &encoded_pixels, ImBuf *image_buffer)
@@ -160,8 +162,8 @@ template<typename ImagePixelAccessor> class PaintingKernel {
         continue;
       }
 
-      if (brush->mask_mtex.tex) {
-        SCULPT_brush_texture_eval(ss, brush, &brush->mask_mtex, pixel.pos, thread_id, brush_color);
+      if (mtex.tex) {
+        SCULPT_brush_texture_eval(ss, brush, &mtex, pixel.pos, thread_id, brush_color);
       }
 
       float4 color = image_accessor.read_pixel(image_buffer);
@@ -171,6 +173,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
       const float falloff_strength = SCULPT_brush_strength_factor_custom_automask(
           ss,
           brush,
+          &brush->mask_mtex,
           pixel.pos,
           sqrtf(test.dist),
           normal,
