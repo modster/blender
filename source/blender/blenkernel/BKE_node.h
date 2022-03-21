@@ -129,6 +129,7 @@ class MFDataType;
 namespace viewport_compositor {
 class Context;
 class NodeOperation;
+class GPUMaterialNode;
 }  // namespace viewport_compositor
 }  // namespace blender
 
@@ -146,9 +147,12 @@ using NodeGatherSocketLinkOperationsFunction =
 
 using NodeGetCompositorOperationFunction = blender::viewport_compositor::NodeOperation
     *(*)(blender::viewport_compositor::Context &context, blender::nodes::DNode node);
+using NodeGetCompositorGPUMaterialNodeFunction =
+    blender::viewport_compositor::GPUMaterialNode *(*)(blender::nodes::DNode node);
 
 #else
 typedef void *NodeGetCompositorOperationFunction;
+typedef void *NodeGetCompositorGPUMaterialNodeFunction;
 typedef void *NodeMultiFunctionBuildFunction;
 typedef void *NodeGeometryExecFunction;
 typedef void *NodeDeclareFunction;
@@ -331,8 +335,13 @@ typedef struct bNodeType {
   /* gpu */
   NodeGPUExecFunction gpu_fn;
 
-  /* Get an instance of this node's compositor operation. */
+  /* Get an instance of this node's compositor operation. Freeing the instance is the
+   * responsibility of the caller. */
   NodeGetCompositorOperationFunction get_compositor_operation;
+
+  /* Get an instance of this node's compositor GPU material node. Freeing the instance is the
+   * responsibility of the caller. */
+  NodeGetCompositorGPUMaterialNodeFunction get_compositor_gpu_material_node;
 
   /* Build a multi-function for this node. */
   NodeMultiFunctionBuildFunction build_multi_function;

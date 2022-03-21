@@ -21,11 +21,15 @@
  * \ingroup cmpnodes
  */
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** SEPARATE HSVA ******************** */
 
-namespace blender::nodes::node_composite_sepcomb_hsva_cc {
+namespace blender::nodes::node_composite_separate_hsva_cc {
 
 static void cmp_node_sephsva_declare(NodeDeclarationBuilder &b)
 {
@@ -36,33 +40,44 @@ static void cmp_node_sephsva_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("A"));
 }
 
-static int node_composite_gpu_sephsva(GPUMaterial *mat,
-                                      bNode *node,
-                                      bNodeExecData *UNUSED(execdata),
-                                      GPUNodeStack *in,
-                                      GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class SeparateHSVAGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &node(), "node_composite_separate_hsva", inputs, outputs);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, "node_composite_separate_hsva", in, out);
+  return new SeparateHSVAGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_sepcomb_hsva_cc
+}  // namespace blender::nodes::node_composite_separate_hsva_cc
 
 void register_node_type_cmp_sephsva()
 {
-  namespace file_ns = blender::nodes::node_composite_sepcomb_hsva_cc;
+  namespace file_ns = blender::nodes::node_composite_separate_hsva_cc;
 
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPHSVA, "Separate HSVA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_sephsva_declare;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_sephsva);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }
 
 /* **************** COMBINE HSVA ******************** */
 
-namespace blender::nodes::node_composite_sepcomb_hsva_cc {
+namespace blender::nodes::node_composite_combine_hsva_cc {
 
 static void cmp_node_combhsva_declare(NodeDeclarationBuilder &b)
 {
@@ -73,26 +88,37 @@ static void cmp_node_combhsva_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Image"));
 }
 
-static int node_composite_gpu_combhsva(GPUMaterial *mat,
-                                       bNode *node,
-                                       bNodeExecData *UNUSED(execdata),
-                                       GPUNodeStack *in,
-                                       GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class CombineHSVAGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &node(), "node_composite_combine_hsva", inputs, outputs);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, "node_composite_combine_hsva", in, out);
+  return new CombineHSVAGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_sepcomb_hsva_cc
+}  // namespace blender::nodes::node_composite_combine_hsva_cc
 
 void register_node_type_cmp_combhsva()
 {
-  namespace file_ns = blender::nodes::node_composite_sepcomb_hsva_cc;
+  namespace file_ns = blender::nodes::node_composite_combine_hsva_cc;
 
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBHSVA, "Combine HSVA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_combhsva_declare;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_combhsva);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

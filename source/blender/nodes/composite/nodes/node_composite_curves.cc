@@ -21,14 +21,20 @@
  * \ingroup cmpnodes
  */
 
+#include "BKE_colortools.h"
+
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
 
 #include "node_composite_util.hh"
 
 /* **************** CURVE Time  ******************** */
 
-namespace blender::nodes::node_composite_curves_cc {
+namespace blender::nodes::node_composite_time_curves_cc {
 
 static void cmp_node_time_declare(NodeDeclarationBuilder &b)
 {
@@ -43,52 +49,11 @@ static void node_composit_init_curves_time(bNodeTree *UNUSED(ntree), bNode *node
   node->storage = BKE_curvemapping_add(1, 0.0f, 0.0f, 1.0f, 1.0f);
 }
 
-static int node_composite_gpu_curve_time(GPUMaterial *mat,
-                                         bNode *node,
-                                         bNodeExecData *UNUSED(execdata),
-                                         GPUNodeStack *in,
-                                         GPUNodeStack *out)
-{
-  CurveMapping *curve_mapping = (CurveMapping *)node->storage;
-
-  BKE_curvemapping_init(curve_mapping);
-  float *band_values;
-  int band_size;
-  BKE_curvemapping_table_RGBA(curve_mapping, &band_values, &band_size);
-  float band_layer;
-  GPUNodeLink *band_texture = GPU_color_band(mat, band_size, band_values, &band_layer);
-
-  float start_slopes[CM_TOT];
-  float end_slopes[CM_TOT];
-  BKE_curvemapping_compute_slopes(curve_mapping, start_slopes, end_slopes);
-  float range_minimums[CM_TOT];
-  BKE_curvemapping_get_range_minimums(curve_mapping, range_minimums);
-  float range_dividers[CM_TOT];
-  BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
-
-  const float start_frame = (float)node->custom1;
-  const float end_frame = (float)node->custom2;
-
-  return GPU_stack_link(mat,
-                        node,
-                        "curves_time",
-                        in,
-                        out,
-                        band_texture,
-                        GPU_constant(&band_layer),
-                        GPU_uniform(range_minimums),
-                        GPU_uniform(range_dividers),
-                        GPU_uniform(start_slopes),
-                        GPU_uniform(end_slopes),
-                        GPU_uniform(&start_frame),
-                        GPU_uniform(&end_frame));
-}
-
-}  // namespace blender::nodes::node_composite_curves_cc
+}  // namespace blender::nodes::node_composite_time_curves_cc
 
 void register_node_type_cmp_curve_time()
 {
-  namespace file_ns = blender::nodes::node_composite_curves_cc;
+  namespace file_ns = blender::nodes::node_composite_time_curves_cc;
 
   static bNodeType ntype;
 
@@ -97,14 +62,13 @@ void register_node_type_cmp_curve_time()
   node_type_size(&ntype, 200, 140, 320);
   node_type_init(&ntype, file_ns::node_composit_init_curves_time);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_curve_time);
 
   nodeRegisterType(&ntype);
 }
 
 /* **************** CURVE VEC  ******************** */
 
-namespace blender::nodes::node_composite_curves_cc {
+namespace blender::nodes::node_composite_vector_curves_cc {
 
 static void cmp_node_curve_vec_declare(NodeDeclarationBuilder &b)
 {
@@ -122,47 +86,63 @@ static void node_buts_curvevec(uiLayout *layout, bContext *UNUSED(C), PointerRNA
   uiTemplateCurveMapping(layout, ptr, "mapping", 'v', false, false, false, false);
 }
 
-static int node_composite_gpu_curve_vec(GPUMaterial *mat,
-                                        bNode *node,
-                                        bNodeExecData *UNUSED(execdata),
-                                        GPUNodeStack *in,
-                                        GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class VectorCurvesGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    CurveMapping *curve_mapping = get_curve_mapping();
+
+    BKE_curvemapping_init(curve_mapping);
+    float *band_values;
+    int band_size;
+    BKE_curvemapping_table_RGBA(curve_mapping, &band_values, &band_size);
+    float band_layer;
+    GPUNodeLink *band_texture = GPU_color_band(material, band_size, band_values, &band_layer);
+
+    float start_slopes[CM_TOT];
+    float end_slopes[CM_TOT];
+    BKE_curvemapping_compute_slopes(curve_mapping, start_slopes, end_slopes);
+    float range_minimums[CM_TOT];
+    BKE_curvemapping_get_range_minimums(curve_mapping, range_minimums);
+    float range_dividers[CM_TOT];
+    BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
+
+    GPU_stack_link(material,
+                   &node(),
+                   "curves_vector",
+                   inputs,
+                   outputs,
+                   band_texture,
+                   GPU_constant(&band_layer),
+                   GPU_uniform(range_minimums),
+                   GPU_uniform(range_dividers),
+                   GPU_uniform(start_slopes),
+                   GPU_uniform(end_slopes));
+  }
+
+  CurveMapping *get_curve_mapping()
+  {
+    return static_cast<CurveMapping *>(node().storage);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  CurveMapping *curve_mapping = (CurveMapping *)node->storage;
-
-  BKE_curvemapping_init(curve_mapping);
-  float *band_values;
-  int band_size;
-  BKE_curvemapping_table_RGBA(curve_mapping, &band_values, &band_size);
-  float band_layer;
-  GPUNodeLink *band_texture = GPU_color_band(mat, band_size, band_values, &band_layer);
-
-  float start_slopes[CM_TOT];
-  float end_slopes[CM_TOT];
-  BKE_curvemapping_compute_slopes(curve_mapping, start_slopes, end_slopes);
-  float range_minimums[CM_TOT];
-  BKE_curvemapping_get_range_minimums(curve_mapping, range_minimums);
-  float range_dividers[CM_TOT];
-  BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
-
-  return GPU_stack_link(mat,
-                        node,
-                        "curves_vector",
-                        in,
-                        out,
-                        band_texture,
-                        GPU_constant(&band_layer),
-                        GPU_uniform(range_minimums),
-                        GPU_uniform(range_dividers),
-                        GPU_uniform(start_slopes),
-                        GPU_uniform(end_slopes));
+  return new VectorCurvesGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_curves_cc
+}  // namespace blender::nodes::node_composite_vector_curves_cc
 
 void register_node_type_cmp_curve_vec()
 {
-  namespace file_ns = blender::nodes::node_composite_curves_cc;
+  namespace file_ns = blender::nodes::node_composite_vector_curves_cc;
 
   static bNodeType ntype;
 
@@ -172,14 +152,14 @@ void register_node_type_cmp_curve_vec()
   node_type_size(&ntype, 200, 140, 320);
   node_type_init(&ntype, file_ns::node_composit_init_curve_vec);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_curve_vec);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }
 
 /* **************** CURVE RGB  ******************** */
 
-namespace blender::nodes::node_composite_curves_cc {
+namespace blender::nodes::node_composite_rgb_curves_cc {
 
 static void cmp_node_rgbcurves_declare(NodeDeclarationBuilder &b)
 {
@@ -196,78 +176,96 @@ static void node_composit_init_curve_rgb(bNodeTree *UNUSED(ntree), bNode *node)
   node->storage = BKE_curvemapping_add(4, 0.0f, 0.0f, 1.0f, 1.0f);
 }
 
-static int node_composite_gpu_curve_rgb(GPUMaterial *mat,
-                                        bNode *node,
-                                        bNodeExecData *UNUSED(execdata),
-                                        GPUNodeStack *in,
-                                        GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class RGBCurvesGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    CurveMapping *curve_mapping = get_curve_mapping();
+
+    BKE_curvemapping_init(curve_mapping);
+    float *band_values;
+    int band_size;
+    BKE_curvemapping_table_RGBA(curve_mapping, &band_values, &band_size);
+    float band_layer;
+    GPUNodeLink *band_texture = GPU_color_band(material, band_size, band_values, &band_layer);
+
+    float start_slopes[CM_TOT];
+    float end_slopes[CM_TOT];
+    BKE_curvemapping_compute_slopes(curve_mapping, start_slopes, end_slopes);
+    float range_minimums[CM_TOT];
+    BKE_curvemapping_get_range_minimums(curve_mapping, range_minimums);
+    float range_dividers[CM_TOT];
+    BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
+
+    if (curve_mapping->tone == CURVE_TONE_FILMLIKE) {
+      GPU_stack_link(material,
+                     &node(),
+                     "curves_film_like",
+                     inputs,
+                     outputs,
+                     band_texture,
+                     GPU_constant(&band_layer),
+                     GPU_uniform(&range_minimums[3]),
+                     GPU_uniform(&range_dividers[3]),
+                     GPU_uniform(&start_slopes[3]),
+                     GPU_uniform(&end_slopes[3]));
+      return;
+    }
+
+    /* If the RGB curves do nothing, use a function that skips RGB computations. */
+    if (BKE_curvemapping_is_map_identity(curve_mapping, 0) &&
+        BKE_curvemapping_is_map_identity(curve_mapping, 1) &&
+        BKE_curvemapping_is_map_identity(curve_mapping, 2)) {
+      GPU_stack_link(material,
+                     &node(),
+                     "curves_combined_only",
+                     inputs,
+                     outputs,
+                     band_texture,
+                     GPU_constant(&band_layer),
+                     GPU_uniform(&range_minimums[3]),
+                     GPU_uniform(&range_dividers[3]),
+                     GPU_uniform(&start_slopes[3]),
+                     GPU_uniform(&end_slopes[3]));
+      return;
+    }
+
+    GPU_stack_link(material,
+                   &node(),
+                   "curves_combined_rgb",
+                   inputs,
+                   outputs,
+                   band_texture,
+                   GPU_constant(&band_layer),
+                   GPU_uniform(range_minimums),
+                   GPU_uniform(range_dividers),
+                   GPU_uniform(start_slopes),
+                   GPU_uniform(end_slopes));
+  }
+
+  CurveMapping *get_curve_mapping()
+  {
+    return static_cast<CurveMapping *>(node().storage);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  CurveMapping *curve_mapping = (CurveMapping *)node->storage;
-
-  BKE_curvemapping_init(curve_mapping);
-  float *band_values;
-  int band_size;
-  BKE_curvemapping_table_RGBA(curve_mapping, &band_values, &band_size);
-  float band_layer;
-  GPUNodeLink *band_texture = GPU_color_band(mat, band_size, band_values, &band_layer);
-
-  float start_slopes[CM_TOT];
-  float end_slopes[CM_TOT];
-  BKE_curvemapping_compute_slopes(curve_mapping, start_slopes, end_slopes);
-  float range_minimums[CM_TOT];
-  BKE_curvemapping_get_range_minimums(curve_mapping, range_minimums);
-  float range_dividers[CM_TOT];
-  BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
-
-  if (curve_mapping->tone == CURVE_TONE_FILMLIKE) {
-    return GPU_stack_link(mat,
-                          node,
-                          "curves_film_like",
-                          in,
-                          out,
-                          band_texture,
-                          GPU_constant(&band_layer),
-                          GPU_uniform(&range_minimums[3]),
-                          GPU_uniform(&range_dividers[3]),
-                          GPU_uniform(&start_slopes[3]),
-                          GPU_uniform(&end_slopes[3]));
-  }
-
-  /* If the RGB curves do nothing, use a function that skips RGB computations. */
-  if (BKE_curvemapping_is_map_identity(curve_mapping, 0) &&
-      BKE_curvemapping_is_map_identity(curve_mapping, 1) &&
-      BKE_curvemapping_is_map_identity(curve_mapping, 2)) {
-    return GPU_stack_link(mat,
-                          node,
-                          "curves_combined_only",
-                          in,
-                          out,
-                          band_texture,
-                          GPU_constant(&band_layer),
-                          GPU_uniform(&range_minimums[3]),
-                          GPU_uniform(&range_dividers[3]),
-                          GPU_uniform(&start_slopes[3]),
-                          GPU_uniform(&end_slopes[3]));
-  }
-
-  return GPU_stack_link(mat,
-                        node,
-                        "curves_combined_rgb",
-                        in,
-                        out,
-                        band_texture,
-                        GPU_constant(&band_layer),
-                        GPU_uniform(range_minimums),
-                        GPU_uniform(range_dividers),
-                        GPU_uniform(start_slopes),
-                        GPU_uniform(end_slopes));
+  return new RGBCurvesGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_curves_cc
+}  // namespace blender::nodes::node_composite_rgb_curves_cc
 
 void register_node_type_cmp_curve_rgb()
 {
-  namespace file_ns = blender::nodes::node_composite_curves_cc;
+  namespace file_ns = blender::nodes::node_composite_rgb_curves_cc;
 
   static bNodeType ntype;
 
@@ -276,7 +274,7 @@ void register_node_type_cmp_curve_rgb()
   node_type_size(&ntype, 200, 140, 320);
   node_type_init(&ntype, file_ns::node_composit_init_curve_rgb);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_curve_rgb);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

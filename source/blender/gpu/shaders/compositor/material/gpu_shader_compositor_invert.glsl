@@ -1,4 +1,3 @@
-
 void node_composite_invert(float fac, vec4 color, float do_rgb, float do_alpha, out vec4 result)
 {
   result = color;

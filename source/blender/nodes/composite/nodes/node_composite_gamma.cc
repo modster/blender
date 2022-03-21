@@ -21,6 +21,10 @@
  * \ingroup cmpnodes
  */
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Gamma Tools  ******************** */
@@ -38,13 +42,24 @@ static void cmp_node_gamma_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Image"));
 }
 
-static int node_composite_gpu_gamma(GPUMaterial *mat,
-                                    bNode *node,
-                                    bNodeExecData *UNUSED(execdata),
-                                    GPUNodeStack *in,
-                                    GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class GammaGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &node(), "node_composite_gamma", inputs, outputs);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, "node_composite_gamma", in, out);
+  return new GammaGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_gamma_cc
@@ -57,7 +72,7 @@ void register_node_type_cmp_gamma()
 
   cmp_node_type_base(&ntype, CMP_NODE_GAMMA, "Gamma", NODE_CLASS_OP_COLOR);
   ntype.declare = file_ns::cmp_node_gamma_declare;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_gamma);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

@@ -24,6 +24,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Premul and Key Alpha Convert ******************** */
@@ -41,18 +45,36 @@ static void node_composit_buts_premulkey(uiLayout *layout, bContext *UNUSED(C), 
   uiItemR(layout, ptr, "mapping", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
 }
 
-static int node_composite_gpu_premulkey(GPUMaterial *mat,
-                                        bNode *node,
-                                        bNodeExecData *UNUSED(execdata),
-                                        GPUNodeStack *in,
-                                        GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class AlphaConvertGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    if (get_mode() == 0) {
+      GPU_stack_link(material, &node(), "color_alpha_premultiply", inputs, outputs);
+      return;
+    }
+
+    GPU_stack_link(material, &node(), "color_alpha_unpremultiply", inputs, outputs);
+  }
+
+  /* 0 -> Premultiply Alpha.
+   * 1 -> Unpremultiply Alpha. */
+  int get_mode()
+  {
+    return node().custom1;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  if (node->custom1 == 1) {
-    return GPU_stack_link(mat, node, "color_alpha_unpremultiply", in, out);
-  }
-  else {
-    return GPU_stack_link(mat, node, "color_alpha_premultiply", in, out);
-  }
+  return new AlphaConvertGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_premulkey_cc
@@ -66,7 +88,7 @@ void register_node_type_cmp_premulkey()
   cmp_node_type_base(&ntype, CMP_NODE_PREMULKEY, "Alpha Convert", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_premulkey_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_premulkey;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_premulkey);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

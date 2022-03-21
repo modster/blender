@@ -88,6 +88,7 @@ static void draw()
   DRWContext context(texture_pool);
   const Scene *scene = get_scene();
   Evaluator evaluator(context, scene->nodetree);
+  evaluator.compile();
   evaluator.evaluate();
 }
 

@@ -26,6 +26,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* ******************* Color Spill Suppression ********************************* */
@@ -96,46 +100,104 @@ static void node_composit_buts_color_spill(uiLayout *layout, bContext *UNUSED(C)
   }
 }
 
-static int node_composite_gpu_color_spill(GPUMaterial *mat,
-                                          bNode *node,
-                                          bNodeExecData *UNUSED(execdata),
-                                          GPUNodeStack *in,
-                                          GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class ColorSpillGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const float spill_channel = get_spill_channel();
+    float spill_scale[3];
+    get_spill_scale(spill_scale);
+    float limit_channels[2];
+    get_limit_channels(limit_channels);
+    const float limit_scale = get_limit_scale();
+
+    GPU_stack_link(material,
+                   &node(),
+                   "node_composite_color_spill",
+                   inputs,
+                   outputs,
+                   GPU_uniform(&spill_channel),
+                   GPU_uniform(spill_scale),
+                   GPU_uniform(limit_channels),
+                   GPU_uniform(&limit_scale));
+  }
+
+  /* Get the index of the channel used for spilling. */
+  int get_spill_channel()
+  {
+    return node().custom1 - 1;
+  }
+
+  /* Get limiting algorithm.
+   * 0 -> Single.
+   * 1 -> Average. */
+  int get_limiting_algorithm()
+  {
+    return node().custom2;
+  }
+
+  NodeColorspill *get_node_color_spill()
+  {
+    return static_cast<NodeColorspill *>(node().storage);
+  }
+
+  void get_spill_scale(float spill_scale[3])
+  {
+    const NodeColorspill *node_color_spill = get_node_color_spill();
+    if (node_color_spill->unspill == 0) {
+      spill_scale[0] = 0.0f;
+      spill_scale[1] = 0.0f;
+      spill_scale[2] = 0.0f;
+      spill_scale[get_spill_channel()] = -1.0f;
+    }
+    else {
+      spill_scale[0] = node_color_spill->uspillr;
+      spill_scale[1] = node_color_spill->uspillg;
+      spill_scale[2] = node_color_spill->uspillb;
+      spill_scale[get_spill_channel()] *= -1.0f;
+    }
+  }
+
+  /* Get the index of the channel used for limiting. */
+  int get_limit_channel()
+  {
+    return get_node_color_spill()->limchan;
+  }
+
+  /* Get the indices of the channels used to compute the limit value. We always assume the limit
+   * algorithm is Average, if it is a single limit channel, store it in both limit channels,
+   * because the average of two identical values is the same value. */
+  void get_limit_channels(float limit_channels[2])
+  {
+    if (get_limiting_algorithm() == 1) {
+      /* If the algorithm is Average, store the indices of the other two channels other than the
+       * spill channel. */
+      limit_channels[0] = (get_spill_channel() + 1) % 3;
+      limit_channels[1] = (get_spill_channel() + 2) % 3;
+    }
+    else {
+      /* If the algorithm is Single, store the index of the limit channel in both channels. */
+      limit_channels[0] = get_limit_channel();
+      limit_channels[1] = get_limit_channel();
+    }
+  }
+
+  float get_limit_scale()
+  {
+    return get_node_color_spill()->limscale;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  const NodeColorspill *data = (NodeColorspill *)node->storage;
-
-  const float spill_channel = (float)(node->custom1 - 1);
-  float spill_scale[3] = {data->uspillr, data->uspillg, data->uspillb};
-  spill_scale[node->custom1 - 1] *= -1.0f;
-  if (data->unspill == 0) {
-    spill_scale[0] = 0.0f;
-    spill_scale[1] = 0.0f;
-    spill_scale[2] = 0.0f;
-    spill_scale[node->custom1 - 1] = -1.0f;
-  }
-
-  /* Always assume the limit method to be average, and for the single method, assign the same
-   * channel to both limit channels. */
-  float limit_channels[2];
-  if (node->custom2 == 0) {
-    limit_channels[0] = (float)data->limchan;
-    limit_channels[1] = (float)data->limchan;
-  }
-  else {
-    limit_channels[0] = (float)(node->custom1 % 3);
-    limit_channels[1] = (float)((node->custom1 + 1) % 3);
-  }
-  const float limit_scale = data->limscale;
-
-  return GPU_stack_link(mat,
-                        node,
-                        "node_composite_color_spill",
-                        in,
-                        out,
-                        GPU_uniform(&spill_channel),
-                        GPU_uniform(spill_scale),
-                        GPU_uniform(limit_channels),
-                        GPU_uniform(&limit_scale));
+  return new ColorSpillGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_color_spill_cc
@@ -152,7 +214,7 @@ void register_node_type_cmp_color_spill()
   node_type_init(&ntype, file_ns::node_composit_init_color_spill);
   node_type_storage(
       &ntype, "NodeColorspill", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_color_spill);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

@@ -14,8 +14,11 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include <string>
+
 #include "BLI_assert.h"
 #include "BLI_hash.hh"
+#include "BLI_listbase.h"
 #include "BLI_map.hh"
 #include "BLI_math_vec_types.hh"
 #include "BLI_math_vector.h"
@@ -30,8 +33,12 @@
 #include "DNA_scene_types.h"
 
 #include "GPU_compute.h"
+#include "GPU_material.h"
 #include "GPU_shader.h"
 #include "GPU_texture.h"
+#include "GPU_uniform_buffer.h"
+
+#include "../../gpu/intern/gpu_shader_create_info.hh"
 
 #include "IMB_colormanagement.h"
 
@@ -383,6 +390,31 @@ void Operation::map_input_to_result(StringRef identifier, Result *result)
   result->increment_reference_count();
 }
 
+Domain Operation::compute_domain()
+{
+  /* If any of the inputs is a domain input and not a single value, return the domain of the first
+   * one. */
+  for (StringRef identifier : input_descriptors_.keys()) {
+    const Result &result = get_input(identifier);
+    bool is_domain = get_input_descriptor(identifier).is_domain;
+    if (is_domain && result.is_texture()) {
+      return result.domain();
+    }
+  }
+
+  /* No domain inputs or all of them are single values, so return the domain of the first non
+   * single input. */
+  for (StringRef identifier : input_descriptors_.keys()) {
+    const Result &result = get_input(identifier);
+    if (result.is_texture()) {
+      return result.domain();
+    }
+  }
+
+  /* All inputs are single values. Return an identity domain. */
+  return Domain::identity();
+}
+
 void Operation::pre_execute()
 {
 }
@@ -554,13 +586,6 @@ NodeOperation::NodeOperation(Context &context, DNode node) : Operation(context),
   populate_results_for_unlinked_inputs();
 }
 
-/* Node operations are buffered in most cases, but the derived operation can override
-   otherwise. */
-bool NodeOperation::is_buffered() const
-{
-  return true;
-}
-
 const bNode &NodeOperation::node() const
 {
   return *node_->bnode();
@@ -573,31 +598,6 @@ bool NodeOperation::is_output_needed(StringRef identifier) const
     return false;
   }
   return true;
-}
-
-Domain NodeOperation::compute_domain()
-{
-  /* If any of the inputs is a domain input and not a single value, return the domain of the first
-   * one. */
-  for (const InputSocketRef *input : node_->inputs()) {
-    const Result &result = get_input(input->identifier());
-    bool is_domain = get_input_descriptor(input->identifier()).is_domain;
-    if (is_domain && result.is_texture()) {
-      return result.domain();
-    }
-  }
-
-  /* No domain inputs or all of them are single values, so return the domain of the first non
-   * single input. */
-  for (const InputSocketRef *input : node_->inputs()) {
-    const Result &result = get_input(input->identifier());
-    if (result.is_texture()) {
-      return result.domain();
-    }
-  }
-
-  /* All inputs are single values. Return an identity domain. */
-  return Domain::identity();
 }
 
 void NodeOperation::pre_execute()
@@ -633,7 +633,7 @@ static DSocket get_node_input_origin_socket(DInputSocket input)
     return input;
   }
 
-  /* Only a single origin socket is guranteed to exist. */
+  /* Only a single origin socket is guaranteed to exist. */
   DSocket socket;
   input.foreach_origin_socket([&](const DSocket origin) { socket = origin; });
   return socket;
@@ -647,7 +647,7 @@ void NodeOperation::populate_results_for_unlinked_inputs()
 
     /* Input is linked, skip it. If the origin is an input, that means the input is connected to an
      * unlinked input of a group input node, hence why we check if the origin is an output. */
-    if (origin && origin->is_output()) {
+    if (origin->is_output()) {
       continue;
     }
 
@@ -670,11 +670,6 @@ void NodeOperation::populate_results_for_unlinked_inputs()
 
 const StringRef ProcessorOperation::input_identifier = StringRef("Input");
 const StringRef ProcessorOperation::output_identifier = StringRef("Output");
-
-bool ProcessorOperation::is_buffered() const
-{
-  return true;
-}
 
 Result &ProcessorOperation::get_result()
 {
@@ -750,11 +745,6 @@ void ConversionProcessorOperation::execute()
   result.unbind_as_image();
   GPU_shader_unbind();
   GPU_shader_free(shader);
-}
-
-Domain ConversionProcessorOperation::compute_domain()
-{
-  return get_input().domain();
 }
 
 /* --------------------------------------------------------------------
@@ -967,96 +957,475 @@ Domain RealizeOnDomainProcessorOperation::compute_domain()
 }
 
 /* --------------------------------------------------------------------
- * Evaluator.
+ * GPU Material Node.
  */
 
-Evaluator::Evaluator(Context &context, bNodeTree *scene_node_tree)
-    : context(context), tree(*scene_node_tree, tree_ref_map){};
-
-Evaluator::~Evaluator()
+GPUMaterialNode::GPUMaterialNode(DNode node) : node_(node)
 {
-  for (const Operation *operation : operations_stream_) {
-    delete operation;
+  populate_inputs();
+  populate_outputs();
+}
+
+GPUNodeStack *GPUMaterialNode::get_inputs_array()
+{
+  return inputs_.data();
+}
+
+GPUNodeStack *GPUMaterialNode::get_outputs_array()
+{
+  return outputs_.data();
+}
+
+bNode &GPUMaterialNode::node() const
+{
+  return *node_->bnode();
+}
+
+static eGPUType gpu_type_from_socket_type(eNodeSocketDatatype type)
+{
+  switch (type) {
+    case SOCK_FLOAT:
+      return GPU_FLOAT;
+    case SOCK_VECTOR:
+      return GPU_VEC3;
+    case SOCK_RGBA:
+      return GPU_VEC4;
+    default:
+      BLI_assert_unreachable();
+      return GPU_NONE;
   }
 }
 
-void Evaluator::evaluate()
+static void gpu_stack_vector_from_socket(float *vector, const SocketRef *socket)
+{
+  switch (socket->bsocket()->type) {
+    case SOCK_FLOAT:
+      vector[0] = socket->default_value<bNodeSocketValueFloat>()->value;
+      return;
+    case SOCK_VECTOR:
+      copy_v3_v3(vector, socket->default_value<bNodeSocketValueVector>()->value);
+      return;
+    case SOCK_RGBA:
+      copy_v4_v4(vector, socket->default_value<bNodeSocketValueRGBA>()->value);
+      return;
+    default:
+      BLI_assert_unreachable();
+  }
+}
+
+static void populate_gpu_node_stack(DSocket socket, GPUNodeStack &stack)
+{
+  /* Make sure this stack is not marked as the end of the stack array. */
+  stack.end = false;
+  /* This will be initialized later by the GPU material compiler or the compile method. */
+  stack.link = nullptr;
+  /* Socket type and its corresponding GPU type. */
+  stack.sockettype = socket->bsocket()->type;
+  stack.type = gpu_type_from_socket_type((eNodeSocketDatatype)socket->bsocket()->type);
+
+  if (socket->is_input()) {
+    /* Get the origin socket connected to the input if any. */
+    const DInputSocket input{socket.context(), &socket->as_input()};
+    DSocket origin = get_node_input_origin_socket(input);
+    /* The input is linked if the origin socket is not null and is an output socket. Had it been an
+     * input socket, then it is an unlinked input of a group input node. */
+    stack.hasinput = origin->is_output();
+    /* Get the socket value from the origin if it is an input, because then it would be an unlinked
+     * input of a group input node, otherwise, get the value from the socket itself. */
+    if (origin->is_input()) {
+      gpu_stack_vector_from_socket(stack.vec, origin.socket_ref());
+    }
+    else {
+      gpu_stack_vector_from_socket(stack.vec, socket.socket_ref());
+    }
+  }
+  else {
+    stack.hasoutput = socket->is_logically_linked();
+    /* Populate the stack vector even for outputs because some nodes store their properties in the
+     * default values of their outputs. */
+    gpu_stack_vector_from_socket(stack.vec, socket.socket_ref());
+  }
+}
+
+void GPUMaterialNode::populate_inputs()
+{
+  /* Reserve a stack for each input in addition to an extra stack at the end to mark the end of the
+   * array, as this is what the GPU module functions expect. */
+  inputs_.resize(node_->inputs().size() + 1);
+  inputs_.last().end = true;
+
+  for (int i = 0; i < node_->inputs().size(); i++) {
+    populate_gpu_node_stack(node_.input(i), inputs_[i]);
+  }
+}
+
+void GPUMaterialNode::populate_outputs()
+{
+  /* Reserve a stack for each output in addition to an extra stack at the end to mark the end of
+   * the array, as this is what the GPU module functions expect. */
+  outputs_.resize(node_->outputs().size() + 1);
+  outputs_.last().end = true;
+
+  for (int i = 0; i < node_->outputs().size(); i++) {
+    populate_gpu_node_stack(node_.output(i), outputs_[i]);
+  }
+}
+
+/* --------------------------------------------------------------------
+ * GPU Material Operation.
+ */
+
+GPUMaterialOperation::GPUMaterialOperation(Context &context, SubSchedule &sub_schedule)
+    : Operation(context), sub_schedule_(sub_schedule)
+{
+  material_ = GPU_material_from_callbacks(
+      &setup_material, &compile_material, &generate_material, this);
+}
+
+GPUMaterialOperation::~GPUMaterialOperation()
+{
+  for (const GPUMaterialNode *gpu_material_node : gpu_material_nodes_.values()) {
+    delete gpu_material_node;
+  }
+  GPU_material_free_single(material_);
+}
+
+void GPUMaterialOperation::execute()
+{
+  const int2 size = compute_domain().size;
+  for (StringRef identifier : output_socket_to_output_identifier_map_.values()) {
+    Result &result = get_result(identifier);
+    result.allocate_texture(size);
+  }
+
+  GPUShader *shader = GPU_material_get_shader(material_);
+  GPU_shader_bind(shader);
+
+  bind_material_resources(shader);
+  bind_inputs(shader);
+  bind_outputs(shader);
+
+  GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
+
+  GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
+
+  GPU_texture_unbind_all();
+  GPU_texture_image_unbind_all();
+  GPU_uniformbuf_unbind_all();
+  GPU_shader_unbind();
+}
+
+StringRef GPUMaterialOperation::get_output_identifier_from_output_socket(DOutputSocket output)
+{
+  return output_socket_to_output_identifier_map_.lookup(output);
+}
+
+InputIdentifierToOutputSocketMap &GPUMaterialOperation::get_input_identifier_to_output_socket_map()
+{
+  return input_identifier_to_output_socket_map_;
+}
+
+void GPUMaterialOperation::bind_material_resources(GPUShader *shader)
+{
+  /* Bind the uniform buffer of the material. */
+  GPUUniformBuf *ubo = GPU_material_uniform_buffer_get(material_);
+  int ubo_binding_location = GPU_shader_get_uniform_block_binding(shader, GPU_UBO_BLOCK_NAME);
+  GPU_uniformbuf_bind(ubo, ubo_binding_location);
+
+  /* Bind color band textures needed by the material. */
+  ListBase textures = GPU_material_textures(material_);
+  LISTBASE_FOREACH (GPUMaterialTexture *, texture, &textures) {
+    if (texture->colorband) {
+      const int texture_image_unit = GPU_shader_get_texture_binding(shader, texture->sampler_name);
+      GPU_texture_bind(*texture->colorband, texture_image_unit);
+    }
+  }
+}
+
+void GPUMaterialOperation::bind_inputs(GPUShader *shader)
+{
+  ListBase textures = GPU_material_textures(material_);
+  LISTBASE_FOREACH (GPUMaterialTexture *, texture, &textures) {
+    /* Input textures are those that do not reference an image or a color band texture. */
+    if (!texture->colorband && !texture->ima) {
+      get_input(texture->sampler_name).bind_as_texture(shader, texture->sampler_name);
+    }
+  }
+}
+
+void GPUMaterialOperation::bind_outputs(GPUShader *shader)
+{
+  ListBase images = GPU_material_images(material_);
+  LISTBASE_FOREACH (GPUMaterialImage *, image, &images) {
+    get_result(image->name_in_shader).bind_as_image(shader, image->name_in_shader);
+  }
+}
+
+void GPUMaterialOperation::setup_material(void *thunk, GPUMaterial *material)
+{
+  GPU_material_is_compute_set(material, true);
+}
+
+void GPUMaterialOperation::compile_material(void *thunk, GPUMaterial *material)
+{
+  GPUMaterialOperation *operation = static_cast<GPUMaterialOperation *>(thunk);
+  for (DNode node : operation->sub_schedule_) {
+    /* Instantiate a GPU material node for the node and add it to the gpu_material_nodes_ map. */
+    GPUMaterialNode *gpu_node = node->typeinfo()->get_compositor_gpu_material_node(node);
+    operation->gpu_material_nodes_.add_new(node, gpu_node);
+
+    /* Link the inputs of the material node if needed. */
+    operation->link_material_node_inputs(node, material);
+
+    /* Compile the node itself. */
+    gpu_node->compile(material);
+
+    /* Populate the output results for the material node if needed. */
+    operation->populate_results_for_material_node(node, material);
+  }
+}
+
+void GPUMaterialOperation::link_material_node_inputs(DNode node, GPUMaterial *material)
+{
+  for (const InputSocketRef *input_ref : node->inputs()) {
+    const DInputSocket input{node.context(), input_ref};
+
+    /* Get the origin socket of this input, which will be an output socket if the input is linked
+     * to an output. */
+    DSocket origin = get_node_input_origin_socket(input);
+
+    /* If the origin socket is an input, that means the input is unlinked. Unlinked inputs will be
+     * linked by the node compile method, so skip here. */
+    if (origin->is_input()) {
+      continue;
+    }
+
+    /* Now that we know the origin is an output, construct a derived output from it. */
+    const DOutputSocket output{origin.context(), &origin->as_output()};
+
+    /* If the origin node is part of the GPU material, then just map the output stack link to the
+     * input stack link. */
+    if (sub_schedule_.contains(output.node())) {
+      map_material_node_input(input, output);
+      continue;
+    }
+
+    /* Otherwise, the origin node is not part of the GPU material, so an input to the GPU material
+     * operation must be declared. */
+    declare_material_input_if_needed(input, output, material);
+
+    link_material_input_loader(input, output, material);
+  }
+}
+
+void GPUMaterialOperation::map_material_node_input(DInputSocket input, DOutputSocket output)
+{
+  /* Get the GPU node stack of the output. */
+  GPUMaterialNode &output_node = *gpu_material_nodes_.lookup(output.node());
+  GPUNodeStack &output_stack = output_node.get_outputs_array()[output->index()];
+
+  /* Get the GPU node stack of the input. */
+  GPUMaterialNode &input_node = *gpu_material_nodes_.lookup(input.node());
+  GPUNodeStack &input_stack = input_node.get_inputs_array()[input->index()];
+
+  /* Map the output link to the input link. */
+  input_stack.link = output_stack.link;
+}
+
+static const char *get_load_function_name(DInputSocket input)
+{
+  switch (input->bsocket()->type) {
+    case SOCK_FLOAT:
+      return "load_input_float";
+    case SOCK_VECTOR:
+      return "load_input_vector";
+    case SOCK_RGBA:
+      return "load_input_color";
+    default:
+      BLI_assert_unreachable();
+      return "";
+  }
+}
+
+void GPUMaterialOperation::declare_material_input_if_needed(DInputSocket input,
+                                                            DOutputSocket output,
+                                                            GPUMaterial *material)
+{
+  /* An input was already declared for that same output, so no need to declare it again. */
+  if (output_socket_to_input_link_map_.contains(output)) {
+    return;
+  }
+
+  /* Add a new input texture to the GPU material. */
+  GPUNodeLink *input_texture_link = GPU_texture(material, GPU_SAMPLER_DEFAULT);
+
+  /* Map the output socket to the input texture link that was created for it. */
+  output_socket_to_input_link_map_.add(output, input_texture_link);
+
+  /* Construct an input descriptor from the socket declaration. */
+  InputDescriptor input_descriptor;
+  input_descriptor.type = get_node_socket_result_type(input.socket_ref());
+  input_descriptor.is_domain =
+      input.node()->declaration()->inputs()[input->index()]->is_compositor_domain_input();
+
+  /* Declare the input descriptor. */
+  StringRef identifier = GPU_material_get_link_texture(input_texture_link)->sampler_name;
+  declare_input_descriptor(identifier, input_descriptor);
+
+  /* Map the operation input to the output socket it is linked to. */
+  input_identifier_to_output_socket_map_.add_new(identifier, output);
+}
+
+void GPUMaterialOperation::link_material_input_loader(DInputSocket input,
+                                                      DOutputSocket output,
+                                                      GPUMaterial *material)
+{
+  /* Link the input node stack to an input loader sampling the input texture. */
+  GPUMaterialNode &node = *gpu_material_nodes_.lookup(input.node());
+  GPUNodeStack &stack = node.get_inputs_array()[input->index()];
+  const char *load_function_name = get_load_function_name(input);
+  GPUNodeLink *input_texture_link = output_socket_to_input_link_map_.lookup(output);
+  GPU_link(material, load_function_name, input_texture_link, &stack.link);
+}
+
+void GPUMaterialOperation::populate_results_for_material_node(DNode node, GPUMaterial *material)
+{
+  for (const OutputSocketRef *output_ref : node->outputs()) {
+    const DOutputSocket output{node.context(), output_ref};
+
+    /* Go over the target inputs that are linked to this output. If any of the target nodes is not
+     * part of the GPU material, then an output result needs to be populated. */
+    bool need_to_populate_result = false;
+    output.foreach_target_socket(
+        [&](DInputSocket target, const DOutputSocket::TargetSocketPathInfo &path_info) {
+          /* Target node is not part of the GPU material. */
+          if (!sub_schedule_.contains(target.node())) {
+            need_to_populate_result = true;
+          }
+        });
+
+    if (need_to_populate_result) {
+      populate_material_result(output, material);
+    }
+  }
+}
+
+static const char *get_store_function_name(ResultType type)
+{
+  switch (type) {
+    case ResultType::Float:
+      return "store_output_float";
+    case ResultType::Vector:
+      return "store_output_vector";
+    case ResultType::Color:
+      return "store_output_color";
+  }
+}
+
+static eGPUTextureFormat texture_format_from_result_type(ResultType type)
+{
+  switch (type) {
+    case ResultType::Float:
+      return GPU_R16F;
+    case ResultType::Vector:
+      return GPU_RGBA16F;
+    case ResultType::Color:
+      return GPU_RGBA16F;
+  }
+}
+
+void GPUMaterialOperation::populate_material_result(DOutputSocket output, GPUMaterial *material)
+{
+  /* Construct a result of an appropriate type. */
+  const ResultType result_type = get_node_socket_result_type(output.socket_ref());
+  const Result result = Result(result_type, texture_pool());
+
+  /* Add a new output image to the GPU material. */
+  const eGPUTextureFormat format = texture_format_from_result_type(result_type);
+  GPUNodeLink *output_image_link = GPU_image_texture(material, format);
+
+  /* Add the result. */
+  StringRef identifier = GPU_material_get_link_image(output_image_link)->name_in_shader;
+  populate_result(identifier, result);
+
+  /* Map the output socket to the identifier of the result. */
+  output_socket_to_output_identifier_map_.add_new(output, identifier);
+
+  /* Link the output node stack to an output storer storing in the newly added output image. */
+  GPUMaterialNode &node = *gpu_material_nodes_.lookup(output.node());
+  GPUNodeLink *output_link = node.get_outputs_array()[output->index()].link;
+  const char *store_function_name = get_store_function_name(result_type);
+  GPU_link(material, store_function_name, output_image_link, output_link);
+}
+
+void GPUMaterialOperation::generate_material(void *thunk,
+                                             GPUMaterial *material,
+                                             GPUCodegenOutput *code_generator_output)
+{
+  gpu::shader::ShaderCreateInfo &info = *reinterpret_cast<gpu::shader::ShaderCreateInfo *>(
+      code_generator_output->create_info);
+
+  /* The GPU material adds resources without explicit locations, so make sure it is done by the
+   * shader creator. */
+  info.auto_resource_location(true);
+
+  info.local_group_size(16, 16);
+
+  /* Add implementation for implicit conversion operations inserted by the code generator. */
+  info.typedef_source("gpu_shader_compositor_type_conversion.glsl");
+
+  /* Add the compute source code of the generator in a main function and set it as the generated
+   * compute source of the shader create info. */
+  std::string source = "void main()\n{\n" + std::string(code_generator_output->compute) + "}\n";
+  info.compute_source_generated = source;
+}
+
+/* --------------------------------------------------------------------
+ * Scheduler.
+ */
+
+Scheduler::Scheduler(bNodeTree *node_tree) : tree_(*node_tree, tree_ref_map_)
+{
+}
+
+void Scheduler::schedule()
 {
   /* Get the output node whose result should be computed and drawn. */
   DNode output_node = compute_output_node();
 
-  /* Validate the compositor node tree. */
-  if (!is_valid(output_node)) {
-    return;
-  }
-
-  /* Instantiate a node operation for every node reachable from the output. */
-  create_node_operations(output_node);
-
   /* Compute the number of buffers needed by each node. */
-  NeededBuffers needed_buffers;
-  compute_needed_buffers(output_node, needed_buffers);
+  compute_needed_buffers(output_node);
 
   /* Compute the execution schedule of the nodes. */
-  NodeSchedule node_schedule;
-  compute_schedule(output_node, needed_buffers, node_schedule);
+  compute_schedule(output_node);
+}
 
-  /* Compute the operations stream. */
-  compute_operations_stream(node_schedule);
-
-  /* Evaluate the operations stream. */
-  evaluate_operations_stream();
+Schedule &Scheduler::get_schedule()
+{
+  return schedule_;
 }
 
 /* The output node is the one marked as NODE_DO_OUTPUT. If multiple types of output nodes are
  * marked, then preference will be CMP_NODE_COMPOSITE > CMP_NODE_VIEWER > CMP_NODE_SPLITVIEWER. */
-DNode Evaluator::compute_output_node() const
+DNode Scheduler::compute_output_node() const
 {
-  const NodeTreeRef &root_tree = tree.root_context().tree();
+  const NodeTreeRef &root_tree = tree_.root_context().tree();
   for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeComposite")) {
     if (node->bnode()->flag & NODE_DO_OUTPUT) {
-      return DNode(&tree.root_context(), node);
+      return DNode(&tree_.root_context(), node);
     }
   }
   for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeViewer")) {
     if (node->bnode()->flag & NODE_DO_OUTPUT) {
-      return DNode(&tree.root_context(), node);
+      return DNode(&tree_.root_context(), node);
     }
   }
   for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeSplitViewer")) {
     if (node->bnode()->flag & NODE_DO_OUTPUT) {
-      return DNode(&tree.root_context(), node);
+      return DNode(&tree_.root_context(), node);
     }
   }
   return DNode();
-}
-
-bool Evaluator::is_valid(DNode output_node)
-{
-  /* The node tree needs to have an output. */
-  if (!output_node) {
-    return false;
-  }
-
-  return true;
-}
-
-/* Traverse the node tree starting from the given node and instantiate the node operations for all
- * reachable nodes, adding the instances to node_operations_. */
-void Evaluator::create_node_operations(DNode node)
-{
-  const bNodeType *type = node->typeinfo();
-  NodeOperation *operation = type->get_compositor_operation(context, node);
-  node_operations_.add_new(node, operation);
-
-  for (const InputSocketRef *input_ref : node->inputs()) {
-    const DInputSocket input{node.context(), input_ref};
-    input.foreach_origin_socket([&](const DSocket origin) {
-      if (!node_operations_.contains(origin.node())) {
-        create_node_operations(origin.node());
-      }
-    });
-  }
 }
 
 /* Consider a node that takes n number of buffers as an input from a number of node dependencies,
@@ -1073,7 +1442,7 @@ void Evaluator::create_node_operations(DNode node)
  * If the node tree was, in fact, a tree, then this would be an accurate computation. However,
  * the node tree is in fact a graph that allows output sharing, so the computation in this case
  * is merely a heuristic estimation that works well in most cases. */
-int Evaluator::compute_needed_buffers(DNode node, NeededBuffers &needed_buffers)
+int Scheduler::compute_needed_buffers(DNode node)
 {
   /* Compute the number of buffers that the node takes as an input as well as the number of
    * buffers needed to compute the most demanding dependency node. */
@@ -1085,11 +1454,11 @@ int Evaluator::compute_needed_buffers(DNode node, NeededBuffers &needed_buffers)
     input.foreach_origin_socket([&](const DSocket origin) {
       input_buffers++;
       /* The origin node was already computed before, so skip it. */
-      if (needed_buffers.contains(origin.node())) {
+      if (needed_buffers_.contains(origin.node())) {
         return;
       }
       /* Recursively compute the number of buffers needed to compute this dependency node. */
-      const int buffers_needed_by_origin = compute_needed_buffers(origin.node(), needed_buffers);
+      const int buffers_needed_by_origin = compute_needed_buffers(origin.node());
       if (buffers_needed_by_origin > buffers_needed_by_dependencies) {
         buffers_needed_by_dependencies = buffers_needed_by_origin;
       }
@@ -1107,7 +1476,7 @@ int Evaluator::compute_needed_buffers(DNode node, NeededBuffers &needed_buffers)
   /* Compute the heuristic estimation of the number of needed intermediate buffers to compute
    * this node and all of its dependencies. */
   const int total_buffers = MAX2(input_buffers + output_buffers, buffers_needed_by_dependencies);
-  needed_buffers.add_new(node, total_buffers);
+  needed_buffers_.add_new(node, total_buffers);
   return total_buffers;
 }
 
@@ -1124,9 +1493,7 @@ int Evaluator::compute_needed_buffers(DNode node, NeededBuffers &needed_buffers)
  * This is a heuristic generalization of the Sethi–Ullman algorithm, a generalization that
  * doesn't always guarantee an optimal evaluation order, as the optimal evaluation order is very
  * difficult to compute, however, this method works well in most cases. */
-void Evaluator::compute_schedule(DNode node,
-                                 NeededBuffers &needed_buffers,
-                                 NodeSchedule &node_schedule)
+void Scheduler::compute_schedule(DNode node)
 {
   /* Compute the nodes directly connected to the node inputs sorted by their needed buffers such
    * that the node with the highest number of needed buffers comes first. */
@@ -1137,13 +1504,14 @@ void Evaluator::compute_schedule(DNode node,
       /* The origin node was added before or was already schedule, so skip it. The number of
        * origin nodes is very small, so linear search is okay.
        */
-      if (sorted_origin_nodes.contains(origin.node()) || node_schedule.contains(origin.node())) {
+      if (sorted_origin_nodes.contains(origin.node()) || schedule_.contains(origin.node())) {
         return;
       }
       /* Sort on insertion, the number of origin nodes is very small, so this is okay. */
       int insertion_position = 0;
       for (int i = 0; i < sorted_origin_nodes.size(); i++) {
-        if (needed_buffers.lookup(origin.node()) > needed_buffers.lookup(sorted_origin_nodes[i])) {
+        if (needed_buffers_.lookup(origin.node()) >
+            needed_buffers_.lookup(sorted_origin_nodes[i])) {
           break;
         }
         insertion_position++;
@@ -1155,26 +1523,130 @@ void Evaluator::compute_schedule(DNode node,
   /* Recursively schedule origin nodes. Nodes with higher number of needed intermediate buffers
    * are scheduled first. */
   for (const DNode &origin_node : sorted_origin_nodes) {
-    compute_schedule(origin_node, needed_buffers, node_schedule);
+    compute_schedule(origin_node);
   }
 
-  node_schedule.add_new(node);
+  schedule_.add_new(node);
 }
 
-void Evaluator::compute_operations_stream(NodeSchedule &node_schedule)
+/* --------------------------------------------------------------------
+ * GPU Material Compile Group.
+ */
+
+/* A node is a GPU material node if it defines a method to get a GPU material node operation. */
+static bool is_gpu_material_node(DNode node)
 {
-  for (const DNode &node : node_schedule) {
-    /* First add the node operation corresponding to the given node to the operations stream. */
-    operations_stream_.append(node_operations_.lookup(node));
-    /* Then map the inputs of the operation to the results connected to them. */
-    map_node_inputs_to_results(node);
+  return node->typeinfo()->get_compositor_gpu_material_node;
+}
+
+void GPUMaterialCompileGroup::add(DNode node)
+{
+  sub_schedule_.add_new(node);
+}
+
+bool GPUMaterialCompileGroup::is_complete(DNode next_node)
+{
+  /* Sub schedule is empty, so the group is not complete. */
+  if (sub_schedule_.is_empty()) {
+    return false;
+  }
+
+  /* If the next node is not a GPU material node, then it can't be added to the group and the group
+   * is considered complete. */
+  if (!is_gpu_material_node(next_node)) {
+    return true;
+  }
+
+  /* If the next node has inputs that are linked to nodes that are not part of this group, then it
+   * can't be added to the group and the group is considered complete. */
+  for (const InputSocketRef *input_ref : next_node->inputs()) {
+    const DInputSocket input{next_node.context(), input_ref};
+    DSocket origin = get_node_input_origin_socket(input);
+
+    /* If the origin is an output, then the input is linked to the origin node. Check if the origin
+     * node is not part of the group. */
+    if (origin->is_output() && !sub_schedule_.contains(origin.node())) {
+      return true;
+    }
+  }
+
+  /* The next node can be added to the group, so it is not complete yet. */
+  return false;
+}
+
+void GPUMaterialCompileGroup::reset()
+{
+  sub_schedule_.clear();
+}
+
+VectorSet<DNode> &GPUMaterialCompileGroup::get_sub_schedule()
+{
+  return sub_schedule_;
+}
+
+/* --------------------------------------------------------------------
+ * Compiler.
+ */
+
+Compiler::Compiler(Context &context, bNodeTree *node_tree)
+    : context_(context), scheduler_(node_tree)
+{
+}
+
+Compiler::~Compiler()
+{
+  for (const Operation *operation : operations_stream_) {
+    delete operation;
   }
 }
 
-void Evaluator::map_node_inputs_to_results(DNode node)
+void Compiler::compile()
+{
+  scheduler_.schedule();
+
+  for (const DNode &node : scheduler_.get_schedule()) {
+    /* First check if the material compile group is complete, and if it is, compile it. */
+    if (gpu_material_compile_group_.is_complete(node)) {
+      compile_gpu_material_group();
+    }
+
+    /* If the node is a GPU material node, add it to the GPU material compile group, it will be
+     * compiled later once the group is complete, see previous statement. */
+    if (is_gpu_material_node(node)) {
+      gpu_material_compile_group_.add(node);
+      continue;
+    }
+
+    /* Otherwise, compile the node into a standard node operation. */
+    compile_standard_node(node);
+  }
+}
+
+OperationsStream &Compiler::operations_stream()
+{
+  return operations_stream_;
+}
+
+void Compiler::compile_standard_node(DNode node)
+{
+  /* Get an instance of the node's compositor operation and add it to both the operations stream
+   * and the node operations map. This instance should be freed by the compiler when it is no
+   * longer needed. */
+  NodeOperation *operation = node->typeinfo()->get_compositor_operation(context_, node);
+  operations_stream_.append(operation);
+  node_operations_.add_new(node, operation);
+
+  /* Map the inputs of the operation to the results of the outputs they are linked to. */
+  map_node_operation_inputs_to_results(node, operation);
+}
+
+void Compiler::map_node_operation_inputs_to_results(DNode node, NodeOperation *operation)
 {
   for (const InputSocketRef *input_ref : node->inputs()) {
     const DInputSocket input{node.context(), input_ref};
+
+    /* Get the origin socket of this input, which will be an output socket if the input is linked
+     * to an output. */
     DSocket origin = get_node_input_origin_socket(input);
 
     /* If the origin socket is an input, that means the input is unlinked. Unlinked inputs are
@@ -1183,20 +1655,80 @@ void Evaluator::map_node_inputs_to_results(DNode node)
       continue;
     }
 
-    /* Get the result from the operation that contains the output socket. */
+    /* Now that we know the origin is an output, construct a derived output from it. */
     const DOutputSocket output{origin.context(), &origin->as_output()};
-    NodeOperation *output_operation = node_operations_.lookup(output.node());
-    Result &result = output_operation->get_result(output->identifier());
 
     /* Map the input to the result we got from the output. */
-    NodeOperation *input_operation = node_operations_.lookup(input.node());
-    input_operation->map_input_to_result(input->identifier(), &result);
+    Result &result = get_output_socket_result(output);
+    operation->map_input_to_result(input->identifier(), &result);
   }
 }
 
-void Evaluator::evaluate_operations_stream()
+void Compiler::compile_gpu_material_group()
 {
-  for (Operation *operation : operations_stream_) {
+  /* Get the sub schedule that is part of the GPU material group, instantiate a GPU Material
+   * Operation from it, and add it to the operations stream. This instance should be freed by the
+   * compiler when it is no longer needed. */
+  SubSchedule &sub_schedule = gpu_material_compile_group_.get_sub_schedule();
+  GPUMaterialOperation *operation = new GPUMaterialOperation(context_, sub_schedule);
+  operations_stream_.append(operation);
+
+  /* Map each of the nodes in the sub schedule to the compiled operation. */
+  for (DNode node : sub_schedule) {
+    gpu_material_operations_.add_new(node, operation);
+  }
+
+  /* Map the inputs of the operation to the results of the outputs they are linked to. */
+  map_gpu_material_operation_inputs_to_results(operation);
+
+  /* Reset the compile group to make it ready to track the next potential group. */
+  gpu_material_compile_group_.reset();
+}
+
+void Compiler::map_gpu_material_operation_inputs_to_results(GPUMaterialOperation *operation)
+{
+  /* For each input of the operation, retrieve the result of the output linked to it, and map the
+   * result to the input. */
+  InputIdentifierToOutputSocketMap &map = operation->get_input_identifier_to_output_socket_map();
+  for (const InputIdentifierToOutputSocketMap::Item &item : map.items()) {
+    /* Map the input to the result we got from the output. */
+    Result &result = get_output_socket_result(item.value);
+    operation->map_input_to_result(item.key, &result);
+  }
+}
+
+Result &Compiler::get_output_socket_result(DOutputSocket output)
+{
+  /* The output belongs to a node that was compiled into a standard node operation, so return a
+   * reference to the result from that operation using the output identifier. */
+  if (node_operations_.contains(output.node())) {
+    NodeOperation *operation = node_operations_.lookup(output.node());
+    return operation->get_result(output->identifier());
+  }
+
+  /* Otherwise, the output belongs to a node that was compiled into a GPU material operation, so
+   * retrieve the internal identifier of that output and return a reference to the result from
+   * that operation using the retrieved identifier. */
+  GPUMaterialOperation *operation = gpu_material_operations_.lookup(output.node());
+  return operation->get_result(operation->get_output_identifier_from_output_socket(output));
+}
+
+/* --------------------------------------------------------------------
+ * Evaluator.
+ */
+
+Evaluator::Evaluator(Context &context, bNodeTree *node_tree) : compiler_(context, node_tree)
+{
+}
+
+void Evaluator::compile()
+{
+  compiler_.compile();
+}
+
+void Evaluator::evaluate()
+{
+  for (Operation *operation : compiler_.operations_stream()) {
     operation->evaluate();
   }
 }

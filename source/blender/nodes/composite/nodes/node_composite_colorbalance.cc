@@ -26,6 +26,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* ******************* Color Balance ********************************* */
@@ -155,34 +159,59 @@ static void node_composit_buts_colorbalance_ex(uiLayout *layout,
   }
 }
 
-static int node_composite_gpu_colorbalance(GPUMaterial *mat,
-                                           bNode *node,
-                                           bNodeExecData *UNUSED(execdata),
-                                           GPUNodeStack *in,
-                                           GPUNodeStack *out)
-{
-  NodeColorBalance *n = (NodeColorBalance *)node->storage;
+using namespace blender::viewport_compositor;
 
-  if (node->custom1 == 0) {
-    return GPU_stack_link(mat,
-                          node,
-                          "node_composite_color_balance_lgg",
-                          in,
-                          out,
-                          GPU_uniform(n->lift),
-                          GPU_uniform(n->gamma),
-                          GPU_uniform(n->gain));
+class ColorBalanceGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const NodeColorBalance *node_color_balance = get_node_color_balance();
+
+    if (get_color_balance_method() == 0) {
+      GPU_stack_link(material,
+                     &node(),
+                     "node_composite_color_balance_lgg",
+                     inputs,
+                     outputs,
+                     GPU_uniform(node_color_balance->lift),
+                     GPU_uniform(node_color_balance->gamma),
+                     GPU_uniform(node_color_balance->gain));
+      return;
+    }
+
+    GPU_stack_link(material,
+                   &node(),
+                   "node_composite_color_balance_asc_cdl",
+                   inputs,
+                   outputs,
+                   GPU_uniform(node_color_balance->offset),
+                   GPU_uniform(node_color_balance->power),
+                   GPU_uniform(node_color_balance->slope),
+                   GPU_uniform(&node_color_balance->offset_basis));
   }
 
-  return GPU_stack_link(mat,
-                        node,
-                        "node_composite_color_balance_asc_cdl",
-                        in,
-                        out,
-                        GPU_uniform(n->offset),
-                        GPU_uniform(n->power),
-                        GPU_uniform(n->slope),
-                        GPU_uniform(&n->offset_basis));
+  /* Get color balance method.
+   * 0 -> LGG.
+   * 1 -> ASC-CDL. */
+  int get_color_balance_method()
+  {
+    return node().custom1;
+  }
+
+  NodeColorBalance *get_node_color_balance()
+  {
+    return static_cast<NodeColorBalance *>(node().storage);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new ColorBalanceGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_colorbalance_cc
@@ -201,7 +230,7 @@ void register_node_type_cmp_colorbalance()
   node_type_init(&ntype, file_ns::node_composit_init_colorbalance);
   node_type_storage(
       &ntype, "NodeColorBalance", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_colorbalance);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

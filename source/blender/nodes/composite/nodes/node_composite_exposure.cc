@@ -21,6 +21,10 @@
  * \ingroup cmpnodes
  */
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Exposure ******************** */
@@ -34,13 +38,24 @@ static void cmp_node_exposure_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Image"));
 }
 
-static int node_composite_gpu_exposure(GPUMaterial *mat,
-                                       bNode *node,
-                                       bNodeExecData *UNUSED(execdata),
-                                       GPUNodeStack *in,
-                                       GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class ExposureGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &node(), "node_composite_exposure", inputs, outputs);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, "node_composite_exposure", in, out);
+  return new ExposureGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_exposure_cc
@@ -53,7 +68,7 @@ void register_node_type_cmp_exposure()
 
   cmp_node_type_base(&ntype, CMP_NODE_EXPOSURE, "Exposure", NODE_CLASS_OP_COLOR);
   ntype.declare = file_ns::cmp_node_exposure_declare;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_exposure);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

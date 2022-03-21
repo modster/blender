@@ -321,12 +321,13 @@ struct GPUSource {
         /* Argument list. */
         "\\(([\\w\\s\\n,]*)\\)");
     const std::regex arg_regex(
-        /* Qualifier. */
-        "(in|out|inout)?"
+        /* Qualifiers. */
+        "((?:in|out|inout|const|restrict|writeonly|\\s+)*)"
         /* Separator. */
         "[\\s]*"
         /* Type. */
-        "(void|[iu]?vec[234]|mat4|float|u?int|Closure|sampler[123]D(?:Array)?)"
+        "(void|[iu]?vec[234]|mat4|float|u?int|Closure|"
+        "sampler[123]D(?:Array)?|image[123]D(?:Array)?)"
         /* Separator. */
         "[\\s]+"
         /* Name. */
@@ -378,7 +379,7 @@ struct GPUSource {
       std::string::const_iterator args_search_start(func_args.cbegin());
       while (std::regex_search(args_search_start, func_args.cend(), args_match, arg_regex)) {
         args_search_start = args_match.suffix().first;
-        std::string arg_qualifier = args_match[1].str();
+        std::string arg_qualifiers = args_match[1].str();
         std::string arg_type = args_match[2].str();
         std::string arg_name = args_match[3].str();
 
@@ -388,14 +389,26 @@ struct GPUSource {
         }
 
         auto parse_qualifier = [](std::string &qualifier) -> GPUFunctionQual {
-          if (qualifier == "out") {
+          if (qualifier == "in") {
+            return FUNCTION_QUAL_IN;
+          }
+          else if (qualifier == "out") {
             return FUNCTION_QUAL_OUT;
           }
           else if (qualifier == "inout") {
             return FUNCTION_QUAL_INOUT;
           }
+          else if (qualifier == "const") {
+            return FUNCTION_QUAL_CONST;
+          }
+          else if (qualifier == "restrict") {
+            return FUNCTION_QUAL_RESTRICT;
+          }
+          else if (qualifier == "writeonly") {
+            return FUNCTION_QUAL_WRITEONLY;
+          }
           else {
-            return FUNCTION_QUAL_IN;
+            return FUNCTION_QUAL_NONE;
           }
         };
 
@@ -430,6 +443,9 @@ struct GPUSource {
           else if (type == "sampler3D") {
             return GPU_TEX3D;
           }
+          else if (type == "image2D") {
+            return GPU_IMAGE_2D;
+          }
           else if (type == "Closure") {
             return GPU_CLOSURE;
           }
@@ -438,7 +454,19 @@ struct GPUSource {
           }
         };
 
-        func->paramqual[func->totparam] = parse_qualifier(arg_qualifier);
+        GPUFunctionQual qualifiers = FUNCTION_QUAL_NONE;
+        std::smatch qualifiers_match;
+        std::string::const_iterator qualifiers_search_start(arg_qualifiers.cbegin());
+        while (std::regex_search(qualifiers_search_start,
+                                 arg_qualifiers.cend(),
+                                 qualifiers_match,
+                                 std::regex("(\\w+)"))) {
+          qualifiers_search_start = qualifiers_match.suffix().first;
+          std::string qualifier = qualifiers_match[1].str();
+          qualifiers = static_cast<GPUFunctionQual>(qualifiers | parse_qualifier(qualifier));
+        }
+
+        func->paramqual[func->totparam] = qualifiers;
         func->paramtype[func->totparam] = parse_type(arg_type);
 
         if (func->paramtype[func->totparam] == GPU_NONE) {
@@ -740,7 +768,8 @@ struct GPUSource {
   bool is_from_material_library() const
   {
     return (filename.startswith("gpu_shader_material_") ||
-            filename.startswith("gpu_shader_common_")) &&
+            filename.startswith("gpu_shader_common_") ||
+            filename.startswith("gpu_shader_compositor_")) &&
            filename.endswith(".glsl");
   }
 };

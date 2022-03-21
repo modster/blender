@@ -21,11 +21,17 @@
  * \ingroup cmpnodes
  */
 
+#include "BLI_assert.h"
+
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** SEPARATE YCCA ******************** */
 
-namespace blender::nodes::node_composite_sepcomb_ycca_cc {
+namespace blender::nodes::node_composite_separate_ycca_cc {
 
 static void cmp_node_sepycca_declare(NodeDeclarationBuilder &b)
 {
@@ -41,40 +47,65 @@ static void node_composit_init_mode_sepycca(bNodeTree *UNUSED(ntree), bNode *nod
   node->custom1 = 1; /* BLI_YCC_ITU_BT709 */
 }
 
-static const char *separate_ycca_gpu_names[] = {
-    "node_composite_separate_ycca_itu_601",
-    "node_composite_separate_ycca_itu_709",
-    "node_composite_separate_ycca_jpeg",
+using namespace blender::viewport_compositor;
+
+class SeparateYCCAGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &node(), get_shader_function_name(), inputs, outputs);
+  }
+
+  int get_mode()
+  {
+    return node().custom1;
+  }
+
+  const char *get_shader_function_name()
+  {
+    switch (get_mode()) {
+      case BLI_YCC_ITU_BT601:
+        return "node_composite_separate_ycca_itu_601";
+      case BLI_YCC_ITU_BT709:
+        return "node_composite_separate_ycca_itu_709";
+      case BLI_YCC_JFIF_0_255:
+        return "node_composite_separate_ycca_jpeg";
+    }
+
+    BLI_assert_unreachable();
+    return nullptr;
+  }
 };
 
-static int node_composite_gpu_sepycca(GPUMaterial *mat,
-                                      bNode *node,
-                                      bNodeExecData *UNUSED(execdata),
-                                      GPUNodeStack *in,
-                                      GPUNodeStack *out)
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, separate_ycca_gpu_names[node->custom1], in, out);
+  return new SeparateYCCAGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_sepcomb_ycca_cc
+}  // namespace blender::nodes::node_composite_separate_ycca_cc
 
 void register_node_type_cmp_sepycca()
 {
-  namespace file_ns = blender::nodes::node_composite_sepcomb_ycca_cc;
+  namespace file_ns = blender::nodes::node_composite_separate_ycca_cc;
 
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPYCCA, "Separate YCbCrA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_sepycca_declare;
   node_type_init(&ntype, file_ns::node_composit_init_mode_sepycca);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_sepycca);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }
 
 /* **************** COMBINE YCCA ******************** */
 
-namespace blender::nodes::node_composite_sepcomb_ycca_cc {
+namespace blender::nodes::node_composite_combine_ycca_cc {
 
 static void cmp_node_combycca_declare(NodeDeclarationBuilder &b)
 {
@@ -90,33 +121,58 @@ static void node_composit_init_mode_combycca(bNodeTree *UNUSED(ntree), bNode *no
   node->custom1 = 1; /* BLI_YCC_ITU_BT709 */
 }
 
-static const char *combine_ycca_gpu_names[] = {
-    "node_composite_combine_ycca_itu_601",
-    "node_composite_combine_ycca_itu_709",
-    "node_composite_combine_ycca_jpeg",
+using namespace blender::viewport_compositor;
+
+class CombineYCCAGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &node(), get_shader_function_name(), inputs, outputs);
+  }
+
+  int get_mode()
+  {
+    return node().custom1;
+  }
+
+  const char *get_shader_function_name()
+  {
+    switch (get_mode()) {
+      case BLI_YCC_ITU_BT601:
+        return "node_composite_combine_ycca_itu_601";
+      case BLI_YCC_ITU_BT709:
+        return "node_composite_combine_ycca_itu_709";
+      case BLI_YCC_JFIF_0_255:
+        return "node_composite_combine_ycca_jpeg";
+    }
+
+    BLI_assert_unreachable();
+    return nullptr;
+  }
 };
 
-static int node_composite_gpu_combycca(GPUMaterial *mat,
-                                       bNode *node,
-                                       bNodeExecData *UNUSED(execdata),
-                                       GPUNodeStack *in,
-                                       GPUNodeStack *out)
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, combine_ycca_gpu_names[node->custom1], in, out);
+  return new CombineYCCAGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_sepcomb_ycca_cc
+}  // namespace blender::nodes::node_composite_combine_ycca_cc
 
 void register_node_type_cmp_combycca()
 {
-  namespace file_ns = blender::nodes::node_composite_sepcomb_ycca_cc;
+  namespace file_ns = blender::nodes::node_composite_combine_ycca_cc;
 
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBYCCA, "Combine YCbCrA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_combycca_declare;
   node_type_init(&ntype, file_ns::node_composit_init_mode_combycca);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_combycca);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

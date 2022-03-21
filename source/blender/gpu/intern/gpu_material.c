@@ -75,6 +75,8 @@ struct GPUMaterial {
   eGPUMaterialStatus status;
   /** Some flags about the nodetree & the needed resources. */
   eGPUMaterialFlag flag;
+  /** If true, all material nodes will be serialized into a compute source. */
+  bool is_compute;
   /* Identify shader variations (shadow, probe, world background...).
    * Should be unique even across render engines. */
   uint64_t uuid;
@@ -149,7 +151,7 @@ static void gpu_material_ramp_texture_build(GPUMaterial *mat)
   mat->coba_builder = NULL;
 }
 
-static void gpu_material_free_single(GPUMaterial *material)
+void GPU_material_free_single(GPUMaterial *material)
 {
   /* Cancel / wait any pending lazy compilation. */
   DRW_deferred_shader_remove(material);
@@ -165,14 +167,14 @@ static void gpu_material_free_single(GPUMaterial *material)
   if (material->coba_tex != NULL) {
     GPU_texture_free(material->coba_tex);
   }
+  MEM_freeN(material);
 }
 
 void GPU_material_free(ListBase *gpumaterial)
 {
   LISTBASE_FOREACH (LinkData *, link, gpumaterial) {
     GPUMaterial *material = link->data;
-    gpu_material_free_single(material);
-    MEM_freeN(material);
+    GPU_material_free_single(material);
   }
   BLI_freelistN(gpumaterial);
 }
@@ -227,9 +229,9 @@ ListBase GPU_material_volume_grids(GPUMaterial *material)
   return material->graph.volume_grids;
 }
 
-ListBase GPU_material_render_passes(GPUMaterial *material)
+ListBase GPU_material_images(GPUMaterial *material)
 {
-  return material->graph.render_passes;
+  return material->graph.images;
 }
 
 GPUUniformAttrList *GPU_material_uniform_attributes(GPUMaterial *material)
@@ -297,6 +299,16 @@ eGPUMaterialStatus GPU_material_status(GPUMaterial *mat)
 void GPU_material_status_set(GPUMaterial *mat, eGPUMaterialStatus status)
 {
   mat->status = status;
+}
+
+bool GPU_material_is_compute(GPUMaterial *material)
+{
+  return material->is_compute;
+}
+
+void GPU_material_is_compute_set(GPUMaterial *material, bool is_compute)
+{
+  material->is_compute = is_compute;
 }
 
 /* Code generation */
@@ -461,4 +473,62 @@ void GPU_materials_free(Main *bmain)
 
   BKE_world_defaults_free_gpu();
   BKE_material_defaults_free_gpu();
+}
+
+GPUMaterial *GPU_material_from_callbacks(GPUMaterialSetupFn setup_function,
+                                         GPUMaterialCompileFn compile_function,
+                                         GPUCodegenCallbackFn generate_function,
+                                         void *thunk)
+{
+  /* Allocate a new material and its material graph. */
+  GPUMaterial *material = MEM_callocN(sizeof(GPUMaterial), "GPUMaterial");
+  material->graph.used_libraries = BLI_gset_new(
+      BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "GPUNodeGraph.used_libraries");
+
+  /* Setup the newly allocated material. */
+  setup_function(thunk, material);
+
+  /* Compile the material. */
+  compile_function(thunk, material);
+
+  /* Create and initialize the texture storing color bands. */
+  gpu_material_ramp_texture_build(material);
+
+  /* Lookup an existing pass in the cache or generate a new one. */
+  material->pass = GPU_generate_pass(material, &material->graph, generate_function, thunk);
+
+  /* The pass already exists in the pass cache but its shader already failed to compile. */
+  if (material->pass == NULL) {
+    material->status = GPU_MAT_FAILED;
+    gpu_node_graph_free(&material->graph);
+    return material;
+  }
+
+  /* The pass already exists in the pass cache and its shader is already compiled. */
+  GPUShader *shader = GPU_pass_shader_get(material->pass);
+  if (shader != NULL) {
+    material->status = GPU_MAT_SUCCESS;
+    gpu_node_graph_free_nodes(&material->graph);
+    return material;
+  }
+
+  /* Compile the pass shader. */
+  bool compiled_successfully = GPU_pass_compile(material->pass, __func__);
+
+  /* Flag that the material was updated. */
+  material->flag |= GPU_MATFLAG_UPDATED;
+
+  /* The pass shader was compiled successful. */
+  if (compiled_successfully) {
+    material->status = GPU_MAT_SUCCESS;
+    gpu_node_graph_free_nodes(&material->graph);
+    return material;
+  }
+
+  /* The pass shader failed to compile. */
+  material->status = GPU_MAT_FAILED;
+  GPU_pass_release(material->pass);
+  material->pass = NULL;
+  gpu_node_graph_free(&material->graph);
+  return material;
 }

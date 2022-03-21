@@ -21,6 +21,10 @@
  * \ingroup cmpnodes
  */
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** NORMAL  ******************** */
@@ -38,13 +42,35 @@ static void cmp_node_normal_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("Dot"));
 }
 
-static int node_composite_gpu_normal(GPUMaterial *mat,
-                                     bNode *node,
-                                     bNodeExecData *UNUSED(execdata),
-                                     GPUNodeStack *in,
-                                     GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class NormalGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material,
+                   &node(),
+                   "node_composite_normal",
+                   inputs,
+                   outputs,
+                   GPU_uniform(get_vector_value()));
+  }
+
+  /* The vector value is stored in the default value of the output socket. */
+  float *get_vector_value()
+  {
+    return get_outputs_array()[0].vec;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, "node_composite_normal", in, out, GPU_uniform(out[0].vec));
+  return new NormalGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_normal_cc
@@ -57,7 +83,7 @@ void register_node_type_cmp_normal()
 
   cmp_node_type_base(&ntype, CMP_NODE_NORMAL, "Normal", NODE_CLASS_OP_VECTOR);
   ntype.declare = file_ns::cmp_node_normal_declare;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_normal);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

@@ -186,8 +186,8 @@ static std::ostream &operator<<(std::ostream &stream, const GPUInput *input)
       return stream << input->texture->sampler_name;
     case GPU_SOURCE_TEX_TILED_MAPPING:
       return stream << input->texture->tiled_mapping_name;
-    case GPU_SOURCE_RENDER_RESULT:
-      return stream << input->render_pass->sampler_name;
+    case GPU_SOURCE_IMAGE:
+      return stream << input->image->name_in_shader;
     case GPU_SOURCE_VOLUME_GRID:
       return stream << input->volume_grid->sampler_name;
     case GPU_SOURCE_VOLUME_GRID_TRANSFORM:
@@ -259,6 +259,7 @@ class GPUCodegen {
     MEM_SAFE_FREE(output.volume);
     MEM_SAFE_FREE(output.thickness);
     MEM_SAFE_FREE(output.displacement);
+    MEM_SAFE_FREE(output.compute);
     delete create_info;
     BLI_freelistN(&ubo_inputs_);
   };
@@ -279,6 +280,7 @@ class GPUCodegen {
 
   void node_serialize(std::stringstream &eval_ss, const GPUNode *node);
   char *graph_serialize(eGPUNodeTag tree_tag, GPUNodeLink *output_link);
+  char *graph_serialize_compute();
 
   static char *extract_c_str(std::stringstream &stream)
   {
@@ -408,9 +410,14 @@ void GPUCodegen::generate_resources()
     /* TODO(@fclem): Global uniform. To put in an UBO. */
     info.push_constant(Type::MAT4, grid->transform_name);
   }
-  /* Render Passes. */
-  LISTBASE_FOREACH (GPUMaterialRenderPass *, rlayer, &graph.render_passes) {
-    ss << "uniform sampler2D " << rlayer->sampler_name << ";\n";
+  /* Images. */
+  LISTBASE_FOREACH (GPUMaterialImage *, image, &graph.images) {
+    info.image(0,
+               image->format,
+               Qualifier::WRITE,
+               ImageType::FLOAT_2D,
+               image->name_in_shader,
+               Frequency::BATCH);
   }
 
   if (!BLI_listbase_is_empty(&ubo_inputs_)) {
@@ -502,7 +509,9 @@ void GPUCodegen::node_serialize(std::stringstream &eval_ss, const GPUNode *node)
         eval_ss << input;
         break;
     }
-    eval_ss << ", ";
+    if (input->next || !BLI_listbase_is_empty(&node->outputs)) {
+      eval_ss << ", ";
+    }
   }
   /* Output arguments. */
   LISTBASE_FOREACH (GPUOutput *, output, &node->outputs) {
@@ -547,6 +556,18 @@ char *GPUCodegen::graph_serialize(eGPUNodeTag tree_tag, GPUNodeLink *output_link
   return eval_c_str;
 }
 
+char *GPUCodegen::graph_serialize_compute()
+{
+  /* Serialize all nodes. */
+  std::stringstream eval_ss;
+  LISTBASE_FOREACH (GPUNode *, node, &graph.nodes) {
+    node_serialize(eval_ss, node);
+  }
+  char *eval_c_str = extract_c_str(eval_ss);
+  BLI_hash_mm2a_add(&hm2a_, (uchar *)eval_c_str, eval_ss.str().size());
+  return eval_c_str;
+}
+
 void GPUCodegen::generate_uniform_buffer()
 {
   /* Extract uniform inputs. */
@@ -586,6 +607,9 @@ void GPUCodegen::generate_graphs()
   output.volume = graph_serialize(GPU_NODE_TAG_VOLUME, graph.outlink_volume);
   output.displacement = graph_serialize(GPU_NODE_TAG_DISPLACEMENT, graph.outlink_displacement);
   output.thickness = graph_serialize(GPU_NODE_TAG_THICKNESS, graph.outlink_thickness);
+  if (GPU_material_is_compute(&mat)) {
+    output.compute = graph_serialize_compute();
+  }
 
   LISTBASE_FOREACH (GPUMaterialAttribute *, attr, &graph.attributes) {
     BLI_hash_mm2a_add(&hm2a_, (uchar *)attr->name, strlen(attr->name));
@@ -605,9 +629,14 @@ GPUPass *GPU_generate_pass(GPUMaterial *material,
                            GPUCodegenCallbackFn finalize_source_cb,
                            void *thunk)
 {
-  /* Prune the unused nodes and extract attributes before compiling so the
-   * generated VBOs are ready to accept the future shader. */
-  gpu_node_graph_prune_unused(graph);
+  /* Prune unused resources and nodes. Only prune unused nodes if the GPU material is not a compute
+   * one, as all nodes need to be evaluated in compute materials due to the use of arbitrary
+   * writes. */
+  const bool prune_nodes = !GPU_material_is_compute(material);
+  gpu_node_graph_prune_unused(graph, prune_nodes);
+
+  /* Extract attributes before compiling so the generated VBOs are ready to accept the future
+   * shader. */
   gpu_node_graph_finalize_uniform_attrs(graph);
 
   GPUCodegen codegen(material, graph);

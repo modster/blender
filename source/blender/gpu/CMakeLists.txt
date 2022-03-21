@@ -281,9 +281,8 @@ set(GLSL_SRC
   shaders/common/gpu_shader_common_math.glsl
   shaders/common/gpu_shader_common_mix_rgb.glsl
   shaders/common/gpu_shader_common_hash.glsl
-  
+
   shaders/compositor/material/gpu_shader_compositor_alpha_over.glsl
-  shaders/compositor/material/gpu_shader_compositor_box_mask.glsl
   shaders/compositor/material/gpu_shader_compositor_bright_contrast.glsl
   shaders/compositor/material/gpu_shader_compositor_channel_matte.glsl
   shaders/compositor/material/gpu_shader_compositor_chroma_matte.glsl
@@ -294,19 +293,20 @@ set(GLSL_SRC
   shaders/compositor/material/gpu_shader_compositor_color_to_luminance.glsl
   shaders/compositor/material/gpu_shader_compositor_difference_matte.glsl
   shaders/compositor/material/gpu_shader_compositor_distance_matte.glsl
-  shaders/compositor/material/gpu_shader_compositor_ellipse_mask.glsl
   shaders/compositor/material/gpu_shader_compositor_exposure.glsl
   shaders/compositor/material/gpu_shader_compositor_gamma.glsl
   shaders/compositor/material/gpu_shader_compositor_hue_correct.glsl
   shaders/compositor/material/gpu_shader_compositor_hue_saturation_value.glsl
   shaders/compositor/material/gpu_shader_compositor_invert.glsl
+  shaders/compositor/material/gpu_shader_compositor_load_input.glsl
   shaders/compositor/material/gpu_shader_compositor_luminance_matte.glsl
   shaders/compositor/material/gpu_shader_compositor_map_value.glsl
   shaders/compositor/material/gpu_shader_compositor_normal.glsl
   shaders/compositor/material/gpu_shader_compositor_posterize.glsl
   shaders/compositor/material/gpu_shader_compositor_separate_combine.glsl
   shaders/compositor/material/gpu_shader_compositor_set_alpha.glsl
-  shaders/compositor/material/gpu_shader_compositor_split_viewer.glsl
+  shaders/compositor/material/gpu_shader_compositor_store_output.glsl
+  shaders/compositor/material/gpu_shader_compositor_type_conversion.glsl
 
   shaders/compositor/compositor_convert_color_to_float.glsl
   shaders/compositor/compositor_convert_float_to_color.glsl
@@ -385,6 +385,7 @@ set(GLSL_SRC
   shaders/material/gpu_shader_material_tex_wave.glsl
   shaders/material/gpu_shader_material_tex_white_noise.glsl
   shaders/material/gpu_shader_material_toon.glsl
+  shaders/material/gpu_shader_material_transform_utils.glsl
   shaders/material/gpu_shader_material_translucent.glsl
   shaders/material/gpu_shader_material_transparent.glsl
   shaders/material/gpu_shader_material_uv_map.glsl

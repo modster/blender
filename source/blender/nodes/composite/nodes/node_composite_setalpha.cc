@@ -24,6 +24,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** SET ALPHA ******************** */
@@ -49,19 +53,36 @@ static void node_composit_buts_set_alpha(uiLayout *layout, bContext *UNUSED(C), 
   uiItemR(layout, ptr, "mode", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
-static int node_composite_gpu_set_alpha(GPUMaterial *mat,
-                                        bNode *node,
-                                        bNodeExecData *UNUSED(execdata),
-                                        GPUNodeStack *in,
-                                        GPUNodeStack *out)
-{
-  const NodeSetAlpha *settings = (NodeSetAlpha *)node->storage;
+using namespace blender::viewport_compositor;
 
-  if (settings->mode == CMP_NODE_SETALPHA_MODE_APPLY) {
-    return GPU_stack_link(mat, node, "node_composite_set_alpha_apply", in, out);
+class SetAlphaGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const NodeSetAlpha *node_set_alpha = get_node_set_alpha();
+
+    if (node_set_alpha->mode == CMP_NODE_SETALPHA_MODE_APPLY) {
+      GPU_stack_link(material, &node(), "node_composite_set_alpha_apply", inputs, outputs);
+      return;
+    }
+
+    GPU_stack_link(material, &node(), "node_composite_set_alpha_replace", inputs, outputs);
   }
 
-  return GPU_stack_link(mat, node, "node_composite_set_alpha_replace", in, out);
+  NodeSetAlpha *get_node_set_alpha()
+  {
+    return static_cast<NodeSetAlpha *>(node().storage);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new SetAlphaGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_setalpha_cc
@@ -78,7 +99,7 @@ void register_node_type_cmp_setalpha()
   node_type_init(&ntype, file_ns::node_composit_init_setalpha);
   node_type_storage(
       &ntype, "NodeSetAlpha", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_set_alpha);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

@@ -21,10 +21,15 @@
  * \ingroup cmpnodes
  */
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** SEPARATE RGBA ******************** */
-namespace blender::nodes::node_composite_sepcomb_rgba_cc {
+
+namespace blender::nodes::node_composite_separate_rgba_cc {
 
 static void cmp_node_seprgba_declare(NodeDeclarationBuilder &b)
 {
@@ -35,33 +40,44 @@ static void cmp_node_seprgba_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("A"));
 }
 
-static int node_composite_gpu_seprgba(GPUMaterial *mat,
-                                      bNode *node,
-                                      bNodeExecData *UNUSED(execdata),
-                                      GPUNodeStack *in,
-                                      GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class SeparateRGBAGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &node(), "node_composite_separate_rgba", inputs, outputs);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, "node_composite_separate_rgba", in, out);
+  return new SeparateRGBAGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_sepcomb_rgba_cc
+}  // namespace blender::nodes::node_composite_separate_rgba_cc
 
 void register_node_type_cmp_seprgba()
 {
-  namespace file_ns = blender::nodes::node_composite_sepcomb_rgba_cc;
+  namespace file_ns = blender::nodes::node_composite_separate_rgba_cc;
 
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPRGBA, "Separate RGBA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_seprgba_declare;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_seprgba);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }
 
 /* **************** COMBINE RGBA ******************** */
 
-namespace blender::nodes::node_composite_sepcomb_rgba_cc {
+namespace blender::nodes::node_composite_combine_rgba_cc {
 
 static void cmp_node_combrgba_declare(NodeDeclarationBuilder &b)
 {
@@ -72,26 +88,37 @@ static void cmp_node_combrgba_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Image"));
 }
 
-static int node_composite_gpu_combrgba(GPUMaterial *mat,
-                                       bNode *node,
-                                       bNodeExecData *UNUSED(execdata),
-                                       GPUNodeStack *in,
-                                       GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class CombineRGBAGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &node(), "node_composite_combine_rgba", inputs, outputs);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, "node_composite_combine_rgba", in, out);
+  return new CombineRGBAGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_sepcomb_rgba_cc
+}  // namespace blender::nodes::node_composite_combine_rgba_cc
 
 void register_node_type_cmp_combrgba()
 {
-  namespace file_ns = blender::nodes::node_composite_sepcomb_rgba_cc;
+  namespace file_ns = blender::nodes::node_composite_combine_rgba_cc;
 
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBRGBA, "Combine RGBA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_combrgba_declare;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_combrgba);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

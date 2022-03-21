@@ -36,9 +36,13 @@ extern "C" {
 struct GSet;
 
 typedef enum {
-  FUNCTION_QUAL_IN,
-  FUNCTION_QUAL_OUT,
-  FUNCTION_QUAL_INOUT,
+  FUNCTION_QUAL_NONE = 0,
+  FUNCTION_QUAL_IN = 1 << 0,
+  FUNCTION_QUAL_OUT = 1 << 1,
+  FUNCTION_QUAL_INOUT = 1 << 2,
+  FUNCTION_QUAL_CONST = 1 << 3,
+  FUNCTION_QUAL_RESTRICT = 1 << 4,
+  FUNCTION_QUAL_WRITEONLY = 1 << 5,
 } GPUFunctionQual;
 
 typedef struct GPUFunction {

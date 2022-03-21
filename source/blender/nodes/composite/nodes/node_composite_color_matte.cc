@@ -24,6 +24,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* ******************* Color Matte ********************************************************** */
@@ -66,25 +70,56 @@ static void node_composit_buts_color_matte(uiLayout *layout, bContext *UNUSED(C)
       col, ptr, "color_value", UI_ITEM_R_SPLIT_EMPTY_NAME | UI_ITEM_R_SLIDER, nullptr, ICON_NONE);
 }
 
-static int node_composite_gpu_color_matte(GPUMaterial *mat,
-                                          bNode *node,
-                                          bNodeExecData *UNUSED(execdata),
-                                          GPUNodeStack *in,
-                                          GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class ColorMatteGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const float hue_epsilon = get_hue_epsilon();
+    const float saturation_epsilon = get_saturation_epsilon();
+    const float value_epsilon = get_value_epsilon();
+
+    GPU_stack_link(material,
+                   &node(),
+                   "node_composite_color_matte",
+                   inputs,
+                   outputs,
+                   GPU_uniform(&hue_epsilon),
+                   GPU_uniform(&saturation_epsilon),
+                   GPU_uniform(&value_epsilon));
+  }
+
+  NodeChroma *get_node_chroma()
+  {
+    return static_cast<NodeChroma *>(node().storage);
+  }
+
+  float get_hue_epsilon()
+  {
+    /* Divide by 2 because the hue wraps around. */
+    return get_node_chroma()->t1 / 2.0f;
+  }
+
+  float get_saturation_epsilon()
+  {
+    return get_node_chroma()->t2;
+  }
+
+  float get_value_epsilon()
+  {
+    return get_node_chroma()->t3;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  const NodeChroma *data = (NodeChroma *)node->storage;
-
-  /* Because the Hue wraps around. */
-  const float hue_epsilon = data->t1 / 2.0f;
-
-  return GPU_stack_link(mat,
-                        node,
-                        "node_composite_color_matte",
-                        in,
-                        out,
-                        GPU_uniform(&hue_epsilon),
-                        GPU_uniform(&data->t2),
-                        GPU_uniform(&data->t3));
+  return new ColorMatteGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_color_matte_cc
@@ -101,7 +136,7 @@ void register_node_type_cmp_color_matte()
   ntype.flag |= NODE_PREVIEW;
   node_type_init(&ntype, file_ns::node_composit_init_color_matte);
   node_type_storage(&ntype, "NodeChroma", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_color_matte);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

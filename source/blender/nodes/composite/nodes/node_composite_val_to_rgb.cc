@@ -21,11 +21,21 @@
  * \ingroup cmpnodes
  */
 
+#include "BLI_assert.h"
+
+#include "IMB_colormanagement.h"
+
+#include "BKE_colorband.h"
+
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** VALTORGB ******************** */
 
-namespace blender::nodes::node_composite_val_to_rgb_cc {
+namespace blender::nodes::node_composite_color_ramp_cc {
 
 static void cmp_node_valtorgb_declare(NodeDeclarationBuilder &b)
 {
@@ -39,72 +49,94 @@ static void node_composit_init_valtorgb(bNodeTree *UNUSED(ntree), bNode *node)
   node->storage = BKE_colorband_add(true);
 }
 
-static int node_composite_gpu_valtorgb(GPUMaterial *mat,
-                                       bNode *node,
-                                       bNodeExecData *UNUSED(execdata),
-                                       GPUNodeStack *in,
-                                       GPUNodeStack *out)
-{
-  struct ColorBand *coba = (ColorBand *)node->storage;
-  float *array, layer;
-  int size;
+using namespace blender::viewport_compositor;
 
-  /* Common / easy case optimization. */
-  if ((coba->tot <= 2) && (coba->color_mode == COLBAND_BLEND_RGB)) {
-    float mul_bias[2];
-    switch (coba->ipotype) {
-      case COLBAND_INTERP_LINEAR:
-        mul_bias[0] = 1.0f / (coba->data[1].pos - coba->data[0].pos);
-        mul_bias[1] = -mul_bias[0] * coba->data[0].pos;
-        return GPU_stack_link(mat,
-                              node,
-                              "valtorgb_opti_linear",
-                              in,
-                              out,
-                              GPU_uniform(mul_bias),
-                              GPU_uniform(&coba->data[0].r),
-                              GPU_uniform(&coba->data[1].r));
-      case COLBAND_INTERP_CONSTANT:
-        mul_bias[1] = max_ff(coba->data[0].pos, coba->data[1].pos);
-        return GPU_stack_link(mat,
-                              node,
-                              "valtorgb_opti_constant",
-                              in,
-                              out,
-                              GPU_uniform(&mul_bias[1]),
-                              GPU_uniform(&coba->data[0].r),
-                              GPU_uniform(&coba->data[1].r));
-      case COLBAND_INTERP_EASE:
-        mul_bias[0] = 1.0f / (coba->data[1].pos - coba->data[0].pos);
-        mul_bias[1] = -mul_bias[0] * coba->data[0].pos;
-        return GPU_stack_link(mat,
-                              node,
-                              "valtorgb_opti_ease",
-                              in,
-                              out,
-                              GPU_uniform(mul_bias),
-                              GPU_uniform(&coba->data[0].r),
-                              GPU_uniform(&coba->data[1].r));
-      default:
-        break;
+class ColorRampGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    struct ColorBand *color_band = get_color_band();
+
+    /* Common / easy case optimization. */
+    if ((color_band->tot <= 2) && (color_band->color_mode == COLBAND_BLEND_RGB)) {
+      float mul_bias[2];
+      switch (color_band->ipotype) {
+        case COLBAND_INTERP_LINEAR:
+          mul_bias[0] = 1.0f / (color_band->data[1].pos - color_band->data[0].pos);
+          mul_bias[1] = -mul_bias[0] * color_band->data[0].pos;
+          GPU_stack_link(material,
+                         &node(),
+                         "valtorgb_opti_linear",
+                         inputs,
+                         outputs,
+                         GPU_uniform(mul_bias),
+                         GPU_uniform(&color_band->data[0].r),
+                         GPU_uniform(&color_band->data[1].r));
+          return;
+        case COLBAND_INTERP_CONSTANT:
+          mul_bias[1] = max_ff(color_band->data[0].pos, color_band->data[1].pos);
+          GPU_stack_link(material,
+                         &node(),
+                         "valtorgb_opti_constant",
+                         inputs,
+                         outputs,
+                         GPU_uniform(&mul_bias[1]),
+                         GPU_uniform(&color_band->data[0].r),
+                         GPU_uniform(&color_band->data[1].r));
+          return;
+        case COLBAND_INTERP_EASE:
+          mul_bias[0] = 1.0f / (color_band->data[1].pos - color_band->data[0].pos);
+          mul_bias[1] = -mul_bias[0] * color_band->data[0].pos;
+          GPU_stack_link(material,
+                         &node(),
+                         "valtorgb_opti_ease",
+                         inputs,
+                         outputs,
+                         GPU_uniform(mul_bias),
+                         GPU_uniform(&color_band->data[0].r),
+                         GPU_uniform(&color_band->data[1].r));
+          return;
+        default:
+          BLI_assert_unreachable();
+          return;
+      }
     }
+
+    float *array, layer;
+    int size;
+    BKE_colorband_evaluate_table_rgba(color_band, &array, &size);
+    GPUNodeLink *tex = GPU_color_band(material, size, array, &layer);
+
+    if (color_band->ipotype == COLBAND_INTERP_CONSTANT) {
+      GPU_stack_link(
+          material, &node(), "valtorgb_nearest", inputs, outputs, tex, GPU_constant(&layer));
+      return;
+    }
+
+    GPU_stack_link(material, &node(), "valtorgb", inputs, outputs, tex, GPU_constant(&layer));
   }
 
-  BKE_colorband_evaluate_table_rgba(coba, &array, &size);
-  GPUNodeLink *tex = GPU_color_band(mat, size, array, &layer);
-
-  if (coba->ipotype == COLBAND_INTERP_CONSTANT) {
-    return GPU_stack_link(mat, node, "valtorgb_nearest", in, out, tex, GPU_constant(&layer));
+  struct ColorBand *get_color_band()
+  {
+    return static_cast<struct ColorBand *>(node().storage);
   }
+};
 
-  return GPU_stack_link(mat, node, "valtorgb", in, out, tex, GPU_constant(&layer));
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new ColorRampGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_val_to_rgb_cc
+}  // namespace blender::nodes::node_composite_color_ramp_cc
 
 void register_node_type_cmp_valtorgb()
 {
-  namespace file_ns = blender::nodes::node_composite_val_to_rgb_cc;
+  namespace file_ns = blender::nodes::node_composite_color_ramp_cc;
 
   static bNodeType ntype;
 
@@ -113,14 +145,14 @@ void register_node_type_cmp_valtorgb()
   node_type_size(&ntype, 240, 200, 320);
   node_type_init(&ntype, file_ns::node_composit_init_valtorgb);
   node_type_storage(&ntype, "ColorBand", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_valtorgb);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }
 
 /* **************** RGBTOBW ******************** */
 
-namespace blender::nodes::node_composite_val_to_rgb_cc {
+namespace blender::nodes::node_composite_rgb_to_bw_cc {
 
 static void cmp_node_rgbtobw_declare(NodeDeclarationBuilder &b)
 {
@@ -128,27 +160,46 @@ static void cmp_node_rgbtobw_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Val"));
 }
 
-static int node_composite_gpu_rgbtobw(GPUMaterial *mat,
-                                      bNode *node,
-                                      bNodeExecData *UNUSED(execdata),
-                                      GPUNodeStack *in,
-                                      GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class RGBToBWGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    float luminance_coefficients[3];
+    IMB_colormanagement_get_luminance_coefficients(luminance_coefficients);
+
+    GPU_stack_link(material,
+                   &node(),
+                   "color_to_luminance",
+                   inputs,
+                   outputs,
+                   GPU_constant(luminance_coefficients));
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, "color_to_luminance", in, out);
+  return new RGBToBWGPUMaterialNode(node);
 }
 
-}  // namespace blender::nodes::node_composite_val_to_rgb_cc
+}  // namespace blender::nodes::node_composite_rgb_to_bw_cc
 
 void register_node_type_cmp_rgbtobw()
 {
-  namespace file_ns = blender::nodes::node_composite_val_to_rgb_cc;
+  namespace file_ns = blender::nodes::node_composite_rgb_to_bw_cc;
 
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_RGBTOBW, "RGB to BW", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_rgbtobw_declare;
   node_type_size_preset(&ntype, NODE_SIZE_SMALL);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_rgbtobw);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

@@ -24,6 +24,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Map Range ******************** */
@@ -48,16 +52,36 @@ static void node_composit_buts_map_range(uiLayout *layout, bContext *UNUSED(C), 
   uiItemR(col, ptr, "use_clamp", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
-static int node_composite_gpu_map_range(GPUMaterial *mat,
-                                        bNode *node,
-                                        bNodeExecData *UNUSED(execdata),
-                                        GPUNodeStack *in,
-                                        GPUNodeStack *out)
-{
-  const float should_clamp = node->custom1 ? 1.0f : 0.0f;
+using namespace blender::viewport_compositor;
 
-  return GPU_stack_link(
-      mat, node, "node_composite_map_range", in, out, GPU_constant(&should_clamp));
+class MapRangeGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const float should_clamp = get_should_clamp();
+
+    GPU_stack_link(material,
+                   &node(),
+                   "node_composite_map_range",
+                   inputs,
+                   outputs,
+                   GPU_constant(&should_clamp));
+  }
+
+  bool get_should_clamp()
+  {
+    return node().custom1;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new MapRangeGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_map_range_cc
@@ -71,7 +95,7 @@ void register_node_type_cmp_map_range()
   cmp_node_type_base(&ntype, CMP_NODE_MAP_RANGE, "Map Range", NODE_CLASS_OP_VECTOR);
   ntype.declare = file_ns::cmp_node_map_range_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_map_range;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_map_range);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

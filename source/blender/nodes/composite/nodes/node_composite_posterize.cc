@@ -21,6 +21,10 @@
  * \ingroup cmpnodes
  */
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Posterize ******************** */
@@ -34,13 +38,24 @@ static void cmp_node_posterize_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Image"));
 }
 
-static int node_composite_gpu_posterize(GPUMaterial *mat,
-                                        bNode *node,
-                                        bNodeExecData *UNUSED(execdata),
-                                        GPUNodeStack *in,
-                                        GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class PosterizeGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &node(), "node_composite_posterize", inputs, outputs);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  return GPU_stack_link(mat, node, "node_composite_posterize", in, out);
+  return new PosterizeGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_posterize_cc
@@ -53,7 +68,7 @@ void register_node_type_cmp_posterize()
 
   cmp_node_type_base(&ntype, CMP_NODE_POSTERIZE, "Posterize", NODE_CLASS_OP_COLOR);
   ntype.declare = file_ns::cmp_node_posterize_declare;
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_posterize);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

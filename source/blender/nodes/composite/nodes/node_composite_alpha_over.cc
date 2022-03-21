@@ -24,6 +24,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** ALPHAOVER ******************** */
@@ -52,24 +56,50 @@ static void node_composit_buts_alphaover(uiLayout *layout, bContext *UNUSED(C), 
   uiItemR(col, ptr, "premul", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
-static int node_composite_gpu_alpha_over(GPUMaterial *mat,
-                                         bNode *node,
-                                         bNodeExecData *UNUSED(execdata),
-                                         GPUNodeStack *in,
-                                         GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class AlphaOverGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const float premultiply_factor = get_premultiply_factor();
+    if (premultiply_factor != 0.0f) {
+      GPU_stack_link(material,
+                     &node(),
+                     "node_composite_alpha_over_mixed",
+                     inputs,
+                     outputs,
+                     GPU_uniform(&premultiply_factor));
+      return;
+    }
+
+    if (get_use_premultiply()) {
+      GPU_stack_link(material, &node(), "node_composite_alpha_over_key", inputs, outputs);
+      return;
+    }
+
+    GPU_stack_link(material, &node(), "node_composite_alpha_over_premultiply", inputs, outputs);
+  }
+
+  bool get_use_premultiply()
+  {
+    return node().custom1;
+  }
+
+  float get_premultiply_factor()
+  {
+    return ((NodeTwoFloats *)node().storage)->x;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  const float premultiply_factor = ((NodeTwoFloats *)node->storage)->x;
-
-  if (premultiply_factor != 0.0f) {
-    return GPU_stack_link(
-        mat, node, "node_composite_alpha_over_mixed", in, out, GPU_uniform(&premultiply_factor));
-  }
-
-  if (node->custom1) {
-    return GPU_stack_link(mat, node, "node_composite_alpha_over_key", in, out);
-  }
-
-  return GPU_stack_link(mat, node, "node_composite_alpha_over_premultiply", in, out);
+  return new AlphaOverGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_alpha_over_cc
@@ -86,7 +116,7 @@ void register_node_type_cmp_alphaover()
   node_type_init(&ntype, file_ns::node_alphaover_init);
   node_type_storage(
       &ntype, "NodeTwoFloats", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_alpha_over);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

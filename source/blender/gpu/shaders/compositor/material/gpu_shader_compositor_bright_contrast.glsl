@@ -3,6 +3,8 @@
  * Extracted of OpenCV demhist.c
  */
 
+#define FLT_EPSILON 1.192092896e-07F
+
 void node_composite_bright_contrast(
     vec4 color, float brightness, float contrast, const float use_premultiply, out vec4 result)
 {

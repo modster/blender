@@ -24,6 +24,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** INVERT ******************** */
@@ -42,19 +46,6 @@ static void node_composit_init_invert(bNodeTree *UNUSED(ntree), bNode *node)
   node->custom1 |= CMP_CHAN_RGB;
 }
 
-static int node_composit_gpu_invert(GPUMaterial *mat,
-                                    bNode *node,
-                                    bNodeExecData *UNUSED(execdata),
-                                    GPUNodeStack *in,
-                                    GPUNodeStack *out)
-{
-  float do_rgb = (node->custom1 & CMP_CHAN_RGB) ? 1.0f : 0.0f;
-  float do_alpha = (node->custom1 & CMP_CHAN_A) ? 1.0f : 0.0f;
-
-  return GPU_stack_link(
-      mat, node, "node_composite_invert", in, out, GPU_constant(&do_rgb), GPU_constant(&do_alpha));
-}
-
 static void node_composit_buts_invert(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiLayout *col;
@@ -62,6 +53,45 @@ static void node_composit_buts_invert(uiLayout *layout, bContext *UNUSED(C), Poi
   col = uiLayoutColumn(layout, false);
   uiItemR(col, ptr, "invert_rgb", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
   uiItemR(col, ptr, "invert_alpha", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
+}
+
+using namespace blender::viewport_compositor;
+
+class InvertGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const float do_rgb = get_do_rgb();
+    const float do_alpha = get_do_alpha();
+
+    GPU_stack_link(material,
+                   &node(),
+                   "node_composite_invert",
+                   inputs,
+                   outputs,
+                   GPU_constant(&do_rgb),
+                   GPU_constant(&do_alpha));
+  }
+
+  bool get_do_rgb()
+  {
+    return node().custom1 & CMP_CHAN_RGB;
+  }
+
+  bool get_do_alpha()
+  {
+    return node().custom1 & CMP_CHAN_A;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new InvertGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_invert_cc
@@ -76,7 +106,7 @@ void register_node_type_cmp_invert()
   ntype.declare = file_ns::cmp_node_invert_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_invert;
   node_type_init(&ntype, file_ns::node_composit_init_invert);
-  node_type_gpu(&ntype, file_ns::node_composit_gpu_invert);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

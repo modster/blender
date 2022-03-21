@@ -26,6 +26,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** MAP VALUE ******************** */
@@ -64,28 +68,54 @@ static void node_composit_buts_map_value(uiLayout *layout, bContext *UNUSED(C), 
   uiItemR(sub, ptr, "max", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
 }
 
-static int node_composite_gpu_map_value(GPUMaterial *mat,
-                                        bNode *node,
-                                        bNodeExecData *UNUSED(execdata),
-                                        GPUNodeStack *in,
-                                        GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class MapValueGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const TexMapping *texture_mapping = get_texture_mapping();
+
+    const float use_min = get_use_min();
+    const float use_max = get_use_max();
+
+    GPU_stack_link(material,
+                   &node(),
+                   "node_composite_map_value",
+                   inputs,
+                   outputs,
+                   GPU_uniform(texture_mapping->loc),
+                   GPU_uniform(texture_mapping->size),
+                   GPU_constant(&use_min),
+                   GPU_uniform(texture_mapping->min),
+                   GPU_constant(&use_max),
+                   GPU_uniform(texture_mapping->max));
+  }
+
+  TexMapping *get_texture_mapping()
+  {
+    return static_cast<TexMapping *>(node().storage);
+  }
+
+  bool get_use_min()
+  {
+    return get_texture_mapping()->flag & TEXMAP_CLIP_MIN;
+  }
+
+  bool get_use_max()
+  {
+    return get_texture_mapping()->flag & TEXMAP_CLIP_MAX;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  const TexMapping *texture_mapping = (TexMapping *)node->storage;
-
-  const float use_min = texture_mapping->flag & TEXMAP_CLIP_MIN ? 1.0f : 0.0f;
-  const float use_max = texture_mapping->flag & TEXMAP_CLIP_MAX ? 1.0f : 0.0f;
-
-  return GPU_stack_link(mat,
-                        node,
-                        "node_composite_map_value",
-                        in,
-                        out,
-                        GPU_uniform(texture_mapping->loc),
-                        GPU_uniform(texture_mapping->size),
-                        GPU_constant(&use_min),
-                        GPU_uniform(texture_mapping->min),
-                        GPU_constant(&use_max),
-                        GPU_uniform(texture_mapping->max));
+  return new MapValueGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_map_value_cc
@@ -101,7 +131,7 @@ void register_node_type_cmp_map_value()
   ntype.draw_buttons = file_ns::node_composit_buts_map_value;
   node_type_init(&ntype, file_ns::node_composit_init_map_value);
   node_type_storage(&ntype, "TexMapping", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_map_value);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

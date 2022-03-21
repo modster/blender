@@ -21,8 +21,14 @@
  * \ingroup cmpnodes
  */
 
+#include <cmath>
+
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
 
 #include "node_composite_util.hh"
 
@@ -65,24 +71,55 @@ static void node_composit_buts_chroma_matte(uiLayout *layout, bContext *UNUSED(C
   // uiItemR(col, ptr, "shadow_adjust", UI_ITEM_R_SLIDER, nullptr, ICON_NONE);
 }
 
-static int node_composite_gpu_chroma_matte(GPUMaterial *mat,
-                                           bNode *node,
-                                           bNodeExecData *UNUSED(execdata),
-                                           GPUNodeStack *in,
-                                           GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+class ChromaMatteGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const float acceptance = get_acceptance();
+    const float cutoff = get_cutoff();
+    const float falloff = get_falloff();
+
+    GPU_stack_link(material,
+                   &node(),
+                   "node_composite_chroma_matte",
+                   inputs,
+                   outputs,
+                   GPU_uniform(&acceptance),
+                   GPU_uniform(&cutoff),
+                   GPU_uniform(&falloff));
+  }
+
+  NodeChroma *get_node_chroma()
+  {
+    return static_cast<NodeChroma *>(node().storage);
+  }
+
+  float get_acceptance()
+  {
+    return std::tan(get_node_chroma()->t1) / 2.0f;
+  }
+
+  float get_cutoff()
+  {
+    return get_node_chroma()->t2;
+  }
+
+  float get_falloff()
+  {
+    return get_node_chroma()->fstrength;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
 {
-  const NodeChroma *data = (NodeChroma *)node->storage;
-
-  const float acceptance = std::tan(data->t1) / 2.0f;
-
-  return GPU_stack_link(mat,
-                        node,
-                        "node_composite_chroma_matte",
-                        in,
-                        out,
-                        GPU_uniform(&acceptance),
-                        GPU_uniform(&data->t2),
-                        GPU_uniform(&data->fstrength));
+  return new ChromaMatteGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_chroma_matte_cc
@@ -99,7 +136,7 @@ void register_node_type_cmp_chroma_matte()
   ntype.flag |= NODE_PREVIEW;
   node_type_init(&ntype, file_ns::node_composit_init_chroma_matte);
   node_type_storage(&ntype, "NodeChroma", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_chroma_matte);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

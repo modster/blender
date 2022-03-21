@@ -62,34 +62,6 @@ static void node_composit_buts_ellipsemask(uiLayout *layout, bContext *UNUSED(C)
   uiItemR(layout, ptr, "mask_type", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
-static int node_composite_gpu_ellipsemask(GPUMaterial *mat,
-                                          bNode *node,
-                                          bNodeExecData *UNUSED(execdata),
-                                          GPUNodeStack *in,
-                                          GPUNodeStack *out)
-{
-  const NodeEllipseMask *data = (NodeEllipseMask *)node->storage;
-
-  const float mask_type = (float)node->custom1;
-  const float cos_angle = std::cos(data->rotation);
-  const float sin_angle = std::sin(data->rotation);
-  const float half_width = data->width / 2.0;
-  const float half_height = data->height / 2.0;
-
-  return GPU_stack_link(mat,
-                        node,
-                        "node_composite_ellipse_mask",
-                        in,
-                        out,
-                        GPU_constant(&mask_type),
-                        GPU_uniform(&data->x),
-                        GPU_uniform(&data->y),
-                        GPU_uniform(&half_width),
-                        GPU_uniform(&half_height),
-                        GPU_uniform(&cos_angle),
-                        GPU_uniform(&sin_angle));
-}
-
 }  // namespace blender::nodes::node_composite_ellipsemask_cc
 
 void register_node_type_cmp_ellipsemask()
@@ -105,7 +77,6 @@ void register_node_type_cmp_ellipsemask()
   node_type_init(&ntype, file_ns::node_composit_init_ellipsemask);
   node_type_storage(
       &ntype, "NodeEllipseMask", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_ellipsemask);
 
   nodeRegisterType(&ntype);
 }

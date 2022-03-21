@@ -26,6 +26,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 /* ******************* Color Correction ********************************* */
@@ -284,47 +288,71 @@ static void node_composit_buts_colorcorrection_ex(uiLayout *layout,
   uiItemR(row, ptr, "midtones_end", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
-static int node_composite_gpu_colorcorrection(GPUMaterial *mat,
-                                              bNode *node,
-                                              bNodeExecData *UNUSED(execdata),
-                                              GPUNodeStack *in,
-                                              GPUNodeStack *out)
-{
-  NodeColorCorrection *n = (NodeColorCorrection *)node->storage;
+using namespace blender::viewport_compositor;
 
-  float enabled_channels[3];
-  for (int i = 0; i < 3; i++) {
-    enabled_channels[i] = (node->custom1 & (1 << i)) ? 1.0f : 0.0f;
+class ColorCorrectionGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    float enabled_channels[3];
+    get_enabled_channels(enabled_channels);
+    float luminance_coefficients[3];
+    IMB_colormanagement_get_luminance_coefficients(luminance_coefficients);
+
+    const NodeColorCorrection *node_color_correction = get_node_color_correction();
+
+    GPU_stack_link(material,
+                   &node(),
+                   "node_composite_color_correction",
+                   inputs,
+                   outputs,
+                   GPU_constant(enabled_channels),
+                   GPU_uniform(&node_color_correction->startmidtones),
+                   GPU_uniform(&node_color_correction->endmidtones),
+                   GPU_uniform(&node_color_correction->master.saturation),
+                   GPU_uniform(&node_color_correction->master.contrast),
+                   GPU_uniform(&node_color_correction->master.gamma),
+                   GPU_uniform(&node_color_correction->master.gain),
+                   GPU_uniform(&node_color_correction->master.lift),
+                   GPU_uniform(&node_color_correction->shadows.saturation),
+                   GPU_uniform(&node_color_correction->shadows.contrast),
+                   GPU_uniform(&node_color_correction->shadows.gamma),
+                   GPU_uniform(&node_color_correction->shadows.gain),
+                   GPU_uniform(&node_color_correction->shadows.lift),
+                   GPU_uniform(&node_color_correction->midtones.saturation),
+                   GPU_uniform(&node_color_correction->midtones.contrast),
+                   GPU_uniform(&node_color_correction->midtones.gamma),
+                   GPU_uniform(&node_color_correction->midtones.gain),
+                   GPU_uniform(&node_color_correction->midtones.lift),
+                   GPU_uniform(&node_color_correction->highlights.saturation),
+                   GPU_uniform(&node_color_correction->highlights.contrast),
+                   GPU_uniform(&node_color_correction->highlights.gamma),
+                   GPU_uniform(&node_color_correction->highlights.gain),
+                   GPU_uniform(&node_color_correction->highlights.lift),
+                   GPU_constant(luminance_coefficients));
   }
 
-  return GPU_stack_link(mat,
-                        node,
-                        "node_composite_color_correction",
-                        in,
-                        out,
-                        GPU_constant(enabled_channels),
-                        GPU_uniform(&n->startmidtones),
-                        GPU_uniform(&n->endmidtones),
-                        GPU_uniform(&n->master.saturation),
-                        GPU_uniform(&n->master.contrast),
-                        GPU_uniform(&n->master.gamma),
-                        GPU_uniform(&n->master.gain),
-                        GPU_uniform(&n->master.lift),
-                        GPU_uniform(&n->shadows.saturation),
-                        GPU_uniform(&n->shadows.contrast),
-                        GPU_uniform(&n->shadows.gamma),
-                        GPU_uniform(&n->shadows.gain),
-                        GPU_uniform(&n->shadows.lift),
-                        GPU_uniform(&n->midtones.saturation),
-                        GPU_uniform(&n->midtones.contrast),
-                        GPU_uniform(&n->midtones.gamma),
-                        GPU_uniform(&n->midtones.gain),
-                        GPU_uniform(&n->midtones.lift),
-                        GPU_uniform(&n->highlights.saturation),
-                        GPU_uniform(&n->highlights.contrast),
-                        GPU_uniform(&n->highlights.gamma),
-                        GPU_uniform(&n->highlights.gain),
-                        GPU_uniform(&n->highlights.lift));
+  void get_enabled_channels(float enabled_channels[3])
+  {
+    for (int i = 0; i < 3; i++) {
+      enabled_channels[i] = (node().custom1 & (1 << i)) ? 1.0f : 0.0f;
+    }
+  }
+
+  NodeColorCorrection *get_node_color_correction()
+  {
+    return static_cast<NodeColorCorrection *>(node().storage);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new ColorCorrectionGPUMaterialNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_colorcorrection_cc
@@ -343,7 +371,7 @@ void register_node_type_cmp_colorcorrection()
   node_type_init(&ntype, file_ns::node_composit_init_colorcorrection);
   node_type_storage(
       &ntype, "NodeColorCorrection", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_colorcorrection);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

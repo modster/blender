@@ -76,6 +76,7 @@ typedef enum eGPUType {
   GPU_TEX2D = 1002,
   GPU_TEX2D_ARRAY = 1003,
   GPU_TEX3D = 1004,
+  GPU_IMAGE_2D = 1005,
 
   /* GLSL Struct types */
   GPU_CLOSURE = 1007,
@@ -136,6 +137,7 @@ typedef struct GPUCodegenOutput {
   char *surface;
   char *volume;
   char *thickness;
+  char *compute;
 
   GPUShaderCreateInfo *create_info;
 } GPUCodegenOutput;
@@ -146,6 +148,7 @@ GPUNodeLink *GPU_constant(const float *num);
 GPUNodeLink *GPU_uniform(const float *num);
 GPUNodeLink *GPU_attribute(GPUMaterial *mat, CustomDataType type, const char *name);
 GPUNodeLink *GPU_uniform_attribute(GPUMaterial *mat, const char *name, bool use_dupli);
+GPUNodeLink *GPU_texture(GPUMaterial *material, eGPUSamplerState sampler_state);
 GPUNodeLink *GPU_image(GPUMaterial *mat,
                        struct Image *ima,
                        struct ImageUser *iuser,
@@ -159,10 +162,7 @@ GPUNodeLink *GPU_color_band(GPUMaterial *mat, int size, float *pixels, float *ro
 GPUNodeLink *GPU_volume_grid(GPUMaterial *mat,
                              const char *name,
                              eGPUVolumeDefaultValue default_value);
-GPUNodeLink *GPU_render_pass(GPUMaterial *mat,
-                             struct Scene *scene,
-                             int view_layer,
-                             eScenePassType pass_type);
+GPUNodeLink *GPU_image_texture(GPUMaterial *material, eGPUTextureFormat format);
 
 bool GPU_link(GPUMaterial *mat, const char *name, ...);
 bool GPU_stack_link(GPUMaterial *mat,
@@ -220,6 +220,7 @@ GPUMaterial *GPU_material_from_nodetree(struct Scene *scene,
                                         void *thunk);
 
 void GPU_material_compile(GPUMaterial *mat);
+void GPU_material_free_single(GPUMaterial *material);
 void GPU_material_free(struct ListBase *gpumaterial);
 
 void GPU_materials_free(struct Main *bmain);
@@ -236,6 +237,9 @@ struct Material *GPU_material_get_material(GPUMaterial *material);
  */
 eGPUMaterialStatus GPU_material_status(GPUMaterial *mat);
 void GPU_material_status_set(GPUMaterial *mat, eGPUMaterialStatus status);
+
+bool GPU_material_is_compute(GPUMaterial *material);
+void GPU_material_is_compute_set(GPUMaterial *material, bool is_compute);
 
 struct GPUUniformBuf *GPU_material_uniform_buffer_get(GPUMaterial *material);
 /**
@@ -289,22 +293,20 @@ typedef struct GPUMaterialVolumeGrid {
   int users;
 } GPUMaterialVolumeGrid;
 
-/* NOTE(fclem): Not to be confused with actual rendering passes.
- * This is a reference to texture input which is the result of a rendering pass. */
-typedef struct GPUMaterialRenderPass {
-  struct GPUMaterialRenderPass *next, *prev;
-  struct Scene *scene;
-  int viewlayer;
-  eScenePassType pass_type;
-  char sampler_name[32]; /* Name of sampler in GLSL. */
-  int users;
-  eGPUSamplerState sampler_state;
-} GPUMaterialRenderPass;
+/* A reference to a write only 2D image of a specific format. */
+typedef struct GPUMaterialImage {
+  struct GPUMaterialImage *next, *prev;
+  eGPUTextureFormat format;
+  char name_in_shader[32];
+} GPUMaterialImage;
 
 ListBase GPU_material_attributes(GPUMaterial *material);
 ListBase GPU_material_textures(GPUMaterial *material);
 ListBase GPU_material_volume_grids(GPUMaterial *material);
-ListBase GPU_material_render_passes(GPUMaterial *material);
+ListBase GPU_material_images(GPUMaterial *material);
+
+GPUMaterialTexture *GPU_material_get_link_texture(GPUNodeLink *link);
+GPUMaterialImage *GPU_material_get_link_image(GPUNodeLink *link);
 
 typedef struct GPUUniformAttr {
   struct GPUUniformAttr *next, *prev;
@@ -330,6 +332,19 @@ GPUUniformAttrList *GPU_material_uniform_attributes(GPUMaterial *material);
 struct GHash *GPU_uniform_attr_list_hash_new(const char *info);
 void GPU_uniform_attr_list_copy(GPUUniformAttrList *dest, GPUUniformAttrList *src);
 void GPU_uniform_attr_list_free(GPUUniformAttrList *set);
+
+typedef void (*GPUMaterialSetupFn)(void *thunk, GPUMaterial *material);
+typedef void (*GPUMaterialCompileFn)(void *thunk, GPUMaterial *material);
+
+/* Construct and immediately compile a GPU material from a set of callbacks. The setup callback
+ * should set the appropriate flags or members to the material. The compile callback should
+ * construct the material graph by adding and linking the necessary GPU material graph nodes. The
+ * generate function should construct the needed shader by initializing the passed shader create
+ * info structure. The given thunk will be passed as the first parameter of each callback. */
+GPUMaterial *GPU_material_from_callbacks(GPUMaterialSetupFn setup_function,
+                                         GPUMaterialCompileFn compile_function,
+                                         GPUCodegenCallbackFn generate_function,
+                                         void *thunk);
 
 #ifdef __cplusplus
 }

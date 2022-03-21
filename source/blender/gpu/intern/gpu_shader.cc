@@ -277,7 +277,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
   GPU_debug_group_begin(GPU_DEBUG_SHADER_COMPILATION_GROUP);
 
   /* At least a vertex shader and a fragment shader are required, or only a compute shader. */
-  if (info.compute_source_.is_empty()) {
+  if (info.compute_source_.is_empty() && info.compute_source_generated.empty()) {
     if (info.vertex_source_.is_empty()) {
       printf("Missing vertex shader in %s.\n", info.name_.c_str());
     }
@@ -378,8 +378,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     shader->geometry_shader_from_glsl(sources);
   }
 
-  if (!info.compute_source_.is_empty()) {
-    auto code = gpu_shader_dependency_get_resolved_source(info.compute_source_);
+  if (!info.compute_source_.is_empty() || !info.compute_source_generated.empty()) {
     std::string layout = shader->compute_layout_declare(info);
 
     Vector<const char *> sources;
@@ -389,7 +388,11 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     sources.extend(typedefs);
     sources.append(resources.c_str());
     sources.append(layout.c_str());
-    sources.extend(code);
+    if (!info.compute_source_.is_empty()) {
+      sources.extend(gpu_shader_dependency_get_resolved_source(info.compute_source_));
+    }
+    sources.extend(info.dependencies_generated);
+    sources.append(info.compute_source_generated.c_str());
 
     shader->compute_shader_from_glsl(sources);
   }
