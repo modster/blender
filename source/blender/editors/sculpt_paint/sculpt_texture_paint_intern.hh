@@ -5,7 +5,6 @@ namespace blender::ed::sculpt_paint::texture_paint {
 struct Polygon {
 };
 
-#if 0
 /* Stores a barycentric coordinate in a float2. */
 struct EncodedBarycentricCoord {
   float2 encoded;
@@ -21,35 +20,6 @@ struct EncodedBarycentricCoord {
     return float3(encoded.x, encoded.y, 1.0 - encoded.x - encoded.y);
   }
 };
-#else
-/* Alternative approach. Half the memory footprint. */
-struct EncodedBarycentricCoord {
-  ushort2 encoded;
-
-  EncodedBarycentricCoord &operator=(const float3 decoded)
-  {
-    encoded = ushort2(encode(decoded.x), encode(decoded.y));
-    return *this;
-  }
-
-  float3 decode() const
-  {
-    float2 decoded(decode(encoded.x), decode(encoded.y));
-    return float3(decoded.x, decoded.y, 1.0f - decoded.x - decoded.y);
-  }
-
-  static uint16_t encode(float value)
-  {
-    float clamped = clamp_f(value, 0.0f, 1.0f);
-    return (uint16_t)clamped * 65535.0;
-  }
-
-  static float decode(uint16_t value)
-  {
-    return value / 65535.0f;
-  }
-};
-#endif
 
 /**
  * Loop incides. Only stores 2 indices, the third one is always `loop_indices[1] + 1`.
@@ -76,27 +46,32 @@ struct Triangle {
   float automasking_factor;
 };
 
+struct TrianglePaintInput {
+  int3 vert_indices;
+  float3 add_barycentric_coord_x;
+  float automasking_factor;
+
+  TrianglePaintInput(const Triangle &triangle)
+      : vert_indices(triangle.vert_indices),
+        add_barycentric_coord_x(triangle.add_barycentric_coord_x),
+        automasking_factor(triangle.automasking_factor)
+  {
+  }
+};
+
 struct Triangles {
+  Vector<TrianglePaintInput> paint_input;
   Vector<EncodedLoopIndices> loop_indices;
-  Vector<int3> vert_indices;
   Vector<int> poly_indices;
-  Vector<float3> add_barycentric_coords_x;
-  Vector<float> automasking_factors;
 
  public:
-  void append(Triangle &triangle)
+  void append(const Triangle &triangle)
   {
+    paint_input.append(TrianglePaintInput(triangle));
     loop_indices.append(triangle.loop_indices);
-    vert_indices.append(triangle.vert_indices);
     poly_indices.append(triangle.poly_index);
-    add_barycentric_coords_x.append(float3(0.0f));
-    automasking_factors.append(0.0);
   }
 
-  int3 get_vert_indices(const int index) const
-  {
-    return vert_indices[index];
-  }
   int3 get_loop_indices(const int index) const
   {
     return loop_indices[index].decode();
@@ -106,22 +81,19 @@ struct Triangles {
     return poly_indices[index];
   }
 
-  void set_add_barycentric_coord_x(const int index, const float3 add_barycentric_coord_x)
+  TrianglePaintInput &get_paint_input(const int index)
   {
-    add_barycentric_coords_x[index] = add_barycentric_coord_x;
+    return paint_input[index];
   }
-  float3 get_add_barycentric_coord_x(const int index) const
+
+  const TrianglePaintInput &get_paint_input(const int index) const
   {
-    return add_barycentric_coords_x[index];
+    return paint_input[index];
   }
 
   void set_automasking_factor(const int index, const float automasking_factor)
   {
-    automasking_factors[index] = automasking_factor;
-  }
-  float get_automasking_factor(const int index) const
-  {
-    return automasking_factors[index];
+    get_paint_input(index).automasking_factor = automasking_factor;
   }
 
   void cleanup_after_init()
@@ -129,15 +101,15 @@ struct Triangles {
     loop_indices.clear();
   }
 
-  uint64_t size()
+  uint64_t size() const
   {
-    return vert_indices.size();
+    return paint_input.size();
   }
-  uint64_t mem_size()
+
+  uint64_t mem_size() const
   {
-    return loop_indices.size() * sizeof(EncodedLoopIndices) + vert_indices.size() * sizeof(int3) +
-           poly_indices.size() * sizeof(int) + add_barycentric_coords_x.size() * sizeof(float3) +
-           automasking_factors.size() * sizeof(float);
+    return loop_indices.size() * sizeof(EncodedLoopIndices) +
+           paint_input.size() * sizeof(TrianglePaintInput) + poly_indices.size() * sizeof(int);
   }
 };
 

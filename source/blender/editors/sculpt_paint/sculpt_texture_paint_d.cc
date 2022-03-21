@@ -148,8 +148,9 @@ template<typename ImagePixelAccessor> class PaintingKernel {
       init_brush_color(image_buffer);
     }
     image_accessor.set_image_position(image_buffer, encoded_pixels.start_image_coordinate);
-    Pixel pixel = get_start_pixel(triangles, encoded_pixels);
-    const Pixel add_pixel = get_delta_pixel(triangles, encoded_pixels, pixel);
+    const TrianglePaintInput triangle = triangles.get_paint_input(encoded_pixels.triangle_index);
+    Pixel pixel = get_start_pixel(triangle, encoded_pixels);
+    const Pixel add_pixel = get_delta_pixel(triangle, encoded_pixels, pixel);
     bool pixels_painted = false;
     for (int x = 0; x < encoded_pixels.num_pixels; x++) {
       if (!brush_test_fn(&test, pixel.pos)) {
@@ -170,7 +171,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
           normal,
           face_normal,
           mask,
-          triangles.get_automasking_factor(encoded_pixels.triangle_index),
+          triangle.automasking_factor,
           thread_id);
 
       blend_color_interpolate_float(color, color, brush_color, falloff_strength * brush_strength);
@@ -213,31 +214,27 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   }
 
   /** Extract the staring pixel from the given encoded_pixels belonging to the triangle. */
-  Pixel get_start_pixel(const Triangles &triangles, const PixelsPackage &encoded_pixels) const
+  Pixel get_start_pixel(const TrianglePaintInput &triangle,
+                        const PixelsPackage &encoded_pixels) const
   {
-    return init_pixel(
-        triangles, encoded_pixels.triangle_index, encoded_pixels.start_barycentric_coord.decode());
+    return init_pixel(triangle, encoded_pixels.start_barycentric_coord.decode());
   }
 
   /**
    * Extract the delta pixel that will be used to advance a Pixel instance to the next pixel. */
-  Pixel get_delta_pixel(const Triangles &triangles,
+  Pixel get_delta_pixel(const TrianglePaintInput &triangle,
                         const PixelsPackage &encoded_pixels,
                         const Pixel &start_pixel) const
   {
-    Pixel result = init_pixel(
-        triangles,
-        encoded_pixels.triangle_index,
-        encoded_pixels.start_barycentric_coord.decode() +
-            triangles.get_add_barycentric_coord_x(encoded_pixels.triangle_index));
+    Pixel result = init_pixel(triangle,
+                              encoded_pixels.start_barycentric_coord.decode() +
+                                  triangle.add_barycentric_coord_x);
     return result - start_pixel;
   }
 
-  Pixel init_pixel(const Triangles &triangles,
-                   const int triangle_index,
-                   const float3 weights) const
+  Pixel init_pixel(const TrianglePaintInput &triangle, const float3 weights) const
   {
-    int3 vert_indices = triangles.get_vert_indices(triangle_index);
+    const int3 &vert_indices = triangle.vert_indices;
     Pixel result;
     interp_v3_v3v3v3(result.pos,
                      mvert[vert_indices[0]].co,
@@ -291,7 +288,8 @@ static void do_task_cb_ex(void *__restrict userdata,
 
   Triangles &triangles = node_data->triangles;
   for (int triangle_index = 0; triangle_index < triangles.size(); triangle_index++) {
-    int3 vert_indices = triangles.get_vert_indices(triangle_index);
+    TrianglePaintInput &triangle = triangles.get_paint_input(triangle_index);
+    int3 &vert_indices = triangle.vert_indices;
     for (int i = 0; i < 3; i++) {
       triangle_brush_test_results[triangle_index] = triangle_brush_test_results[triangle_index] ||
                                                     data->vertex_brush_tests[vert_indices[i]];

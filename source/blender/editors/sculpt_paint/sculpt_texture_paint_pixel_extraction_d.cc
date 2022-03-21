@@ -64,7 +64,7 @@ static bool has_been_visited(std::vector<bool> &visited_polygons, const int poly
 
 static void extract_barycentric_pixels(TileData &tile_data,
                                        const ImBuf *image_buffer,
-                                       Triangles &triangles,
+                                       TrianglePaintInput &triangle,
                                        const int triangle_index,
                                        const float2 uvs[3],
                                        const int minx,
@@ -100,9 +100,8 @@ static void extract_barycentric_pixels(TileData &tile_data,
     }
     package.num_pixels = x - package.start_image_coordinate.x;
     if (package.num_pixels > best_num_pixels) {
-      triangles.set_add_barycentric_coord_x(
-          triangle_index,
-          (barycentric - package.start_barycentric_coord.decode()) / package.num_pixels);
+      triangle.add_barycentric_coord_x = (barycentric - package.start_barycentric_coord.decode()) /
+                                         package.num_pixels;
       best_num_pixels = package.num_pixels;
     }
     tile_data.encoded_pixels.append(package);
@@ -184,8 +183,9 @@ static void do_encode_pixels(void *__restrict userdata,
       const float maxu = clamp_f(max_fff(uvs[0].x, uvs[1].x, uvs[2].x), 0.0f, 1.0f);
       const int maxx = min_ii(ceil(maxu * image_buffer->x), image_buffer->x);
 
+      TrianglePaintInput &triangle = triangles.get_paint_input(triangle_index);
       extract_barycentric_pixels(
-          tile_data, image_buffer, triangles, triangle_index, uvs, minx, miny, maxx, maxy);
+          tile_data, image_buffer, triangle, triangle_index, uvs, minx, miny, maxx, maxy);
     }
 
     BKE_image_release_ibuf(image, image_buffer, nullptr);
