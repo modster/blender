@@ -17,60 +17,51 @@ IF(NOT USD_ROOT_DIR AND NOT $ENV{USD_ROOT_DIR} STREQUAL "")
   SET(USD_ROOT_DIR $ENV{USD_ROOT_DIR})
 ENDIF()
 
-find_package(pxr REQUIRED OFF)
+SET(_usd_SEARCH_DIRS
+  ${USD_ROOT_DIR}
+  /opt/lib/usd
+)
 
-if (NOT pxr_FOUND)
+FIND_PATH(USD_INCLUDE_DIR
+  NAMES
+    pxr/usd/usd/api.h
+  HINTS
+    ${_usd_SEARCH_DIRS}
+  PATH_SUFFIXES
+    include
+  DOC "Universal Scene Description (USD) header files"
+  NO_CMAKE_PATH
+)
 
-  SET(_usd_SEARCH_DIRS
-    ${USD_ROOT_DIR}
-    /opt/lib/usd
-  )
+FIND_LIBRARY(USD_LIBRARY
+  NAMES
+    usd_m usd_ms ${USD_LIBRARY_PREFIX}usd
+  NAMES_PER_DIR
+  HINTS
+    ${_usd_SEARCH_DIRS}
+  PATH_SUFFIXES
+    lib64 lib lib/static
+  DOC "Universal Scene Description (USD) library"
+)
 
-  FIND_PATH(USD_INCLUDE_DIR
-    NAMES
-      pxr/usd/usd/api.h
-    HINTS
-      ${_usd_SEARCH_DIRS}
-    PATH_SUFFIXES
-      include
-    DOC "Universal Scene Description (USD) header files"
-  )
-
-  FIND_LIBRARY(USD_LIBRARY
-    NAMES
-      usd_m usd_ms
-    NAMES_PER_DIR
-    HINTS
-      ${_usd_SEARCH_DIRS}
-    PATH_SUFFIXES
-      lib64 lib lib/static
-    DOC "Universal Scene Description (USD) monolithic library"
-  )
-
-  IF(${USD_LIBRARY_NOTFOUND})
-    set(USD_FOUND FALSE)
-  ELSE()
-    # handle the QUIETLY and REQUIRED arguments and set USD_FOUND to TRUE if
-    # all listed variables are TRUE
-    INCLUDE(FindPackageHandleStandardArgs)
-    FIND_PACKAGE_HANDLE_STANDARD_ARGS(USD DEFAULT_MSG USD_LIBRARY USD_INCLUDE_DIR)
-
-    IF(USD_FOUND)
-      get_filename_component(USD_LIBRARY_DIR ${USD_LIBRARY} DIRECTORY)
-      SET(USD_INCLUDE_DIRS ${USD_INCLUDE_DIR})
-      set(USD_LIBRARIES ${USD_LIBRARY})
-    ENDIF()
-  ENDIF()
-
-  UNSET(_usd_SEARCH_DIRS)
-
+IF(${USD_LIBRARY_NOTFOUND})
+  set(USD_FOUND FALSE)
 ELSE()
-    SET(USD_FOUND ON)
-    SET(USD_INCLUDE_DIR ${PXR_INCLUDE_DIRS})
-    SET(USD_LIBRARIES ${PXR_LIBRARIES})
+  # handle the QUIETLY and REQUIRED arguments and set USD_FOUND to TRUE if
+  # all listed variables are TRUE
+  INCLUDE(FindPackageHandleStandardArgs)
+  FIND_PACKAGE_HANDLE_STANDARD_ARGS(USD DEFAULT_MSG USD_LIBRARY USD_INCLUDE_DIR)
+
+  IF(USD_FOUND)
+    get_filename_component(USD_LIBRARY_DIR ${USD_LIBRARY} DIRECTORY)
+    SET(USD_INCLUDE_DIRS ${USD_INCLUDE_DIR})
+    set(USD_LIBRARIES ${USD_LIBRARY})
+  ENDIF()
 ENDIF()
 
 MARK_AS_ADVANCED(
   USD_INCLUDE_DIR
   USD_LIBRARY_DIR
 )
+
+UNSET(_usd_SEARCH_DIRS)

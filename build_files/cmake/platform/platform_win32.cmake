@@ -255,9 +255,6 @@ if(NOT DEFINED LIBDIR)
   elseif(MSVC_VERSION GREATER 1909)
     message(STATUS "Visual Studio 2017 detected.")
     set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/${LIBDIR_BASE}_vc15)
-  elseif(MSVC_VERSION EQUAL 1900)
-    message(STATUS "Visual Studio 2015 detected.")
-    set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/${LIBDIR_BASE}_vc15)
   endif()
 else()
   message(STATUS "Using pre-compiled LIBDIR: ${LIBDIR}")
@@ -306,8 +303,8 @@ set(ZLIB_INCLUDE_DIR ${LIBDIR}/zlib/include)
 set(ZLIB_LIBRARY ${LIBDIR}/zlib/lib/libz_st.lib)
 set(ZLIB_DIR ${LIBDIR}/zlib)
 
-windows_find_package(zlib) # we want to find before finding things that depend on it like png
-windows_find_package(png)
+windows_find_package(ZLIB) # we want to find before finding things that depend on it like png
+windows_find_package(PNG)
 
 if(NOT PNG_FOUND)
   warn_hardcoded_paths(libpng)
@@ -319,9 +316,9 @@ if(NOT PNG_FOUND)
 endif()
 
 set(JPEG_NAMES ${JPEG_NAMES} libjpeg)
-windows_find_package(jpeg REQUIRED)
+windows_find_package(JPEG REQUIRED)
 if(NOT JPEG_FOUND)
-  warn_hardcoded_paths(jpeg)
+  warn_hardcoded_paths(JPEG)
   set(JPEG_INCLUDE_DIR ${LIBDIR}/jpeg/include)
   set(JPEG_LIBRARIES ${LIBDIR}/jpeg/lib/libjpeg.lib)
 endif()
@@ -339,7 +336,7 @@ set(FREETYPE_LIBRARIES
   ${LIBDIR}/brotli/lib/brotlidec-static.lib
   ${LIBDIR}/brotli/lib/brotlicommon-static.lib
 )
-windows_find_package(freetype REQUIRED)
+windows_find_package(Freetype REQUIRED)
 
 if(WITH_FFTW3)
   set(FFTW3 ${LIBDIR}/fftw3)
@@ -395,9 +392,9 @@ if(WITH_CODEC_FFMPEG)
     ${LIBDIR}/ffmpeg/include
     ${LIBDIR}/ffmpeg/include/msvc
   )
-  windows_find_package(FFMPEG)
+  windows_find_package(FFmpeg)
   if(NOT FFMPEG_FOUND)
-    warn_hardcoded_paths(ffmpeg)
+    warn_hardcoded_paths(FFmpeg)
     set(FFMPEG_LIBRARIES
       ${LIBDIR}/ffmpeg/lib/avcodec.lib
       ${LIBDIR}/ffmpeg/lib/avformat.lib
@@ -409,7 +406,7 @@ if(WITH_CODEC_FFMPEG)
 endif()
 
 if(WITH_IMAGE_OPENEXR)
-  windows_find_package(OPENEXR REQUIRED)
+  windows_find_package(OpenEXR REQUIRED)
   if(NOT OPENEXR_FOUND)
     set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
     set(OPENEXR_VERSION "2.1")
@@ -468,17 +465,15 @@ if(WITH_PYTHON)
 endif()
 
 if(WITH_BOOST)
-  if(WITH_CYCLES_OSL)
+  if(WITH_CYCLES AND WITH_CYCLES_OSL)
     set(boost_extra_libs wave)
   endif()
-  if(WITH_BLENDER)
-    if(WITH_INTERNATIONAL)
-      list(APPEND boost_extra_libs locale)
-    endif()
-    set(Boost_USE_STATIC_RUNTIME ON) # prefix lib
-    set(Boost_USE_MULTITHREADED ON) # suffix -mt
-    set(Boost_USE_STATIC_LIBS ON) # suffix -s
+  if(WITH_INTERNATIONAL)
+    list(APPEND boost_extra_libs locale)
   endif()
+  set(Boost_USE_STATIC_RUNTIME ON) # prefix lib
+  set(Boost_USE_MULTITHREADED ON) # suffix -mt
+  set(Boost_USE_STATIC_LIBS ON) # suffix -s
   if(WITH_WINDOWS_FIND_MODULES)
     find_package(Boost COMPONENTS date_time filesystem thread regex system ${boost_extra_libs})
   endif()
@@ -513,7 +508,7 @@ if(WITH_BOOST)
       debug ${BOOST_LIBPATH}/libboost_thread-${BOOST_DEBUG_POSTFIX}
       debug ${BOOST_LIBPATH}/libboost_chrono-${BOOST_DEBUG_POSTFIX}
     )
-    if(WITH_CYCLES_OSL)
+    if(WITH_CYCLES AND WITH_CYCLES_OSL)
       set(BOOST_LIBRARIES ${BOOST_LIBRARIES}
         optimized ${BOOST_LIBPATH}/libboost_wave-${BOOST_POSTFIX}
         debug ${BOOST_LIBPATH}/libboost_wave-${BOOST_DEBUG_POSTFIX})
@@ -706,7 +701,7 @@ if(WITH_CODEC_SNDFILE)
   set(LIBSNDFILE_LIBRARIES ${LIBSNDFILE_LIBPATH}/libsndfile-1.lib)
 endif()
 
-if(WITH_CYCLES_OSL)
+if(WITH_CYCLES AND WITH_CYCLES_OSL)
   set(CYCLES_OSL ${LIBDIR}/osl CACHE PATH "Path to OpenShadingLanguage installation")
   set(OSL_SHADER_DIR ${CYCLES_OSL}/shaders)
   # Shaders have moved around a bit between OSL versions, check multiple locations
@@ -739,7 +734,7 @@ if(WITH_CYCLES_OSL)
   endif()
 endif()
 
-if(WITH_CYCLES_EMBREE)
+if(WITH_CYCLES AND WITH_CYCLES_EMBREE)
   windows_find_package(Embree)
   if(NOT EMBREE_FOUND)
     set(EMBREE_INCLUDE_DIRS ${LIBDIR}/embree/include)
@@ -767,21 +762,17 @@ if(WITH_CYCLES_EMBREE)
 endif()
 
 if(WITH_USD)
-  if(USD_INCLUDE_DIRS AND USD_LIBRARY_DIR)
+  windows_find_package(USD)
+  if(NOT USD_FOUND)
     set(USD_FOUND ON)
-  else()
-    windows_find_package(USD)
-    if(NOT USD_FOUND)
-      set(USD_FOUND ON)
-      set(USD_INCLUDE_DIRS ${LIBDIR}/usd/include)
-      set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/libusd_m.lib)
-      set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/libusd_m_d.lib)
-      set(USD_LIBRARY_DIR ${LIBDIR}/usd/lib)
-      set(USD_LIBRARIES
-        debug ${USD_DEBUG_LIB}
-        optimized ${USD_RELEASE_LIB}
-      )
-    endif()
+    set(USD_INCLUDE_DIRS ${LIBDIR}/usd/include)
+    set(USD_RELEASE_LIB ${LIBDIR}/usd/lib/libusd_m.lib)
+    set(USD_DEBUG_LIB ${LIBDIR}/usd/lib/libusd_m_d.lib)
+    set(USD_LIBRARY_DIR ${LIBDIR}/usd/lib)
+    set(USD_LIBRARIES
+      debug ${USD_DEBUG_LIB}
+      optimized ${USD_RELEASE_LIB}
+    )
   endif()
 endif()
 
