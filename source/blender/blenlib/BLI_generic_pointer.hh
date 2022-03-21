@@ -2,9 +2,9 @@
 
 #pragma once
 
-#include "FN_cpp_type.hh"
+#include "BLI_cpp_type.hh"
 
-namespace blender::fn {
+namespace blender {
 
 /**
  * A generic non-const pointer whose type is only known at runtime.
@@ -120,4 +120,4 @@ class GPointer {
   }
 };
 
-}  // namespace blender::fn
+}  // namespace blender

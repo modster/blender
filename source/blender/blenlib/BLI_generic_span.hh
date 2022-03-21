@@ -3,14 +3,13 @@
 #pragma once
 
 /** \file
- * \ingroup fn
+ * \ingroup bli
  */
 
+#include "BLI_cpp_type.hh"
 #include "BLI_span.hh"
 
-#include "FN_cpp_type.hh"
-
-namespace blender::fn {
+namespace blender {
 
 /**
  * A generic span. It behaves just like a blender::Span<T>, but the type is only known at run-time.
@@ -167,4 +166,4 @@ class GMutableSpan {
   }
 };
 
-}  // namespace blender::fn
+}  // namespace blender

@@ -3,28 +3,47 @@
 #pragma once
 
 /** \file
- * \ingroup fn
+ * \ingroup bli
  *
- * The `CPPType` class is the core of a runtime-type-system. It allows working with arbitrary C++
- * types in a generic way. An instance of `CPPType` wraps exactly one type like `int` or
- * `std::string`.
+ * The `CPPType` class allows working with arbitrary C++ types in a generic way. An instance of
+ * #CPPType wraps exactly one type like `int` or `std::string`.
+ *
+ * With #CPPType one can write generic data structures and algorithms. That is similar to what C++
+ * templates allow. The difference is that when using templates, the types have to be known at
+ * compile time and the code has to be instantiated multiple times. On the other hand, when using
+ * #CPPType, the data type only has to be known at run-time, and the code only has to be compiled
+ * once. Whether #CPPType or classic c++ templates should be used depends on the context:
+ * - If the data type is not known at run-time, #CPPType should be used.
+ * - If the data type is known to be one of a few, it depends on how performance sensitive the code
+ *   is.
+ *   - If it it's a small hot loop, a template can be used to optimize for every type (at the
+ *     cost of longer compile time, a larger binary and the complexity that comes from using
+ *     templates).
+ *   - If the code is not performance sensitive, it usually makes sense to use #CPPType instead.
+ * - Sometimes a combination can make sense. Optimized code can be be generated at compile-time for
+ *   some types, while there is a fallback code path using #CPPType for all other types.
+ *   #CPPType::to_static_type allows dispatching between both versions based on the type.
+ *
+ * Under some circumstances, #CPPType serves a similar role as #std::type_info. However, #CPPType
+ * has much more utility because it contains methods for actually working with instances of the
+ * type.
  *
  * Every type has a size and an alignment. Every function dealing with C++ types in a generic way,
- * has to make sure that alignment rules are followed. The methods provided by a CPPType instance
+ * has to make sure that alignment rules are followed. The methods provided by a #CPPType instance
  * will check for correct alignment as well.
  *
  * Every type has a name that is for debugging purposes only. It should not be used as identifier.
  *
- * To check if two instances of CPPType represent the same type, only their pointers have to be
- * compared. Any C++ type has at most one corresponding CPPType instance.
+ * To check if two instances of #CPPType represent the same type, only their pointers have to be
+ * compared. Any C++ type has at most one corresponding #CPPType instance.
  *
- * A CPPType instance comes with many methods that allow dealing with types in a generic way. Most
- * methods come in three variants. Using the construct-default methods as example:
- *  - default_construct(void *ptr):
+ * A #CPPType instance comes with many methods that allow dealing with types in a generic way. Most
+ * methods come in three variants. Using the default-construct methods as an example:
+ *  - `default_construct(void *ptr)`:
  *      Constructs a single instance of that type at the given pointer.
- *  - default_construct_n(void *ptr, int64_t n):
+ *  - `default_construct_n(void *ptr, int64_t n)`:
  *      Constructs n instances of that type in an array that starts at the given pointer.
- *  - default_construct_indices(void *ptr, IndexMask mask):
+ *  - `default_construct_indices(void *ptr, IndexMask mask)`:
  *      Constructs multiple instances of that type in an array that starts at the given pointer.
  *      Only the indices referenced by `mask` will by constructed.
  *
@@ -39,8 +58,9 @@
  * Concepts like inheritance are currently not captured by this system. This is not because it is
  * not possible, but because it was not necessary to add this complexity yet.
  *
- * One could also implement CPPType itself using virtual inheritance. However, I found the approach
- * used now with explicit function pointers to work better. Here are some reasons:
+ * One could also implement CPPType itself using virtual methods and a child class for every
+ * wrapped type. However, the approach used now with explicit function pointers to works better.
+ * Here are some reasons:
  *  - If CPPType would be inherited once for every used C++ type, we would get a lot of classes
  *    that would only be instanced once each.
  *  - Methods like `default_construct` that operate on a single instance have to be fast. Even this
@@ -52,6 +72,7 @@
 
 #include "BLI_hash.hh"
 #include "BLI_index_mask.hh"
+#include "BLI_map.hh"
 #include "BLI_math_base.h"
 #include "BLI_string_ref.hh"
 #include "BLI_utility_mixins.hh"
@@ -71,7 +92,7 @@ enum class CPPTypeFlags {
 };
 ENUM_OPERATORS(CPPTypeFlags, CPPTypeFlags::EqualityComparable)
 
-namespace blender::fn {
+namespace blender {
 
 /** Utility class to pass template parameters to constructor of `CPPType`. */
 template<typename T, CPPTypeFlags Flags> struct CPPTypeParam {
@@ -142,7 +163,7 @@ class CPPType : NonCopyable, NonMovable {
   /**
    * Get the `CPPType` that corresponds to a specific static type.
    * This only works for types that actually implement the template specialization using
-   * `MAKE_CPP_TYPE`.
+   * `BLI_CPP_TYPE_MAKE`.
    */
   template<typename T> static const CPPType &get()
   {
@@ -624,9 +645,80 @@ class CPPType : NonCopyable, NonMovable {
   {
     return this == &CPPType::get<std::decay_t<T>>();
   }
+
+  /**
+   * Convert a #CPPType that is only known at run-time, to a static type that is known at
+   * compile-time. This allows the compiler to optimize a function for specific types, while all
+   * other types can still use a generic fallback function.
+   *
+   * \param Types The types that code should be generated for.
+   * \param fn The function object to call. This is expected to have a templated `operator()` and a
+   *   non-templated `operator()`. The templated version will be called if the current #CPPType
+   *   matches any of the given types. Otherwise, the non-templated function is called.
+   */
+  template<typename... Types, typename Fn> void to_static_type(const Fn &fn) const
+  {
+    using Callback = void (*)(const Fn &fn);
+
+    /* Build a lookup table to avoid having to compare the current #CPPType with every type in
+     * #Types one after another. */
+    static const Map<const CPPType *, Callback> callback_map = []() {
+      Map<const CPPType *, Callback> callback_map;
+      /* This adds an entry in the map for every type in #Types. */
+      (callback_map.add_new(&CPPType::get<Types>(),
+                            [](const Fn &fn) {
+                              /* Call the templated `operator()` of the given function object. */
+                              fn.template operator()<Types>();
+                            }),
+       ...);
+      return callback_map;
+    }();
+
+    const Callback callback = callback_map.lookup_default(this, nullptr);
+    if (callback != nullptr) {
+      callback(fn);
+    }
+    else {
+      /* Call the non-templated `operator()` of the given function object. */
+      fn();
+    }
+  }
+
+  template<typename T> struct type_tag {
+    using type = T;
+  };
+
+ private:
+  template<typename Fn> struct TypeTagExecutor {
+    const Fn &fn;
+
+    template<typename T> void operator()() const
+    {
+      fn(type_tag<T>{});
+    }
+
+    void operator()() const
+    {
+      fn(type_tag<void>{});
+    }
+  };
+
+ public:
+  /**
+   * Similar to #to_static_type but is easier to use with a lambda function. The function is
+   * expected to take a single `auto type_tag` parameter. To extract the static type, use:
+   * `using T = typename decltype(type_tag)::type;`
+   *
+   * If the current #CPPType is not in #Types, the type tag is `void`.
+   */
+  template<typename... Types, typename Fn> void to_static_type_tag(const Fn &fn) const
+  {
+    TypeTagExecutor<Fn> executor{fn};
+    this->to_static_type<Types...>(executor);
+  }
 };
 
-}  // namespace blender::fn
+}  // namespace blender
 
 /* Utility for allocating an uninitialized buffer for a single value of the given #CPPType. */
 #define BUFFER_FOR_CPP_TYPE_VALUE(type, variable_name) \
