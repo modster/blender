@@ -2325,33 +2325,27 @@ static float brush_strength(const Sculpt *sd,
   }
 }
 
-float SCULPT_brush_strength_factor_custom_automask(SculptSession *ss,
-                                                   const Brush *br,
-                                                   const float brush_point[3],
-                                                   const float len,
-                                                   const float vno[3],
-                                                   const float fno[3],
-                                                   const float mask,
-                                                   const float automask_factor,
-                                                   const int thread_id)
+float SCULPT_brush_texture_eval(SculptSession *ss,
+                                const Brush *brush,
+                                const MTex *mtex,
+                                const float brush_point[3],
+                                const int thread_id,
+                                float r_rgba[4])
 {
   StrokeCache *cache = ss->cache;
   const Scene *scene = cache->vc->scene;
-  const MTex *mtex = &br->mtex;
-  float avg = 1.0f;
-  float rgba[4];
   float point[3];
-
   sub_v3_v3v3(point, brush_point, cache->plane_offset);
 
   if (!mtex->tex) {
-    avg = 1.0f;
+    return 1.0f;
   }
   else if (mtex->brush_map_mode == MTEX_MAP_MODE_3D) {
     /* Get strength by feeding the vertex location directly into a texture. */
-    avg = BKE_brush_sample_tex_3d(scene, br, point, rgba, 0, ss->tex_pool);
+    return BKE_brush_sample_tex_3d(scene, brush, point, r_rgba, 0, ss->tex_pool);
   }
   else if (ss->texcache) {
+    float avg;
     float symm_point[3], point_2d[2];
     /* Quite warnings. */
     float x = 0.0f, y = 0.0f;
@@ -2378,21 +2372,41 @@ float SCULPT_brush_strength_factor_custom_automask(SculptSession *ss,
       x = symm_point[0];
       y = symm_point[1];
 
-      x *= br->mtex.size[0];
-      y *= br->mtex.size[1];
+      x *= mtex->size[0];
+      y *= mtex->size[1];
 
-      x += br->mtex.ofs[0];
-      y += br->mtex.ofs[1];
+      x += mtex->ofs[0];
+      y += mtex->ofs[1];
 
-      avg = paint_get_tex_pixel(&br->mtex, x, y, ss->tex_pool, thread_id);
+      avg = paint_get_tex_pixel(mtex, x, y, ss->tex_pool, thread_id);
 
-      avg += br->texture_sample_bias;
+      avg += brush->texture_sample_bias;
+      return avg;
     }
     else {
       const float point_3d[3] = {point_2d[0], point_2d[1], 0.0f};
-      avg = BKE_brush_sample_tex_3d(scene, br, point_3d, rgba, 0, ss->tex_pool);
+      return BKE_brush_sample_tex_3d(scene, brush, point_3d, r_rgba, 0, ss->tex_pool);
     }
   }
+  return 1.0f;
+}
+
+float SCULPT_brush_strength_factor_custom_automask(SculptSession *ss,
+                                                   const Brush *br,
+                                                   const float brush_point[3],
+                                                   const float len,
+                                                   const float vno[3],
+                                                   const float fno[3],
+                                                   const float mask,
+                                                   const float automask_factor,
+                                                   const int thread_id)
+{
+  StrokeCache *cache = ss->cache;
+  const MTex *mtex = &br->mtex;
+  float avg = 1.0f;
+  float rgba[4];
+
+  avg = SCULPT_brush_texture_eval(ss, br, mtex, brush_point, thread_id, rgba);
 
   /* Hardness. */
   float final_len = len;

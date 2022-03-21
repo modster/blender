@@ -1124,6 +1124,12 @@ const float *SCULPT_brush_frontface_normal_from_falloff_shape(SculptSession *ss,
 /**
  * Return a multiplier for brush strength on a particular vertex.
  */
+float SCULPT_brush_texture_eval(SculptSession *ss,
+                                const Brush *brush,
+                                const MTex *mtex,
+                                const float brush_point[3],
+                                const int thread_id,
+                                float r_rgba[4]);
 float SCULPT_brush_strength_factor(struct SculptSession *ss,
                                    const struct Brush *br,
                                    const float point[3],
