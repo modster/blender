@@ -29,6 +29,7 @@
 #include "BLI_vector.hh"
 
 #include "IMB_colormanagement.h"
+#include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf_wrappers.hh"
 
@@ -173,8 +174,11 @@ template<typename ImagePixelAccessor> class PaintingKernel {
           mask,
           triangle.automasking_factor,
           thread_id);
-
-      blend_color_interpolate_float(color, color, brush_color, falloff_strength * brush_strength);
+      float4 paint_color = brush_color * falloff_strength * brush_strength;
+      float4 buffer_color;
+      blend_color_mix_float(buffer_color, color, paint_color);
+      buffer_color *= brush->alpha;
+      IMB_blend_color_float(color, color, buffer_color, static_cast<IMB_BlendMode>(brush->blend));
       image_accessor.store_pixel(image_buffer, color);
       pixels_painted = true;
 
