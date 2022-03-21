@@ -50,6 +50,8 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
   }
   vert_gen << vert;
   info.vertex_source_generated = vert_gen.str();
+  /* Everything is in generated source. */
+  info.vertex_source("eevee_empty.glsl");
 
   {
     frag_gen << frag;
@@ -66,14 +68,18 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
     frag_gen << "}\n\n";
 
     info.fragment_source_generated = frag_gen.str();
+    /* Everything is in generated source. */
+    info.fragment_source("eevee_empty.glsl");
   }
 
   if (geom) {
     // info.geometry_source_generated = blender::StringRefNull(geom);
+    /* Everything is in generated source. */
+    info.geometry_source("eevee_empty.glsl");
   }
 
   if (defines) {
-    info.typedef_source_generated = blender::StringRefNull(defines);
+    info.typedef_source_generated += blender::StringRefNull(defines);
   }
 
   info.additional_info("draw_view");
