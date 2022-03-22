@@ -47,7 +47,7 @@ class TreeElementOverridesItem : public AbstractTreeElement {
 };
 
 class TreeElementOverridesProperty final : public TreeElementOverridesItem {
-  IDOverrideLibraryProperty &override_prop_;
+  [[maybe_unused]] IDOverrideLibraryProperty &override_prop_;
 
  public:
   PointerRNA override_rna_ptr;
