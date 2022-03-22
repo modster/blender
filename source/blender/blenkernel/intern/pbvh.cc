@@ -54,6 +54,8 @@ struct MLoopColHelper {
     float temp[4];
 
     linearrgb_to_srgb_v3_v3(temp, color);
+    temp[3] = color[3];
+
     rgba_float_to_uchar(reinterpret_cast<unsigned char *>(col), temp);
   }
 };
@@ -134,7 +136,8 @@ static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
       const MPoly *mp = pbvh->mpoly + melem->indices[i];
       const MLoop *ml = pbvh->mloop + mp->loopstart;
 
-      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + mp->loopstart;
+      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) +
+                                      mp->loopstart;
 
       for (int j = 0; j < mp->totloop; j++, col++, ml++) {
         if (ml->v == vertex) {
@@ -152,7 +155,8 @@ static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
     }
   }
   else {
-    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + vertex;
+    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) +
+                                    vertex;
     Helper::toFloat(col, r_color);
   }
 }
@@ -177,7 +181,8 @@ static void pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
       const MPoly *mp = pbvh->mpoly + melem->indices[i];
       const MLoop *ml = pbvh->mloop + mp->loopstart;
 
-      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + mp->loopstart;
+      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) +
+                                      mp->loopstart;
 
       for (int j = 0; j < mp->totloop; j++, col++, ml++) {
         if (ml->v == vertex) {
@@ -187,7 +192,8 @@ static void pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
     }
   }
   else {
-    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) + vertex;
+    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) +
+                                    vertex;
     Setter::setFloat(col, color);
   }
 }
