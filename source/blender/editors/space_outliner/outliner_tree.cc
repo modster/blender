@@ -75,8 +75,9 @@ using namespace blender::ed::outliner;
 /* prototypes */
 static int outliner_exclude_filter_get(const SpaceOutliner *space_outliner);
 
-/* ********************************************************* */
-/* Persistent Data */
+/* -------------------------------------------------------------------- */
+/** \name Persistent Data
+ * \{ */
 
 static void outliner_storage_cleanup(SpaceOutliner *space_outliner)
 {
@@ -176,8 +177,11 @@ static void check_persistent(
   BKE_outliner_treehash_add_element(space_outliner->runtime->treehash, tselem);
 }
 
-/* ********************************************************* */
-/* Tree Management */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Tree Management
+ * \{ */
 
 void outliner_free_tree(ListBase *tree)
 {
@@ -976,10 +980,14 @@ TreeElement *outliner_add_collection_recursive(SpaceOutliner *space_outliner,
   return ten;
 }
 
+/** \} */
+
 /* ======================================================= */
 /* Generic Tree Building helpers - order these are called is top to bottom */
 
-/* Sorting ------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
+/** \name Tree Sorting Helper
+ * \{ */
 
 struct tTreeSort {
   TreeElement *te;
@@ -1211,7 +1219,11 @@ static void outliner_collections_children_sort(ListBase *lb)
   }
 }
 
-/* Filtering ----------------------------------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Tree Filtering Helper
+ * \{ */
 
 struct OutlinerTreeElementFocus {
   TreeStoreElem *tselem;
@@ -1660,8 +1672,11 @@ static void outliner_clear_newid_from_main(Main *bmain)
   FOREACH_MAIN_ID_END;
 }
 
-/* ======================================================= */
-/* Main Tree Building API */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Main Tree Building API
+ * \{ */
 
 void outliner_build_tree(Main *mainvar,
                          Scene *scene,
@@ -1723,3 +1738,5 @@ void outliner_build_tree(Main *mainvar,
    * as this expects valid IDs in this pointer, not random unknown data. */
   outliner_clear_newid_from_main(mainvar);
 }
+
+/** \} */

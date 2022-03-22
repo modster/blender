@@ -547,7 +547,7 @@ void outliner_collection_delete(struct bContext *C,
                                 struct Main *bmain,
                                 struct Scene *scene,
                                 struct ReportList *reports,
-                                bool hierarchy);
+                                bool do_hierarchy);
 
 void OUTLINER_OT_collection_new(struct wmOperatorType *ot);
 void OUTLINER_OT_collection_duplicate_linked(struct wmOperatorType *ot);
@@ -644,7 +644,8 @@ float outliner_right_columns_width(const struct SpaceOutliner *space_outliner);
  */
 TreeElement *outliner_find_element_with_flag(const ListBase *lb, short flag);
 /**
- * Find if element is visible in the outliner tree.
+ * Find if element is visible in the outliner tree, i.e. if all of its parents are expanded.
+ * Doesn't check if the item is in view-bounds, for that use #outliner_is_element_in_view().
  */
 bool outliner_is_element_visible(const TreeElement *te);
 /**

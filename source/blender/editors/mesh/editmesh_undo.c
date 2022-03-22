@@ -591,7 +591,8 @@ static void *undomesh_from_editmesh(UndoMesh *um, BMEditMesh *em, Key *key, Undo
     um->me.key = NULL;
   }
 
-  /* BM_mesh_validate(em->bm); */ /* for troubleshooting */
+  /* Uncomment for troubleshooting. */
+  // BM_mesh_validate(em->bm);
 
   BM_mesh_bm_to_me(
       NULL,
@@ -672,6 +673,7 @@ static void undomesh_to_editmesh(UndoMesh *um, Object *ob, BMEditMesh *em)
                      (&(struct BMeshFromMeshParams){
                          /* Handled with tessellation. */
                          .calc_face_normal = false,
+                         .calc_vert_normal = false,
                          .active_shapekey = um->shapenr,
                      }));
 

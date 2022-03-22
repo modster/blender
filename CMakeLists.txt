@@ -256,7 +256,7 @@ endif()
 
 if(UNIX AND NOT APPLE)
   option(WITH_SYSTEM_GLEW "Use GLEW OpenGL wrapper library provided by the operating system" OFF)
-  option(WITH_SYSTEM_GLEW "Use GLEW OpenGL wrapper library provided by the operating system" OFF)
+  option(WITH_SYSTEM_GLES "Use OpenGL ES library provided by the operating system"           ON)
   option(WITH_SYSTEM_FREETYPE "Use the freetype library provided by the operating system" OFF)
 else()
   # not an option for other OS's
@@ -530,6 +530,19 @@ mark_as_advanced(
   WITH_GL_PROFILE_ES20
   WITH_GPU_SHADER_BUILDER
 )
+
+# Metal
+
+if (APPLE)
+  option(WITH_METAL_BACKEND "Use Metal for graphics instead of (or as well as) OpenGL on macOS." OFF)
+  mark_as_advanced(WITH_METAL_BACKEND)
+else()
+  set(WITH_METAL_BACKEND OFF)
+endif()
+
+if (WITH_METAL_BACKEND)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
+endif()
 
 if(WIN32)
   option(WITH_GL_ANGLE "Link with the ANGLE library, an OpenGL ES 2.0 implementation based on Direct3D, instead of the system OpenGL library." OFF)
@@ -1275,6 +1288,16 @@ else()
 endif()
 
 #-----------------------------------------------------------------------------
+# Configure Metal.
+if (WITH_METAL_BACKEND)
+  add_definitions(-DWITH_METAL_BACKEND)
+
+  # No need to add frameworks here, all the ones we need for Metal and
+  # Metal-OpenGL Interop are already being added by
+  # build_files/cmake/platform/platform_apple.cmake
+endif()
+
+#-----------------------------------------------------------------------------
 # Configure OpenMP.
 if(WITH_OPENMP)
   if(NOT OPENMP_CUSTOM)
@@ -1668,6 +1691,8 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
   ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_DUPLICATE_ENUM -Wno-duplicate-enum)
   ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_UNDEF -Wno-undef)
   ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_MISSING_NORETURN -Wno-missing-noreturn)
+  ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_UNUSED_BUT_SET_VARIABLE -Wno-unused-but-set-variable)
+  ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_DEPRECATED_DECLARATIONS -Wno-deprecated-declarations)
 
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_REMOVE_STRICT_FLAGS CXX_WARN_NO_UNUSED_PARAMETER -Wno-unused-parameter)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_REMOVE_STRICT_FLAGS CXX_WARN_NO_UNUSED_PRIVATE_FIELD -Wno-unused-private-field)
