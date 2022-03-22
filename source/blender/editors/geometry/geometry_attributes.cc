@@ -17,6 +17,7 @@
 #include "BKE_context.h"
 #include "BKE_deform.h"
 #include "BKE_geometry_set.hh"
+#include "BKE_mesh.h"
 #include "BKE_object_deform.h"
 #include "BKE_report.h"
 
@@ -421,6 +422,11 @@ static int geometry_color_attribute_remove_exec(bContext *C, wmOperator *op)
 
   if (!BKE_id_attribute_remove(id, layer, op->reports)) {
     return OPERATOR_CANCELLED;
+  }
+
+  if (GS(id->name) == ID_ME) {
+    Mesh *me = static_cast<Mesh *>(ob->data);
+    BKE_mesh_update_customdata_pointers(me, true);
   }
 
   DEG_id_tag_update(id, ID_RECALC_GEOMETRY);
