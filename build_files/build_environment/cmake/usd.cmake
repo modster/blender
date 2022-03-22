@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-if(WIN32 AND BUILD_MODE STREQUAL Debug)
-  # There is something wonky in the ctor of the USD Trace class
-  # It will gobble up all ram and derefs a nullptr once it runs
-  # out...so...thats fun... I lack the time to debug this currently
-  # so disabling the trace will have to suffice.
-  set(USD_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DTRACE_DISABLE")
-  # USD does not look for debug libs, nor does it link them
-  # when building static, so this is just to keep find_package happy
-  # if we ever link dynamically on windows util will need to be linked.
+if(WIN32)
+  # OIIO and OSL are statically linked for us, but USD doesn't know
+  set(USD_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DOIIO_STATIC_DEFINE /DOSL_STATIC_DEFINE")
+  if(BUILD_MODE STREQUAL Debug)
+    # USD does not look for debug libs, nor does it link them
+    # when building static, so this is just to keep find_package happy
+    # if we ever link dynamically on windows util will need to be linked as well.
+    set(USD_OIIO_CMAKE_DEFINES "-DOIIO_LIBRARIES=${LIBDIR}/openimageio/lib/OpenImageIO_d${LIBEXT}")
+  endif()
   set(USD_PLATFORM_FLAGS
-    -DOIIO_LIBRARIES=${LIBDIR}/openimageio/lib/OpenImageIO_d${LIBEXT}
+    ${USD_OIIO_CMAKE_DEFINES}
     -DCMAKE_CXX_FLAGS=${USD_CXX_FLAGS}
   )
 endif()
