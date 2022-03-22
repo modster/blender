@@ -266,10 +266,13 @@ set(GLSL_SRC
   engines/eevee/shaders/closure_eval_lib.glsl
   engines/eevee/shaders/closure_eval_diffuse_lib.glsl
   engines/eevee/shaders/closure_eval_glossy_lib.glsl
+  engines/eevee/shaders/closure_eval_impl_lib.glsl
   engines/eevee/shaders/closure_eval_refraction_lib.glsl
+  engines/eevee/shaders/closure_eval_stubs_lib.glsl
   engines/eevee/shaders/closure_eval_translucent_lib.glsl
   engines/eevee/shaders/closure_type_lib.glsl
   engines/eevee/shaders/eevee_empty.glsl
+  engines/eevee/shaders/eevee_empty_volume.glsl
   engines/eevee/shaders/effect_bloom_frag.glsl
   engines/eevee/shaders/effect_dof_bokeh_frag.glsl
   engines/eevee/shaders/effect_dof_dilate_tiles_frag.glsl
@@ -334,6 +337,7 @@ set(GLSL_SRC
   engines/eevee/shaders/volumetric_resolve_frag.glsl
   engines/eevee/shaders/volumetric_scatter_frag.glsl
   engines/eevee/shaders/volumetric_integration_frag.glsl
+  engines/eevee/shaders/world_vert.glsl
 
   engines/workbench/shaders/workbench_cavity_lib.glsl
   engines/workbench/shaders/workbench_common_lib.glsl
@@ -365,6 +369,7 @@ set(GLSL_SRC
 
   engines/workbench/workbench_shader_shared.h
 
+  intern/shaders/common_attribute_lib.glsl
   intern/shaders/common_colormanagement_lib.glsl
   intern/shaders/common_globals_lib.glsl
   intern/shaders/common_gpencil_lib.glsl

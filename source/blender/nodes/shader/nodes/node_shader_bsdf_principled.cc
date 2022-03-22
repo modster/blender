@@ -168,6 +168,10 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
     flag |= GPU_MATFLAG_TRANSPARENT;
   }
 
+  if (use_subsurf) {
+    use_subsurf = GPU_material_sss_profile_create(mat, in[2].vec);
+  }
+
   float use_multi_scatter = (node->custom1 == SHD_GLOSSY_MULTI_GGX) ? 1.0f : 0.0f;
   float use_sss = (use_subsurf) ? 1.0f : 0.0f;
 
@@ -182,6 +186,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
                  in,
                  out,
                  GPU_constant(&use_multi_scatter),
+                 GPU_uniform(&use_sss),
                  &diffuse_weight,
                  &specular_weight,
                  &glass_reflection_weight,

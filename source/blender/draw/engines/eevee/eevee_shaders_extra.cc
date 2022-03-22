@@ -26,21 +26,44 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
 
   uint64_t options = GPU_material_uuid_get(gpumat);
   const bool is_background = (options & (VAR_WORLD_PROBE | VAR_WORLD_BACKGROUND)) != 0;
+  const bool is_volume = (options & (VAR_MAT_VOLUME)) != 0;
 
   GPUCodegenOutput &codegen = *codegen_;
   ShaderCreateInfo &info = *reinterpret_cast<ShaderCreateInfo *>(codegen.create_info);
 
-  info.auto_resource_location(true);
+  info.legacy_resource_location(true);
 
-  std::stringstream global_vars;
+  if (GPU_material_flag_get(gpumat, GPU_MATFLAG_SUBSURFACE)) {
+    info.define("USE_SSS");
+  }
 
   std::stringstream attr_load;
+
+  const bool do_fragment_attrib_load = is_background;
+
+  if (do_fragment_attrib_load && !info.vertex_out_interfaces_.is_empty()) {
+    /* Codegen outputs only one interface. */
+    const StageInterfaceInfo &iface = *info.vertex_out_interfaces_.first();
+    /* Globals the attrib_load() can write to when it is in the fragment shader. */
+    attr_load << "struct " << iface.name << " {\n";
+    for (auto &inout : iface.inouts) {
+      attr_load << "  " << inout.type << " " << inout.name << ";\n";
+    }
+    attr_load << "};\n";
+    attr_load << iface.name << " " << iface.instance_name << ";\n";
+    /* Global vars just to make code valid. Only Orco is supported. */
+    for (const ShaderCreateInfo::VertIn &in : info.vertex_inputs_) {
+      attr_load << in.type << " " << in.name << ";\n";
+    }
+    info.vertex_out_interfaces_.clear();
+  }
+
   attr_load << "void attrib_load()\n";
   attr_load << "{\n";
   attr_load << ((codegen.attr_load) ? codegen.attr_load : "");
   attr_load << "}\n\n";
 
-  std::stringstream vert_gen, frag_gen;
+  std::stringstream vert_gen, frag_gen, geom_gen;
 
   if (is_background) {
     frag_gen << attr_load.str();
@@ -48,32 +71,35 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
   else {
     vert_gen << attr_load.str();
   }
-  vert_gen << vert;
-  info.vertex_source_generated = vert_gen.str();
-  /* Everything is in generated source. */
-  info.vertex_source("eevee_empty.glsl");
+
+  {
+    vert_gen << vert;
+    info.vertex_source_generated = vert_gen.str();
+    /* Everything is in generated source. */
+    info.vertex_source(is_volume ? "eevee_empty_volume.glsl" : "eevee_empty.glsl");
+  }
 
   {
     frag_gen << frag;
     frag_gen << "Closure nodetree_exec()\n";
     frag_gen << "{\n";
     if (GPU_material_is_volume_shader(gpumat)) {
-      //   frag_gen << ((codegen.volume) ? codegen.volume : "return CLOSURE_DEFAULT;\n");
-      frag_gen << "return CLOSURE_DEFAULT;\n";
+      frag_gen << ((codegen.volume) ? codegen.volume : "return CLOSURE_DEFAULT;\n");
     }
     else {
-      //   frag_gen << ((codegen.surface) ? codegen.surface : "return CLOSURE_DEFAULT;\n");
-      frag_gen << "return CLOSURE_DEFAULT;\n";
+      frag_gen << ((codegen.surface) ? codegen.surface : "return CLOSURE_DEFAULT;\n");
     }
     frag_gen << "}\n\n";
 
     info.fragment_source_generated = frag_gen.str();
     /* Everything is in generated source. */
-    info.fragment_source("eevee_empty.glsl");
+    info.fragment_source(is_volume ? "eevee_empty_volume.glsl" : "eevee_empty.glsl");
   }
 
   if (geom) {
-    // info.geometry_source_generated = blender::StringRefNull(geom);
+    geom_gen << geom;
+    info.geometry_source_generated = geom_gen.str();
+    info.geometry_layout(PrimitiveIn::TRIANGLES, PrimitiveOut::TRIANGLE_STRIP, 3);
     /* Everything is in generated source. */
     info.geometry_source("eevee_empty.glsl");
   }
@@ -81,6 +107,4 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
   if (defines) {
     info.typedef_source_generated += blender::StringRefNull(defines);
   }
-
-  info.additional_info("draw_view");
 }

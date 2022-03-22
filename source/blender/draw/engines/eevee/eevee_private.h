@@ -1296,6 +1296,11 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
                                              char *vert,
                                              char *geom,
                                              char *defines);
+GPUShader *eevee_shaders_sh_create_helper(const char *name,
+                                          const char *vert_name,
+                                          const char *frag_name,
+                                          const char *defines,
+                                          bool use_layered_rendering);
 
 /* eevee_lightprobes.c */
 

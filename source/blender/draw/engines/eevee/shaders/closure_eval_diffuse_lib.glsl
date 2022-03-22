@@ -1,6 +1,7 @@
 #pragma BLENDER_REQUIRE(lights_lib.glsl)
 #pragma BLENDER_REQUIRE(lightprobe_lib.glsl)
 #pragma BLENDER_REQUIRE(ambient_occlusion_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_eval_lib.glsl)
 
 struct ClosureInputDiffuse {
   vec3 N;      /** Shading normal. */

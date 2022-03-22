@@ -50,9 +50,13 @@ static int node_shader_gpu_subsurface_scattering(GPUMaterial *mat,
     GPU_link(mat, "world_normals_get", &in[5].link);
   }
 
+  bool use_subsurf = GPU_material_sss_profile_create(mat, in[2].vec);
+  float use_sss = (use_subsurf) ? 1.0f : 0.0f;
+
   GPU_material_flag_set(mat, GPU_MATFLAG_DIFFUSE | GPU_MATFLAG_SUBSURFACE);
-  GPU_stack_link(mat, node, "node_subsurface_scattering", in, out);
-  return GPU_stack_eval_link(mat, node, "node_subsurface_scattering_eval", in, out);
+  GPU_stack_link(mat, node, "node_subsurface_scattering", in, out, GPU_uniform(&use_sss));
+  return GPU_stack_eval_link(
+      mat, node, "node_subsurface_scattering_eval", in, out, GPU_uniform(&use_sss));
 }
 
 static void node_shader_update_subsurface_scattering(bNodeTree *ntree, bNode *node)

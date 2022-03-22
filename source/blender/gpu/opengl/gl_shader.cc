@@ -955,7 +955,7 @@ bool GLShader::finalize(const shader::ShaderCreateInfo *info)
     return false;
   }
 
-  if (info != nullptr) {
+  if (info != nullptr && info->legacy_resource_location_ == false) {
     interface = new GLShaderInterface(shader_program_, *info);
   }
   else {

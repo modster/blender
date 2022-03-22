@@ -26,6 +26,10 @@
 #  endif
 #endif
 
+#ifndef GPU_FRAGMENT_SHADER
+#  define gl_FragCoord vec4(0.0)
+#endif
+
 uniform sampler2D horizonBuffer;
 
 /* aoSettings flags */
@@ -415,3 +419,7 @@ OcclusionData occlusion_load(vec3 vP, float custom_occlusion)
 
   return data;
 }
+
+#ifndef GPU_FRAGMENT_SHADER
+#  undef gl_FragCoord
+#endif

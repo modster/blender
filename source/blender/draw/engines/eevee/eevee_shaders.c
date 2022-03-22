@@ -170,6 +170,7 @@ extern char datatoc_common_math_lib_glsl[];
 extern char datatoc_common_math_geom_lib_glsl[];
 extern char datatoc_common_view_lib_glsl[];
 extern char datatoc_gpu_shader_common_obinfos_lib_glsl[];
+extern char datatoc_gpu_shader_codegen_lib_glsl[];
 
 extern char datatoc_ambient_occlusion_lib_glsl[];
 extern char datatoc_background_vert_glsl[];
@@ -178,6 +179,7 @@ extern char datatoc_bsdf_lut_frag_glsl[];
 extern char datatoc_bsdf_sampling_lib_glsl[];
 extern char datatoc_btdf_lut_frag_glsl[];
 extern char datatoc_closure_type_lib_glsl[];
+extern char datatoc_closure_eval_stubs_lib_glsl[];
 extern char datatoc_common_uniforms_lib_glsl[];
 extern char datatoc_common_utiltex_lib_glsl[];
 extern char datatoc_cryptomatte_frag_glsl[];
@@ -230,6 +232,7 @@ extern char datatoc_lightprobe_planar_downsample_vert_glsl[];
 extern char datatoc_lightprobe_vert_glsl[];
 extern char datatoc_lights_lib_glsl[];
 extern char datatoc_closure_eval_lib_glsl[];
+extern char datatoc_closure_eval_impl_lib_glsl[];
 extern char datatoc_closure_eval_diffuse_lib_glsl[];
 extern char datatoc_closure_eval_glossy_lib_glsl[];
 extern char datatoc_closure_eval_refraction_lib_glsl[];
@@ -261,6 +264,7 @@ extern char datatoc_volumetric_lib_glsl[];
 extern char datatoc_volumetric_resolve_frag_glsl[];
 extern char datatoc_volumetric_scatter_frag_glsl[];
 extern char datatoc_volumetric_vert_glsl[];
+extern char datatoc_world_vert_glsl[];
 
 /* *********** FUNCTIONS *********** */
 
@@ -275,6 +279,7 @@ static void eevee_shader_library_ensure(void)
     DRW_SHADER_LIB_ADD(e_data.lib, common_view_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, common_uniforms_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, gpu_shader_common_obinfos_lib);
+    DRW_SHADER_LIB_ADD(e_data.lib, gpu_shader_codegen_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, random_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, renderpass_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, bsdf_common_lib);
@@ -299,6 +304,8 @@ static void eevee_shader_library_ensure(void)
     DRW_SHADER_LIB_ADD(e_data.lib, closure_eval_glossy_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, closure_eval_translucent_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, closure_eval_refraction_lib);
+    DRW_SHADER_LIB_ADD(e_data.lib, closure_eval_impl_lib);
+    DRW_SHADER_LIB_ADD(e_data.lib, closure_eval_stubs_lib);
 
     e_data.surface_lit_frag = DRW_shader_library_create_shader_string(e_data.lib,
                                                                       datatoc_surface_frag_glsl);
@@ -828,6 +835,7 @@ struct GPUShader *EEVEE_shaders_volumes_clear_sh_get()
                                                                   datatoc_volumetric_frag_glsl,
                                                                   e_data.lib,
                                                                   SHADER_DEFINES
+                                                                  "#define STANDALONE\n"
                                                                   "#define VOLUMETRICS\n"
                                                                   "#define CLEAR\n");
   }
@@ -842,6 +850,7 @@ struct GPUShader *EEVEE_shaders_volumes_scatter_sh_get()
                                                          datatoc_volumetric_scatter_frag_glsl,
                                                          e_data.lib,
                                                          SHADER_DEFINES
+                                                         "#define STANDALONE\n"
                                                          "#define VOLUMETRICS\n"
                                                          "#define VOLUME_SHADOW\n");
   }
@@ -857,6 +866,7 @@ struct GPUShader *EEVEE_shaders_volumes_scatter_with_lights_sh_get()
         datatoc_volumetric_scatter_frag_glsl,
         e_data.lib,
         SHADER_DEFINES
+        "#define STANDALONE\n"
         "#define VOLUMETRICS\n"
         "#define VOLUME_LIGHTING\n"
         "#define VOLUME_SHADOW\n");
@@ -872,7 +882,9 @@ struct GPUShader *EEVEE_shaders_volumes_integration_sh_get()
         datatoc_volumetric_geom_glsl,
         datatoc_volumetric_integration_frag_glsl,
         e_data.lib,
-        USE_VOLUME_OPTI ? "#define USE_VOLUME_OPTI\n" SHADER_DEFINES : SHADER_DEFINES);
+        USE_VOLUME_OPTI ? "#define USE_VOLUME_OPTI\n"
+                          "#define STANDALONE\n" SHADER_DEFINES :
+                          "#define STANDALONE\n" SHADER_DEFINES);
   }
   return e_data.volumetric_integration_sh;
 }
@@ -1375,7 +1387,7 @@ static char *eevee_get_vert(int options)
     str = DRW_shader_library_create_shader_string(e_data.lib, datatoc_volumetric_vert_glsl);
   }
   else if ((options & (VAR_WORLD_PROBE | VAR_WORLD_BACKGROUND)) != 0) {
-    str = DRW_shader_library_create_shader_string(e_data.lib, datatoc_background_vert_glsl);
+    str = DRW_shader_library_create_shader_string(e_data.lib, datatoc_world_vert_glsl);
   }
   else {
     str = DRW_shader_library_create_shader_string(e_data.lib, datatoc_surface_vert_glsl);

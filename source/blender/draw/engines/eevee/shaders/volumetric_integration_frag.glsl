@@ -11,14 +11,14 @@ uniform sampler3D volumeScattering; /* Result of the scatter step */
 uniform sampler3D volumeExtinction;
 
 #ifdef USE_VOLUME_OPTI
-uniform layout(r11f_g11f_b10f) writeonly restrict image3D finalScattering_img;
-uniform layout(r11f_g11f_b10f) writeonly restrict image3D finalTransmittance_img;
+uniform layout(r11f_g11f_b10f)
+writeonly restrict image3D finalScattering_img;
+uniform layout(r11f_g11f_b10f)
+writeonly restrict image3D finalTransmittance_img;
 
 vec3 finalScattering;
 vec3 finalTransmittance;
 #else
-
-flat in int slice;
 
 layout(location = 0) out vec3 finalScattering;
 layout(location = 1) out vec3 finalTransmittance;

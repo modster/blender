@@ -30,8 +30,4 @@ void main()
   vPos.w = 1.0;
 
   PASS_RESOURCE_ID
-
-#ifdef USE_ATTR
-  pass_attr(vec3(0.0), mat3(1), mat4(1));
-#endif
 }

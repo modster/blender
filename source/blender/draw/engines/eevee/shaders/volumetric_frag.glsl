@@ -1,6 +1,5 @@
 
 #pragma BLENDER_REQUIRE(volumetric_lib.glsl)
-#pragma BLENDER_REQUIRE(closure_type_lib.glsl)
 
 /* Based on Frosbite Unified Volumetric.
  * https://www.ea.com/frostbite/news/physically-based-unified-volumetric-rendering-in-frostbite */
@@ -49,21 +48,21 @@ void main()
 #endif
 
 #ifdef CLEAR
-  Closure cl = CLOSURE_DEFAULT;
+  volumeScattering = vec4(0.0, 0.0, 0.0, 1.0);
+  volumeExtinction = vec4(0.0, 0.0, 0.0, 1.0);
+  volumeEmissive = vec4(0.0, 0.0, 0.0, 1.0);
+  volumePhase = vec4(0.0, 0.0, 0.0, 0.0);
 #else
   Closure cl = nodetree_exec();
-#endif
-
-#ifdef MESH_SHADER
+#  ifdef MESH_SHADER
   cl.scatter *= volumeDensityScale;
   cl.absorption *= volumeDensityScale;
   cl.emission *= volumeDensityScale;
-#endif
+#  endif
 
   volumeScattering = vec4(cl.scatter, 1.0);
   volumeExtinction = vec4(cl.absorption + cl.scatter, 1.0);
   volumeEmissive = vec4(cl.emission, 1.0);
-
   /* Do not add phase weight if no scattering. */
   if (all(equal(cl.scatter, vec3(0.0)))) {
     volumePhase = vec4(0.0);
@@ -71,4 +70,5 @@ void main()
   else {
     volumePhase = vec4(cl.anisotropy, vec3(1.0));
   }
+#endif
 }

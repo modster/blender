@@ -81,7 +81,7 @@ struct GPUMaterial {
   /** DEPRECATED: To remove. */
   GPUUniformBuf *sss_profile;  /* UBO containing SSS profile. */
   GPUTexture *sss_tex_profile; /* Texture containing SSS profile. */
-  float sss_enabled;
+  bool sss_enabled;
   float sss_radii[3];
   int sss_samples;
   bool sss_dirty;
@@ -153,6 +153,12 @@ static void gpu_material_free_single(GPUMaterial *material)
   }
   if (material->coba_tex != NULL) {
     GPU_texture_free(material->coba_tex);
+  }
+  if (material->sss_profile != NULL) {
+    GPU_uniformbuf_free(material->sss_profile);
+  }
+  if (material->sss_tex_profile != NULL) {
+    GPU_texture_free(material->sss_tex_profile);
   }
 }
 
@@ -425,8 +431,12 @@ static void compute_sss_translucence_kernel(const GPUSssKernelData *kd,
 }
 #  undef INTEGRAL_RESOLUTION
 
-void GPU_material_sss_profile_create(GPUMaterial *material, float radii[3])
+bool GPU_material_sss_profile_create(GPUMaterial *material, float radii[3])
 {
+  /* Enable only once. */
+  if (material->sss_enabled) {
+    return false;
+  }
   copy_v3_v3(material->sss_radii, radii);
   material->sss_dirty = true;
   material->sss_enabled = true;
@@ -435,6 +445,7 @@ void GPU_material_sss_profile_create(GPUMaterial *material, float radii[3])
   if (material->sss_profile == NULL) {
     material->sss_profile = GPU_uniformbuf_create(sizeof(GPUSssKernelData));
   }
+  return true;
 }
 
 struct GPUUniformBuf *GPU_material_sss_profile_get(GPUMaterial *material,

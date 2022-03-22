@@ -4,6 +4,7 @@
 #pragma BLENDER_REQUIRE(lightprobe_lib.glsl)
 #pragma BLENDER_REQUIRE(ambient_occlusion_lib.glsl)
 #pragma BLENDER_REQUIRE(ssr_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_eval_lib.glsl)
 
 struct ClosureInputRefraction {
   vec3 N;          /** Shading normal. */
