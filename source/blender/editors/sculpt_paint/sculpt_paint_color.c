@@ -393,6 +393,9 @@ static void do_smear_brush_task_cb_exec(void *__restrict userdata,
     float interp_color[4];
     copy_v4_v4(interp_color, ss->cache->prev_colors[vd.index]);
 
+    float no[3];
+    SCULPT_vertex_normal_get(ss, vd.index, no);
+
     switch (brush->smear_deform_type) {
       case BRUSH_SMEAR_DEFORM_DRAG:
         sub_v3_v3v3(current_disp, ss->cache->location, ss->cache->last_location);
@@ -404,27 +407,76 @@ static void do_smear_brush_task_cb_exec(void *__restrict userdata,
         sub_v3_v3v3(current_disp, vd.co, ss->cache->location);
         break;
     }
+
+    /* Project into vertex plane. */
+    madd_v3_v3fl(current_disp, no, -dot_v3v3(current_disp, no));
+
     normalize_v3_v3(current_disp_norm, current_disp);
     mul_v3_v3fl(current_disp, current_disp_norm, ss->cache->bstrength);
 
-    SculptVertexNeighborIter ni;
-    SCULPT_VERTEX_NEIGHBORS_ITER_BEGIN (ss, vd.index, ni) {
-      float vertex_disp[3];
-      float vertex_disp_norm[3];
-      sub_v3_v3v3(vertex_disp, SCULPT_vertex_co_get(ss, ni.index), vd.co);
-      const float *neighbor_color = ss->cache->prev_colors[ni.index];
-      normalize_v3_v3(vertex_disp_norm, vertex_disp);
-      if (dot_v3v3(current_disp_norm, vertex_disp_norm) >= 0.0f) {
-        continue;
+    float accum[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float totw = 0.0f;
+
+    SculptVertexNeighborIter ni2;
+
+    SCULPT_VERTEX_NEIGHBORS_ITER_BEGIN (ss, vd.index, ni2) {
+      const float *nco = SCULPT_vertex_co_get(ss, ni2.index);
+
+      SculptVertexNeighborIter ni;
+      SCULPT_VERTEX_NEIGHBORS_ITER_BEGIN (ss, ni2.index, ni) {
+        if (ni.index == vd.index) {
+          continue;
+        }
+
+        float vertex_disp[3];
+        float vertex_disp_norm[3];
+
+        sub_v3_v3v3(vertex_disp, SCULPT_vertex_co_get(ss, ni.index), vd.co);
+
+        /* Weight by how close we are to our target distance from vd.co. */
+        float w = (1.0f + fabsf(len_v3(vertex_disp) / ss->cache->bstrength - 1.0));
+
+        /* TODO: use cotangents (or at least face areas) here. */
+        float len = len_v3v3(SCULPT_vertex_co_get(ss, ni.index), nco);
+        if (len > 0.0f) {
+          len = ss->cache->bstrength / len;
+        }
+        else { /* Coincident point. */
+          len = 1.0f;
+        }
+
+        /* Multiply weight with edge lengths (in the future this will be
+           cotangent weights or face areas). */
+        w *= len;
+
+        /* Build directional weight. */
+
+        /* Project into vertex plane. */
+        madd_v3_v3fl(vertex_disp, no, -dot_v3v3(no, vertex_disp));
+        normalize_v3_v3(vertex_disp_norm, vertex_disp);
+
+        if (dot_v3v3(current_disp_norm, vertex_disp_norm) >= 0.0f) {
+          continue;
+        }
+
+        const float *neighbor_color = ss->cache->prev_colors[ni.index];
+        float color_interp = -dot_v3v3(current_disp_norm, vertex_disp_norm);
+
+        /* Square directional weight to get a somewhat sharper result. */
+        w *= color_interp * color_interp;
+
+        madd_v4_v4fl(accum, neighbor_color, w);
+        totw += w;
       }
-      const float color_interp = clamp_f(
-          -dot_v3v3(current_disp_norm, vertex_disp_norm), 0.0f, 1.0f);
-      float color_mix[4];
-      copy_v4_v4(color_mix, neighbor_color);
-      mul_v4_fl(color_mix, color_interp * fade);
-      blend_color_mix_float(interp_color, interp_color, color_mix);
+      SCULPT_VERTEX_NEIGHBORS_ITER_END(ni);
     }
-    SCULPT_VERTEX_NEIGHBORS_ITER_END(ni);
+    SCULPT_VERTEX_NEIGHBORS_ITER_END(ni2);
+
+    if (totw != 0.0f) {
+      mul_v4_fl(accum, 1.0f / totw);
+    }
+
+    blend_color_mix_float(interp_color, interp_color, accum);
 
     float col[4];
     SCULPT_vertex_color_get(ss, vd.index, col);
