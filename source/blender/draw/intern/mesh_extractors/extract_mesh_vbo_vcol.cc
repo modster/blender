@@ -40,12 +40,12 @@ static blender::Vector<VColRef> get_vcol_refs(const CustomData *cd_vdata,
         continue;
       }
 
-      if (!(vcol_layers & (1UL << layeri))) {
-        layeri++;
+      if (layer->flag & CD_FLAG_TEMPORARY) {
         continue;
       }
 
-      if (layer->flag & CD_FLAG_TEMPORARY) {
+      if (!(vcol_layers & (1UL << layeri))) {
+        layeri++;
         continue;
       }
 
@@ -89,21 +89,22 @@ static void init_vcol_format(GPUVertFormat *format,
 
     GPU_vertformat_safe_attr_name(ref.layer->name, attr_safe_name, GPU_MAX_SAFE_ATTR_NAME);
 
+    /* VCol layer name. */
     BLI_snprintf(attr_name, sizeof(attr_name), "c%s", attr_safe_name);
-
     GPU_vertformat_attr_add(format, attr_name, GPU_COMP_U16, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
 
+    /* Active layer name. */
     if (ref.layer == active) {
       GPU_vertformat_alias_add(format, "ac");
     }
 
+    /* Active render layer name. */
     if (ref.layer == render) {
       GPU_vertformat_alias_add(format, "c");
     }
 
     /* Gather number of auto layers. */
     /* We only do `vcols` that are not overridden by `uvs`. */
-
     bool bad = ref.domain == ATTR_DOMAIN_CORNER;
     bad = bad && CustomData_get_named_layer_index(cd_ldata, CD_MLOOPUV, ref.layer->name) != -1;
 
@@ -149,7 +150,6 @@ static void extract_vcol_init(const MeshRenderData *mr,
   CustomDataLayer *active_color = BKE_id_attributes_active_color_get(&query_mesh.id);
   CustomDataLayer *render_color = BKE_id_attributes_render_color_get(&query_mesh.id);
 
-  // BKE_id_attribute_domain
   const uint32_t vcol_layers = cache->cd_used.vcol;
   init_vcol_format(&format, cache, cd_vdata, cd_ldata, active_color, render_color);
 

@@ -631,6 +631,8 @@ void BKE_id_attribute_copy_domains_temp(ID *temp_id,
     case ID_ME: {
       Mesh *me = (Mesh *)temp_id;
 
+      me->edit_mesh = NULL;
+
       me->vdata = vdata ? *vdata : reset;
       me->edata = edata ? *edata : reset;
       me->ldata = ldata ? *ldata : reset;
