@@ -43,6 +43,7 @@
 #include "DNA_world_types.h"
 
 #include "RNA_access.h"
+#include "RNA_prototypes.h"
 
 #include "BKE_anim_data.h"
 #include "BKE_animsys.h"
@@ -525,7 +526,7 @@ static void *acf_summary_setting_ptr(bAnimListElem *ale,
   return NULL;
 }
 
-/* all animation summary (DopeSheet only) type define */
+/** All animation summary (dope-sheet only) type define. */
 static bAnimChannelType ACF_SUMMARY = {
     "Summary",              /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -634,7 +635,7 @@ static void *acf_scene_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
   }
 }
 
-/* scene type define */
+/** Scene type define. */
 static bAnimChannelType ACF_SCENE = {
     "Scene",                /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -810,7 +811,7 @@ static void *acf_object_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings se
   }
 }
 
-/* object type define */
+/** Object type define. */
 static bAnimChannelType ACF_OBJECT = {
     "Object",               /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -987,7 +988,7 @@ static void *acf_group_setting_ptr(bAnimListElem *ale,
   return GET_ACF_FLAG_PTR(agrp->flag, type);
 }
 
-/* group type define */
+/** Group type define. */
 static bAnimChannelType ACF_GROUP = {
     "Group",               /* type name */
     ACHANNEL_ROLE_CHANNEL, /* role */
@@ -1111,7 +1112,7 @@ static void *acf_fcurve_setting_ptr(bAnimListElem *ale,
   return GET_ACF_FLAG_PTR(fcu->flag, type);
 }
 
-/* fcurve type define */
+/** F-Curve type define. */
 static bAnimChannelType ACF_FCURVE = {
     "F-Curve",             /* type name */
     ACHANNEL_ROLE_CHANNEL, /* role */
@@ -1231,7 +1232,7 @@ static int acf_nla_controls_icon(bAnimListElem *UNUSED(ale))
   return ICON_NLA;
 }
 
-/* NLA Control FCurves Expander type define */
+/** NLA Control F-Curves expander type define. */
 static bAnimChannelType ACF_NLACONTROLS = {
     "NLA Controls Expander", /* type name */
     ACHANNEL_ROLE_EXPANDER,  /* role */
@@ -1271,7 +1272,7 @@ static void acf_nla_curve_name(bAnimListElem *ale, char *name)
   }
 }
 
-/* NLA Control F-Curve type define */
+/** NLA Control F-Curve type define. */
 static bAnimChannelType ACF_NLACURVE = {
     "NLA Control F-Curve", /* type name */
     ACHANNEL_ROLE_CHANNEL, /* role */
@@ -1361,7 +1362,7 @@ static void *acf_fillactd_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* object action expander type define */
+/** Object action expander type define. */
 static bAnimChannelType ACF_FILLACTD = {
     "Ob-Action Filler",     /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -1446,7 +1447,7 @@ static void *acf_filldrivers_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* drivers expander type define */
+/** Drivers expander type define. */
 static bAnimChannelType ACF_FILLDRIVERS = {
     "Drivers Filler",       /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -1525,7 +1526,7 @@ static void *acf_dsmat_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
   }
 }
 
-/* material expander type define */
+/** Material expander type define. */
 static bAnimChannelType ACF_DSMAT = {
     "Material Data Expander", /* type name */
     ACHANNEL_ROLE_EXPANDER,   /* role */
@@ -1606,7 +1607,7 @@ static void *acf_dslight_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* light expander type define */
+/** Light expander type define. */
 static bAnimChannelType ACF_DSLIGHT = {
     "Light Expander",       /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -1692,7 +1693,7 @@ static void *acf_dstex_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
   }
 }
 
-/* texture expander type define */
+/** Texture expander type define. */
 static bAnimChannelType ACF_DSTEX = {
     "Texture Data Expander", /* type name */
     ACHANNEL_ROLE_EXPANDER,  /* role */
@@ -1775,7 +1776,7 @@ static void *acf_dscachefile_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* CacheFile expander type define. */
+/** CacheFile expander type define.. */
 static bAnimChannelType ACF_DSCACHEFILE = {
     "Cache File Expander",  /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -1858,7 +1859,7 @@ static void *acf_dscam_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
   }
 }
 
-/* camera expander type define */
+/** Camera expander type define. */
 static bAnimChannelType ACF_DSCAM = {
     "Camera Expander",      /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -1947,7 +1948,7 @@ static void *acf_dscur_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
   }
 }
 
-/* curve expander type define */
+/** Curve expander type define. */
 static bAnimChannelType ACF_DSCUR = {
     "Curve Expander",       /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2045,7 +2046,7 @@ static void *acf_dsskey_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings se
   }
 }
 
-/* shapekey expander type define */
+/** Shape-key expander type define. */
 static bAnimChannelType ACF_DSSKEY = {
     "Shape Key Expander",   /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2124,7 +2125,7 @@ static void *acf_dswor_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
   }
 }
 
-/* world expander type define */
+/** World expander type define. */
 static bAnimChannelType ACF_DSWOR = {
     "World Expander",       /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2203,7 +2204,7 @@ static void *acf_dspart_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings se
   }
 }
 
-/* particle expander type define */
+/** Particle expander type define. */
 static bAnimChannelType ACF_DSPART = {
     "Particle Data Expander", /* type name */
     ACHANNEL_ROLE_EXPANDER,   /* role */
@@ -2284,7 +2285,7 @@ static void *acf_dsmball_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* metaball expander type define */
+/** Meta-ball expander type define. */
 static bAnimChannelType ACF_DSMBALL = {
     "Metaball Expander",    /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2363,7 +2364,7 @@ static void *acf_dsarm_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
   }
 }
 
-/* metaball expander type define */
+/** Armature expander type define. */
 static bAnimChannelType ACF_DSARM = {
     "Armature Expander",    /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2455,7 +2456,7 @@ static void *acf_dsntree_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* node tree expander type define */
+/** Node tree expander type define. */
 static bAnimChannelType ACF_DSNTREE = {
     "Node Tree Expander",   /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2536,7 +2537,7 @@ static void *acf_dslinestyle_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* node tree expander type define */
+/** Line Style expander type define. */
 static bAnimChannelType ACF_DSLINESTYLE = {
     "Line Style Expander",  /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2615,7 +2616,7 @@ static void *acf_dsmesh_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings se
   }
 }
 
-/* node tree expander type define */
+/** Mesh expander type define. */
 static bAnimChannelType ACF_DSMESH = {
     "Mesh Expander",        /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2695,7 +2696,7 @@ static void *acf_dslat_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
   }
 }
 
-/* node tree expander type define */
+/** Lattice expander type define. */
 static bAnimChannelType ACF_DSLAT = {
     "Lattice Expander",     /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2775,7 +2776,7 @@ static void *acf_dsspk_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
   }
 }
 
-/* speaker expander type define */
+/** Speaker expander type define. */
 static bAnimChannelType ACF_DSSPK = {
     "Speaker Expander",     /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2856,7 +2857,7 @@ static void *acf_dscurves_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* Curves expander type define */
+/** Curves expander type define. */
 static bAnimChannelType ACF_DSHAIR = {
     "Curves Expander",      /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -2937,7 +2938,7 @@ static void *acf_dspointcloud_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* pointcloud expander type define */
+/** Point-cloud expander type define. */
 static bAnimChannelType ACF_DSPOINTCLOUD = {
     "PointCloud Expander",  /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -3018,7 +3019,7 @@ static void *acf_dsvolume_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* volume expander type define */
+/** Volume expander type define. */
 static bAnimChannelType ACF_DSVOLUME = {
     "Volume Expander",      /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -3097,6 +3098,7 @@ static void *acf_dssimulation_setting_ptr(bAnimListElem *ale,
   }
 }
 
+/** Simulation expander type define. */
 static bAnimChannelType ACF_DSSIMULATION = {
     "Simulation Expander",  /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -3177,7 +3179,7 @@ static void *acf_dsgpencil_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* grease pencil expander type define */
+/** Grease-pencil expander type define. */
 static bAnimChannelType ACF_DSGPENCIL = {
     "GPencil DS Expander",  /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -3258,7 +3260,7 @@ static void *acf_dsmclip_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* world expander type define */
+/** Movie-clip expander type define. */
 static bAnimChannelType ACF_DSMCLIP = {
     "Movieclip Expander",   /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -3373,7 +3375,7 @@ static void *acf_shapekey_setting_ptr(bAnimListElem *ale,
   }
 }
 
-/* shapekey expander type define */
+/** Shape-key expander type define. */
 static bAnimChannelType ACF_SHAPEKEY = {
     "Shape Key",           /* type name */
     ACHANNEL_ROLE_CHANNEL, /* role */
@@ -3453,7 +3455,7 @@ static void *acf_gpd_setting_ptr(bAnimListElem *ale,
   return GET_ACF_FLAG_PTR(gpd->flag, type);
 }
 
-/* gpencil datablock type define */
+/** Grease-pencil data-block type define. */
 static bAnimChannelType ACF_GPD = {
     "GPencil Datablock",    /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -3552,7 +3554,7 @@ static void *acf_gpl_setting_ptr(bAnimListElem *ale,
   return GET_ACF_FLAG_PTR(gpl->flag, type);
 }
 
-/* grease pencil layer type define */
+/** Grease-pencil layer type define. */
 static bAnimChannelType ACF_GPL = {
     "GPencil Layer",       /* type name */
     ACHANNEL_ROLE_CHANNEL, /* role */
@@ -3634,7 +3636,7 @@ static void *acf_mask_setting_ptr(bAnimListElem *ale,
   return GET_ACF_FLAG_PTR(mask->flag, type);
 }
 
-/* mask datablock type define */
+/** Mask data-block type define. */
 static bAnimChannelType ACF_MASKDATA = {
     "Mask Datablock",       /* type name */
     ACHANNEL_ROLE_EXPANDER, /* role */
@@ -3730,7 +3732,7 @@ static void *acf_masklay_setting_ptr(bAnimListElem *ale,
   return GET_ACF_FLAG_PTR(masklay->flag, type);
 }
 
-/* grease pencil layer type define */
+/** Mask layer type define. */
 static bAnimChannelType ACF_MASKLAYER = {
     "Mask Layer",          /* type name */
     ACHANNEL_ROLE_CHANNEL, /* role */
@@ -3870,7 +3872,7 @@ static void *acf_nlatrack_setting_ptr(bAnimListElem *ale,
   return GET_ACF_FLAG_PTR(nlt->flag, type);
 }
 
-/* nla track type define */
+/** NLA track type define. */
 static bAnimChannelType ACF_NLATRACK = {
     "NLA Track",           /* type name */
     ACHANNEL_ROLE_CHANNEL, /* role */
