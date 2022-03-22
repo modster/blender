@@ -1562,6 +1562,15 @@ static void sculpt_undo_set_active_layer(struct bContext *C, SculptAttrRef *attr
   CustomDataLayer *layer;
   layer = BKE_id_attribute_find(&me->id, attr->name, attr->type, attr->domain);
 
+  if (!layer) {
+    /* memfile undo killed the layer; re-create it */
+    CustomData *cdata = attr->domain == ATTR_DOMAIN_POINT ? &me->vdata : &me->ldata;
+    int totelem = attr->domain == ATTR_DOMAIN_POINT ? me->totvert : me->totloop;
+
+    CustomData_add_layer_named(cdata, attr->type, CD_DEFAULT, NULL, totelem, attr->name);
+    layer = BKE_id_attribute_find(&me->id, attr->name, attr->type, attr->domain);
+  }
+
   if (layer) {
     BKE_id_attributes_active_color_set(&me->id, layer);
 

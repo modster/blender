@@ -693,6 +693,8 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
               break;
             }
 
+            /* Note: this is the logical index into the color attribute list,
+               not the customdata index. */
             int layer_i = BKE_id_attribute_to_index(
                 (ID *)&query_mesh, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
 
