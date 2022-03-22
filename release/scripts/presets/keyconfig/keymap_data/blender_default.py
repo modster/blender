@@ -31,6 +31,7 @@ class Params:
         "context_menu_event",
         "cursor_set_event",
         "cursor_tweak_event",
+        "use_tweak_tool_lmb_interaction",
         "use_mouse_emulate_3_button",
 
         # User preferences:
@@ -102,6 +103,7 @@ class Params:
             use_gizmo_drag=True,
             use_fallback_tool=False,
             use_fallback_tool_rmb=False,
+            use_tweak_tool_lmb_interaction=False,
             use_v3d_tab_menu=False,
             use_v3d_shade_ex_pie=False,
             use_v3d_mmb_pan=False,
@@ -129,6 +131,7 @@ class Params:
                 self.tool_maybe_tweak_value = 'PRESS'
             else:
                 self.tool_maybe_tweak_value = 'CLICK_DRAG'
+            self.use_tweak_tool_lmb_interaction = use_tweak_tool_lmb_interaction
 
             self.context_menu_event = {"type": 'W', "value": 'PRESS'}
 
@@ -150,6 +153,7 @@ class Params:
             self.action_mouse = 'RIGHTMOUSE'
             self.tool_mouse = 'LEFTMOUSE'
             self.tool_maybe_tweak_value = 'CLICK_DRAG'
+            self.use_tweak_tool_lmb_interaction = False
 
             if self.legacy:
                 self.context_menu_event = {"type": 'W', "value": 'PRESS'}
@@ -326,6 +330,22 @@ def _template_items_hide_reveal_actions(op_hide, op_reveal):
     ]
 
 
+def _template_object_hide_collection_from_number_keys():
+    return [
+        ("object.hide_collection", {
+            "type": NUMBERS_1[i], "value": 'PRESS',
+            **({"shift": True} if extend else {}),
+            **({"alt": True} if add_10 else {}),
+        }, {"properties": [
+            ("collection_index", i + (11 if add_10 else 1)),
+            ("extend", extend),
+        ]})
+        for extend in (False, True)
+        for add_10 in (False, True)
+        for i in range(10)
+    ]
+
+
 def _template_items_object_subdivision_set():
     return [
         ("object.subdivision_set",
@@ -426,16 +446,34 @@ def _template_items_change_frame(params):
 
 # Tool System Templates
 
-def _template_items_tool_select(params, operator, cursor_operator, *, extend):
+def _template_items_tool_select(params, operator, cursor_operator, fallback, *, extend):
     if params.select_mouse == 'LEFTMOUSE':
-        # Immediate select without quick delay.
+        # By default use 'PRESS' for immediate select without quick delay.
+        # Fallback key-maps 'CLICK' since 'PRESS' events passes through (allowing either click or drag).
+        #
+        # NOTE: When the active (non-fallback) tool uses a key-map that activates it's primary tool on drag,
+        # it's important that this key-map uses click and not press. Otherwise it becomes impossible to use
+        # the tool without selecting elements under the cursor.
         return [
-            (operator, {"type": 'LEFTMOUSE', "value": 'PRESS'},
+            (operator, {"type": 'LEFTMOUSE', "value": 'CLICK' if fallback else 'PRESS'},
              {"properties": [("deselect_all", True)]}),
-            (operator, {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
+            (operator, {"type": 'LEFTMOUSE', "value": 'CLICK' if fallback else 'PRESS', "shift": True},
              {"properties": [(extend, True)]}),
         ]
     else:
+        # Experimental support for LMB interaction for the tweak tool.
+        if params.use_tweak_tool_lmb_interaction and not fallback:
+            return [
+                (operator, {"type": 'LEFTMOUSE', "value": 'PRESS'},
+                 {"properties": [("deselect_all", True), ("select_passthrough", True)]}),
+                (operator, {"type": 'LEFTMOUSE', "value": 'CLICK'},
+                 {"properties": [("deselect_all", True)]}),
+                (operator, {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
+                 {"properties": [("deselect_all", False), ("toggle", True)]}),
+                ("transform.translate", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'},
+                 {"properties": [("release_confirm", True)]}),
+            ]
+
         # For right mouse, set the cursor.
         return [
             (cursor_operator, {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
@@ -1219,7 +1257,7 @@ def km_uv_editor(params):
         ("transform.shear", {"type": 'S', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
         ("transform.mirror", {"type": 'M', "value": 'PRESS', "ctrl": True}, None),
         ("wm.context_toggle", {"type": 'TAB', "value": 'PRESS', "shift": True},
-         {"properties": [("data_path", 'tool_settings.use_snap')]}),
+         {"properties": [("data_path", 'tool_settings.use_snap_uv')]}),
         ("wm.context_menu_enum", {"type": 'TAB', "value": 'PRESS', "shift": True, "ctrl": True},
          {"properties": [("data_path", 'tool_settings.snap_uv_element')]}),
         *_template_items_context_menu("IMAGE_MT_uvs_context_menu", params.context_menu_event),
@@ -2084,7 +2122,7 @@ def km_node_editor(params):
          {"type": params.select_mouse, "value": 'CLICK_DRAG', "alt": True},
          {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
         ("wm.context_toggle", {"type": 'TAB', "value": 'PRESS', "shift": True},
-         {"properties": [("data_path", 'tool_settings.use_snap')]}),
+         {"properties": [("data_path", 'tool_settings.use_snap_node')]}),
         ("wm.context_menu_enum", {"type": 'TAB', "value": 'PRESS', "shift": True, "ctrl": True},
          {"properties": [("data_path", 'tool_settings.snap_node_element')]}),
         ("wm.context_toggle", {"type": 'Z', "value": 'PRESS', "alt": True, "shift": True},
@@ -4405,13 +4443,7 @@ def km_pose(params):
         ("pose.breakdown", {"type": 'E', "value": 'PRESS', "shift": True}, None),
         ("pose.blend_to_neighbor", {"type": 'E', "value": 'PRESS', "shift": True, "alt": True}, None),
         op_menu("VIEW3D_MT_pose_propagate", {"type": 'P', "value": 'PRESS', "alt": True}),
-        *(
-            (("object.hide_collection",
-              {"type": NUMBERS_1[i], "value": 'PRESS', "any": True},
-              {"properties": [("collection_index", i + 1)]})
-             for i in range(10)
-             )
-        ),
+        *_template_object_hide_collection_from_number_keys(),
         *_template_items_context_menu("VIEW3D_MT_pose_context_menu", params.context_menu_event),
     ])
 
@@ -4481,13 +4513,7 @@ def km_object_mode(params):
         ("object.link_to_collection", {"type": 'M', "value": 'PRESS', "shift": True}, None),
         *_template_items_hide_reveal_actions("object.hide_view_set", "object.hide_view_clear"),
         ("object.hide_collection", {"type": 'H', "value": 'PRESS', "ctrl": True}, None),
-        *(
-            (("object.hide_collection",
-              {"type": NUMBERS_1[i], "value": 'PRESS', "any": True},
-              {"properties": [("collection_index", i + 1)]})
-             for i in range(10)
-             )
-        ),
+        *_template_object_hide_collection_from_number_keys(),
         *_template_items_context_menu("VIEW3D_MT_object_context_menu", params.context_menu_event),
     ])
 
@@ -6280,7 +6306,7 @@ def km_image_editor_tool_uv_select(params, *, fallback):
         {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
             *([] if (fallback and (params.select_mouse == 'RIGHTMOUSE')) else _template_items_tool_select(
-                params, "uv.select", "uv.cursor_set", extend="extend")),
+                params, "uv.select", "uv.cursor_set", fallback, extend="extend")),
             *([] if (not params.use_fallback_tool_rmb) else _template_uv_select(
                 type=params.select_mouse, value=params.select_mouse_value, legacy=params.legacy)),
         ]},
@@ -6487,7 +6513,7 @@ def km_3d_view_tool_select(params, *, fallback):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             *([] if (fallback and (params.select_mouse == 'RIGHTMOUSE')) else _template_items_tool_select(
-                params, "view3d.select", "view3d.cursor3d", extend="toggle")),
+                params, "view3d.select", "view3d.cursor3d", fallback, extend="toggle")),
             *([] if (not params.use_fallback_tool_rmb) else _template_view3d_select(
                 type=params.select_mouse, value=params.select_mouse_value, legacy=params.legacy, exclude_mod="ctrl")),
         ]},
@@ -7399,7 +7425,7 @@ def km_3d_view_tool_edit_gpencil_select(params, *, fallback):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             *([] if (fallback and (params.select_mouse == 'RIGHTMOUSE')) else _template_items_tool_select(
-                params, "gpencil.select", "view3d.cursor3d", extend="toggle")),
+                params, "gpencil.select", "view3d.cursor3d", fallback, extend="toggle")),
             *([] if (not params.use_fallback_tool_rmb) else _template_view3d_gpencil_select(
                 type=params.select_mouse, value=params.select_mouse_value, legacy=params.legacy)),
         ]},
@@ -7537,7 +7563,7 @@ def km_3d_view_tool_sculpt_gpencil_select(params):
     return (
         "3D View Tool: Sculpt Gpencil, Tweak",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select(params, "gpencil.select", "view3d.cursor3d", extend="toggle")},
+        {"items": _template_items_tool_select(params, "gpencil.select", "view3d.cursor3d", False, extend="toggle")},
     )
 
 
@@ -7577,7 +7603,7 @@ def km_sequencer_editor_tool_generic_select(params, *, fallback):
         {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
             *([] if (fallback and (params.select_mouse == 'RIGHTMOUSE')) else _template_items_tool_select(
-                params, "sequencer.select", "sequencer.cursor_set", extend="toggle")),
+                params, "sequencer.select", "sequencer.cursor_set", fallback, extend="toggle")),
 
             *([] if (not params.use_fallback_tool_rmb) else _template_sequencer_preview_select(
                 type=params.select_mouse, value=params.select_mouse_value, legacy=params.legacy)),

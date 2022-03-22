@@ -22,10 +22,16 @@ set(INC
   ../../../../intern/eigen
   ../../../../intern/glew-mx
   ../../../../intern/guardedalloc
+  # RNA_prototypes.h
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(SRC
+  curves_sculpt_add.cc
+  curves_sculpt_comb.cc
+  curves_sculpt_delete.cc
   curves_sculpt_ops.cc
+  curves_sculpt_snake_hook.cc
   paint_cursor.c
   paint_curve.c
   paint_curve_undo.c
@@ -71,6 +77,7 @@ set(SRC
   sculpt_uv.c
 
   curves_sculpt_intern.h
+  curves_sculpt_intern.hh
   paint_intern.h
   sculpt_intern.h
 )
@@ -93,3 +100,6 @@ if(WITH_TBB)
 endif()
 
 blender_add_lib(bf_editor_sculpt_paint "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.h
+add_dependencies(bf_editor_sculpt_paint bf_rna)

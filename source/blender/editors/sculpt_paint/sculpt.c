@@ -2748,6 +2748,10 @@ static void update_brush_local_mat(Sculpt *sd, Object *ob)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name Generic Brush Plane & Symmetry Utilities
+ * \{ */
+
 typedef struct {
   SculptSession *ss;
   const float *ray_start;
@@ -5723,11 +5727,5 @@ void SCULPT_fake_neighbors_free(Object *ob)
   SculptSession *ss = ob->sculpt;
   sculpt_pose_fake_neighbors_free(ss);
 }
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Operator Registration
- * \{ */
 
 /** \} */
