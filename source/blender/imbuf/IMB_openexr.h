@@ -2,12 +2,12 @@
  * Copyright 2006 Blender Foundation. All rights reserved. */
 
 /** \file
- * \ingroup openexr
+ * \ingroup imbuf
  */
 
 #pragma once
 
-/* Experiment with more advanced EXR API. */
+/* API for reading and writing multilayer EXR files. */
 
 /* XXX layer+pass name max 64? */
 /* This api also supports max 8 channels per pass now. easy to fix! */
@@ -104,13 +104,6 @@ void IMB_exr_close(void *handle);
 void IMB_exr_add_view(void *handle, const char *name);
 
 bool IMB_exr_has_multilayer(void *handle);
-
-void IMB_exr_channel_name(char *fullname,
-                          const char *layname,
-                          const char *passname,
-                          const char *viewname,
-                          const char *chan_id,
-                          const int channel);
 
 #ifdef __cplusplus
 } /* extern "C" */
