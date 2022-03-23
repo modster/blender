@@ -23,14 +23,6 @@ else()
   set(OIIO_SIMD_FLAGS)
 endif()
 
-if(WITH_WEBP)
-  set(WEBP_ARGS
-    -DWEBP_INCLUDE_DIR=${LIBDIR}/webp/include
-    -DWEBP_LIBRARY=${LIBDIR}/webp/lib/${LIBPREFIX}webp${LIBEXT}
-  )
-  set(WEBP_DEP external_webp)
-endif()
-
 if(MSVC)
   set(OPENJPEG_FLAGS
     -DOpenJPEG_ROOT=${LIBDIR}/openjpeg_msvc
@@ -65,7 +57,7 @@ set(OPENIMAGEIO_EXTRA_ARGS
   -DUSE_FREETYPE=OFF
   -DUSE_LIBRAW=OFF
   -DUSE_OPENCOLORIO=OFF
-  -DUSE_WEBP=${WITH_WEBP}
+  -DUSE_WEBP=ON
   -DOIIO_BUILD_TOOLS=${OIIO_TOOLS}
   -DOIIO_BUILD_TESTS=OFF
   -DBUILD_TESTING=OFF
@@ -89,7 +81,7 @@ set(OPENIMAGEIO_EXTRA_ARGS
   -DBUILD_MISSING_FMT=OFF
   -DFMT_INCLUDE_DIR=${LIBDIR}/fmt/include/
   -DRobinmap_ROOT=${LIBDIR}/robinmap
-  ${WEBP_FLAGS}
+  -DWebP_ROOT=${LIBDIR}/webp
   ${OIIO_SIMD_FLAGS}
   -DOpenEXR_ROOT=${LIBDIR}/openexr
   -DImath_ROOT=${LIBDIR}/imath
@@ -118,7 +110,7 @@ add_dependencies(
   external_fmt
   external_robinmap
   external_openjpeg${OPENJPEG_POSTFIX}
-  ${WEBP_DEP}
+  external_webp
 )
 
 if(WIN32)

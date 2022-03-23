@@ -174,6 +174,12 @@ if(WITH_IMAGE_HDR)
   add_definitions(-DWITH_HDR)
 endif()
 
+if(WITH_IMAGE_WEBP)
+  list(APPEND LIB
+    ${WEBP_LIBRARIES}
+  )
+endif()
+
 list(APPEND INC
   ../../../intern/opencolorio
 )

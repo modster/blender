@@ -318,9 +318,9 @@ set(SNDFILE_HASH 646b5f98ce89ac60cdb060fcd398247c)
 set(SNDFILE_HASH_TYPE MD5)
 set(SNDFILE_FILE libsndfile-${SNDFILE_VERSION}.tar.gz)
 
-set(WEBP_VERSION 0.6.1)
+set(WEBP_VERSION 1.2.2)
 set(WEBP_URI https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz)
-set(WEBP_HASH b49ce9c3e3e9acae4d91bca44bb85a72)
+set(WEBP_HASH b5e2e414a8adee4c25fe56b18dd9c549)
 set(WEBP_HASH_TYPE MD5)
 set(WEBP_FILE libwebp-${WEBP_VERSION}.tar.gz)
 

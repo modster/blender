@@ -111,9 +111,7 @@ if(BLENDER_PLATFORM_ARM)
   include(cmake/sse2neon.cmake)
 endif()
 
-if(WITH_WEBP)
-  include(cmake/webp.cmake)
-endif()
+include(cmake/webp.cmake)
 
 if(NOT WIN32 OR ENABLE_MINGW64)
   include(cmake/gmp.cmake)
