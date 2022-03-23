@@ -2218,6 +2218,45 @@ class VIEW3D_PT_gpencil_brush_presets(Panel, PresetPanel):
     preset_add_operator = "scene.gpencil_brush_preset_add"
 
 
+class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
+    bl_category = "Tool"
+    bl_context = ".sculpt_mode"  # dot on purpose (access from topbar)
+    bl_label = "Painting Canvas"
+
+    @classmethod
+    def poll(cls, context):
+        brush = context.tool_settings.sculpt.brush
+        return (brush is not None and context.active_object is not None)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        ob = context.active_object
+        settings = context.tool_settings.paint_mode
+
+        layout.prop(settings, "canvas_type")
+        match settings.canvas_type:
+            case 'VERTEX':
+                me = ob.data
+                layout.template_list("MESH_UL_vcols", "vcols", me, "vertex_colors", me.vertex_colors, "active_index", rows=2)
+
+            case 'MATERIAL':
+                layout.template_list(
+                    "MATERIAL_UL_matslots", "",
+                    ob, "material_slots",
+                    ob, "active_material_index",
+                    rows=2,
+                )
+
+            case 'IMAGE':
+                me = ob.data
+
+                layout.template_ID(settings, "image", new="image.new", open="image.open")
+                layout.menu("VIEW3D_MT_tools_projectpaint_uvlayer")
+
+
 classes = (
     VIEW3D_MT_brush_context_menu,
     VIEW3D_MT_brush_gpencil_context_menu,
@@ -2306,6 +2345,8 @@ classes = (
     VIEW3D_PT_tools_grease_pencil_brush_vertex_color,
     VIEW3D_PT_tools_grease_pencil_brush_vertex_palette,
     VIEW3D_PT_tools_grease_pencil_brush_vertex_falloff,
+
+    VIEW3D_PT_tools_paint_canvas,
 )
 
 if __name__ == "__main__":  # only for live edit.
