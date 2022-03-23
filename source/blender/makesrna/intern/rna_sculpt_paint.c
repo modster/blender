@@ -549,6 +549,12 @@ static void rna_ImaPaint_canvas_update(bContext *C, PointerRNA *UNUSED(ptr))
   }
 }
 
+static bool rna_PaintModeSettings_image_poll(PointerRNA *UNUSED(ptr), PointerRNA value)
+{
+  Image *image = (Image *)value.owner_id;
+  return !ELEM(image->type, IMA_TYPE_COMPOSITE, IMA_TYPE_R_RESULT);
+}
+
 static bool rna_ImaPaint_detect_data(ImagePaintSettings *imapaint)
 {
   return imapaint->missing_data == 0;
@@ -989,8 +995,10 @@ static void rna_def_paint_mode(BlenderRNA *brna)
   prop = RNA_def_property(srna, "canvas_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "canvas_type");
   RNA_def_property_enum_items(prop, rna_enum_canvas_type_items);
+  RNA_def_property_ui_text(prop, "Canvas", "Type of canvas to paint on");
 
   prop = RNA_def_property(srna, "image", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_PaintModeSettings_image_poll");
   RNA_def_property_flag(prop, PROP_EDITABLE | PROP_CONTEXT_UPDATE);
   RNA_def_property_ui_text(prop, "Texture", "Image used as as painting target");
 }

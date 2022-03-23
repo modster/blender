@@ -2251,10 +2251,8 @@ class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
                 )
 
             case 'IMAGE':
-                me = ob.data
-
                 layout.template_ID(settings, "image", new="image.new", open="image.open")
-                layout.menu("VIEW3D_MT_tools_projectpaint_uvlayer")
+                layout.menu("VIEW3D_MT_tools_projectpaint_uvlayer", text="UV Map")
 
 
 classes = (
