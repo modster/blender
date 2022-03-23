@@ -866,7 +866,7 @@ static void do_mask_by_color_contiguous_update_nodes_cb(
   }
   BKE_pbvh_vertex_iter_end;
   if (update_node) {
-    BKE_pbvh_node_mark_redraw(data->nodes[n]);
+    BKE_pbvh_node_mark_update_mask(data->nodes[n]);
   }
 }
 
@@ -1066,6 +1066,7 @@ static int sculpt_mask_by_color_invoke(bContext *C, wmOperator *op, const wmEven
   SCULPT_undo_push_end(ob);
 
   SCULPT_flush_update_done(C, ob, SCULPT_UPDATE_MASK);
+  DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
 
   return OPERATOR_FINISHED;
 }

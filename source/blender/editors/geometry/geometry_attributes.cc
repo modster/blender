@@ -506,7 +506,7 @@ void GEOMETRY_OT_attribute_convert(wmOperatorType *ot)
       {int(ConvertAttributeMode::Generic), "GENERIC", 0, "Generic", ""},
       {int(ConvertAttributeMode::UVMap), "UV_MAP", 0, "UV Map", ""},
       {int(ConvertAttributeMode::VertexGroup), "VERTEX_GROUP", 0, "Vertex Group", ""},
-      {int(ConvertAttributeMode::VertexColor), "VERTEX_COLOR", 0, "Vertex Color", ""},
+      {int(ConvertAttributeMode::VertexColor), "VERTEX_COLOR", 0, "Color Attribute", ""},
       {0, nullptr, 0, nullptr, nullptr},
   };
 

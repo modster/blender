@@ -438,7 +438,7 @@ const EnumPropertyItem rna_enum_bake_target_items[] = {
     {R_BAKE_TARGET_VERTEX_COLORS,
      "VERTEX_COLORS",
      0,
-     "Vertex Colors",
+     "Color Attributes",
      "Bake to active vertex color layer on meshes"},
     {0, NULL, 0, NULL, NULL},
 };
