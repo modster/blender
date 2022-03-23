@@ -2225,8 +2225,20 @@ class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
 
     @classmethod
     def poll(cls, context):
+        if not context.preferences.experimental.use_sculpt_texture_paint:
+            return False
+
+        if context.active_object is None:
+            return False
+
         brush = context.tool_settings.sculpt.brush
-        return (brush is not None and context.active_object is not None)
+        if brush:
+            return brush.sculpt_tool in [
+                'PAINT',
+            ]
+
+        # TODO: check active tool... but when migrating to paint mode this might not be needed.
+        return True
 
     def draw(self, context):
         layout = self.layout
