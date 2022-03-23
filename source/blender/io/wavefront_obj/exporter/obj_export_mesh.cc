@@ -89,8 +89,13 @@ std::pair<Mesh *, bool> OBJMesh::triangulate_mesh_eval()
   if (export_mesh_eval_->totpoly <= 0) {
     return {export_mesh_eval_, false};
   }
-  const struct BMeshCreateParams bm_create_params = {0u};
-  const struct BMeshFromMeshParams bm_convert_params = {1u, 0, 0, 0};
+  const BMeshCreateParams bm_create_params = {0u};
+  BMeshFromMeshParams bm_convert_params{};
+  bm_convert_params.calc_face_normal = true;
+  bm_convert_params.calc_vert_normal = true;
+  bm_convert_params.add_key_index = false;
+  bm_convert_params.use_shapekey = false;
+
   /* Lower threshold where triangulation of a polygon starts, i.e. a quadrilateral will be
    * triangulated here. */
   const int triangulate_min_verts = 4;
@@ -207,7 +212,10 @@ void OBJMesh::calc_poly_order()
   blender::parallel_sort(poly_order_.begin(), poly_order_.end(), [&](int a, int b) {
     int mat_a = mpolys[a].mat_nr;
     int mat_b = mpolys[b].mat_nr;
-    return mat_a < mat_b;
+    if (mat_a != mat_b) {
+      return mat_a < mat_b;
+    }
+    return a < b;
   });
 }
 
