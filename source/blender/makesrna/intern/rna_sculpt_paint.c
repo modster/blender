@@ -82,6 +82,13 @@ static const EnumPropertyItem rna_enum_gpencil_paint_mode[] = {
      "Paint the material with custom vertex color"},
     {0, NULL, 0, NULL, NULL},
 };
+
+static const EnumPropertyItem rna_enum_canvas_type_items[] = {
+    {PAINT_CANVAS_VERTEX, "VERTEX", 0, "Vertex", ""},
+    {PAINT_CANVAS_MATERIAL, "MATERIAL", 0, "Material", ""},
+    {PAINT_CANVAS_IMAGE, "IMAGE", 0, "Image", ""},
+    {0, NULL, 0, NULL, NULL},
+};
 #endif
 
 const EnumPropertyItem rna_enum_symmetrize_direction_items[] = {
@@ -416,6 +423,11 @@ static char *rna_VertexPaint_path(PointerRNA *ptr)
 static char *rna_ImagePaintSettings_path(PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("tool_settings.image_paint");
+}
+
+static char *rna_PaintModeSettings_path(PointerRNA *UNUSED(ptr))
+{
+  return BLI_strdup("tool_settings.paint_mode");
 }
 
 static char *rna_UvSculpt_path(PointerRNA *UNUSED(ptr))
@@ -962,6 +974,25 @@ static void rna_def_vertex_paint(BlenderRNA *brna)
   RNA_def_property_ui_range(prop, 1, 32, 1, 1);
   RNA_def_property_ui_text(
       prop, "Radial Symmetry Count X Axis", "Number of times to copy strokes across the surface");
+}
+
+static void rna_def_paint_mode(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "PaintModeSettings", NULL);
+  RNA_def_struct_sdna(srna, "PaintModeSettings");
+  RNA_def_struct_path_func(srna, "rna_PaintModeSettings_path");
+  RNA_def_struct_ui_text(srna, "Paint Mode", "Properties of paint mode");
+
+  prop = RNA_def_property(srna, "canvas_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "canvas_type");
+  RNA_def_property_enum_items(prop, rna_enum_canvas_type_items);
+
+  prop = RNA_def_property(srna, "image", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_EDITABLE | PROP_CONTEXT_UPDATE);
+  RNA_def_property_ui_text(prop, "Texture", "Image used as as painting target");
 }
 
 static void rna_def_image_paint(BlenderRNA *brna)
@@ -1551,6 +1582,7 @@ void RNA_def_sculpt_paint(BlenderRNA *brna)
   rna_def_gp_sculptpaint(brna);
   rna_def_gp_weightpaint(brna);
   rna_def_vertex_paint(brna);
+  rna_def_paint_mode(brna);
   rna_def_image_paint(brna);
   rna_def_particle_edit(brna);
   rna_def_gpencil_guides(brna);

@@ -923,6 +923,19 @@ typedef struct ImagePaintSettings {
 } ImagePaintSettings;
 
 /* ------------------------------------------- */
+/* Paint mode settings */
+
+typedef struct PaintModeSettings {
+  /** Type of canvas to paint on (ePaintCanvasType) */
+  char canvas_type;
+  char _pad[7];
+
+  /** Selected image when canvas_type=PAINT_CANVAS_IMAGE. */
+  Image *image;
+
+} PaintModeSettings;
+
+/* ------------------------------------------- */
 /* Particle Edit */
 
 /** Settings for a Particle Editing Brush. */
@@ -1454,6 +1467,9 @@ typedef struct ToolSettings {
 
   /* Image Paint (8 bytes aligned please!) */
   struct ImagePaintSettings imapaint;
+
+  /** Settings for paint mode. */
+  struct PaintModeSettings paint_mode;
 
   /* Particle Editing */
   struct ParticleEditSettings particle;
@@ -2272,6 +2288,16 @@ typedef enum eImagePaintMode {
   IMAGEPAINT_MODE_MATERIAL = 0, /* detect texture paint slots from the material */
   IMAGEPAINT_MODE_IMAGE = 1,    /* select texture paint image directly */
 } eImagePaintMode;
+
+/** PaintModeSettings.canvas_type */
+typedef enum ePaintCanvasType {
+  /** Paint on the active vertex color layer. */
+  PAINT_CANVAS_VERTEX = 0,
+  /** Paint on the active texture of the active material slot. */
+  PAINT_CANVAS_MATERIAL = 1,
+  /** Paint on a selected image. */
+  PAINT_CANVAS_IMAGE = 2,
+} ePaintCanvasType;
 
 /** #ImagePaintSettings.interp */
 enum {
