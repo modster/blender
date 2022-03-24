@@ -347,7 +347,7 @@ windows_find_package(WebP)
 if(NOT WEBP_FOUND)
   set(WEBP_INCLUDE_DIRS ${LIBDIR}/webp/include)
   set(WEBP_ROOT_DIR ${LIBDIR}/webp)
-  set(WEBP_LIBRARIES ${LIBDIR}/webp/lib/webp.lib ${LIBDIR}/webp/lib/webpdecoder.lib ${LIBDIR}/webp/lib/webpdemux.lib ${LIBDIR}/webp/lib/webpmux.lib)
+  set(WEBP_LIBRARIES ${LIBDIR}/webp/lib/webp.lib ${LIBDIR}/webp/lib/webpdemux.lib ${LIBDIR}/webp/lib/webpmux.lib)
   set(WEBP_FOUND ON)
 endif()
 

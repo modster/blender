@@ -34,7 +34,6 @@ FIND_PATH(WEBP_INCLUDE_DIR
 
 SET(_webp_FIND_COMPONENTS
     webp
-    webpdecoder
     webpmux
     webpdemux
   )
@@ -76,5 +75,3 @@ MARK_AS_ADVANCED(
   WEBP_INCLUDE_DIR
   WEBP_LIBRARY_DIR
 )
-message("WEBP_FOUND = ${WEBP_FOUND}")
-message("WEBP_LIBRARIES = ${WEBP_LIBRARIES}")

@@ -241,7 +241,6 @@ if(WITH_IMAGE_WEBP)
   endif()
 endif()
 
-
 if(WITH_BOOST)
   set(Boost_NO_BOOST_CMAKE ON)
   set(BOOST_ROOT ${LIBDIR}/boost)
