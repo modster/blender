@@ -607,6 +607,10 @@ if(WITH_IMAGE_HDR)
   add_definitions(-DWITH_HDR)
 endif()
 
+if(WITH_IMAGE_WEBP)
+	add_definitions(-DWITH_WEBP)
+endif()
+
 if(WITH_CODEC_AVI)
   list(APPEND INC
     ../io/avi
@@ -818,6 +822,7 @@ if(WITH_GTESTS)
     intern/cryptomatte_test.cc
     intern/curves_geometry_test.cc
     intern/fcurve_test.cc
+    intern/image_test.cc
     intern/idprop_serialize_test.cc
     intern/image_partial_update_test.cc
     intern/lattice_deform_test.cc
