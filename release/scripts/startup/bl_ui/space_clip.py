@@ -125,8 +125,6 @@ class CLIP_HT_tool_header(Header):
         layout = self.layout
         sc = context.space_data
 
-        layout.template_header()
-        
         if sc.view == 'CLIP':
 
             self.draw_tool_settings(context)
@@ -195,9 +193,6 @@ class CLIP_HT_header(Header):
         sc = context.space_data
         clip = sc.clip
         show_region_tool_header = sc.show_region_tool_header
-
-        if not show_region_tool_header:
-            layout.template_header()
 
         CLIP_MT_tracking_editor_menus.draw_collapsible(context, layout)
 
@@ -291,7 +286,6 @@ class CLIP_HT_header(Header):
     def _draw_masking(self, context):
         layout = self.layout
 
-        tool_settings = context.tool_settings
         sc = context.space_data
         clip = sc.clip
 
@@ -321,8 +315,7 @@ class CLIP_HT_header(Header):
 
         sc = context.space_data
 
-        if not sc.show_region_tool_header:
-            layout.template_header()
+        layout.template_header()
 
         layout.prop(sc, "mode", text="")
         if sc.mode == 'TRACKING':
