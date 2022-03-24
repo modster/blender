@@ -35,6 +35,8 @@ struct ViewLayer;
 
 namespace blender::ed::outliner {
 
+class TreeElementID;
+
 /**
  * \brief The data to build the tree from.
  */
@@ -149,6 +151,10 @@ class TreeDisplayOverrideLibraryHierarchy final : public AbstractTreeDisplay {
   TreeDisplayOverrideLibraryHierarchy(SpaceOutliner &space_outliner);
 
   ListBase buildTree(const TreeSourceData &source_data) override;
+
+ private:
+  ListBase build_hierarchy_for_lib_or_main(Main *bmain, TreeElement &parent_te, Library *lib = nullptr);
+  void build_hierarchy_for_ID(Main *bmain, ID &override_root_id, TreeElementID &te_id) const;
 };
 
 /* -------------------------------------------------------------------- */

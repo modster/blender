@@ -2169,6 +2169,9 @@ int ui_id_icon_get(const bContext *C, ID *id, const bool big)
 
 int UI_icon_from_library(const ID *id)
 {
+  if (ID_IS_OVERRIDE_LIBRARY(id)) {
+    return ICON_LIBRARY_DATA_OVERRIDE;
+  }
   if (ID_IS_LINKED(id)) {
     if (id->tag & LIB_TAG_MISSING) {
       return ICON_LIBRARY_DATA_BROKEN;
@@ -2177,9 +2180,6 @@ int UI_icon_from_library(const ID *id)
       return ICON_LIBRARY_DATA_INDIRECT;
     }
     return ICON_LIBRARY_DATA_DIRECT;
-  }
-  if (ID_IS_OVERRIDE_LIBRARY(id)) {
-    return ICON_LIBRARY_DATA_OVERRIDE;
   }
   if (ID_IS_ASSET(id)) {
     return ICON_ASSET_MANAGER;

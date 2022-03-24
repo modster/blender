@@ -3911,7 +3911,8 @@ void draw_outliner(const bContext *C)
     /* draw user toggle columns */
     outliner_draw_userbuts(block, region, space_outliner, &space_outliner->tree);
   }
-  else if (space_outliner->outlinevis == SO_OVERRIDES_LIBRARY) {
+  else if ((space_outliner->outlinevis == SO_OVERRIDES_LIBRARY) &&
+           (space_outliner->lib_override_view_mode == SO_LIB_OVERRIDE_VIEW_PROPERTIES)) {
     /* Draw overrides status columns. */
     outliner_draw_overrides_warning_buts(
         block, region, space_outliner, &space_outliner->tree, true);

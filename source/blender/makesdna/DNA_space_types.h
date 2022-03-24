@@ -395,7 +395,9 @@ typedef enum eSpaceOutliner_Mode {
 
 /** #SpaceOutliner.outlinevis */
 typedef enum eSpaceOutliner_LibOverrideViewMode {
+  /* View all overrides with RNA buttons to edit the overridden values. */
   SO_LIB_OVERRIDE_VIEW_PROPERTIES = 0,
+  /* View entire override hierarchies. */
   SO_LIB_OVERRIDE_VIEW_HIERARCHY = 1,
 } eSpaceOutliner_LibOverrideViewMode;
 
