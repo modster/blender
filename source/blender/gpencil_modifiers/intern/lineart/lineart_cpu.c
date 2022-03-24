@@ -98,6 +98,14 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *spl,
                                                         double *from,
                                                         double *to);
 
+static LineartVert *lineart_triangle_share_point(const LineartTriangle *l,
+                                                 const LineartTriangle *r);
+
+static bool lineart_triangle_get_other_verts(const LineartTriangle *tri,
+                                             const LineartVert *vt,
+                                             LineartVert **l,
+                                             LineartVert **r);
+
 static void OcclusionCollideFunc(void *userPtr,
                                  struct RTCCollision *collisions,
                                  unsigned int num_collisions);
@@ -2209,15 +2217,167 @@ static bool lineart_geometry_check_visible(double (*model_view_proj)[4],
   return true;
 }
 
+static bool lineart_embree_triangle_2v_intersection_test(LineartVert *v1,
+                                                         LineartVert *v2,
+                                                         LineartTriangle *tri,
+                                                         LineartTriangle *testing,
+                                                         double *last,
+                                                         double *result)
+{
+  double Lv[3];
+  double Rv[3];
+  double dot_l, dot_r;
+  double gloc[3];
+  LineartVert *l = v1, *r = v2;
+
+  sub_v3_v3v3_db(Lv, l->gloc, testing->v[0]->gloc);
+  sub_v3_v3v3_db(Rv, r->gloc, testing->v[0]->gloc);
+
+  dot_l = dot_v3v3_db(Lv, testing->gn);
+  dot_r = dot_v3v3_db(Rv, testing->gn);
+
+  if (dot_l * dot_r > 0 || (!dot_l && !dot_r)) {
+    return false;
+  }
+
+  dot_l = fabs(dot_l);
+  dot_r = fabs(dot_r);
+
+  interp_v3_v3v3_db(gloc, l->gloc, r->gloc, dot_l / (dot_l + dot_r));
+
+  /* Due to precision issue, we might end up with the same point as the one we already detected.
+   */
+  if (last && LRT_DOUBLE_CLOSE_ENOUGH(last[0], gloc[0]) &&
+      LRT_DOUBLE_CLOSE_ENOUGH(last[1], gloc[1]) && LRT_DOUBLE_CLOSE_ENOUGH(last[2], gloc[2])) {
+    return false;
+  }
+
+  if (!(lineart_point_inside_triangle3d(
+          gloc, testing->v[0]->gloc, testing->v[1]->gloc, testing->v[2]->gloc))) {
+    return false;
+  }
+
+  copy_v3_v3_db(result, gloc);
+
+  return true;
+}
+
+static bool lineart_embree_triangle_intersect(LineartTriangle *tri,
+                                              LineartTriangle *testing,
+                                              double *r_v1,
+                                              double *r_v2)
+{
+  double va1[3], va2[3];
+  double *v1 = va1, *v2 = va2;
+  double **next = &v1;
+  double E0T[3];
+  double E1T[3];
+  double E2T[3];
+  double TE0[3];
+  double TE1[3];
+  double TE2[3];
+  LineartVert *sv1, *sv2;
+  double cl[3];
+  bool isuccess;
+
+  LineartVert *share = lineart_triangle_share_point(testing, tri);
+
+  if (share) {
+    /* If triangles have sharing points like `abc` and `acd`, then we only need to detect `bc`
+     * against `acd` or `cd` against `abc`. */
+
+    LineartVert *new_share;
+    lineart_triangle_get_other_verts(tri, share, &sv1, &sv2);
+
+    new_share = share;
+    v1 = share->gloc;
+
+    isuccess = lineart_embree_triangle_2v_intersection_test(sv1, sv2, tri, testing, 0, v2);
+
+    if (!isuccess) {
+      lineart_triangle_get_other_verts(testing, share, &sv1, &sv2);
+      isuccess = lineart_embree_triangle_2v_intersection_test(sv1, sv2, testing, tri, 0, v2);
+      if (!isuccess) {
+        return false;
+      }
+    }
+  }
+  else {
+    /* If not sharing any points, then we need to try all the possibilities. */
+
+    int pcount = 0;
+
+    isuccess = lineart_embree_triangle_2v_intersection_test(
+        tri->v[0], tri->v[1], tri, testing, 0, E0T);
+    if (isuccess && (pcount < 2)) {
+      (*next) = E0T;
+      next = &v2;
+      pcount++;
+    }
+    isuccess = lineart_embree_triangle_2v_intersection_test(
+        tri->v[1], tri->v[2], tri, testing, v1, E1T);
+    if (isuccess && (pcount < 2)) {
+      (*next) = E1T;
+      next = &v2;
+      pcount++;
+    }
+    if (pcount < 2) {
+      isuccess = lineart_embree_triangle_2v_intersection_test(
+          tri->v[2], tri->v[0], tri, testing, v1, E2T);
+    }
+    if (isuccess && (pcount < 2)) {
+      (*next) = E2T;
+      next = &v2;
+      pcount++;
+    }
+
+    if (pcount < 2) {
+      isuccess = lineart_embree_triangle_2v_intersection_test(
+          testing->v[0], testing->v[1], testing, tri, v1, TE0);
+    }
+    if (isuccess && (pcount < 2)) {
+      (*next) = TE0;
+      next = &v2;
+      pcount++;
+    }
+    if (pcount < 2) {
+      isuccess = lineart_embree_triangle_2v_intersection_test(
+          testing->v[1], testing->v[2], testing, tri, v1, TE1);
+    }
+    if (isuccess && (pcount < 2)) {
+      (*next) = TE1;
+      next = &v2;
+      pcount++;
+    }
+    if (pcount < 2) {
+      isuccess = lineart_embree_triangle_2v_intersection_test(
+          testing->v[2], testing->v[0], testing, tri, v1, TE2);
+    }
+    if (isuccess && (pcount < 2)) {
+      (*next) = TE2;
+      next = &v2;
+      pcount++;
+    }
+    if (pcount < 2) {
+      return false;
+    }
+  }
+
+  copy_v3_v3_db(r_v1, v1);
+  copy_v3_v3_db(r_v2, v2);
+
+  return true;
+}
+
 static void lineart_embree_clear_mesh_record(LineartRenderBuffer *rb)
 {
   if (rb->mesh_record.array) {
-    for (int i = 0; i < rb->mesh_record.max_length; i++) {
-      LineartPointArrayFinal *rec = &rb->mesh_record.array[i];
-      if (rec->points) {
-        MEM_freeN(rec->points);
-      }
-    }
+    // for (int i = 0; i < rb->mesh_record.max_length; i++) {
+    //  LineartPointArrayFinal *rec = &rb->mesh_record.array[i];
+    //  if (rec->points) {
+    //    MEM_freeN(rec->points);
+    //  }
+    //}
     MEM_freeN(rb->mesh_record.array);
   }
   rb->mesh_record.max_length = 0;
@@ -2252,7 +2412,7 @@ static void lineart_embree_init_mesh_record(LineartRenderBuffer *rb)
   /* In case anything dirty. */
   lineart_embree_clear_mesh_record(rb);
 
-  const char *config = "verbose=3";
+  const char *config = "verbose=3,start_threads=1,set_affinity=1";
   rb->rtcdevice = rtcNewDevice(config);
   rb->rtcscene_geom = rtcNewScene(rb->rtcdevice);
   rb->rtcscene_view = rtcNewScene(rb->rtcdevice);
@@ -2338,18 +2498,6 @@ static void lineart_embree_transform_point_array(LineartRenderBuffer *rb,
   rb->mesh_record.next = geom_id + 1;
   rec->rb = rb;
 
-  if (!me->runtime.looptris.array) {
-    BKE_mesh_runtime_looptri_recalc(me);
-  }
-
-  rec->numpoints = pcount;
-  rec->looptri = me->runtime.looptris.array;
-  rec->loop = me->mloop;
-  rec->points = MEM_mallocN(sizeof(float) * 3 * pcount, "LineartPointArrayFinal::points");
-  for (int i = 0; i < pcount; i++) {
-    mul_v3_m4v3(&rec->points[i * 3], ob->obmat, me->mvert[i].co);
-  }
-
   /* Only user typed geometry supports rtcCollide(). */
   // rtcSetGeometryUserPrimitiveCount(geom, me->runtime.looptris.len);
   /* Reduce the geom user count to 1, and when scene is destroyed the geom is destroyed
@@ -2376,8 +2524,14 @@ static void lineart_embree_new_virtual_geometry(LineartRenderBuffer *rb,
  * committed until that. */
 static void lineart_embree_generate_occlusion_pairs(LineartRenderBuffer *rb)
 {
+  LineartThreadOcclusionData *tod = lineart_thread_init_occlusion_result();
+  rb->thread_occlusion_data = tod;
+
   rtcCommitScene(rb->rtcscene_view);
   rtcCollide(rb->rtcscene_view, rb->rtcscene_geom, OcclusionCollideFunc, rb);
+
+  rb->occlusion_record.array = lineart_thread_finalize_occlusion_result(
+      tod, &rb->occlusion_record.next);
 }
 
 static void lineart_main_load_geometries(
@@ -2555,7 +2709,7 @@ static void lineart_main_load_geometries(
 }
 
 static void lineart_add_intersection_record_thread(
-    LineartRenderBuffer *rb, float *i1, float *i2, LineartTriangle *t1, LineartTriangle *t2)
+    LineartRenderBuffer *rb, double *i1, double *i2, LineartTriangle *t1, LineartTriangle *t2)
 {
   LineartMeshRecord *rec = &rb->mesh_record;
   BLI_spin_lock(&rb->lock_task);
@@ -2574,8 +2728,8 @@ static void lineart_add_intersection_record_thread(
   rec->intersection_pair_next++;
   BLI_spin_unlock(&rb->lock_task);
 
-  copy_v3_v3(&write->p1[0], i1);
-  copy_v3_v3(&write->p2[0], i2);
+  copy_v3_v3_db(&write->p1[0], i1);
+  copy_v3_v3_db(&write->p2[0], i2);
   write->t1 = t1;
   write->t2 = t2;
 }
@@ -2635,7 +2789,7 @@ static bool lineart_isect_tri_tri_v3_check_overlap(const float t_a0[3],
   return isect_tri_tri_v3(t_a0, t_a1, t_a2, t_b0, t_b1, t_b2, r_i1, r_i2);
 }
 
-static void __attribute__((optimize("O0")))
+static void  //__attribute__((optimize("O0")))
 IntersectionCollideFunc(void *userPtr,
                         struct RTCCollision *collisions,
                         unsigned int num_collisions)
@@ -2656,20 +2810,15 @@ IntersectionCollideFunc(void *userPtr,
     if (lineart_triangle_share_edge(ta, tb)) {
       continue;
     }
-    copy_v3fl_v3db(pa0, ta->v[0]->gloc);
-    copy_v3fl_v3db(pa1, ta->v[1]->gloc);
-    copy_v3fl_v3db(pa2, ta->v[2]->gloc);
-    copy_v3fl_v3db(pb0, tb->v[0]->gloc);
-    copy_v3fl_v3db(pb1, tb->v[1]->gloc);
-    copy_v3fl_v3db(pb2, tb->v[2]->gloc);
-    float i1[3], i2[3];
-    if (lineart_isect_tri_tri_v3_check_overlap(pa0, pa1, pa2, pb0, pb1, pb2, i1, i2)) {
+    double i1[3], i2[3];
+
+    if (lineart_embree_triangle_intersect(ta, tb, i1, i2)) {
       lineart_add_intersection_record_thread(rb, i1, i2, ta, tb);
     }
   }
 }
 
-static void __attribute__((optimize("O0")))
+static void  //__attribute__((optimize("O0")))
 OcclusionCollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned int num_collisions)
 {
   LineartRenderBuffer *rb = (LineartRenderBuffer *)userPtr;
@@ -2720,7 +2869,9 @@ OcclusionCollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned in
     float i1[3], i2[3];
     if (lineart_isect_tri_tri_v3_check_overlap(
             &pa[0], &pa[3], &pa[6], &pb[0], &pb[3], &pb[6], i1, i2)) {
-      lineart_add_occlusion_pair_thread(rb, eln_edge, eln_triangle, prim_edge, prim_triangle);
+      // lineart_add_occlusion_pair_thread(rb, eln_edge, eln_triangle, prim_edge, prim_triangle);
+      lineart_thread_add_occlusion_pair(
+          rb->thread_occlusion_data, eln_edge, eln_triangle, prim_edge, prim_triangle);
     }
   }
 }
@@ -2744,8 +2895,8 @@ static void lineart_intersection_lines_from_record(LineartRenderBuffer *rb)
 
   for (int i = 0; i < rb->mesh_record.intersection_pair_next; i++) {
     LineartIntersectionRecord *ir = &rb->mesh_record.intersection_record[i];
-    float *i1 = ir->p1;
-    float *i2 = ir->p2;
+    double *i1 = ir->p1;
+    double *i2 = ir->p2;
     LineartEdge *e = &elist[i];
     LineartEdgeSegment *es = &eslist[i];
     BLI_addtail(&e->segments, es);
@@ -2754,8 +2905,8 @@ static void lineart_intersection_lines_from_record(LineartRenderBuffer *rb)
     LineartVert *v2 = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartVert));
     e->v1 = v1;
     e->v2 = v2;
-    copy_v3db_v3fl(v1->gloc, i1);
-    copy_v3db_v3fl(v2->gloc, i2);
+    copy_v3_v3_db(v1->gloc, i1);
+    copy_v3_v3_db(v2->gloc, i2);
     e->t1 = ir->t1;
     e->t2 = ir->t2;
 

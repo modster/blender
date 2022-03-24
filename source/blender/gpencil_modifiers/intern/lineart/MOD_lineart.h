@@ -210,17 +210,17 @@ struct MLoopTri;
 struct MLoop;
 struct LineartRenderBuffer;
 typedef struct LineartPointArrayFinal {
-  float *points;
-  int numpoints;
-  struct MLoopTri *looptri; /* Refernce to original_me->runtime->looptri; */
-  struct MLoop *loop;       /* Refernce to original_me->mloop; */
+  // float *points;
+  // int numpoints;
+  // struct MLoopTri *looptri; /* Refernce to original_me->runtime->looptri; */
+  // struct MLoop *loop;       /* Refernce to original_me->mloop; */
   LineartElementLinkNode *eln_triangle;
   struct LineartRenderBuffer *rb;
 } LineartPointArrayFinal;
 
 typedef struct LineartIntersectionRecord {
-  float p1[3];
-  float p2[3];
+  double p1[3];
+  double p2[3];
   struct LineartTriangle *t1;
   struct LineartTriangle *t2;
 } LineartIntersectionRecord;
@@ -248,6 +248,8 @@ typedef struct LineartOcclusionPairRecord {
   uint32_t max_length;
   uint32_t scheduled_next;
 } LineartOcclusionPairRecord;
+
+typedef struct LineartThreadOcclusionData LineartThreadOcclusionData;
 
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
@@ -300,6 +302,7 @@ typedef struct LineartRenderBuffer {
   RTCScene rtcscene_geom;
   RTCScene rtcscene_view;
 
+  struct LineartThreadOcclusionData *thread_occlusion_data;
   LineartMeshRecord mesh_record;
   LineartOcclusionPairRecord occlusion_record;
 
@@ -780,3 +783,20 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
 float MOD_lineart_chain_compute_length(LineartEdgeChain *ec);
 
 void ED_operatortypes_lineart(void);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+LineartThreadOcclusionData *lineart_thread_init_occlusion_result(void);
+void lineart_thread_add_occlusion_pair(LineartThreadOcclusionData *data,
+                                       LineartElementLinkNode *eln_edge,
+                                       LineartElementLinkNode *eln_triangle,
+                                       LineartEdge *e,
+                                       LineartTriangle *t);
+LineartOcclusionPair *lineart_thread_finalize_occlusion_result(LineartThreadOcclusionData *data,
+                                                               int *result_count);
+
+#ifdef __cplusplus
+}
+#endif

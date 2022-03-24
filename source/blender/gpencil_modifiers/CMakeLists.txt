@@ -1,6 +1,18 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright 2018 Blender Foundation. All rights reserved.
 
+if(WITH_TBB)
+  add_definitions(-DWITH_TBB)
+
+  list(APPEND INC_SYS
+    ${TBB_INCLUDE_DIRS}
+  )
+
+  list(APPEND LIB
+    ${TBB_LIBRARIES}
+  )
+endif()
+
 set(INC
   .
   intern
@@ -70,6 +82,7 @@ set(SRC
   intern/MOD_gpencil_util.h
 
   # Lineart code
+  intern/lineart/lineart_cpp_bridge.cpp
   intern/lineart/lineart_chain.c
   intern/lineart/lineart_cpu.c
   intern/lineart/lineart_ops.c
