@@ -208,7 +208,6 @@ static void rna_userdef_version_get(PointerRNA *ptr, int *value)
 /** Mark the preferences as being changed so they are saved on exit. */
 #  define USERDEF_TAG_DIRTY rna_userdef_is_dirty_update_impl()
 
-/** Use single function so we can more easily break-point it. */
 void rna_userdef_is_dirty_update_impl(void)
 {
   /* We can't use 'ptr->data' because this update function
@@ -219,14 +218,11 @@ void rna_userdef_is_dirty_update_impl(void)
   }
 }
 
-/**
- * Use as a fallback update handler,
- * never use 'ptr' unless its type is checked.
- */
 void rna_userdef_is_dirty_update(Main *UNUSED(bmain),
                                  Scene *UNUSED(scene),
                                  PointerRNA *UNUSED(ptr))
 {
+  /* WARNING: never use 'ptr' unless its type is checked. */
   rna_userdef_is_dirty_update_impl();
 }
 
@@ -6442,6 +6438,12 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Named Attribute Nodes",
                            "Enable named attribute nodes in the geometry nodes add menu");
+
+  prop = RNA_def_property(srna, "use_select_nearest_on_first_click", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "use_select_nearest_on_first_click", 1);
+  RNA_def_property_ui_text(prop,
+                           "Object Select Nearest on First Click",
+                           "When enabled, always select the front-most object on the first click");
 
   prop = RNA_def_property(srna, "enable_eevee_next", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "enable_eevee_next", 1);
