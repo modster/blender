@@ -12,6 +12,7 @@
 #include <mutex>
 
 #include "BLI_float4x4.hh"
+#include "BLI_generic_virtual_array.hh"
 #include "BLI_index_mask.hh"
 #include "BLI_math_vec_types.hh"
 #include "BLI_span.hh"
@@ -20,8 +21,6 @@
 #include "BLI_virtual_array.hh"
 
 #include "BKE_attribute_access.hh"
-
-#include "FN_generic_virtual_array.hh"
 
 namespace blender::bke {
 
@@ -123,14 +122,14 @@ class CurvesGeometry : public ::CurvesGeometry {
    * Accessors.
    */
 
-  int points_size() const;
-  int curves_size() const;
+  int num_points() const;
+  int num_curves() const;
   IndexRange points_range() const;
   IndexRange curves_range() const;
 
   /**
    * The index of the first point in every curve. The size of this span is one larger than the
-   * number of curves. Consider using #range_for_curve rather than using the offsets directly.
+   * number of curves. Consider using #points_for_curve rather than using the offsets directly.
    */
   Span<int> offsets() const;
   MutableSpan<int> offsets();
@@ -138,8 +137,8 @@ class CurvesGeometry : public ::CurvesGeometry {
   /**
    * Access a range of indices of point data for a specific curve.
    */
-  IndexRange range_for_curve(int index) const;
-  IndexRange range_for_curves(IndexRange curves) const;
+  IndexRange points_for_curve(int index) const;
+  IndexRange points_for_curves(IndexRange curves) const;
 
   /** The type (#CurveType) of each curve, or potentially a single if all are the same type. */
   VArray<int8_t> curve_types() const;
@@ -204,6 +203,24 @@ class CurvesGeometry : public ::CurvesGeometry {
   MutableSpan<float> nurbs_weights();
 
   /**
+   * The index of a triangle (#MLoopTri) that a curve is attached to.
+   * The index is -1, if the curve is not attached.
+   */
+  VArray<int> surface_triangle_indices() const;
+  MutableSpan<int> surface_triangle_indices();
+
+  /**
+   * Barycentric coordinates of the attachment point within a triangle.
+   * Only the first two coordinates are stored. The third coordinate can be derived because the sum
+   * of the three coordinates is 1.
+   *
+   * When the triangle index is -1, this coordinate should be ignored.
+   * The span can be empty, when all triangle indices are -1.
+   */
+  Span<float2> surface_triangle_coords() const;
+  MutableSpan<float2> surface_triangle_coords();
+
+  /**
    * Calculate the largest and smallest position values, only including control points
    * (rather than evaluated points). The existing values of `min` and `max` are taken into account.
    *
@@ -232,11 +249,11 @@ class CurvesGeometry : public ::CurvesGeometry {
    * Access a range of indices of point data for a specific curve.
    * Call #evaluated_offsets() first to ensure that the evaluated offsets cache is current.
    */
-  IndexRange evaluated_range_for_curve(int index) const;
+  IndexRange evaluated_points_for_curve(int index) const;
 
   /**
    * The index of the first evaluated point for every curve. The size of this span is one larger
-   * than the number of curves. Consider using #evaluated_range_for_curve rather than using the
+   * than the number of curves. Consider using #evaluated_points_for_curve rather than using the
    * offsets directly.
    */
   Span<int> evaluated_offsets() const;
@@ -258,7 +275,7 @@ class CurvesGeometry : public ::CurvesGeometry {
    * Change the number of elements. New values for existing attributes should be properly
    * initialized afterwards.
    */
-  void resize(int point_size, int curve_size);
+  void resize(int num_points, int num_curves);
 
   /** Call after deforming the position attribute. */
   void tag_positions_changed();
@@ -277,13 +294,17 @@ class CurvesGeometry : public ::CurvesGeometry {
 
   void remove_curves(IndexMask curves_to_delete);
 
+  /**
+   * Change the direction of selected curves (switch the start and end) without changing their
+   * shape.
+   */
+  void reverse_curves(IndexMask curves_to_reverse);
+
   /* --------------------------------------------------------------------
    * Attributes.
    */
 
-  fn::GVArray adapt_domain(const fn::GVArray &varray,
-                           AttributeDomain from,
-                           AttributeDomain to) const;
+  GVArray adapt_domain(const GVArray &varray, AttributeDomain from, AttributeDomain to) const;
 };
 
 namespace curves {
@@ -293,9 +314,9 @@ namespace curves {
  * and the fact that curves with two points cannot be cyclic. The logic is simple, but this
  * function should be used to make intentions clearer.
  */
-inline int curve_segment_size(const int size, const bool cyclic)
+inline int curve_segment_size(const int num_points, const bool cyclic)
 {
-  return (cyclic && size > 2) ? size : size - 1;
+  return (cyclic && num_points > 2) ? num_points : num_points - 1;
 }
 
 namespace bezier {
@@ -360,16 +381,16 @@ namespace catmull_rom {
 
 /**
  * Calculate the number of evaluated points that #interpolate_to_evaluated is expected to produce.
- * \param size: The number of points in the curve.
+ * \param num_points: The number of points in the curve.
  * \param resolution: The resolution for each segment.
  */
-int calculate_evaluated_size(int size, bool cyclic, int resolution);
+int calculate_evaluated_size(int num_points, bool cyclic, int resolution);
 
 /**
  * Evaluate the Catmull Rom curve. The length of the #dst span should be calculated with
  * #calculate_evaluated_size and is expected to divide evenly by the #src span's segment size.
  */
-void interpolate_to_evaluated(fn::GSpan src, bool cyclic, int resolution, fn::GMutableSpan dst);
+void interpolate_to_evaluated(GSpan src, bool cyclic, int resolution, GMutableSpan dst);
 
 }  // namespace catmull_rom
 
@@ -378,7 +399,7 @@ namespace nurbs {
 /**
  * Checks the conditions that a NURBS curve needs to evaluate.
  */
-bool check_valid_size_and_order(int size, int8_t order, bool cyclic, KnotsMode knots_mode);
+bool check_valid_size_and_order(int num_points, int8_t order, bool cyclic, KnotsMode knots_mode);
 
 /**
  * Calculate the standard evaluated size for a NURBS curve, using the standard that
@@ -389,14 +410,14 @@ bool check_valid_size_and_order(int size, int8_t order, bool cyclic, KnotsMode k
  * shared.
  */
 int calculate_evaluated_size(
-    int size, int8_t order, bool cyclic, int resolution, KnotsMode knots_mode);
+    int num_points, int8_t order, bool cyclic, int resolution, KnotsMode knots_mode);
 
 /**
  * Calculate the length of the knot vector for a NURBS curve with the given properties.
  * The knots must be longer for a cyclic curve, for example, in order to provide weights for the
  * last evaluated points that are also influenced by the first control points.
  */
-int knots_size(int size, int8_t order, bool cyclic);
+int knots_size(int num_points, int8_t order, bool cyclic);
 
 /**
  * Calculate the knots for a spline given its properties, based on built-in standards defined by
@@ -407,7 +428,7 @@ int knots_size(int size, int8_t order, bool cyclic);
  * changes, and is generally more intuitive than defining the knot vector manually.
  */
 void calculate_knots(
-    int size, KnotsMode mode, int8_t order, bool cyclic, MutableSpan<float> knots);
+    int num_points, KnotsMode mode, int8_t order, bool cyclic, MutableSpan<float> knots);
 
 /**
  * Based on the knots, the order, and other properties of a NURBS curve, calculate a cache that can
@@ -415,7 +436,7 @@ void calculate_knots(
  * two pieces of information for every evaluated point: the first control point that influences it,
  * and a weight for each control point.
  */
-void calculate_basis_cache(int size,
+void calculate_basis_cache(int num_points,
                            int evaluated_size,
                            int8_t order,
                            bool cyclic,
@@ -433,18 +454,18 @@ void calculate_basis_cache(int size,
 void interpolate_to_evaluated(const BasisCache &basis_cache,
                               int8_t order,
                               Span<float> control_weights,
-                              fn::GSpan src,
-                              fn::GMutableSpan dst);
+                              GSpan src,
+                              GMutableSpan dst);
 
 }  // namespace nurbs
 
 }  // namespace curves
 
-Curves *curves_new_nomain(int point_size, int curves_size);
+Curves *curves_new_nomain(int num_points, int num_curves);
 
 /**
  * Create a new curves data-block containing a single curve with the given length and type.
  */
-Curves *curves_new_nomain_single(int point_size, CurveType type);
+Curves *curves_new_nomain_single(int num_points, CurveType type);
 
 }  // namespace blender::bke

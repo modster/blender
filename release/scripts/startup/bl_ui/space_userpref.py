@@ -461,6 +461,7 @@ class USERPREF_PT_edit_weight_paint(EditingPanel, CenterAlignMixIn, Panel):
         col.active = view.use_weight_color_range
         col.template_color_ramp(view, "weight_color_range", expand=True)
 
+
 class USERPREF_PT_edit_text_editor(EditingPanel, CenterAlignMixIn, Panel):
     bl_label = "Text Editor"
     bl_options = {'DEFAULT_CLOSED'}
@@ -685,10 +686,10 @@ class USERPREF_PT_viewport_display(ViewportPanel, CenterAlignMixIn, Panel):
         prefs = context.preferences
         view = prefs.view
 
-        col = layout.column(heading="Show")
+        col = layout.column(heading="Text Info Overlay")
         col.prop(view, "show_object_info", text="Object Info")
         col.prop(view, "show_view_name", text="View Name")
-        col.prop(view, "show_playback_fps", text="Playback FPS")
+        col.prop(view, "show_playback_fps", text="Playback Frame Rate (FPS)")
 
         layout.separator()
 
@@ -2276,6 +2277,7 @@ class USERPREF_PT_experimental_prototypes(ExperimentalPanel, Panel):
                 ({"property": "use_new_curves_type"}, "T68981"),
                 ({"property": "use_new_point_cloud_type"}, "T75717"),
                 ({"property": "use_full_frame_compositor"}, "T88150"),
+                ({"property": "enable_eevee_next"}, "T93220"),
             ),
         )
 
