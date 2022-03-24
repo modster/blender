@@ -22,7 +22,6 @@
 #include "BKE_mesh.h"
 #include "BKE_mesh_runtime.h"
 #include "BKE_paint.h"
-#include "BKE_spline.hh"
 
 #include "DNA_brush_enums.h"
 #include "DNA_brush_types.h"
@@ -71,7 +70,7 @@ class DeleteOperation : public CurvesSculptStrokeOperation {
     Vector<int64_t> indices;
     const IndexMask curves_to_remove = index_mask_ops::find_indices_based_on_predicate(
         curves.curves_range(), 512, indices, [&](const int curve_i) {
-          const IndexRange point_range = curves.range_for_curve(curve_i);
+          const IndexRange point_range = curves.points_for_curve(curve_i);
           for (const int segment_i : IndexRange(point_range.size() - 1)) {
             const float3 pos1 = positions[point_range[segment_i]];
             const float3 pos2 = positions[point_range[segment_i + 1]];
