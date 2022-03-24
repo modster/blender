@@ -1393,6 +1393,7 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
 {
   tGPDasset *tgpa = op->customdata;
   wmWindow *win = CTX_wm_window(C);
+  bool shift = (event->modifier & KM_SHIFT) != 0;
 
   switch (event->type) {
     case LEFTMOUSE: {
@@ -1471,7 +1472,7 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
     case MOUSEMOVE: {
       /* Apply transform. */
       if (tgpa->flag & GP_ASSET_FLAG_TRANSFORMING) {
-        gpencil_asset_transform_strokes(tgpa, event->mval, event->shift);
+        gpencil_asset_transform_strokes(tgpa, event->mval, shift);
         gpencil_2d_cage_calc(tgpa);
         ED_area_tag_redraw(tgpa->area);
       }
@@ -1488,10 +1489,10 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
         /* Flip. */
         tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
         tgpa->flag |= GP_ASSET_FLAG_TRANSFORMING;
-        tgpa->manipulator_index = (event->shift) ? CAGE_FLIP_VERT : CAGE_FLIP_HORZ;
+        tgpa->manipulator_index = (shift) ? CAGE_FLIP_VERT : CAGE_FLIP_HORZ;
         tgpa->mode = GP_ASSET_TRANSFORM_SCALE;
 
-        gpencil_asset_transform_strokes(tgpa, event->mval, event->shift);
+        gpencil_asset_transform_strokes(tgpa, event->mval, shift);
         gpencil_2d_cage_calc(tgpa);
         ED_area_tag_redraw(tgpa->area);
 
