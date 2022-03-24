@@ -1,27 +1,14 @@
-/*
- * Copyright 2011-2021 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #include "integrator/pass_accessor.h"
 
-#include "render/buffers.h"
-#include "util/util_logging.h"
+#include "session/buffers.h"
+#include "util/log.h"
 
 // clang-format off
 #include "kernel/device/cpu/compat.h"
-#include "kernel/kernel_types.h"
+#include "kernel/types.h"
 // clang-format on
 
 CCL_NAMESPACE_BEGIN
@@ -96,9 +83,12 @@ static void pad_pixels(const BufferParams &buffer_params,
     return;
   }
 
-  const size_t size = buffer_params.width * buffer_params.height;
+  const size_t size = static_cast<size_t>(buffer_params.width) * buffer_params.height;
   if (destination.pixels) {
-    float *pixel = destination.pixels;
+    const size_t pixel_stride = destination.pixel_stride ? destination.pixel_stride :
+                                                           destination.num_components;
+
+    float *pixel = destination.pixels + pixel_stride * destination.offset;
 
     for (size_t i = 0; i < size; i++, pixel += dest_num_components) {
       if (dest_num_components >= 3 && src_num_components == 1) {
@@ -112,8 +102,8 @@ static void pad_pixels(const BufferParams &buffer_params,
   }
 
   if (destination.pixels_half_rgba) {
-    const half one = float_to_half(1.0f);
-    half4 *pixel = destination.pixels_half_rgba;
+    const half one = float_to_half_display(1.0f);
+    half4 *pixel = destination.pixels_half_rgba + destination.offset;
 
     for (size_t i = 0; i < size; i++, pixel++) {
       if (dest_num_components >= 3 && src_num_components == 1) {
@@ -135,13 +125,10 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
     return false;
   }
 
-  if (pass_access_info_.offset == PASS_UNUSED) {
-    return false;
-  }
-
   const PassType type = pass_access_info_.type;
   const PassMode mode = pass_access_info_.mode;
   const PassInfo pass_info = Pass::get_info(type, pass_access_info_.include_albedo);
+  int num_written_components = pass_info.num_components;
 
   if (pass_info.num_components == 1) {
     /* Single channel passes. */
@@ -189,8 +176,10 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
     else if ((pass_info.divide_type != PASS_NONE || pass_info.direct_type != PASS_NONE ||
               pass_info.indirect_type != PASS_NONE) &&
              mode != PassMode::DENOISED) {
-      /* RGB lighting passes that need to divide out color and/or sum direct and indirect. */
+      /* RGB lighting passes that need to divide out color and/or sum direct and indirect.
+       * These can also optionally write alpha like the combined pass. */
       get_pass_light_path(render_buffers, buffer_params, destination);
+      num_written_components = 4;
     }
     else {
       /* Passes that need no special computation, or denoised passes that already
@@ -216,7 +205,7 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
     }
   }
 
-  pad_pixels(buffer_params, destination, pass_info.num_components);
+  pad_pixels(buffer_params, destination, num_written_components);
 
   return true;
 }

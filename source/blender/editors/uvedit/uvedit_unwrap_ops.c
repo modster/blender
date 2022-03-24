@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup eduv
@@ -118,7 +102,7 @@ static bool ED_uvedit_ensure_uvs(Object *obedit)
   int cd_loop_uv_offset;
 
   if (em && em->bm->totface && !CustomData_has_layer(&em->bm->ldata, CD_MLOOPUV)) {
-    ED_mesh_uv_texture_add(obedit->data, NULL, true, true);
+    ED_mesh_uv_texture_add(obedit->data, NULL, true, true, NULL);
   }
 
   /* Happens when there are no faces. */
@@ -135,7 +119,7 @@ static bool ED_uvedit_ensure_uvs(Object *obedit)
 
     BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
       MLoopUV *luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
-      luv->flag |= MLOOPUV_VERTSEL;
+      luv->flag |= (MLOOPUV_VERTSEL | MLOOPUV_EDGESEL);
     }
   }
 
@@ -171,7 +155,7 @@ bool ED_uvedit_udim_params_from_image_space(const SpaceImage *sima,
     int active_udim = 1001;
     /* NOTE: Presently, when UDIM grid and tiled image are present together, only active tile for
      * the tiled image is considered. */
-    Image *image = sima->image;
+    const Image *image = sima->image;
     if (image && image->source == IMA_SRC_TILED) {
       ImageTile *active_tile = BLI_findlink(&image->tiles, image->active_tile_index);
       if (active_tile) {
@@ -181,11 +165,10 @@ bool ED_uvedit_udim_params_from_image_space(const SpaceImage *sima,
     else {
       /* TODO: Support storing an active UDIM when there are no tiles present.
        * Until then, use 2D cursor to find the active tile index for the UDIM grid. */
-      const float cursor_loc[2] = {sima->cursor[0], sima->cursor[1]};
-      if (uv_coords_isect_udim(sima->image, sima->tile_grid_shape, cursor_loc)) {
+      if (uv_coords_isect_udim(sima->image, sima->tile_grid_shape, sima->cursor)) {
         int tile_number = 1001;
-        tile_number += floorf(cursor_loc[1]) * 10;
-        tile_number += floorf(cursor_loc[0]);
+        tile_number += floorf(sima->cursor[1]) * 10;
+        tile_number += floorf(sima->cursor[0]);
         active_udim = tile_number;
       }
     }
@@ -2827,6 +2810,8 @@ void UV_OT_cylinder_project(wmOperatorType *ot)
   uv_map_clip_correct_properties(ot);
 }
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name Cube UV Project Operator
  * \{ */
@@ -2984,6 +2969,7 @@ void ED_uvedit_add_simple_uvs(Main *bmain, const Scene *scene, Object *ob)
                      me,
                      (&(struct BMeshFromMeshParams){
                          .calc_face_normal = true,
+                         .calc_vert_normal = true,
                      }));
   /* select all uv loops first - pack parameters needs this to make sure charts are registered */
   ED_uvedit_select_all(bm);

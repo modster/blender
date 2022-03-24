@@ -1,20 +1,4 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # <pep8 compliant>
 
@@ -591,6 +575,31 @@ class IMAGE_MT_uvs_snap_pie(Menu):
         ).target = 'ADJACENT_UNSELECTED'
 
 
+class IMAGE_MT_view_pie(Menu):
+    bl_label = "View"
+
+    def draw(self, context):
+        layout = self.layout
+
+        sima = context.space_data
+        show_uvedit = sima.show_uvedit
+        show_maskedit = sima.show_maskedit
+
+        pie = layout.menu_pie()
+        pie.operator("image.view_all")
+
+        if show_uvedit or show_maskedit:
+            pie.operator("image.view_selected", text="Frame Selected", icon='ZOOM_SELECTED')
+            pie.operator("image.view_center_cursor", text="Center View to Cursor")
+        else:
+            # Add spaces so items stay in the same position through all modes.
+            pie.separator()
+            pie.separator()
+
+        pie.operator("image.view_zoom_ratio", text="Zoom 1:1").ratio = 1
+        pie.operator("image.view_all", text="Frame All Fit").fit_view = True
+
+
 class IMAGE_HT_tool_header(Header):
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'TOOL_HEADER'
@@ -725,7 +734,7 @@ class IMAGE_HT_header(Header):
             act_snap_uv_element = tool_settings.bl_rna.properties['snap_uv_element'].enum_items[snap_uv_element]
 
             row = layout.row(align=True)
-            row.prop(tool_settings, "use_snap", text="")
+            row.prop(tool_settings, "use_snap_uv", text="")
 
             sub = row.row(align=True)
             sub.popover(
@@ -761,7 +770,6 @@ class IMAGE_HT_header(Header):
         ima = sima.image
         iuser = sima.image_user
         tool_settings = context.tool_settings
-        show_region_tool_header = sima.show_region_tool_header
 
         show_render = sima.show_render
         show_uvedit = sima.show_uvedit
@@ -774,15 +782,23 @@ class IMAGE_HT_header(Header):
 
         # UV editing.
         if show_uvedit:
-            uvedit = sima.uv_editor
-
             layout.prop(tool_settings, "use_uv_select_sync", text="")
 
             if tool_settings.use_uv_select_sync:
                 layout.template_edit_mode_selection()
             else:
-                layout.prop(tool_settings, "uv_select_mode", text="", expand=True)
-                layout.prop(uvedit, "sticky_select_mode", icon_only=True)
+                row = layout.row(align=True)
+                uv_select_mode = tool_settings.uv_select_mode[:]
+                row.operator("uv.select_mode", text="", icon='UV_VERTEXSEL',
+                             depress=(uv_select_mode == 'VERTEX')).type = 'VERTEX'
+                row.operator("uv.select_mode", text="", icon='UV_EDGESEL',
+                             depress=(uv_select_mode == 'EDGE')).type = 'EDGE'
+                row.operator("uv.select_mode", text="", icon='UV_FACESEL',
+                             depress=(uv_select_mode == 'FACE')).type = 'FACE'
+                row.operator("uv.select_mode", text="", icon='UV_ISLANDSEL',
+                             depress=(uv_select_mode == 'ISLAND')).type = 'ISLAND'
+
+                layout.prop(tool_settings, "uv_sticky_select_mode", icon_only=True)
 
         IMAGE_MT_editor_menus.draw_collapsible(context, layout)
 
@@ -812,8 +828,6 @@ class IMAGE_HT_header(Header):
         sub.popover(panel="IMAGE_PT_overlay", text="")
 
         if show_uvedit:
-            uvedit = sima.uv_editor
-
             mesh = context.edit_object.data
             layout.prop_search(mesh.uv_layers, "active", mesh, "uv_layers", text="")
 
@@ -1647,6 +1661,7 @@ classes = (
     IMAGE_MT_mask_context_menu,
     IMAGE_MT_pivot_pie,
     IMAGE_MT_uvs_snap_pie,
+    IMAGE_MT_view_pie,
     IMAGE_HT_tool_header,
     IMAGE_HT_header,
     IMAGE_MT_editor_menus,

@@ -1,29 +1,16 @@
-/*
- * Copyright 2011-2021 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #include "device/hip/device.h"
 
-#include "util/util_logging.h"
+#include "util/log.h"
 
 #ifdef WITH_HIP
 #  include "device/device.h"
 #  include "device/hip/device_impl.h"
 
-#  include "util/util_string.h"
-#  include "util/util_windows.h"
+#  include "util/string.h"
+#  include "util/windows.h"
 #endif /* WITH_HIP */
 
 CCL_NAMESPACE_BEGIN
@@ -57,9 +44,16 @@ bool device_hip_init()
     }
   }
   else {
-    VLOG(1) << "HIPEW initialization failed: "
-            << ((hipew_result == HIPEW_ERROR_ATEXIT_FAILED) ? "Error setting up atexit() handler" :
-                                                              "Error opening the library");
+    if (hipew_result == HIPEW_ERROR_ATEXIT_FAILED) {
+      VLOG(1) << "HIPEW initialization failed: Error setting up atexit() handler";
+    }
+    else if (hipew_result == HIPEW_ERROR_OLD_DRIVER) {
+      VLOG(1) << "HIPEW initialization failed: Driver version too old, requires AMD Radeon Pro "
+                 "21.Q4 driver or newer";
+    }
+    else {
+      VLOG(1) << "HIPEW initialization failed: Error opening HIP dynamic library";
+    }
   }
 
   return result;
@@ -131,9 +125,9 @@ void device_hip_info(vector<DeviceInfo> &devices)
       continue;
     }
 
-    int major;
-    hipDeviceGetAttribute(&major, hipDeviceAttributeComputeCapabilityMajor, num);
-    // TODO : (Arya) What is the last major version we are supporting?
+    if (!hipSupportsDevice(num)) {
+      continue;
+    }
 
     DeviceInfo info;
 
@@ -141,7 +135,6 @@ void device_hip_info(vector<DeviceInfo> &devices)
     info.description = string(name);
     info.num = num;
 
-    info.has_half_images = (major >= 3);
     info.has_nanovdb = true;
     info.denoisers = 0;
 

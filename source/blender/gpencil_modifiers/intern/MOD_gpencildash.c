@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021, Blender Foundation
- * This is a new part of Blender
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2021 Blender Foundation. */
 
 /** \file
  * \ingroup modifiers
@@ -51,6 +35,7 @@
 #include "UI_resources.h"
 
 #include "RNA_access.h"
+#include "RNA_prototypes.h"
 
 #include "BLT_translation.h"
 
@@ -112,12 +97,13 @@ static bool stroke_dash(const bGPDstroke *gps,
   int new_stroke_offset = 0;
   int trim_start = 0;
 
+  int sequence_length = 0;
   for (int i = 0; i < dmd->segments_len; i++) {
-    if (dmd->segments[i].dash + real_gap(&dmd->segments[i]) < 1) {
-      BLI_assert_unreachable();
-      /* This means there's a part that doesn't have any length, can't do dot-dash. */
-      return false;
-    }
+    sequence_length += dmd->segments[i].dash + real_gap(&dmd->segments[i]);
+  }
+  if (sequence_length < 1) {
+    /* This means the whole segment has no length, can't do dot-dash. */
+    return false;
   }
 
   const DashGpencilModifierSegment *const first_segment = &dmd->segments[0];
@@ -170,6 +156,7 @@ static bool stroke_dash(const bGPDstroke *gps,
       stroke->points[is].z = p->z;
       stroke->points[is].pressure = p->pressure * ds->radius;
       stroke->points[is].strength = p->strength * ds->opacity;
+      copy_v4_v4(stroke->points[is].vert_color, p->vert_color);
     }
     BLI_addtail(r_strokes, stroke);
 
@@ -218,9 +205,10 @@ static void apply_dash_for_frame(
                                        dmd->flag & GP_LENGTH_INVERT_PASS,
                                        dmd->flag & GP_LENGTH_INVERT_LAYERPASS,
                                        dmd->flag & GP_LENGTH_INVERT_MATERIAL)) {
-      stroke_dash(gps, dmd, &result);
-      BLI_remlink(&gpf->strokes, gps);
-      BKE_gpencil_free_stroke(gps);
+      if (stroke_dash(gps, dmd, &result)) {
+        BLI_remlink(&gpf->strokes, gps);
+        BKE_gpencil_free_stroke(gps);
+      }
     }
   }
   bGPDstroke *gps_dash;
@@ -246,6 +234,18 @@ static void bakeModifier(Main *UNUSED(bmain),
 
 /* -------------------------------- */
 
+static bool isDisabled(GpencilModifierData *md, int UNUSED(userRenderParams))
+{
+  DashGpencilModifierData *dmd = (DashGpencilModifierData *)md;
+
+  int sequence_length = 0;
+  for (int i = 0; i < dmd->segments_len; i++) {
+    sequence_length += dmd->segments[i].dash + real_gap(&dmd->segments[i]);
+  }
+  /* This means the whole segment has no length, can't do dot-dash. */
+  return sequence_length < 1;
+}
+
 /* Generic "generateStrokes" callback */
 static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Object *ob)
 {
@@ -255,7 +255,7 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     BKE_gpencil_frame_active_set(depsgraph, gpd);
     bGPDframe *gpf = gpl->actframe;
     if (gpf == NULL) {
-      return;
+      continue;
     }
     apply_dash_for_frame(ob, gpl, gpd, gpf, (DashGpencilModifierData *)md);
   }
@@ -312,8 +312,6 @@ static void panel_draw(const bContext *C, Panel *panel)
                  UI_TEMPLATE_LIST_FLAG_NONE);
 
   uiLayout *col = uiLayoutColumn(row, false);
-  uiLayoutSetContextPointer(col, "modifier", ptr);
-
   uiLayout *sub = uiLayoutColumn(col, true);
   uiItemO(sub, "", ICON_ADD, "GPENCIL_OT_segment_add");
   uiItemO(sub, "", ICON_REMOVE, "GPENCIL_OT_segment_remove");
@@ -378,7 +376,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Dash = {
 
     /* initData */ initData,
     /* freeData */ freeData,
-    /* isDisabled */ NULL,
+    /* isDisabled */ isDisabled,
     /* updateDepsgraph */ NULL,
     /* dependsOnTime */ NULL,
     /* foreachIDLink */ foreachIDLink,

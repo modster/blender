@@ -1,26 +1,13 @@
-/*
- * Copyright 2011-2021 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #include "integrator/render_scheduler.h"
 
-#include "render/session.h"
-#include "render/tile.h"
-#include "util/util_logging.h"
-#include "util/util_math.h"
-#include "util/util_time.h"
+#include "session/session.h"
+#include "session/tile.h"
+#include "util/log.h"
+#include "util/math.h"
+#include "util/time.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -33,7 +20,7 @@ RenderScheduler::RenderScheduler(TileManager &tile_manager, const SessionParams 
       background_(params.background),
       pixel_size_(params.pixel_size),
       tile_manager_(tile_manager),
-      default_start_resolution_divider_(pixel_size_ * 8)
+      default_start_resolution_divider_(params.use_resolution_divider ? pixel_size_ * 8 : 0)
 {
   use_progressive_noise_floor_ = !background_;
 }
@@ -88,6 +75,16 @@ int RenderScheduler::get_num_samples() const
   return num_samples_;
 }
 
+void RenderScheduler::set_sample_offset(int sample_offset)
+{
+  sample_offset_ = sample_offset;
+}
+
+int RenderScheduler::get_sample_offset() const
+{
+  return sample_offset_;
+}
+
 void RenderScheduler::set_time_limit(double time_limit)
 {
   time_limit_ = time_limit;
@@ -102,7 +99,7 @@ int RenderScheduler::get_rendered_sample() const
 {
   DCHECK_GT(get_num_rendered_samples(), 0);
 
-  return start_sample_ + get_num_rendered_samples() - 1;
+  return start_sample_ + get_num_rendered_samples() - 1 - sample_offset_;
 }
 
 int RenderScheduler::get_num_rendered_samples() const
@@ -110,17 +107,19 @@ int RenderScheduler::get_num_rendered_samples() const
   return state_.num_rendered_samples;
 }
 
-void RenderScheduler::reset(const BufferParams &buffer_params, int num_samples)
+void RenderScheduler::reset(const BufferParams &buffer_params, int num_samples, int sample_offset)
 {
   buffer_params_ = buffer_params;
 
   update_start_resolution_divider();
 
   set_num_samples(num_samples);
+  set_start_sample(sample_offset);
+  set_sample_offset(sample_offset);
 
   /* In background mode never do lower resolution render preview, as it is not really supported
    * by the software. */
-  if (background_) {
+  if (background_ || start_resolution_divider_ == 0) {
     state_.resolution_divider = 1;
   }
   else {
@@ -171,7 +170,7 @@ void RenderScheduler::reset(const BufferParams &buffer_params, int num_samples)
 
 void RenderScheduler::reset_for_next_tile()
 {
-  reset(buffer_params_, num_samples_);
+  reset(buffer_params_, num_samples_, sample_offset_);
 }
 
 bool RenderScheduler::render_work_reschedule_on_converge(RenderWork &render_work)
@@ -245,7 +244,7 @@ void RenderScheduler::render_work_reschedule_on_cancel(RenderWork &render_work)
   render_work.tile.write = tile_write;
   render_work.full.write = full_write;
 
-  /* Do not write tile if it has zero samples it it, treat it similarly to all other tiles which
+  /* Do not write tile if it has zero samples in it, treat it similarly to all other tiles which
    * got canceled. */
   if (!state_.tile_result_was_written && has_rendered_samples) {
     render_work.tile.write = true;
@@ -317,6 +316,7 @@ RenderWork RenderScheduler::get_render_work()
 
   render_work.path_trace.start_sample = get_start_sample_to_path_trace();
   render_work.path_trace.num_samples = get_num_samples_to_path_trace();
+  render_work.path_trace.sample_offset = get_sample_offset();
 
   render_work.init_render_buffers = (render_work.path_trace.start_sample == get_start_sample());
 
@@ -827,6 +827,26 @@ int RenderScheduler::get_num_samples_to_path_trace() const
       num_samples_to_occupy = lround(state_.occupancy_num_samples * 0.7f / state_.occupancy);
     }
 
+    /* When time limit is used clamp the calculated number of samples to keep occupancy.
+     * This is because time limit causes the last render iteration to happen with less number of
+     * samples, which conflicts with the occupancy (lower number of samples causes lower
+     * occupancy, also the calculation is based on number of previously rendered samples).
+     *
+     * When time limit is not used the number of samples per render iteration is either increasing
+     * or stays the same, so there is no need to clamp number of samples calculated for occupancy.
+     */
+    if (time_limit_ != 0.0 && state_.start_render_time != 0.0) {
+      const double remaining_render_time = max(
+          0.0, time_limit_ - (time_dt() - state_.start_render_time));
+      const double time_per_sample_average = path_trace_time_.get_average();
+      const double predicted_render_time = num_samples_to_occupy * time_per_sample_average;
+
+      if (predicted_render_time > remaining_render_time) {
+        num_samples_to_occupy = lround(num_samples_to_occupy *
+                                       (remaining_render_time / predicted_render_time));
+      }
+    }
+
     num_samples_to_render = max(num_samples_to_render,
                                 min(num_samples_to_occupy, max_num_samples_to_render));
   }
@@ -841,7 +861,8 @@ int RenderScheduler::get_num_samples_to_path_trace() const
    * is to ensure that the final render is pixel-matched regardless of how many samples per second
    * compute device can do. */
 
-  return adaptive_sampling_.align_samples(path_trace_start_sample, num_samples_to_render);
+  return adaptive_sampling_.align_samples(path_trace_start_sample - sample_offset_,
+                                          num_samples_to_render);
 }
 
 int RenderScheduler::get_num_samples_during_navigation(int resolution_divider) const
@@ -1029,6 +1050,10 @@ bool RenderScheduler::work_need_rebalance()
 
 void RenderScheduler::update_start_resolution_divider()
 {
+  if (default_start_resolution_divider_ == 0) {
+    return;
+  }
+
   if (start_resolution_divider_ == 0) {
     /* Resolution divider has never been calculated before: use default resolution, so that we have
      * somewhat good initial behavior, giving a chance to collect real numbers. */

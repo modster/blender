@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2007 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2007 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup wm
@@ -119,6 +103,7 @@
 #include "ED_space_api.h"
 #include "ED_undo.h"
 #include "ED_util.h"
+#include "ED_view3d.h"
 
 #include "BLF_api.h"
 #include "BLT_lang.h"
@@ -178,15 +163,15 @@ static bool opengl_is_init = false;
 
 void WM_init_opengl(void)
 {
-  /* must be called only once */
+  /* Must be called only once. */
   BLI_assert(opengl_is_init == false);
 
   if (G.background) {
-    /* Ghost is still not init elsewhere in background mode. */
+    /* Ghost is still not initialized elsewhere in background mode. */
     wm_ghost_init(NULL);
   }
 
-  /* Needs to be first to have an ogl context bound. */
+  /* Needs to be first to have an OpenGL context bound. */
   DRW_opengl_context_create();
 
   GPU_init();
@@ -222,10 +207,6 @@ static void sound_jack_sync_callback(Main *bmain, int mode, double time)
   }
 }
 
-/**
- * Initialize Blender and load the startup file & preferences
- * (only called once).
- */
 void WM_init(bContext *C, int argc, const char **argv)
 {
 
@@ -255,7 +236,7 @@ void WM_init(bContext *C, int argc, const char **argv)
   BKE_region_callback_free_gizmomap_set(wm_gizmomap_remove);
   BKE_region_callback_refresh_tag_gizmomap_set(WM_gizmomap_tag_refresh);
   BKE_library_callback_remap_editor_id_reference_set(WM_main_remap_editor_id_reference);
-  BKE_spacedata_callback_id_remap_set(ED_spacedata_id_remap);
+  BKE_spacedata_callback_id_remap_set(ED_spacedata_id_remap_single);
   DEG_editors_set_update_cb(ED_render_id_flush_update, ED_render_scene_update);
 
   ED_spacetypes_init();
@@ -317,9 +298,9 @@ void WM_init(bContext *C, int argc, const char **argv)
                       NULL,
                       &params_file_read_post);
 
-  /* NOTE: leave `G_MAIN->name` set to an empty string since this
+  /* NOTE: leave `G_MAIN->filepath` set to an empty string since this
    * matches behavior after loading a new file. */
-  BLI_assert(G_MAIN->name[0] == '\0');
+  BLI_assert(G_MAIN->filepath[0] == '\0');
 
   /* Call again to set from preferences. */
   BLT_lang_set(NULL);
@@ -359,10 +340,10 @@ void WM_init(bContext *C, int argc, const char **argv)
 
   if (!G.background) {
     if (wm_start_with_console) {
-      GHOST_toggleConsole(1);
+      setConsoleWindowState(GHOST_kConsoleWindowStateShow);
     }
     else {
-      GHOST_toggleConsole(3);
+      setConsoleWindowState(GHOST_kConsoleWindowStateHideForNonConsoleLaunch);
     }
   }
 
@@ -384,7 +365,7 @@ void WM_init_splash(bContext *C)
 
     if (wm->windows.first) {
       CTX_wm_window_set(C, wm->windows.first);
-      WM_operator_name_call(C, "WM_OT_splash", WM_OP_INVOKE_DEFAULT, NULL);
+      WM_operator_name_call(C, "WM_OT_splash", WM_OP_INVOKE_DEFAULT, NULL, NULL);
       CTX_wm_window_set(C, prevwin);
     }
   }
@@ -431,10 +412,6 @@ static int wm_exit_handler(bContext *C, const wmEvent *event, void *userdata)
   return WM_UI_HANDLER_BREAK;
 }
 
-/**
- * Cause a delayed #WM_exit()
- * call to avoid leaking memory when trying to exit from within operators.
- */
 void wm_exit_schedule_delayed(const bContext *C)
 {
   /* What we do here is a little bit hacky, but quite simple and doesn't require bigger
@@ -448,9 +425,6 @@ void wm_exit_schedule_delayed(const bContext *C)
   WM_event_add_mousemove(win); /* ensure handler actually gets called */
 }
 
-/**
- * \note doesn't run exit() call #WM_exit() for that.
- */
 void WM_exit_ex(bContext *C, const bool do_python)
 {
   wmWindowManager *wm = C ? CTX_wm_manager(C) : NULL;
@@ -466,19 +440,19 @@ void WM_exit_ex(bContext *C, const bool do_python)
       if (undo_memfile != NULL) {
         /* save the undo state as quit.blend */
         Main *bmain = CTX_data_main(C);
-        char filename[FILE_MAX];
+        char filepath[FILE_MAX];
         bool has_edited;
         const int fileflags = G.fileflags & ~G_FILE_COMPRESS;
 
-        BLI_join_dirfile(filename, sizeof(filename), BKE_tempdir_base(), BLENDER_QUIT_FILE);
+        BLI_join_dirfile(filepath, sizeof(filepath), BKE_tempdir_base(), BLENDER_QUIT_FILE);
 
         has_edited = ED_editors_flush_edits(bmain);
 
         if ((has_edited &&
              BLO_write_file(
-                 bmain, filename, fileflags, &(const struct BlendFileWriteParams){0}, NULL)) ||
-            (BLO_memfile_write_file(undo_memfile, filename))) {
-          printf("Saved session recovery to '%s'\n", filename);
+                 bmain, filepath, fileflags, &(const struct BlendFileWriteParams){0}, NULL)) ||
+            (BLO_memfile_write_file(undo_memfile, filepath))) {
+          printf("Saved session recovery to '%s'\n", filepath);
         }
       }
     }
@@ -546,6 +520,7 @@ void WM_exit_ex(bContext *C, const bool do_python)
   RE_engines_exit();
 
   ED_preview_free_dbase(); /* frees a Main dbase, before BKE_blender_free! */
+  ED_preview_restart_queue_free();
   ED_assetlist_storage_exit();
 
   if (wm) {
@@ -571,6 +546,13 @@ void WM_exit_ex(bContext *C, const bool do_python)
 
   BKE_blender_free(); /* blender.c, does entire library and spacetypes */
                       //  BKE_material_copybuf_free();
+
+  /* Free the GPU subdivision data after the database to ensure that subdivision structs used by
+   * the modifiers were garbage collected. */
+  if (opengl_is_init) {
+    DRW_subdiv_free();
+  }
+
   ANIM_fcurves_copybuf_free();
   ANIM_drivers_copybuf_free();
   ANIM_driver_vars_copybuf_free();
@@ -596,9 +578,7 @@ void WM_exit_ex(bContext *C, const bool do_python)
     DRW_opengl_context_destroy();
   }
 
-#ifdef WITH_INTERNATIONAL
   BLT_lang_free();
-#endif
 
   ANIM_keyingset_infos_exit();
 
@@ -654,11 +634,6 @@ void WM_exit_ex(bContext *C, const bool do_python)
   BKE_tempdir_session_purge();
 }
 
-/**
- * \brief Main exit function to close Blender ordinarily.
- * \note Use #wm_exit_schedule_delayed() to close Blender from an operator.
- * Might leak memory otherwise.
- */
 void WM_exit(bContext *C)
 {
   WM_exit_ex(C, true);
@@ -676,10 +651,6 @@ void WM_exit(bContext *C)
   exit(G.is_break == true);
 }
 
-/**
- * Needed for cases when operators are re-registered
- * (when operator type pointers are stored).
- */
 void WM_script_tag_reload(void)
 {
   UI_interface_tag_script_reload();

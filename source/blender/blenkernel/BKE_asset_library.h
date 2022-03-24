@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -21,7 +7,6 @@
 #pragma once
 
 struct Main;
-//
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,9 +15,14 @@ extern "C" {
 /** Forward declaration, defined in intern/asset_library.hh */
 typedef struct AssetLibrary AssetLibrary;
 
-/** TODO(@sybren): properly have a think/discussion about the API for this. */
+/**
+ * Return the #AssetLibrary rooted at the given directory path.
+ *
+ * Will return the same pointer for repeated calls, until another blend file is loaded.
+ *
+ * To get the in-memory-only "current file" asset library, pass an empty path.
+ */
 struct AssetLibrary *BKE_asset_library_load(const char *library_path);
-void BKE_asset_library_free(struct AssetLibrary *asset_library);
 
 /**
  * Try to find an appropriate location for an asset library root from a file or directory path.
@@ -68,6 +58,13 @@ bool BKE_asset_library_find_suitable_root_path_from_path(
  */
 bool BKE_asset_library_find_suitable_root_path_from_main(
     const struct Main *bmain, char r_library_path[768 /* FILE_MAXDIR */]);
+
+/** Look up the asset's catalog and copy its simple name into #asset_data. */
+void BKE_asset_library_refresh_catalog_simplename(struct AssetLibrary *asset_library,
+                                                  struct AssetMetaData *asset_data);
+
+/** Return whether any loaded AssetLibrary has unsaved changes to its catalogs. */
+bool BKE_asset_library_has_any_unsaved_catalogs(void);
 
 #ifdef __cplusplus
 }

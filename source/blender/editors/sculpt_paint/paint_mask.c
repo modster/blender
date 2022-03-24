@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2012 by Nicholas Bishop
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2012 by Nicholas Bishop. All rights reserved. */
 
 /** \file
  * \ingroup edsculpt
@@ -978,6 +962,7 @@ static void sculpt_gesture_trim_normals_update(SculptGestureContext *sgcontext)
                      trim_mesh,
                      (&(struct BMeshFromMeshParams){
                          .calc_face_normal = true,
+                         .calc_vert_normal = true,
                      }));
   BM_mesh_elem_hflag_enable_all(bm, BM_FACE, BM_ELEM_TAG, false);
   BMO_op_callf(bm,
@@ -1230,12 +1215,14 @@ static void sculpt_gesture_apply_trim(SculptGestureContext *sgcontext)
                      trim_mesh,
                      &((struct BMeshFromMeshParams){
                          .calc_face_normal = true,
+                         .calc_vert_normal = true,
                      }));
 
   BM_mesh_bm_from_me(bm,
                      sculpt_mesh,
                      &((struct BMeshFromMeshParams){
                          .calc_face_normal = true,
+                         .calc_vert_normal = true,
                      }));
 
   const int looptris_tot = poly_to_tri_count(bm->totface, bm->totloop);
@@ -1428,7 +1415,7 @@ static void project_line_gesture_apply_task_cb(void *__restrict userdata,
     }
     add_v3_v3(vd.co, disp);
     if (vd.mvert) {
-      vd.mvert->flag |= ME_VERT_PBVH_UPDATE;
+      BKE_pbvh_vert_mark_update(sgcontext->ss->pbvh, vd.index);
     }
     any_updated = true;
   }

@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #pragma once
 
@@ -26,13 +13,11 @@
 #  pragma GCC diagnostic ignored "-Wuninitialized"
 #endif
 
-#include "util/util_half.h"
-#include "util/util_math.h"
-#include "util/util_simd.h"
-#include "util/util_texture.h"
-#include "util/util_types.h"
-
-#define ccl_addr_space
+#include "util/half.h"
+#include "util/math.h"
+#include "util/simd.h"
+#include "util/texture.h"
+#include "util/types.h"
 
 /* On x86_64, versions of glibc < 2.16 have an issue where expf is
  * much slower than the double version.  This was fixed in glibc 2.16.

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 /** \file
  * \ingroup GHOST
  * \brief GHOST C-API function and type declarations.
@@ -162,7 +146,7 @@ extern void GHOST_GetAllDisplayDimensions(GHOST_SystemHandle systemhandle,
  * The new window is added to the list of windows managed.
  * Never explicitly delete the window, use disposeWindow() instead.
  * \param systemhandle: The handle to the system.
- * \param parentWindow: Handle of parent (or owner) window, or NULL
+ * \param parent_windowhandle: Handle of parent (or owner) window, or NULL
  * \param title: The name of the window.
  * (displayed in the title bar of the window if the OS supports it).
  * \param left: The coordinate of the left edge of the window.
@@ -191,7 +175,7 @@ extern GHOST_WindowHandle GHOST_CreateWindow(GHOST_SystemHandle systemhandle,
  * Create a new off-screen context.
  * Never explicitly delete the context, use #disposeContext() instead.
  * \param systemhandle: The handle to the system.
- * \param platform_support_callback: An optional callback to check platform support.
+ * \param glSettings: Misc OpenGL options.
  * \return A handle to the new context ( == NULL if creation failed).
  */
 extern GHOST_ContextHandle GHOST_CreateOpenGLContext(GHOST_SystemHandle systemhandle,
@@ -264,6 +248,16 @@ extern GHOST_TSuccess GHOST_EndFullScreen(GHOST_SystemHandle systemhandle);
  * \return The current status.
  */
 extern int GHOST_GetFullScreen(GHOST_SystemHandle systemhandle);
+
+/**
+ * Get the Window under the cursor.
+ * \param x: The x-coordinate of the cursor.
+ * \param y: The y-coordinate of the cursor.
+ * \return The window under the cursor or nullptr in none.
+ */
+extern GHOST_WindowHandle GHOST_GetWindowUnderCursor(GHOST_SystemHandle systemhandle,
+                                                     int32_t x,
+                                                     int32_t y);
 
 /***************************************************************************************
  * Event management functionality
@@ -729,13 +723,6 @@ extern GHOST_TSuccess GHOST_ReleaseOpenGLContext(GHOST_ContextHandle contexthand
 extern unsigned int GHOST_GetContextDefaultOpenGLFramebuffer(GHOST_ContextHandle contexthandle);
 
 /**
- * Returns whether a context is rendered upside down compared to OpenGL. This only needs to be
- * called if there's a non-OpenGL context, which is really the exception.
- * So generally, this does not need to be called.
- */
-extern int GHOST_isUpsideDownContext(GHOST_ContextHandle contexthandle);
-
-/**
  * Get the OpenGL frame-buffer handle that serves as a default frame-buffer.
  */
 extern unsigned int GHOST_GetDefaultOpenGLFramebuffer(GHOST_WindowHandle windwHandle);
@@ -896,16 +883,11 @@ extern char *GHOST_getClipboard(bool selection);
 extern void GHOST_putClipboard(const char *buffer, bool selection);
 
 /**
- * Toggles console
- * \param action:
- * - 0: Hides
- * - 1: Shows
- * - 2: Toggles
- * - 3: Hides if it runs not from  command line
- * - *: Does nothing
+ * Set the Console State
+ * \param action: console state
  * \return current status (1 -visible, 0 - hidden)
  */
-extern int GHOST_toggleConsole(int action);
+extern int setConsoleWindowState(GHOST_TConsoleWindowState action);
 
 /**
  * Use native pixel size (MacBook pro 'retina'), if supported.
@@ -1139,6 +1121,30 @@ unsigned int GHOST_XrGetActionCount(GHOST_XrContextHandle xr_context, const char
 void GHOST_XrGetActionCustomdataArray(GHOST_XrContextHandle xr_context,
                                       const char *action_set_name,
                                       void **r_customdata_array);
+
+/* controller model */
+/**
+ * Load the OpenXR controller model.
+ */
+int GHOST_XrLoadControllerModel(GHOST_XrContextHandle xr_context, const char *subaction_path);
+
+/**
+ * Unload the OpenXR controller model.
+ */
+void GHOST_XrUnloadControllerModel(GHOST_XrContextHandle xr_context, const char *subaction_path);
+
+/**
+ * Update component transforms for the OpenXR controller model.
+ */
+int GHOST_XrUpdateControllerModelComponents(GHOST_XrContextHandle xr_context,
+                                            const char *subaction_path);
+
+/**
+ * Get vertex data for the OpenXR controller model.
+ */
+int GHOST_XrGetControllerModelData(GHOST_XrContextHandle xr_context,
+                                   const char *subaction_path,
+                                   GHOST_XrControllerModelData *r_data);
 
 #endif /* WITH_XR_OPENXR */
 

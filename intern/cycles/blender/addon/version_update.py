@@ -1,24 +1,10 @@
-#
-# Copyright 2011-2014 Blender Foundation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2011-2022 Blender Foundation
 
 # <pep8 compliant>
 from __future__ import annotations
 
 import bpy
-import math
 
 from bpy.app.handlers import persistent
 
@@ -86,7 +72,7 @@ def do_versions(self):
             # Device might not currently be available so this can fail
             try:
                 if system.legacy_compute_device_type == 1:
-                    prop.compute_device_type = 'OPENCL'
+                    prop.compute_device_type = 'NONE' # Was OpenCL
                 elif system.legacy_compute_device_type == 2:
                     prop.compute_device_type = 'CUDA'
                 else:
@@ -96,6 +82,12 @@ def do_versions(self):
 
             # Init device list for UI
             prop.get_devices(prop.compute_device_type)
+
+    if bpy.context.preferences.version <= (3, 0, 40):
+        # Disable OpenCL device
+        prop = bpy.context.preferences.addons[__package__].preferences
+        if prop.is_property_set("compute_device_type") and prop['compute_device_type'] == 4:
+            prop.compute_device_type = 'NONE'
 
     # We don't modify startup file because it assumes to
     # have all the default values only.
@@ -235,8 +227,9 @@ def do_versions(self):
                     cscene.use_denoising = False
                 if not cscene.is_property_set("use_preview_denoising"):
                     cscene.use_preview_denoising = False
-                if not cscene.is_property_set("sampling_pattern"):
-                    cscene.sampling_pattern = 'PROGRESSIVE_MUTI_JITTER'
+                if not cscene.is_property_set("sampling_pattern") or \
+                   cscene.get('sampling_pattern') >= 2:
+                    cscene.sampling_pattern = 'PROGRESSIVE_MULTI_JITTER'
 
                 # Removal of square samples.
                 cscene = scene.cycles

@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup RNA
@@ -59,6 +45,7 @@
 #  include "SEQ_relations.h"
 #  include "SEQ_render.h"
 #  include "SEQ_sequencer.h"
+#  include "SEQ_time.h"
 
 #  include "WM_api.h"
 
@@ -69,7 +56,7 @@ static void rna_Sequence_update_rnafunc(ID *id, Sequence *self, bool do_data)
   ListBase *seqbase = SEQ_get_seqbase_by_seq(&ed->seqbase, self);
 
   if (do_data) {
-    SEQ_relations_update_changed_seq_and_deps(scene, self, true, true);
+    SEQ_time_update_recursive(scene, self);
     // new_tstripdata(self); /* need 2.6x version of this. */
   }
 
@@ -327,8 +314,7 @@ static Sequence *rna_Sequences_new_movie(ID *id,
   SEQ_add_load_data_init(&load_data, name, file, frame_start, channel);
   load_data.fit_method = fit_method;
   load_data.allow_invalid_file = true;
-  double start_offset = -1;
-  Sequence *seq = SEQ_add_movie_strip(bmain, scene, seqbase, &load_data, &start_offset);
+  Sequence *seq = SEQ_add_movie_strip(bmain, scene, seqbase, &load_data);
 
   DEG_relations_tag_update(bmain);
   DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
@@ -377,7 +363,7 @@ static Sequence *rna_Sequences_new_sound(ID *id,
   SeqLoadData load_data;
   SEQ_add_load_data_init(&load_data, name, file, frame_start, channel);
   load_data.allow_invalid_file = true;
-  Sequence *seq = SEQ_add_sound_strip(bmain, scene, seqbase, &load_data, 0.0f);
+  Sequence *seq = SEQ_add_sound_strip(bmain, scene, seqbase, &load_data);
 
   if (seq == NULL) {
     BKE_report(reports, RPT_ERROR, "Sequences.new_sound: unable to open sound file");

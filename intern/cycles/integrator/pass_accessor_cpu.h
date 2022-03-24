@@ -1,20 +1,9 @@
-/*
- * Copyright 2011-2021 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #pragma once
+
+#include "device/cpu/kernel.h"
 
 #include "integrator/pass_accessor.h"
 
@@ -28,25 +17,19 @@ class PassAccessorCPU : public PassAccessor {
   using PassAccessor::PassAccessor;
 
  protected:
-  template<typename Processor>
-  inline void run_get_pass_kernel_processor(const RenderBuffers *render_buffers,
-                                            const BufferParams &buffer_params,
-                                            const Destination &destination,
-                                            const Processor &processor) const;
+  inline void run_get_pass_kernel_processor_float(
+      const KernelFilmConvert *kfilm_convert,
+      const RenderBuffers *render_buffers,
+      const BufferParams &buffer_params,
+      const Destination &destination,
+      const CPUKernels::FilmConvertFunction func) const;
 
-  template<typename Processor>
-  inline void run_get_pass_kernel_processor_float(const KernelFilmConvert *kfilm_convert,
-                                                  const RenderBuffers *render_buffers,
-                                                  const BufferParams &buffer_params,
-                                                  const Destination &destination,
-                                                  const Processor &processor) const;
-
-  template<typename Processor>
-  inline void run_get_pass_kernel_processor_half_rgba(const KernelFilmConvert *kfilm_convert,
-                                                      const RenderBuffers *render_buffers,
-                                                      const BufferParams &buffer_params,
-                                                      const Destination &destination,
-                                                      const Processor &processor) const;
+  inline void run_get_pass_kernel_processor_half_rgba(
+      const KernelFilmConvert *kfilm_convert,
+      const RenderBuffers *render_buffers,
+      const BufferParams &buffer_params,
+      const Destination &destination,
+      const CPUKernels::FilmConvertHalfRGBAFunction func) const;
 
 #define DECLARE_PASS_ACCESSOR(pass) \
   virtual void get_pass_##pass(const RenderBuffers *render_buffers, \

@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2021 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #include "device/cpu/kernel.h"
 
@@ -26,6 +13,9 @@ CCL_NAMESPACE_BEGIN
       KERNEL_NAME_EVAL(cpu_avx, name), KERNEL_NAME_EVAL(cpu_avx2, name)
 
 #define REGISTER_KERNEL(name) name(KERNEL_FUNCTIONS(name))
+#define REGISTER_KERNEL_FILM_CONVERT(name) \
+  film_convert_##name(KERNEL_FUNCTIONS(film_convert_##name)), \
+      film_convert_half_rgba_##name(KERNEL_FUNCTIONS(film_convert_half_rgba_##name))
 
 CPUKernels::CPUKernels()
     : /* Integrator. */
@@ -44,18 +34,31 @@ CPUKernels::CPUKernels()
       /* Shader evaluation. */
       REGISTER_KERNEL(shader_eval_displace),
       REGISTER_KERNEL(shader_eval_background),
+      REGISTER_KERNEL(shader_eval_curve_shadow_transparency),
       /* Adaptive sampling. */
       REGISTER_KERNEL(adaptive_sampling_convergence_check),
       REGISTER_KERNEL(adaptive_sampling_filter_x),
       REGISTER_KERNEL(adaptive_sampling_filter_y),
       /* Cryptomatte. */
       REGISTER_KERNEL(cryptomatte_postprocess),
-      /* Bake. */
-      REGISTER_KERNEL(bake)
+      /* Film Convert. */
+      REGISTER_KERNEL_FILM_CONVERT(depth),
+      REGISTER_KERNEL_FILM_CONVERT(mist),
+      REGISTER_KERNEL_FILM_CONVERT(sample_count),
+      REGISTER_KERNEL_FILM_CONVERT(float),
+      REGISTER_KERNEL_FILM_CONVERT(light_path),
+      REGISTER_KERNEL_FILM_CONVERT(float3),
+      REGISTER_KERNEL_FILM_CONVERT(motion),
+      REGISTER_KERNEL_FILM_CONVERT(cryptomatte),
+      REGISTER_KERNEL_FILM_CONVERT(shadow_catcher),
+      REGISTER_KERNEL_FILM_CONVERT(shadow_catcher_matte_with_shadow),
+      REGISTER_KERNEL_FILM_CONVERT(combined),
+      REGISTER_KERNEL_FILM_CONVERT(float4)
 {
 }
 
 #undef REGISTER_KERNEL
+#undef REGISTER_KERNEL_FILM_CONVERT
 #undef KERNEL_FUNCTIONS
 
 CCL_NAMESPACE_END

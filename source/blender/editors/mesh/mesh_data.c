@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2009 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2009 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup edmesh
@@ -37,12 +21,14 @@
 #include "BKE_customdata.h"
 #include "BKE_editmesh.h"
 #include "BKE_mesh.h"
+#include "BKE_mesh_runtime.h"
 #include "BKE_report.h"
 
 #include "DEG_depsgraph.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+#include "RNA_prototypes.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -208,7 +194,6 @@ static void mesh_uv_reset_mface(MPoly *mp, MLoopUV *mloopuv)
   mesh_uv_reset_array(fuv, mp->totloop);
 }
 
-/* without bContext, called in uvedit */
 void ED_mesh_uv_loop_reset_ex(struct Mesh *me, const int layernum)
 {
   BMEditMesh *em = me->edit_mesh;
@@ -253,9 +238,11 @@ void ED_mesh_uv_loop_reset(struct bContext *C, struct Mesh *me)
   WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
 }
 
-/* NOTE: keep in sync with #ED_mesh_color_add. */
-int ED_mesh_uv_texture_add(Mesh *me, const char *name, const bool active_set, const bool do_init)
+int ED_mesh_uv_texture_add(
+    Mesh *me, const char *name, const bool active_set, const bool do_init, ReportList *reports)
 {
+  /* NOTE: keep in sync with #ED_mesh_color_add. */
+
   BMEditMesh *em;
   int layernum_dst;
 
@@ -266,6 +253,7 @@ int ED_mesh_uv_texture_add(Mesh *me, const char *name, const bool active_set, co
 
     layernum_dst = CustomData_number_of_layers(&em->bm->ldata, CD_MLOOPUV);
     if (layernum_dst >= MAX_MTFACE) {
+      BKE_reportf(reports, RPT_WARNING, "Cannot add more than %i UV maps", MAX_MTFACE);
       return -1;
     }
 
@@ -285,6 +273,7 @@ int ED_mesh_uv_texture_add(Mesh *me, const char *name, const bool active_set, co
   else {
     layernum_dst = CustomData_number_of_layers(&me->ldata, CD_MLOOPUV);
     if (layernum_dst >= MAX_MTFACE) {
+      BKE_reportf(reports, RPT_WARNING, "Cannot add more than %i UV maps", MAX_MTFACE);
       return -1;
     }
 
@@ -325,13 +314,13 @@ void ED_mesh_uv_texture_ensure(struct Mesh *me, const char *name)
 
     layernum_dst = CustomData_number_of_layers(&em->bm->ldata, CD_MLOOPUV);
     if (layernum_dst == 0) {
-      ED_mesh_uv_texture_add(me, name, true, true);
+      ED_mesh_uv_texture_add(me, name, true, true, NULL);
     }
   }
   else {
     layernum_dst = CustomData_number_of_layers(&me->ldata, CD_MLOOPUV);
     if (layernum_dst == 0) {
-      ED_mesh_uv_texture_add(me, name, true, true);
+      ED_mesh_uv_texture_add(me, name, true, true, NULL);
     }
   }
 }
@@ -378,9 +367,11 @@ bool ED_mesh_uv_texture_remove_named(Mesh *me, const char *name)
   return false;
 }
 
-/* NOTE: keep in sync with #ED_mesh_uv_texture_add. */
-int ED_mesh_color_add(Mesh *me, const char *name, const bool active_set, const bool do_init)
+int ED_mesh_color_add(
+    Mesh *me, const char *name, const bool active_set, const bool do_init, ReportList *reports)
 {
+  /* NOTE: keep in sync with #ED_mesh_uv_texture_add. */
+
   BMEditMesh *em;
   int layernum;
 
@@ -389,6 +380,7 @@ int ED_mesh_color_add(Mesh *me, const char *name, const bool active_set, const b
 
     layernum = CustomData_number_of_layers(&em->bm->ldata, CD_MLOOPCOL);
     if (layernum >= MAX_MCOL) {
+      BKE_reportf(reports, RPT_WARNING, "Cannot add more than %i vertex color layers", MAX_MCOL);
       return -1;
     }
 
@@ -406,6 +398,7 @@ int ED_mesh_color_add(Mesh *me, const char *name, const bool active_set, const b
   else {
     layernum = CustomData_number_of_layers(&me->ldata, CD_MLOOPCOL);
     if (layernum >= MAX_MCOL) {
+      BKE_reportf(reports, RPT_WARNING, "Cannot add more than %i vertex color layers", MAX_MCOL);
       return -1;
     }
 
@@ -510,9 +503,11 @@ static bool sculpt_vertex_color_remove_poll(bContext *C)
   return false;
 }
 
-/* NOTE: keep in sync with #ED_mesh_uv_texture_add. */
-int ED_mesh_sculpt_color_add(Mesh *me, const char *name, const bool active_set, const bool do_init)
+int ED_mesh_sculpt_color_add(
+    Mesh *me, const char *name, const bool active_set, const bool do_init, ReportList *reports)
 {
+  /* NOTE: keep in sync with #ED_mesh_uv_texture_add. */
+
   BMEditMesh *em;
   int layernum;
 
@@ -521,6 +516,8 @@ int ED_mesh_sculpt_color_add(Mesh *me, const char *name, const bool active_set, 
 
     layernum = CustomData_number_of_layers(&em->bm->vdata, CD_PROP_COLOR);
     if (layernum >= MAX_MCOL) {
+      BKE_reportf(
+          reports, RPT_WARNING, "Cannot add more than %i sculpt vertex color layers", MAX_MCOL);
       return -1;
     }
 
@@ -538,6 +535,8 @@ int ED_mesh_sculpt_color_add(Mesh *me, const char *name, const bool active_set, 
   else {
     layernum = CustomData_number_of_layers(&me->vdata, CD_PROP_COLOR);
     if (layernum >= MAX_MCOL) {
+      BKE_reportf(
+          reports, RPT_WARNING, "Cannot add more than %i sculpt vertex color layers", MAX_MCOL);
       return -1;
     }
 
@@ -634,12 +633,12 @@ static bool uv_texture_remove_poll(bContext *C)
   return false;
 }
 
-static int mesh_uv_texture_add_exec(bContext *C, wmOperator *UNUSED(op))
+static int mesh_uv_texture_add_exec(bContext *C, wmOperator *op)
 {
   Object *ob = ED_object_context(C);
   Mesh *me = ob->data;
 
-  if (ED_mesh_uv_texture_add(me, NULL, true, true) == -1) {
+  if (ED_mesh_uv_texture_add(me, NULL, true, true, op->reports) == -1) {
     return OPERATOR_CANCELLED;
   }
 
@@ -719,12 +718,12 @@ static bool vertex_color_remove_poll(bContext *C)
   return false;
 }
 
-static int mesh_vertex_color_add_exec(bContext *C, wmOperator *UNUSED(op))
+static int mesh_vertex_color_add_exec(bContext *C, wmOperator *op)
 {
   Object *ob = ED_object_context(C);
   Mesh *me = ob->data;
 
-  if (ED_mesh_color_add(me, NULL, true, true) == -1) {
+  if (ED_mesh_color_add(me, NULL, true, true, op->reports) == -1) {
     return OPERATOR_CANCELLED;
   }
 
@@ -775,12 +774,12 @@ void MESH_OT_vertex_color_remove(wmOperatorType *ot)
 
 /*********************** Sculpt Vertex Color Operators ************************/
 
-static int mesh_sculpt_vertex_color_add_exec(bContext *C, wmOperator *UNUSED(op))
+static int mesh_sculpt_vertex_color_add_exec(bContext *C, wmOperator *op)
 {
   Object *ob = ED_object_context(C);
   Mesh *me = ob->data;
 
-  if (ED_mesh_sculpt_color_add(me, NULL, true, true) == -1) {
+  if (ED_mesh_sculpt_color_add(me, NULL, true, true, op->reports) == -1) {
     return OPERATOR_CANCELLED;
   }
 
@@ -894,6 +893,7 @@ static int mesh_customdata_mask_clear_exec(bContext *C, wmOperator *UNUSED(op))
 
 void MESH_OT_customdata_mask_clear(wmOperatorType *ot)
 {
+  /* NOTE: no create_mask yet */
 
   /* identifiers */
   ot->name = "Clear Sculpt Mask Data";
@@ -1005,11 +1005,6 @@ static int mesh_customdata_custom_splitnormals_add_exec(bContext *C, wmOperator 
       /* Tag edges as sharp according to smooth threshold if needed,
        * to preserve autosmooth shading. */
       if (me->flag & ME_AUTOSMOOTH) {
-        float(*polynors)[3] = MEM_mallocN(sizeof(*polynors) * (size_t)me->totpoly, __func__);
-
-        BKE_mesh_calc_normals_poly(
-            me->mvert, me->totvert, me->mloop, me->totloop, me->mpoly, me->totpoly, polynors);
-
         BKE_edges_sharp_from_angle_set(me->mvert,
                                        me->totvert,
                                        me->medge,
@@ -1017,11 +1012,9 @@ static int mesh_customdata_custom_splitnormals_add_exec(bContext *C, wmOperator 
                                        me->mloop,
                                        me->totloop,
                                        me->mpoly,
-                                       polynors,
+                                       BKE_mesh_poly_normals_ensure(me),
                                        me->totpoly,
                                        me->smoothresh);
-
-        MEM_freeN(polynors);
       }
 
       CustomData_add_layer(data, CD_CUSTOMLOOPNORMAL, CD_DEFAULT, NULL, me->totloop);
@@ -1119,6 +1112,8 @@ static void mesh_add_verts(Mesh *mesh, int len)
   mesh->vdata = vdata;
   BKE_mesh_update_customdata_pointers(mesh, false);
 
+  BKE_mesh_runtime_clear_cache(mesh);
+
   /* scan the input list and insert the new vertices */
 
   /* set default flags */
@@ -1155,6 +1150,8 @@ static void mesh_add_edges(Mesh *mesh, int len)
   mesh->edata = edata;
   BKE_mesh_update_customdata_pointers(mesh, false); /* new edges don't change tessellation */
 
+  BKE_mesh_runtime_clear_cache(mesh);
+
   /* set default flags */
   medge = &mesh->medge[mesh->totedge];
   for (i = 0; i < len; i++, medge++) {
@@ -1182,6 +1179,8 @@ static void mesh_add_loops(Mesh *mesh, int len)
   if (!CustomData_has_layer(&ldata, CD_MLOOP)) {
     CustomData_add_layer(&ldata, CD_MLOOP, CD_CALLOC, NULL, totloop);
   }
+
+  BKE_mesh_runtime_clear_cache(mesh);
 
   CustomData_free(&mesh->ldata, mesh->totloop);
   mesh->ldata = ldata;
@@ -1213,6 +1212,8 @@ static void mesh_add_polys(Mesh *mesh, int len)
   CustomData_free(&mesh->pdata, mesh->totpoly);
   mesh->pdata = pdata;
   BKE_mesh_update_customdata_pointers(mesh, true);
+
+  BKE_mesh_runtime_clear_cache(mesh);
 
   /* set default flags */
   mpoly = &mesh->mpoly[mesh->totpoly];

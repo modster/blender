@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 import os
 import bpy
 from bpy.props import (
@@ -56,7 +58,7 @@ class Prefs(bpy.types.KeyConfigPreferences):
         update=update_fn,
     )
     tool_key_mode: EnumProperty(
-        name="Tool Keys:",
+        name="Tool Keys",
         description=(
             "The method of keys to activate tools such as move, rotate & scale (G, R, S)"
         ),
@@ -83,6 +85,28 @@ class Prefs(bpy.types.KeyConfigPreferences):
         ),
         update=update_fn,
     )
+
+    # Experimental: only show with developer extras, see: T96544.
+    use_tweak_select_passthrough: BoolProperty(
+        name="Tweak Select: Mouse Select & Move",
+        description=(
+            "The tweak tool is activated immediately instead of placing the cursor. "
+            "This is an experimental preference and may be removed"
+        ),
+        default=False,
+        update=update_fn,
+    )
+    # Experimental: only show with developer extras, see: T96544.
+    use_tweak_tool_lmb_interaction: BoolProperty(
+        name="Tweak Tool: Left Mouse Select & Move",
+        description=(
+            "The tweak tool is activated immediately instead of placing the cursor. "
+            "This is an experimental preference and may be removed"
+        ),
+        default=False,
+        update=update_fn,
+    )
+
     use_alt_click_leader: BoolProperty(
         name="Alt Click Tool Prompt",
         description=(
@@ -202,7 +226,7 @@ class Prefs(bpy.types.KeyConfigPreferences):
         update=update_fn,
     )
 
-    # Developer note, this is an experemental option.
+    # Developer note, this is an experimental option.
     use_pie_click_drag: BoolProperty(
         name="Pie Menu on Drag",
         description=(
@@ -234,6 +258,7 @@ class Prefs(bpy.types.KeyConfigPreferences):
 
         prefs = context.preferences
 
+        show_developer_ui = prefs.view.show_developer_ui
         is_select_left = (self.select_mouse == 'LEFT')
         use_mouse_emulate_3_button = (
             prefs.inputs.use_mouse_emulate_3_button and
@@ -242,13 +267,13 @@ class Prefs(bpy.types.KeyConfigPreferences):
 
         # General settings.
         col = layout.column()
-        col.row().prop(self, "select_mouse", text="Select with Mouse Button:", expand=True)
-        col.row().prop(self, "spacebar_action", text="Spacebar Action:", expand=True)
+        col.row().prop(self, "select_mouse", text="Select with Mouse Button", expand=True)
+        col.row().prop(self, "spacebar_action", text="Spacebar Action", expand=True)
 
         if is_select_left:
-            col.row().prop(self, "gizmo_action", text="Activate Gizmo Event:", expand=True)
+            col.row().prop(self, "gizmo_action", text="Activate Gizmo Event", expand=True)
         else:
-            col.row().prop(self, "rmb_action", text="Right Mouse Select Action:", expand=True)
+            col.row().prop(self, "rmb_action", text="Right Mouse Select Action", expand=True)
 
         col.row().prop(self, "tool_key_mode", expand=True)
 
@@ -268,12 +293,19 @@ class Prefs(bpy.types.KeyConfigPreferences):
         row = sub.row()
         row.prop(self, "use_select_all_toggle")
 
+        if show_developer_ui:
+            row = sub.row()
+            row.prop(self, "use_tweak_select_passthrough")
+        if show_developer_ui and (not is_select_left):
+            row = sub.row()
+            row.prop(self, "use_tweak_tool_lmb_interaction")
+
         # 3DView settings.
         col = layout.column()
         col.label(text="3D View")
-        col.row().prop(self, "v3d_tilde_action", text="Grave Accent / Tilde Action:", expand=True)
-        col.row().prop(self, "v3d_mmb_action", text="Middle Mouse Action:", expand=True)
-        col.row().prop(self, "v3d_alt_mmb_drag_action", text="Alt Middle Mouse Drag Action:", expand=True)
+        col.row().prop(self, "v3d_tilde_action", text="Grave Accent / Tilde Action", expand=True)
+        col.row().prop(self, "v3d_mmb_action", text="Middle Mouse Action", expand=True)
+        col.row().prop(self, "v3d_alt_mmb_drag_action", text="Alt Middle Mouse Drag Action", expand=True)
 
         # Checkboxes sub-layout.
         col = layout.column()
@@ -299,6 +331,7 @@ def load():
     kc = context.window_manager.keyconfigs.new(IDNAME)
     kc_prefs = kc.preferences
 
+    show_developer_ui = prefs.view.show_developer_ui
     is_select_left = (kc_prefs.select_mouse == 'LEFT')
     use_mouse_emulate_3_button = (
         prefs.inputs.use_mouse_emulate_3_button and
@@ -318,7 +351,13 @@ def load():
             use_v3d_tab_menu=kc_prefs.use_v3d_tab_menu,
             use_v3d_shade_ex_pie=kc_prefs.use_v3d_shade_ex_pie,
             use_gizmo_drag=(is_select_left and kc_prefs.gizmo_action == 'DRAG'),
-            use_fallback_tool=(True if is_select_left else (kc_prefs.rmb_action == 'FALLBACK_TOOL')),
+            use_fallback_tool=True,
+            use_fallback_tool_rmb=(False if is_select_left else kc_prefs.rmb_action == 'FALLBACK_TOOL'),
+            use_tweak_select_passthrough=(show_developer_ui and kc_prefs.use_tweak_select_passthrough),
+            use_tweak_tool_lmb_interaction=(
+                False if is_select_left else
+                (show_developer_ui and kc_prefs.use_tweak_tool_lmb_interaction)
+            ),
             use_alt_tool_or_cursor=(
                 (not use_mouse_emulate_3_button) and
                 (kc_prefs.use_alt_tool if is_select_left else kc_prefs.use_alt_cursor)

@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup RNA
@@ -32,6 +18,25 @@
 #include "BKE_volume.h"
 
 #include "BLI_math_base.h"
+
+const EnumPropertyItem rna_enum_volume_grid_data_type_items[] = {
+    {VOLUME_GRID_BOOLEAN, "BOOLEAN", 0, "Boolean", "Boolean"},
+    {VOLUME_GRID_FLOAT, "FLOAT", 0, "Float", "Single precision float"},
+    {VOLUME_GRID_DOUBLE, "DOUBLE", 0, "Double", "Double precision"},
+    {VOLUME_GRID_INT, "INT", 0, "Integer", "32-bit integer"},
+    {VOLUME_GRID_INT64, "INT64", 0, "Integer 64-bit", "64-bit integer"},
+    {VOLUME_GRID_MASK, "MASK", 0, "Mask", "No data, boolean mask of active voxels"},
+    {VOLUME_GRID_VECTOR_FLOAT, "VECTOR_FLOAT", 0, "Float Vector", "3D float vector"},
+    {VOLUME_GRID_VECTOR_DOUBLE, "VECTOR_DOUBLE", 0, "Double Vector", "3D double vector"},
+    {VOLUME_GRID_VECTOR_INT, "VECTOR_INT", 0, "Integer Vector", "3D integer vector"},
+    {VOLUME_GRID_POINTS,
+     "POINTS",
+     0,
+     "Points (Unsupported)",
+     "Points grid, currently unsupported by volume objects"},
+    {VOLUME_GRID_UNKNOWN, "UNKNOWN", 0, "Unknown", "Unsupported data type"},
+    {0, NULL, 0, NULL, NULL},
+};
 
 #ifdef RNA_RUNTIME
 
@@ -244,30 +249,10 @@ static void rna_def_volume_grid(BlenderRNA *brna)
       prop, "rna_VolumeGrid_name_get", "rna_VolumeGrid_name_length", NULL);
   RNA_def_property_ui_text(prop, "Name", "Volume grid name");
 
-  static const EnumPropertyItem data_type_items[] = {
-      {VOLUME_GRID_BOOLEAN, "BOOLEAN", 0, "Boolean", "Boolean"},
-      {VOLUME_GRID_FLOAT, "FLOAT", 0, "Float", "Single precision float"},
-      {VOLUME_GRID_DOUBLE, "DOUBLE", 0, "Double", "Double precision"},
-      {VOLUME_GRID_INT, "INT", 0, "Integer", "32-bit integer"},
-      {VOLUME_GRID_INT64, "INT64", 0, "Integer 64-bit", "64-bit integer"},
-      {VOLUME_GRID_MASK, "MASK", 0, "Mask", "No data, boolean mask of active voxels"},
-      {VOLUME_GRID_STRING, "STRING", 0, "String", "Text string"},
-      {VOLUME_GRID_VECTOR_FLOAT, "VECTOR_FLOAT", 0, "Float Vector", "3D float vector"},
-      {VOLUME_GRID_VECTOR_DOUBLE, "VECTOR_DOUBLE", 0, "Double Vector", "3D double vector"},
-      {VOLUME_GRID_VECTOR_INT, "VECTOR_INT", 0, "Integer Vector", "3D integer vector"},
-      {VOLUME_GRID_POINTS,
-       "POINTS",
-       0,
-       "Points (Unsupported)",
-       "Points grid, currently unsupported by volume objects"},
-      {VOLUME_GRID_UNKNOWN, "UNKNOWN", 0, "Unknown", "Unsupported data type"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   prop = RNA_def_property(srna, "data_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_enum_funcs(prop, "rna_VolumeGrid_data_type_get", NULL, NULL);
-  RNA_def_property_enum_items(prop, data_type_items);
+  RNA_def_property_enum_items(prop, rna_enum_volume_grid_data_type_items);
   RNA_def_property_ui_text(prop, "Data Type", "Data type of voxel values");
 
   prop = RNA_def_property(srna, "channels", PROP_INT, PROP_UNSIGNED);

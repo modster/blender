@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2019, Blender Foundation.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2019 Blender Foundation. */
 
 /** \file
  * \ingroup draw_engine
@@ -200,6 +185,15 @@ void OVERLAY_grid_init(OVERLAY_Data *vedata)
   shd->grid_distance = dist / 2.0f;
 
   ED_view3d_grid_steps(scene, v3d, rv3d, shd->grid_steps);
+
+  if ((v3d->flag & (V3D_XR_SESSION_SURFACE | V3D_XR_SESSION_MIRROR)) != 0) {
+    /* The calculations for the grid parameters assume that the view matrix has no scale component,
+     * which may not be correct if the user is "shrunk" or "enlarged" by zooming in or out.
+     * Therefore, we need to compensate the values here. */
+    float viewinvscale = len_v3(
+        viewinv[0]); /* Assumption is uniform scaling (all column vectors are of same length). */
+    shd->grid_distance *= viewinvscale;
+  }
 }
 
 void OVERLAY_grid_cache_init(OVERLAY_Data *vedata)

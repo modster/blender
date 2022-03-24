@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2009 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2009 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup RNA
@@ -41,7 +25,9 @@
 #ifdef RNA_RUNTIME
 
 #  include "BKE_image.h"
+#  include "BKE_image_format.h"
 #  include "BKE_main.h"
+#  include "BKE_scene.h"
 #  include <errno.h>
 
 #  include "IMB_colormanagement.h"
@@ -75,7 +61,6 @@ static void rna_Image_save_render(
     void *lock;
 
     iuser.scene = scene;
-    iuser.ok = 1;
 
     ibuf = BKE_image_acquire_ibuf(image, &iuser, &lock);
 
@@ -85,19 +70,23 @@ static void rna_Image_save_render(
     else {
       ImBuf *write_ibuf;
 
-      write_ibuf = IMB_colormanagement_imbuf_for_write(
-          ibuf, true, true, &scene->view_settings, &scene->display_settings, &scene->r.im_format);
+      ImageFormatData image_format;
+      BKE_image_format_init_for_write(&image_format, scene, NULL);
 
-      write_ibuf->planes = scene->r.im_format.planes;
+      write_ibuf = IMB_colormanagement_imbuf_for_write(ibuf, true, true, &image_format);
+
+      write_ibuf->planes = image_format.planes;
       write_ibuf->dither = scene->r.dither_intensity;
 
-      if (!BKE_imbuf_write(write_ibuf, path, &scene->r.im_format)) {
+      if (!BKE_imbuf_write(write_ibuf, path, &image_format)) {
         BKE_reportf(reports, RPT_ERROR, "Could not write image: %s, '%s'", strerror(errno), path);
       }
 
       if (write_ibuf != ibuf) {
         IMB_freeImBuf(write_ibuf);
       }
+
+      BKE_image_format_free(&image_format);
     }
 
     BKE_image_release_ibuf(image, ibuf, lock);
@@ -113,14 +102,14 @@ static void rna_Image_save(Image *image, Main *bmain, bContext *C, ReportList *r
 
   ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
   if (ibuf) {
-    char filename[FILE_MAX];
-    BLI_strncpy(filename, image->filepath, sizeof(filename));
-    BLI_path_abs(filename, ID_BLEND_PATH(bmain, &image->id));
+    char filepath[FILE_MAX];
+    BLI_strncpy(filepath, image->filepath, sizeof(filepath));
+    BLI_path_abs(filepath, ID_BLEND_PATH(bmain, &image->id));
 
     /* NOTE: we purposefully ignore packed files here,
      * developers need to explicitly write them via 'packed_files' */
 
-    if (IMB_saveiff(ibuf, filename, ibuf->flags)) {
+    if (IMB_saveiff(ibuf, filepath, ibuf->flags)) {
       image->type = IMA_TYPE_IMAGE;
 
       if (image->source == IMA_SRC_GENERATED) {
@@ -214,11 +203,17 @@ static void rna_Image_scale(Image *image, ReportList *reports, int width, int he
   }
 }
 
-static int rna_Image_gl_load(Image *image, ReportList *reports, int frame)
+static int rna_Image_gl_load(
+    Image *image, ReportList *reports, int frame, int layer_index, int pass_index)
 {
   ImageUser iuser;
   BKE_imageuser_default(&iuser);
   iuser.framenr = frame;
+  iuser.layer = layer_index;
+  iuser.pass = pass_index;
+  if (image->rr != NULL) {
+    BKE_image_multilayer_index(image->rr, &iuser);
+  }
 
   GPUTexture *tex = BKE_image_get_gpu_texture(image, &iuser, NULL);
 
@@ -231,14 +226,15 @@ static int rna_Image_gl_load(Image *image, ReportList *reports, int frame)
   return 0; /* GL_NO_ERROR */
 }
 
-static int rna_Image_gl_touch(Image *image, ReportList *reports, int frame)
+static int rna_Image_gl_touch(
+    Image *image, ReportList *reports, int frame, int layer_index, int pass_index)
 {
   int error = 0; /* GL_NO_ERROR */
 
   BKE_image_tag_time(image);
 
-  if (image->gputexture[TEXTARGET_2D][0] == NULL) {
-    error = rna_Image_gl_load(image, reports, frame);
+  if (image->gputexture[TEXTARGET_2D][0][IMA_TEXTURE_RESOLUTION_FULL] == NULL) {
+    error = rna_Image_gl_load(image, reports, frame, layer_index, pass_index);
   }
 
   return error;
@@ -333,6 +329,24 @@ void RNA_api_image(StructRNA *srna)
   RNA_def_function_flag(func, FUNC_USE_REPORTS);
   RNA_def_int(
       func, "frame", 0, 0, INT_MAX, "Frame", "Frame of image sequence or movie", 0, INT_MAX);
+  RNA_def_int(func,
+              "layer_index",
+              0,
+              0,
+              INT_MAX,
+              "Layer",
+              "Index of layer that should be loaded",
+              0,
+              INT_MAX);
+  RNA_def_int(func,
+              "pass_index",
+              0,
+              0,
+              INT_MAX,
+              "Pass",
+              "Index of pass that should be loaded",
+              0,
+              INT_MAX);
   /* return value */
   parm = RNA_def_int(
       func, "error", 0, -INT_MAX, INT_MAX, "Error", "OpenGL error value", -INT_MAX, INT_MAX);
@@ -347,6 +361,24 @@ void RNA_api_image(StructRNA *srna)
   RNA_def_function_flag(func, FUNC_USE_REPORTS);
   RNA_def_int(
       func, "frame", 0, 0, INT_MAX, "Frame", "Frame of image sequence or movie", 0, INT_MAX);
+  RNA_def_int(func,
+              "layer_index",
+              0,
+              0,
+              INT_MAX,
+              "Layer",
+              "Index of layer that should be loaded",
+              0,
+              INT_MAX);
+  RNA_def_int(func,
+              "pass_index",
+              0,
+              0,
+              INT_MAX,
+              "Pass",
+              "Index of pass that should be loaded",
+              0,
+              INT_MAX);
   /* return value */
   parm = RNA_def_int(
       func, "error", 0, -INT_MAX, INT_MAX, "Error", "OpenGL error value", -INT_MAX, INT_MAX);

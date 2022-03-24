@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -56,12 +42,12 @@ class AssetCatalogPath {
   /**
    * The path itself, such as "Agents/Secret/327".
    */
-  std::string path_;
+  std::string path_ = "";
 
  public:
   static const char SEPARATOR;
 
-  AssetCatalogPath() = delete;
+  AssetCatalogPath() = default;
   AssetCatalogPath(StringRef path);
   AssetCatalogPath(const std::string &path);
   AssetCatalogPath(const char *path);
@@ -75,6 +61,9 @@ class AssetCatalogPath {
   /** C-string representation of the path. */
   const char *c_str() const;
   const std::string &str() const;
+
+  /* The last path component, used as label in the tree view. */
+  StringRefNull name() const;
 
   /* In-class operators, because of the implicit `AssetCatalogPath(StringRef)` constructor.
    * Otherwise `string == string` could cast both sides to `AssetCatalogPath`. */

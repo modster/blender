@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup blenloader
@@ -61,6 +47,7 @@
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_node.h"
+#include "BKE_node_tree_update.h"
 #include "BKE_paint.h"
 #include "BKE_screen.h"
 #include "BKE_workspace.h"
@@ -208,7 +195,8 @@ static void blo_update_defaults_screen(bScreen *screen,
 
       LISTBASE_FOREACH (ARegion *, region, regionbase) {
         if (region->regiontype == RGN_TYPE_TOOL_HEADER) {
-          if ((sl->spacetype == SPACE_IMAGE) && hide_image_tool_header) {
+          if (((sl->spacetype == SPACE_IMAGE) && hide_image_tool_header) ||
+              sl->spacetype == SPACE_SEQ) {
             region->flag |= RGN_FLAG_HIDDEN;
           }
           else {
@@ -293,7 +281,7 @@ static void blo_update_defaults_scene(Main *bmain, Scene *scene)
   }
 
   /* Rename render layers. */
-  BKE_view_layer_rename(bmain, scene, scene->view_layers.first, "View Layer");
+  BKE_view_layer_rename(bmain, scene, scene->view_layers.first, "ViewLayer");
 
   /* Disable Z pass by default. */
   LISTBASE_FOREACH (ViewLayer *, view_layer, &scene->view_layers) {
@@ -366,15 +354,6 @@ static void blo_update_defaults_scene(Main *bmain, Scene *scene)
   }
 }
 
-/**
- * Update defaults in startup.blend, without having to save and embed the file.
- * This function can be emptied each time the startup.blend is updated.
- *
- * \note Screen data may be cleared at this point, this will happen in the case
- * an app-template's data needs to be versioned when read-file is called with "Load UI" disabled.
- * Versioning the screen data can be safely skipped without "Load UI" since the screen data
- * will have been versioned when it was first loaded.
- */
 void BLO_update_defaults_startup_blend(Main *bmain, const char *app_template)
 {
   /* For all app templates. */
@@ -591,9 +570,11 @@ void BLO_update_defaults_startup_blend(Main *bmain, const char *app_template)
           bNodeSocketValueFloat *roughness_data = roughness_socket->default_value;
           roughness_data->value = 0.4f;
           node->custom2 = SHD_SUBSURFACE_RANDOM_WALK;
+          BKE_ntree_update_tag_node_property(ma->nodetree, node);
         }
         else if (node->type == SH_NODE_SUBSURFACE_SCATTERING) {
           node->custom1 = SHD_SUBSURFACE_RANDOM_WALK;
+          BKE_ntree_update_tag_node_property(ma->nodetree, node);
         }
       }
     }

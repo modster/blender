@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spfile
@@ -27,11 +11,13 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_linklist.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_appdir.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_lib_remap.h"
 #include "BKE_main.h"
 #include "BKE_screen.h"
 
@@ -43,6 +29,8 @@
 #include "WM_message.h"
 #include "WM_types.h"
 
+#include "ED_asset.h"
+#include "ED_asset_indexer.h"
 #include "ED_fileselect.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"
@@ -54,6 +42,7 @@
 #include "UI_view2d.h"
 
 #include "GPU_framebuffer.h"
+#include "file_indexer.h"
 #include "file_intern.h" /* own include */
 #include "filelist.h"
 #include "fsmenu.h"
@@ -303,15 +292,6 @@ static void file_ensure_valid_region_state(bContext *C,
   }
 }
 
-/**
- * Tag the space to recreate the file-list.
- */
-static void file_tag_reset_list(ScrArea *area, SpaceFile *sfile)
-{
-  filelist_tag_force_reset(sfile->files);
-  ED_area_tag_refresh(area);
-}
-
 static void file_refresh(const bContext *C, ScrArea *area)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
@@ -326,7 +306,7 @@ static void file_refresh(const bContext *C, ScrArea *area)
 
   if (sfile->files && (sfile->tags & FILE_TAG_REBUILD_MAIN_FILES) &&
       filelist_needs_reset_on_main_changes(sfile->files)) {
-    filelist_tag_force_reset(sfile->files);
+    filelist_tag_force_reset_mainfiles(sfile->files);
   }
   sfile->tags &= ~FILE_TAG_REBUILD_MAIN_FILES;
 
@@ -336,8 +316,9 @@ static void file_refresh(const bContext *C, ScrArea *area)
   }
 
   if (ED_fileselect_is_asset_browser(sfile)) {
-    /* Only poses supported as non-experimental right now. */
-    params->filter_id = U.experimental.use_extended_asset_browser ? FILTER_ID_ALL : FILTER_ID_AC;
+    /* Ask the asset code for appropriate ID filter flags for the supported assets, and mask others
+     * out. */
+    params->filter_id &= ED_asset_types_supported_as_filter_flags();
   }
 
   filelist_settype(sfile->files, params->type);
@@ -360,6 +341,12 @@ static void file_refresh(const bContext *C, ScrArea *area)
         sfile->files, asset_params->asset_catalog_visibility, &asset_params->catalog_id);
   }
 
+  if (ED_fileselect_is_asset_browser(sfile)) {
+    const bool use_asset_indexer = !USER_EXPERIMENTAL_TEST(&U, no_asset_indexing);
+    filelist_setindexer(sfile->files,
+                        use_asset_indexer ? &file_indexer_asset : &file_indexer_noop);
+  }
+
   /* Update the active indices of bookmarks & co. */
   sfile->systemnr = fsmenu_get_active_indices(fsmenu, FS_CATEGORY_SYSTEM, params->dir);
   sfile->system_bookmarknr = fsmenu_get_active_indices(
@@ -369,7 +356,7 @@ static void file_refresh(const bContext *C, ScrArea *area)
 
   if (filelist_needs_force_reset(sfile->files)) {
     filelist_readjob_stop(sfile->files, wm);
-    filelist_clear(sfile->files);
+    filelist_clear_from_reset_tag(sfile->files);
   }
 
   if (filelist_needs_reading(sfile->files)) {
@@ -431,9 +418,8 @@ static void file_on_reload_callback_call(SpaceFile *sfile)
 static void file_reset_filelist_showing_main_data(ScrArea *area, SpaceFile *sfile)
 {
   if (sfile->files && filelist_needs_reset_on_main_changes(sfile->files)) {
-    /* Full refresh of the file list if local asset data was changed. Refreshing this view
-     * is cheap and users expect this to be updated immediately. */
-    file_tag_reset_list(area, sfile);
+    filelist_tag_force_reset_mainfiles(sfile->files);
+    ED_area_tag_refresh(area);
   }
 }
 
@@ -664,10 +650,10 @@ static void file_main_region_draw(const bContext *C, ARegion *region)
   /* on first read, find active file */
   if (params->highlight_file == -1) {
     wmEvent *event = CTX_wm_window(C)->eventstate;
-    file_highlight_set(sfile, region, event->x, event->y);
+    file_highlight_set(sfile, region, event->xy[0], event->xy[1]);
   }
 
-  if (!file_draw_hint_if_invalid(sfile, region)) {
+  if (!file_draw_hint_if_invalid(C, sfile, region)) {
     file_draw_list(C, region);
   }
 
@@ -988,7 +974,7 @@ static int /*eContextResult*/ file_context(const bContext *C,
   return CTX_RESULT_MEMBER_NOT_FOUND;
 }
 
-static void file_id_remap(ScrArea *area, SpaceLink *sl, ID *UNUSED(old_id), ID *UNUSED(new_id))
+static void file_id_remap(ScrArea *area, SpaceLink *sl, const struct IDRemapper *UNUSED(mappings))
 {
   SpaceFile *sfile = (SpaceFile *)sl;
 
@@ -999,7 +985,6 @@ static void file_id_remap(ScrArea *area, SpaceLink *sl, ID *UNUSED(old_id), ID *
   file_reset_filelist_showing_main_data(area, sfile);
 }
 
-/* only called once, from space/spacetypes.c */
 void ED_spacetype_file(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype file");

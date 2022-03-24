@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2009, Blender Foundation, Joshua Leung
- * This is a new part of Blender
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2009 Blender Foundation, Joshua Leung. */
 
 /** \file
  * \ingroup edarmature
@@ -69,6 +53,7 @@
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+#include "RNA_prototypes.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -613,11 +598,8 @@ static void pose_slide_apply_quat(tPoseSlideOp *pso, tPChanFCurveLink *pfl)
     float quat_final[4];
 
     /* Perform blending. */
-    if (pso->mode == POSESLIDE_BREAKDOWN) {
-      /* Just perform the interpolation between quat_prev and
-       * quat_next using pso->factor as a guide. */
-      float quat_prev[4];
-      float quat_next[4];
+    if (ELEM(pso->mode, POSESLIDE_BREAKDOWN, POSESLIDE_PUSH, POSESLIDE_RELAX)) {
+      float quat_prev[4], quat_next[4];
 
       quat_prev[0] = evaluate_fcurve(fcu_w, prevFrameF);
       quat_prev[1] = evaluate_fcurve(fcu_x, prevFrameF);
@@ -632,29 +614,29 @@ static void pose_slide_apply_quat(tPoseSlideOp *pso, tPChanFCurveLink *pfl)
       normalize_qt(quat_prev);
       normalize_qt(quat_next);
 
-      interp_qt_qtqt(quat_final, quat_prev, quat_next, ED_slider_factor_get(pso->slider));
-    }
-    else if (pso->mode == POSESLIDE_PUSH || pso->mode == POSESLIDE_RELAX) {
-      float quat_breakdown[4];
-      float quat_curr[4];
-
-      copy_qt_qt(quat_curr, pchan->quat);
-
-      quat_breakdown[0] = evaluate_fcurve(fcu_w, cframe);
-      quat_breakdown[1] = evaluate_fcurve(fcu_x, cframe);
-      quat_breakdown[2] = evaluate_fcurve(fcu_y, cframe);
-      quat_breakdown[3] = evaluate_fcurve(fcu_z, cframe);
-
-      normalize_qt(quat_breakdown);
-      normalize_qt(quat_curr);
-
-      if (pso->mode == POSESLIDE_PUSH) {
-        interp_qt_qtqt(
-            quat_final, quat_breakdown, quat_curr, 1.0f + ED_slider_factor_get(pso->slider));
+      if (pso->mode == POSESLIDE_BREAKDOWN) {
+        /* Just perform the interpolation between quat_prev and
+         * quat_next using pso->factor as a guide. */
+        interp_qt_qtqt(quat_final, quat_prev, quat_next, ED_slider_factor_get(pso->slider));
       }
       else {
-        BLI_assert(pso->mode == POSESLIDE_RELAX);
-        interp_qt_qtqt(quat_final, quat_curr, quat_breakdown, ED_slider_factor_get(pso->slider));
+        float quat_curr[4], quat_breakdown[4];
+
+        normalize_qt_qt(quat_curr, pchan->quat);
+
+        /* Compute breakdown based on actual frame range. */
+        const float factor = (cframe - pso->prevFrame) / (float)(pso->nextFrame - pso->prevFrame);
+
+        interp_qt_qtqt(quat_breakdown, quat_prev, quat_next, factor);
+
+        if (pso->mode == POSESLIDE_PUSH) {
+          interp_qt_qtqt(
+              quat_final, quat_breakdown, quat_curr, 1.0f + ED_slider_factor_get(pso->slider));
+        }
+        else {
+          BLI_assert(pso->mode == POSESLIDE_RELAX);
+          interp_qt_qtqt(quat_final, quat_curr, quat_breakdown, ED_slider_factor_get(pso->slider));
+        }
       }
     }
     else if (pso->mode == POSESLIDE_BLEND) {
@@ -914,7 +896,7 @@ static void pose_slide_draw_status(bContext *C, tPoseSlideOp *pso)
       strcpy(mode_str, TIP_("Breakdown"));
       break;
     case POSESLIDE_BLEND:
-      strcpy(mode_str, TIP_("Blend To Neighbor"));
+      strcpy(mode_str, TIP_("Blend to Neighbor"));
       break;
 
     default:
@@ -1042,7 +1024,7 @@ static int pose_slide_invoke_common(bContext *C, wmOperator *op, const wmEvent *
     const ActKeyColumn *nk = ED_keylist_find_next(pso->keylist, cframe);
 
     /* New set the frames. */
-    /* Prev frame. */
+    /* Previous frame. */
     pso->prevFrame = (pk) ? (pk->cfra) : (pso->cframe - 1);
     RNA_int_set(op->ptr, "prev_frame", pso->prevFrame);
     /* Next frame. */
@@ -1051,7 +1033,7 @@ static int pose_slide_invoke_common(bContext *C, wmOperator *op, const wmEvent *
   }
   else {
     /* Current frame itself is a keyframe, so just take keyframes on either side. */
-    /* Prev frame. */
+    /* Previous frame. */
     pso->prevFrame = (ak->prev) ? (ak->prev->cfra) : (pso->cframe - 1);
     RNA_int_set(op->ptr, "prev_frame", pso->prevFrame);
     /* Next frame. */
@@ -1740,7 +1722,7 @@ static int pose_slide_blend_to_neighbors_exec(bContext *C, wmOperator *op)
 void POSE_OT_blend_to_neighbors(wmOperatorType *ot)
 {
   /* Identifiers. */
-  ot->name = "Blend To Neighbor";
+  ot->name = "Blend to Neighbor";
   ot->idname = "POSE_OT_blend_to_neighbor";
   ot->description = "Blend from current position to previous or next keyframe";
 

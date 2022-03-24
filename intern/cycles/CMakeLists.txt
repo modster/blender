@@ -1,20 +1,13 @@
-# Copyright 2011-2020 Blender Foundation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2011-2022 Blender Foundation
 
 # Standalone or with Blender
-if(NOT WITH_BLENDER AND WITH_CYCLES_STANDALONE)
-  set(CYCLES_INSTALL_PATH ${CMAKE_INSTALL_PREFIX})
+if(NOT WITH_BLENDER)
+  if(WITH_CYCLES_STANDALONE OR NOT WITH_CYCLES_HYDRA_RENDER_DELEGATE)
+    set(CYCLES_INSTALL_PATH ${CMAKE_INSTALL_PREFIX})
+  else()
+    set(CYCLES_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/hdCycles/resources)
+  endif()
 else()
   set(WITH_CYCLES_BLENDER ON)
   # WINDOWS_PYTHON_DEBUG needs to write into the user addons folder since it will
@@ -226,6 +219,9 @@ add_definitions(
   -DCCL_NAMESPACE_END=}
 )
 
+if(WITH_CYCLES_DEBUG)
+  add_definitions(-DWITH_CYCLES_DEBUG)
+endif()
 if(WITH_CYCLES_STANDALONE_GUI)
   add_definitions(-DWITH_CYCLES_STANDALONE_GUI)
 endif()
@@ -295,13 +291,6 @@ if(WITH_OPENIMAGEDENOISE)
   )
 endif()
 
-if(WITH_CYCLES_STANDALONE)
-  set(WITH_CYCLES_DEVICE_CUDA TRUE)
-  set(WITH_CYCLES_DEVICE_HIP TRUE)
-endif()
-# TODO(sergey): Consider removing it, only causes confusion in interface.
-set(WITH_CYCLES_DEVICE_MULTI TRUE)
-
 # Logging capabilities using GLog library.
 if(WITH_CYCLES_LOGGING)
   add_definitions(-DWITH_CYCLES_LOGGING)
@@ -341,13 +330,18 @@ else()
 endif()
 
 # Warnings
-if(CMAKE_COMPILER_IS_GNUCXX)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_C_COMPILER_ID MATCHES "Clang")
   ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS _has_cxxflag_float_conversion "-Werror=float-conversion")
   ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS _has_cxxflag_double_promotion "-Werror=double-promotion")
   ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS _has_no_error_unused_macros "-Wno-error=unused-macros")
   unset(_has_cxxflag_float_conversion)
   unset(_has_cxxflag_double_promotion)
   unset(_has_no_error_unused_macros)
+endif()
+
+if(WITH_CYCLES_HYDRA_RENDER_DELEGATE AND NOT WITH_USD)
+  message(STATUS "USD not found, disabling WITH_CYCLES_HYDRA_RENDER_DELEGATE")
+  set(WITH_CYCLES_HYDRA_RENDER_DELEGATE OFF)
 endif()
 
 if(WITH_CYCLES_CUDA_BINARIES AND (NOT WITH_CYCLES_CUBIN_COMPILER))
@@ -400,7 +394,8 @@ add_subdirectory(doc)
 add_subdirectory(graph)
 add_subdirectory(integrator)
 add_subdirectory(kernel)
-add_subdirectory(render)
+add_subdirectory(scene)
+add_subdirectory(session)
 add_subdirectory(subd)
 add_subdirectory(util)
 
@@ -409,6 +404,10 @@ if(WITH_GTESTS)
   add_subdirectory(test)
 endif()
 
-if(NOT WITH_BLENDER AND WITH_CYCLES_STANDALONE)
+if(WITH_CYCLES_HYDRA_RENDER_DELEGATE)
+  add_subdirectory(hydra)
+endif()
+
+if(NOT WITH_BLENDER)
   delayed_do_install(${CMAKE_BINARY_DIR}/bin)
 endif()

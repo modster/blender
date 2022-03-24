@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spfile
@@ -275,6 +259,9 @@ static FileSelectParams *fileselect_ensure_updated_file_params(SpaceFile *sfile)
     if ((prop = RNA_struct_find_property(op->ptr, "filter_usd"))) {
       params->filter |= RNA_property_boolean_get(op->ptr, prop) ? FILE_TYPE_USD : 0;
     }
+    if ((prop = RNA_struct_find_property(op->ptr, "filter_obj"))) {
+      params->filter |= RNA_property_boolean_get(op->ptr, prop) ? FILE_TYPE_OBJECT_IO : 0;
+    }
     if ((prop = RNA_struct_find_property(op->ptr, "filter_volume"))) {
       params->filter |= RNA_property_boolean_get(op->ptr, prop) ? FILE_TYPE_VOLUME : 0;
     }
@@ -318,6 +305,10 @@ static FileSelectParams *fileselect_ensure_updated_file_params(SpaceFile *sfile)
       params->flag |= RNA_boolean_get(op->ptr, "active_collection") ? FILE_ACTIVE_COLLECTION : 0;
     }
 
+    if ((prop = RNA_struct_find_property(op->ptr, "allow_path_tokens"))) {
+      params->flag |= RNA_property_boolean_get(op->ptr, prop) ? FILE_PATH_TOKENS_ALLOW : 0;
+    }
+
     if ((prop = RNA_struct_find_property(op->ptr, "display_type"))) {
       params->display = RNA_property_enum_get(op->ptr, prop);
     }
@@ -358,9 +349,6 @@ static FileSelectParams *fileselect_ensure_updated_file_params(SpaceFile *sfile)
   return params;
 }
 
-/**
- * If needed, create and return the file select parameters for the active browse mode.
- */
 FileSelectParams *ED_fileselect_ensure_active_params(SpaceFile *sfile)
 {
   switch ((eFileBrowse_Mode)sfile->browse_mode) {
@@ -380,9 +368,6 @@ FileSelectParams *ED_fileselect_ensure_active_params(SpaceFile *sfile)
   return NULL;
 }
 
-/**
- * Get the file select parameters for the active browse mode.
- */
 FileSelectParams *ED_fileselect_get_active_params(const SpaceFile *sfile)
 {
   if (!sfile) {
@@ -409,6 +394,15 @@ FileSelectParams *ED_fileselect_get_file_params(const SpaceFile *sfile)
 FileAssetSelectParams *ED_fileselect_get_asset_params(const SpaceFile *sfile)
 {
   return (sfile->browse_mode == FILE_BROWSE_MODE_ASSETS) ? sfile->asset_params : NULL;
+}
+
+bool ED_fileselect_is_local_asset_library(const SpaceFile *sfile)
+{
+  const FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
+  if (asset_params == NULL) {
+    return false;
+  }
+  return asset_params->asset_library_ref.type == ASSET_LIBRARY_LOCAL;
 }
 
 static void fileselect_refresh_asset_params(FileAssetSelectParams *asset_params)
@@ -483,6 +477,18 @@ struct ID *ED_fileselect_active_asset_get(const SpaceFile *sfile)
   return filelist_file_get_id(file);
 }
 
+void ED_fileselect_activate_asset_catalog(const SpaceFile *sfile, const bUUID catalog_id)
+{
+  if (!ED_fileselect_is_asset_browser(sfile)) {
+    return;
+  }
+
+  FileAssetSelectParams *params = ED_fileselect_get_asset_params(sfile);
+  params->asset_catalog_visibility = FILE_SHOW_ASSETS_FROM_CATALOG;
+  params->catalog_id = catalog_id;
+  WM_main_add_notifier(NC_SPACE | ND_SPACE_ASSET_PARAMS, NULL);
+}
+
 static void on_reload_activate_by_id(SpaceFile *sfile, onReloadFnData custom_data)
 {
   ID *asset_id = (ID *)custom_data;
@@ -509,23 +515,56 @@ void ED_fileselect_activate_by_id(SpaceFile *sfile, ID *asset_id, const bool def
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
   struct FileList *files = sfile->files;
 
-  const int num_files_filtered = filelist_files_ensure(files);
-  for (int file_index = 0; file_index < num_files_filtered; ++file_index) {
-    const FileDirEntry *file = filelist_file_ex(files, file_index, false);
-
-    if (filelist_file_get_id(file) != asset_id) {
-      filelist_entry_select_set(files, file, FILE_SEL_REMOVE, FILE_SEL_SELECTED, CHECK_ALL);
-      continue;
-    }
-
-    params->active_file = file_index;
-    filelist_entry_select_set(files, file, FILE_SEL_ADD, FILE_SEL_SELECTED, CHECK_ALL);
-
-    /* Keep looping to deselect the other files. */
+  const int file_index = filelist_file_find_id(files, asset_id);
+  const FileDirEntry *file = filelist_file_ex(files, file_index, true);
+  if (file == NULL) {
+    return;
   }
+
+  params->active_file = file_index;
+  filelist_entry_select_set(files, file, FILE_SEL_ADD, FILE_SEL_SELECTED, CHECK_ALL);
 
   WM_main_add_notifier(NC_ASSET | NA_ACTIVATED, NULL);
   WM_main_add_notifier(NC_ASSET | NA_SELECTED, NULL);
+}
+
+static void on_reload_select_by_relpath(SpaceFile *sfile, onReloadFnData custom_data)
+{
+  const char *relative_path = custom_data;
+  ED_fileselect_activate_by_relpath(sfile, relative_path);
+}
+
+void ED_fileselect_activate_by_relpath(SpaceFile *sfile, const char *relative_path)
+{
+  /* If there are filelist operations running now ("pending" true) or soon ("force reset" true),
+   * there is a fair chance that the to-be-activated file at relative_path will only be present
+   * after these operations have completed. Defer activation until then. */
+  struct FileList *files = sfile->files;
+  if (files == NULL || filelist_pending(files) || filelist_needs_force_reset(files)) {
+    /* Casting away the constness of `relative_path` is safe here, because eventually it just ends
+     * up in another call to this function, and then it's a const char* again. */
+    file_on_reload_callback_register(sfile, on_reload_select_by_relpath, (char *)relative_path);
+    return;
+  }
+
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  const int num_files_filtered = filelist_files_ensure(files);
+
+  for (int file_index = 0; file_index < num_files_filtered; ++file_index) {
+    const FileDirEntry *file = filelist_file(files, file_index);
+
+    if (STREQ(file->relpath, relative_path)) {
+      params->active_file = file_index;
+      filelist_entry_select_set(files, file, FILE_SEL_ADD, FILE_SEL_SELECTED, CHECK_ALL);
+    }
+  }
+  WM_main_add_notifier(NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+}
+
+void ED_fileselect_deselect_all(SpaceFile *sfile)
+{
+  file_select_deselect_all(sfile, FILE_SEL_SELECTED);
+  WM_main_add_notifier(NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
 }
 
 /* The subset of FileSelectParams.flag items we store into preferences. Note that FILE_SORT_ALPHA
@@ -589,13 +628,6 @@ void ED_fileselect_set_params_from_userdef(SpaceFile *sfile)
   }
 }
 
-/**
- * Update the user-preference data for the file space. In fact, this also contains some
- * non-FileSelectParams data, but we can safely ignore this.
- *
- * \param temp_win_size: If the browser was opened in a temporary window,
- * pass its size here so we can store that in the preferences. Otherwise NULL.
- */
 void ED_fileselect_params_to_userdef(SpaceFile *sfile,
                                      const int temp_win_size[2],
                                      const bool is_maximized)
@@ -633,9 +665,6 @@ void ED_fileselect_params_to_userdef(SpaceFile *sfile,
   }
 }
 
-/**
- * Sets FileSelectParams->file (name of selected file)
- */
 void fileselect_file_set(SpaceFile *sfile, const int index)
 {
   const struct FileDirEntry *file = filelist_file(sfile->files, index);
@@ -756,10 +785,6 @@ int ED_fileselect_layout_offset(FileLayout *layout, int x, int y)
   return active_file;
 }
 
-/**
- * Get the currently visible bounds of the layout in screen space. Matches View2D.mask minus the
- * top column-header row.
- */
 void ED_fileselect_layout_maskrect(const FileLayout *layout, const View2D *v2d, rcti *r_rect)
 {
   *r_rect = v2d->mask;
@@ -783,7 +808,7 @@ bool ED_fileselect_layout_isect_rect(const FileLayout *layout,
   return BLI_rcti_isect(&maskrect, rect, r_dst);
 }
 
-void ED_fileselect_layout_tilepos(FileLayout *layout, int tile, int *x, int *y)
+void ED_fileselect_layout_tilepos(const FileLayout *layout, int tile, int *x, int *y)
 {
   if (layout->flag == FILE_LAYOUT_HOR) {
     *x = layout->tile_border_x +
@@ -799,9 +824,6 @@ void ED_fileselect_layout_tilepos(FileLayout *layout, int tile, int *x, int *y)
   }
 }
 
-/**
- * Check if the region coordinate defined by \a x and \a y are inside the column header.
- */
 bool file_attribute_column_header_is_inside(const View2D *v2d,
                                             const FileLayout *layout,
                                             int x,
@@ -828,9 +850,6 @@ bool file_attribute_column_type_enabled(const FileSelectParams *params,
   }
 }
 
-/**
- * Find the column type at region coordinate given by \a x (y doesn't matter for this).
- */
 FileAttributeColumnType file_attribute_column_type_find_isect(const View2D *v2d,
                                                               const FileSelectParams *params,
                                                               FileLayout *layout,
@@ -942,6 +961,8 @@ static void file_attribute_columns_init(const FileSelectParams *params, FileLayo
 void ED_fileselect_init_layout(struct SpaceFile *sfile, ARegion *region)
 {
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  /* Request a slightly more compact layout for asset browsing. */
+  const bool compact = ED_fileselect_is_asset_browser(sfile);
   FileLayout *layout = NULL;
   View2D *v2d = &region->v2d;
   int numfiles;
@@ -961,12 +982,13 @@ void ED_fileselect_init_layout(struct SpaceFile *sfile, ARegion *region)
   layout->textheight = textheight;
 
   if (params->display == FILE_IMGDISPLAY) {
+    const float pad_fac = compact ? 0.15f : 0.3f;
     layout->prv_w = ((float)params->thumbnail_size / 20.0f) * UI_UNIT_X;
     layout->prv_h = ((float)params->thumbnail_size / 20.0f) * UI_UNIT_Y;
-    layout->tile_border_x = 0.3f * UI_UNIT_X;
-    layout->tile_border_y = 0.3f * UI_UNIT_X;
-    layout->prv_border_x = 0.3f * UI_UNIT_X;
-    layout->prv_border_y = 0.3f * UI_UNIT_Y;
+    layout->tile_border_x = pad_fac * UI_UNIT_X;
+    layout->tile_border_y = pad_fac * UI_UNIT_X;
+    layout->prv_border_x = pad_fac * UI_UNIT_X;
+    layout->prv_border_y = pad_fac * UI_UNIT_Y;
     layout->tile_w = layout->prv_w + 2 * layout->prv_border_x;
     layout->tile_h = layout->prv_h + 2 * layout->prv_border_y + textheight;
     layout->width = (int)(BLI_rctf_size_x(&v2d->cur) - 2 * layout->tile_border_x);
@@ -1044,10 +1066,6 @@ FileLayout *ED_fileselect_get_layout(struct SpaceFile *sfile, ARegion *region)
   return sfile->layout;
 }
 
-/**
- * Support updating the directory even when this isn't the active space
- * needed so RNA properties update function isn't context sensitive, see T70255.
- */
 void ED_file_change_dir_ex(bContext *C, ScrArea *area)
 {
   /* May happen when manipulating non-active spaces. */
@@ -1107,8 +1125,8 @@ int file_select_match(struct SpaceFile *sfile, const char *pattern, char *matche
    */
   for (int i = 0; i < n; i++) {
     FileDirEntry *file = filelist_file(sfile->files, i);
-    /* Do not check whether file is a file or dir here! Causes T44243
-     * (we do accept dirs at this stage). */
+    /* Do not check whether file is a file or dir here! Causes: T44243
+     * (we do accept directories at this stage). */
     if (fnmatch(pattern, file->relpath, 0) == 0) {
       filelist_entry_select_set(sfile->files, file, FILE_SEL_ADD, FILE_SEL_SELECTED, CHECK_ALL);
       if (!match) {
@@ -1243,12 +1261,6 @@ void file_params_smoothscroll_timer_clear(wmWindowManager *wm, wmWindow *win, Sp
   sfile->smoothscroll_timer = NULL;
 }
 
-/**
- * Set the renaming-state to #FILE_PARAMS_RENAME_POSTSCROLL_PENDING and trigger the smooth-scroll
- * timer. To be used right after a file was renamed.
- * Note that the caller is responsible for setting the correct rename-file info
- * (#FileSelectParams.renamefile or #FileSelectParams.rename_id).
- */
 void file_params_invoke_rename_postscroll(wmWindowManager *wm, wmWindow *win, SpaceFile *sfile)
 {
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
@@ -1262,9 +1274,6 @@ void file_params_invoke_rename_postscroll(wmWindowManager *wm, wmWindow *win, Sp
   sfile->scroll_offset = 0;
 }
 
-/**
- * To be executed whenever renaming ends (successfully or not).
- */
 void file_params_rename_end(wmWindowManager *wm,
                             wmWindow *win,
                             SpaceFile *sfile,
@@ -1296,10 +1305,6 @@ static int file_params_find_renamed(const FileSelectParams *params, struct FileL
                                        filelist_file_find_path(filelist, params->renamefile);
 }
 
-/**
- * Helper used by both main update code, and smooth-scroll timer,
- * to try to enable rename editing from #FileSelectParams.renamefile name.
- */
 void file_params_renamefile_activate(SpaceFile *sfile, FileSelectParams *params)
 {
   BLI_assert(params->rename_flag != 0);
@@ -1311,7 +1316,7 @@ void file_params_renamefile_activate(SpaceFile *sfile, FileSelectParams *params)
 
   BLI_assert(params->renamefile[0] != '\0' || params->rename_id != NULL);
 
-  const int idx = file_params_find_renamed(params, sfile->files);
+  int idx = file_params_find_renamed(params, sfile->files);
   if (idx >= 0) {
     FileDirEntry *file = filelist_file(sfile->files, idx);
     BLI_assert(file != NULL);
@@ -1324,7 +1329,11 @@ void file_params_renamefile_activate(SpaceFile *sfile, FileSelectParams *params)
       params->rename_flag = FILE_PARAMS_RENAME_ACTIVE;
     }
     else if ((params->rename_flag & FILE_PARAMS_RENAME_POSTSCROLL_PENDING) != 0) {
+      /* file_select_deselect_all() will resort and re-filter, so `idx` will probably have changed.
+       * Need to get the correct #FileDirEntry again. */
       file_select_deselect_all(sfile, FILE_SEL_SELECTED);
+      idx = file_params_find_renamed(params, sfile->files);
+      file = filelist_file(sfile->files, idx);
       filelist_entry_select_set(
           sfile->files, file, FILE_SEL_ADD, FILE_SEL_SELECTED | FILE_SEL_HIGHLIGHTED, CHECK_ALL);
       params->active_file = idx;

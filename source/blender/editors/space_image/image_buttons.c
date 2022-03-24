@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup spimage
@@ -36,6 +20,7 @@
 
 #include "BKE_context.h"
 #include "BKE_image.h"
+#include "BKE_image_format.h"
 #include "BKE_node.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
@@ -63,7 +48,6 @@
 #define B_NOP -1
 #define MAX_IMAGE_INFO_LEN 128
 
-/* gets active viewer user */
 struct ImageUser *ntree_get_active_iuser(bNodeTree *ntree)
 {
   bNode *node;
@@ -729,30 +713,10 @@ static void rna_update_cb(bContext *C, void *arg_cb, void *UNUSED(arg))
 {
   RNAUpdateCb *cb = (RNAUpdateCb *)arg_cb;
 
-  /* ideally this would be done by RNA itself, but there we have
-   * no image user available, so we just update this flag here */
-  cb->iuser->ok = 1;
-
   /* we call update here on the pointer property, this way the
    * owner of the image pointer can still define its own update
    * and notifier */
   RNA_property_update(C, &cb->ptr, cb->prop);
-}
-
-static bool image_has_alpha(Image *ima, ImageUser *iuser)
-{
-  ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL);
-  if (ibuf == NULL) {
-    return false;
-  }
-
-  int imtype = BKE_image_ftype_to_imtype(ibuf->ftype, &ibuf->foptions);
-  char valid_channels = BKE_imtype_valid_channels(imtype, false);
-  bool has_alpha = (valid_channels & IMA_CHAN_FLAG_ALPHA) != 0;
-
-  BKE_image_release_ibuf(ima, ibuf, NULL);
-
-  return has_alpha;
 }
 
 void uiTemplateImage(uiLayout *layout,
@@ -964,7 +928,7 @@ void uiTemplateImage(uiLayout *layout,
 
     if (compact == 0) {
       if (ima->source != IMA_SRC_GENERATED) {
-        if (image_has_alpha(ima, iuser)) {
+        if (BKE_image_has_alpha(ima)) {
           uiLayout *sub = uiLayoutColumn(col, false);
           uiItemR(sub, &imaptr, "alpha_mode", 0, IFACE_("Alpha"), ICON_NONE);
 
@@ -994,14 +958,11 @@ void uiTemplateImageSettings(uiLayout *layout, PointerRNA *imfptr, bool color_ma
 {
   ImageFormatData *imf = imfptr->data;
   ID *id = imfptr->owner_id;
-  PointerRNA display_settings_ptr;
-  PropertyRNA *prop;
   const int depth_ok = BKE_imtype_valid_depths(imf->imtype);
   /* some settings depend on this being a scene that's rendered */
   const bool is_render_out = (id && GS(id->name) == ID_SCE);
 
   uiLayout *col;
-  bool show_preview = false;
 
   col = uiLayoutColumn(layout, false);
 
@@ -1041,7 +1002,6 @@ void uiTemplateImageSettings(uiLayout *layout, PointerRNA *imfptr, bool color_ma
   }
 
   if (is_render_out && ELEM(imf->imtype, R_IMF_IMTYPE_OPENEXR, R_IMF_IMTYPE_MULTILAYER)) {
-    show_preview = true;
     uiItemR(col, imfptr, "use_preview", 0, NULL, ICON_NONE);
   }
 
@@ -1060,7 +1020,7 @@ void uiTemplateImageSettings(uiLayout *layout, PointerRNA *imfptr, bool color_ma
 
   if (imf->imtype == R_IMF_IMTYPE_CINEON) {
 #if 1
-    uiItemL(col, IFACE_("Hard coded Non-Linear, Gamma:1.7"), ICON_NONE);
+    uiItemL(col, TIP_("Hard coded Non-Linear, Gamma:1.7"), ICON_NONE);
 #else
     uiItemR(col, imfptr, "use_cineon_log", 0, NULL, ICON_NONE);
     uiItemR(col, imfptr, "cineon_black", 0, NULL, ICON_NONE);
@@ -1073,18 +1033,22 @@ void uiTemplateImageSettings(uiLayout *layout, PointerRNA *imfptr, bool color_ma
     uiItemR(col, imfptr, "tiff_codec", 0, NULL, ICON_NONE);
   }
 
-  /* color management */
-  if (color_management && (!BKE_imtype_requires_linear_float(imf->imtype) ||
-                           (show_preview && imf->flag & R_IMF_FLAG_PREVIEW_JPG))) {
-    prop = RNA_struct_find_property(imfptr, "display_settings");
-    display_settings_ptr = RNA_property_pointer_get(imfptr, prop);
+  /* Override color management */
+  if (color_management) {
+    uiItemS(col);
+    uiItemR(col, imfptr, "color_management", 0, NULL, ICON_NONE);
 
-    col = uiLayoutColumn(layout, false);
-    uiItemL(col, IFACE_("Color Management"), ICON_NONE);
-
-    uiItemR(col, &display_settings_ptr, "display_device", 0, NULL, ICON_NONE);
-
-    uiTemplateColormanagedViewSettings(col, NULL, imfptr, "view_settings");
+    if (imf->color_management == R_IMF_COLOR_MANAGEMENT_OVERRIDE) {
+      if (BKE_imtype_requires_linear_float(imf->imtype)) {
+        PointerRNA linear_settings_ptr = RNA_pointer_get(imfptr, "linear_colorspace_settings");
+        uiItemR(col, &linear_settings_ptr, "name", 0, IFACE_("Color Space"), ICON_NONE);
+      }
+      else {
+        PointerRNA display_settings_ptr = RNA_pointer_get(imfptr, "display_settings");
+        uiItemR(col, &display_settings_ptr, "display_device", 0, NULL, ICON_NONE);
+        uiTemplateColormanagedViewSettings(col, NULL, imfptr, "view_settings");
+      }
+    }
   }
 }
 

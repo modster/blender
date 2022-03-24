@@ -5,6 +5,9 @@
  * of data the CPU has to precompute and transfer for each update.
  */
 
+/* TODO(fclem): Keep documentation but remove the uniform declaration. */
+#ifndef USE_GPU_SHADER_CREATE_INFO
+
 /**
  * hairStrandsRes: Number of points per hair strand.
  * 2 - no subdivision
@@ -33,8 +36,6 @@ uniform int hairStrandOffset = 0;
 
 /* -- Per control points -- */
 uniform samplerBuffer hairPointBuffer; /* RGBA32F */
-#define point_position xyz
-#define point_time w /* Position along the hair length */
 
 /* -- Per strands data -- */
 uniform usamplerBuffer hairStrandBuffer;    /* R32UI */
@@ -43,6 +44,10 @@ uniform usamplerBuffer hairStrandSegBuffer; /* R16UI */
 /* Not used, use one buffer per uv layer */
 // uniform samplerBuffer hairUVBuffer; /* RG32F */
 // uniform samplerBuffer hairColBuffer; /* RGBA16 linear color */
+#endif
+
+#define point_position xyz
+#define point_time w /* Position along the hair length */
 
 /* -- Subdivision stage -- */
 /**
@@ -153,7 +158,7 @@ float hair_shaperadius(float shape, float root, float tip, float time)
   return (radius * (root - tip)) + tip;
 }
 
-#  ifdef OS_MAC
+#  if defined(OS_MAC) && defined(GPU_OPENGL)
 in float dummy;
 #  endif
 
@@ -173,7 +178,7 @@ void hair_get_pos_tan_binor_time(bool is_persp,
   wpos = data.point_position;
   time = data.point_time;
 
-#  ifdef OS_MAC
+#  if defined(OS_MAC) && defined(GPU_OPENGL)
   /* Generate a dummy read to avoid the driver bug with shaders having no
    * vertex reads on macOS (T60171) */
   wpos.y += dummy * 0.0;

@@ -1,25 +1,12 @@
-/*
- * Copyright 2011-2021 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #pragma once
 
 /* So ImathMath is included before our kernel_cpu_compat. */
 #ifdef WITH_OSL
 /* So no context pollution happens from indirectly included windows.h */
-#  include "util/util_windows.h"
+#  include "util/windows.h"
 #  include <OSL/oslexec.h>
 #endif
 
@@ -29,22 +16,22 @@
 
 #include "device/cpu/kernel.h"
 #include "device/device.h"
-#include "device/device_memory.h"
+#include "device/memory.h"
 
 // clang-format off
 #include "kernel/device/cpu/compat.h"
 #include "kernel/device/cpu/kernel.h"
 #include "kernel/device/cpu/globals.h"
 
-#include "kernel/osl/osl_shader.h"
-#include "kernel/osl/osl_globals.h"
+#include "kernel/osl/shader.h"
+#include "kernel/osl/globals.h"
 // clang-format on
 
 CCL_NAMESPACE_BEGIN
 
 class CPUDevice : public Device {
  public:
-  KernelGlobals kernel_globals;
+  KernelGlobalsCPU kernel_globals;
 
   device_vector<TextureInfo> texture_info;
   bool need_texture_info;
@@ -57,12 +44,8 @@ class CPUDevice : public Device {
   RTCDevice embree_device;
 #endif
 
-  CPUKernels kernels;
-
   CPUDevice(const DeviceInfo &info_, Stats &stats_, Profiler &profiler_);
   ~CPUDevice();
-
-  virtual bool show_samples() const override;
 
   virtual BVHLayoutMask get_bvh_layout_mask() const override;
 
@@ -90,7 +73,6 @@ class CPUDevice : public Device {
 
   void build_bvh(BVH *bvh, Progress &progress, bool refit) override;
 
-  virtual const CPUKernels *get_cpu_kernels() const override;
   virtual void get_cpu_kernel_thread_globals(
       vector<CPUKernelThreadGlobals> &kernel_thread_globals) override;
   virtual void *get_cpu_osl_memory() override;

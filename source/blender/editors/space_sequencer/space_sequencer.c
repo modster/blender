@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spseq
@@ -28,6 +12,7 @@
 #include "DNA_gpencil_types.h"
 #include "DNA_mask_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_sound_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -38,8 +23,11 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_lib_id.h"
+#include "BKE_lib_remap.h"
 #include "BKE_screen.h"
 #include "BKE_sequencer_offscreen.h"
+
+#include "GPU_state.h"
 
 #include "ED_screen.h"
 #include "ED_space_api.h"
@@ -53,6 +41,7 @@
 
 #include "RNA_access.h"
 
+#include "SEQ_transform.h"
 #include "SEQ_utils.h"
 
 #include "UI_interface.h"
@@ -60,6 +49,9 @@
 #include "UI_view2d.h"
 
 #include "IMB_imbuf.h"
+
+/* Only for cursor drawing. */
+#include "DRW_engine.h"
 
 /* Own include. */
 #include "sequencer_intern.h"
@@ -178,7 +170,7 @@ static SpaceLink *sequencer_create(const ScrArea *UNUSED(area), const Scene *sce
   region->v2d.cur = region->v2d.tot;
 
   region->v2d.min[0] = 10.0f;
-  region->v2d.min[1] = 4.0f;
+  region->v2d.min[1] = 1.0f;
 
   region->v2d.max[0] = MAXFRAMEF;
   region->v2d.max[1] = MAXSEQ;
@@ -394,7 +386,7 @@ static bool image_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
     }
   }
 
-  return 0;
+  return WM_drag_is_ID_type(drag, ID_IM);
 }
 
 static bool movie_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
@@ -410,7 +402,8 @@ static bool movie_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
       }
     }
   }
-  return 0;
+
+  return WM_drag_is_ID_type(drag, ID_MC);
 }
 
 static bool sound_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
@@ -426,41 +419,75 @@ static bool sound_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
       }
     }
   }
-  return 0;
+
+  return WM_drag_is_ID_type(drag, ID_SO);
 }
 
 static void sequencer_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
-  /* Copy drag path to properties. */
-  if (RNA_struct_find_property(drop->ptr, "filepath")) {
-    RNA_string_set(drop->ptr, "filepath", drag->path);
+  ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, 0);
+  /* ID dropped. */
+  if (id != NULL) {
+    const ID_Type id_type = GS(id->name);
+    if (id_type == ID_IM) {
+      Image *ima = (Image *)id;
+      PointerRNA itemptr;
+      char dir[FILE_MAX], file[FILE_MAX];
+      BLI_split_dirfile(ima->filepath, dir, file, sizeof(dir), sizeof(file));
+      RNA_string_set(drop->ptr, "directory", dir);
+      RNA_collection_clear(drop->ptr, "files");
+      RNA_collection_add(drop->ptr, "files", &itemptr);
+      RNA_string_set(&itemptr, "name", file);
+    }
+    else if (id_type == ID_MC) {
+      MovieClip *clip = (MovieClip *)id;
+      RNA_string_set(drop->ptr, "filepath", clip->filepath);
+      RNA_struct_property_unset(drop->ptr, "name");
+    }
+    else if (id_type == ID_SO) {
+      bSound *sound = (bSound *)id;
+      RNA_string_set(drop->ptr, "filepath", sound->filepath);
+      RNA_struct_property_unset(drop->ptr, "name");
+    }
   }
+  /* Path dropped. */
+  else if (drag->path[0]) {
+    if (RNA_struct_find_property(drop->ptr, "filepath")) {
+      RNA_string_set(drop->ptr, "filepath", drag->path);
+    }
+    if (RNA_struct_find_property(drop->ptr, "directory")) {
+      PointerRNA itemptr;
+      char dir[FILE_MAX], file[FILE_MAX];
 
-  if (RNA_struct_find_property(drop->ptr, "directory")) {
-    PointerRNA itemptr;
-    char dir[FILE_MAX], file[FILE_MAX];
+      BLI_split_dirfile(drag->path, dir, file, sizeof(dir), sizeof(file));
 
-    BLI_split_dirfile(drag->path, dir, file, sizeof(dir), sizeof(file));
+      RNA_string_set(drop->ptr, "directory", dir);
 
-    RNA_string_set(drop->ptr, "directory", dir);
-
-    RNA_collection_clear(drop->ptr, "files");
-    RNA_collection_add(drop->ptr, "files", &itemptr);
-    RNA_string_set(&itemptr, "name", file);
+      RNA_collection_clear(drop->ptr, "files");
+      RNA_collection_add(drop->ptr, "files", &itemptr);
+      RNA_string_set(&itemptr, "name", file);
+    }
   }
 }
 
 /* This region dropbox definition. */
-static void sequencer_dropboxes(void)
-{
-  ListBase *lb = WM_dropboxmap_find("Sequencer", SPACE_SEQ, RGN_TYPE_WINDOW);
 
+static void sequencer_dropboxes_add_to_lb(ListBase *lb)
+{
   WM_dropbox_add(
       lb, "SEQUENCER_OT_image_strip_add", image_drop_poll, sequencer_drop_copy, NULL, NULL);
   WM_dropbox_add(
       lb, "SEQUENCER_OT_movie_strip_add", movie_drop_poll, sequencer_drop_copy, NULL, NULL);
   WM_dropbox_add(
       lb, "SEQUENCER_OT_sound_strip_add", sound_drop_poll, sequencer_drop_copy, NULL, NULL);
+}
+
+static void sequencer_dropboxes(void)
+{
+  ListBase *lb = WM_dropboxmap_find("Sequencer", SPACE_SEQ, RGN_TYPE_WINDOW);
+  sequencer_dropboxes_add_to_lb(lb);
+  lb = WM_dropboxmap_find("Sequencer", SPACE_SEQ, RGN_TYPE_PREVIEW);
+  sequencer_dropboxes_add_to_lb(lb);
 }
 
 /* ************* end drop *********** */
@@ -663,12 +690,6 @@ static void sequencer_main_region_message_subscribe(const wmRegionMessageSubscri
   /* Timeline depends on scene properties. */
   {
     bool use_preview = (scene->r.flag & SCER_PRV_RANGE);
-    extern PropertyRNA rna_Scene_frame_start;
-    extern PropertyRNA rna_Scene_frame_end;
-    extern PropertyRNA rna_Scene_frame_preview_start;
-    extern PropertyRNA rna_Scene_frame_preview_end;
-    extern PropertyRNA rna_Scene_use_preview_range;
-    extern PropertyRNA rna_Scene_frame_current;
     const PropertyRNA *props[] = {
         use_preview ? &rna_Scene_frame_preview_start : &rna_Scene_frame_start,
         use_preview ? &rna_Scene_frame_preview_end : &rna_Scene_frame_end,
@@ -751,6 +772,9 @@ static void sequencer_preview_region_init(wmWindowManager *wm, ARegion *region)
   /* Own keymap. */
   keymap = WM_keymap_ensure(wm->defaultconf, "SequencerPreview", SPACE_SEQ, 0);
   WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+
+  ListBase *lb = WM_dropboxmap_find("Sequencer", SPACE_SEQ, RGN_TYPE_PREVIEW);
+  WM_event_add_dropbox_handler(&region->handlers, lb);
 }
 
 static void sequencer_preview_region_layout(const bContext *C, ARegion *region)
@@ -769,41 +793,67 @@ static void sequencer_preview_region_view2d_changed(const bContext *C, ARegion *
   sseq->flag &= ~SEQ_ZOOM_TO_FIT;
 }
 
+static bool is_cursor_visible(const SpaceSeq *sseq)
+{
+  if (G.moving & G_TRANSFORM_CURSOR) {
+    return true;
+  }
+
+  if ((sseq->flag & SEQ_SHOW_OVERLAY) &&
+      (sseq->preview_overlay.flag & SEQ_PREVIEW_SHOW_2D_CURSOR) != 0) {
+    return true;
+  }
+  return false;
+}
+
 static void sequencer_preview_region_draw(const bContext *C, ARegion *region)
 {
   ScrArea *area = CTX_wm_area(C);
   SpaceSeq *sseq = area->spacedata.first;
   Scene *scene = CTX_data_scene(C);
   wmWindowManager *wm = CTX_wm_manager(C);
-  const bool draw_overlay = (scene->ed && (scene->ed->over_flag & SEQ_EDIT_OVERLAY_SHOW) &&
-                             (sseq->flag & SEQ_SHOW_OVERLAY));
+  const bool draw_overlay = sseq->flag & SEQ_SHOW_OVERLAY;
+  const bool draw_frame_overlay = (scene->ed &&
+                                   (scene->ed->overlay_frame_flag & SEQ_EDIT_OVERLAY_FRAME_SHOW) &&
+                                   draw_overlay);
+  const bool is_playing = ED_screen_animation_playing(wm);
 
-  /* XXX temp fix for wrong setting in sseq->mainb */
-  if (sseq->mainb == SEQ_DRAW_SEQUENCE) {
-    sseq->mainb = SEQ_DRAW_IMG_IMBUF;
-  }
-
-  if (!draw_overlay || sseq->overlay_type != SEQ_DRAW_OVERLAY_REFERENCE) {
+  if (!(draw_frame_overlay && (sseq->overlay_frame_type == SEQ_OVERLAY_FRAME_TYPE_REFERENCE))) {
     sequencer_draw_preview(C, scene, region, sseq, scene->r.cfra, 0, false, false);
   }
 
-  if (draw_overlay && sseq->overlay_type != SEQ_DRAW_OVERLAY_CURRENT) {
+  if (draw_frame_overlay && sseq->overlay_frame_type != SEQ_OVERLAY_FRAME_TYPE_CURRENT) {
     int over_cfra;
 
-    if (scene->ed->over_flag & SEQ_EDIT_OVERLAY_ABS) {
-      over_cfra = scene->ed->over_cfra;
+    if (scene->ed->overlay_frame_flag & SEQ_EDIT_OVERLAY_FRAME_ABS) {
+      over_cfra = scene->ed->overlay_frame_abs;
     }
     else {
-      over_cfra = scene->r.cfra + scene->ed->over_ofs;
+      over_cfra = scene->r.cfra + scene->ed->overlay_frame_ofs;
     }
 
-    if (over_cfra != scene->r.cfra || sseq->overlay_type != SEQ_DRAW_OVERLAY_RECT) {
+    if ((over_cfra != scene->r.cfra) ||
+        (sseq->overlay_frame_type != SEQ_OVERLAY_FRAME_TYPE_RECT)) {
       sequencer_draw_preview(
           C, scene, region, sseq, scene->r.cfra, over_cfra - scene->r.cfra, true, false);
     }
   }
 
-  WM_gizmomap_draw(region->gizmo_map, C, WM_GIZMOMAP_DRAWSTEP_2D);
+  /* No need to show the cursor for scopes. */
+  if ((is_playing == false) && (sseq->mainb == SEQ_DRAW_IMG_IMBUF) && is_cursor_visible(sseq)) {
+    GPU_color_mask(true, true, true, true);
+    GPU_depth_mask(false);
+    GPU_depth_test(GPU_DEPTH_NONE);
+
+    float cursor_pixel[2];
+    SEQ_image_preview_unit_to_px(scene, sseq->cursor, cursor_pixel);
+
+    DRW_draw_cursor_2d_ex(region, cursor_pixel);
+  }
+
+  if ((is_playing == false) && (sseq->gizmo_flag & SEQ_GIZMO_HIDE) == 0) {
+    WM_gizmomap_draw(region->gizmo_map, C, WM_GIZMOMAP_DRAWSTEP_2D);
+  }
 
   if ((U.uiflag & USER_SHOW_FPS) && ED_screen_animation_no_scrub(wm)) {
     const rcti *rect = ED_region_visible_rect(region);
@@ -917,24 +967,16 @@ static void sequencer_buttons_region_listener(const wmRegionListenerParams *para
   }
 }
 
-static void sequencer_id_remap(ScrArea *UNUSED(area), SpaceLink *slink, ID *old_id, ID *new_id)
+static void sequencer_id_remap(ScrArea *UNUSED(area),
+                               SpaceLink *slink,
+                               const struct IDRemapper *mappings)
 {
   SpaceSeq *sseq = (SpaceSeq *)slink;
-
-  if (!ELEM(GS(old_id->name), ID_GD)) {
-    return;
-  }
-
-  if ((ID *)sseq->gpd == old_id) {
-    sseq->gpd = (bGPdata *)new_id;
-    id_us_min(old_id);
-    id_us_plus(new_id);
-  }
+  BKE_id_remapper_apply(mappings, (ID **)&sseq->gpd, ID_REMAP_APPLY_DEFAULT);
 }
 
 /* ************************************* */
 
-/* Only called once, from space/spacetypes.c. */
 void ED_spacetype_sequencer(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype sequencer");
@@ -965,7 +1007,9 @@ void ED_spacetype_sequencer(void)
   art->draw_overlay = sequencer_main_region_draw_overlay;
   art->listener = sequencer_main_region_listener;
   art->message_subscribe = sequencer_main_region_message_subscribe;
-  art->keymapflag = ED_KEYMAP_TOOL | ED_KEYMAP_VIEW2D | ED_KEYMAP_FRAMES | ED_KEYMAP_ANIMATION;
+  /* NOTE: inclusion of #ED_KEYMAP_GIZMO is currently for scripts and isn't used by default. */
+  art->keymapflag = ED_KEYMAP_TOOL | ED_KEYMAP_GIZMO | ED_KEYMAP_VIEW2D | ED_KEYMAP_FRAMES |
+                    ED_KEYMAP_ANIMATION;
   BLI_addhead(&st->regiontypes, art);
 
   /* Preview. */

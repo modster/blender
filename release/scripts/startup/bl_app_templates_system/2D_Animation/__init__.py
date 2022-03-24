@@ -1,20 +1,4 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # Initialization script for 2D Animation template
 
@@ -54,26 +38,11 @@ def update_factory_startup_grease_pencils():
         gpd.onion_keyframe_type = 'ALL'
 
 
-def update_factory_startup_theme():
-    # To prevent saving over the current theme Preferences,
-    # store the current state of use_preferences_save to use later.
-    preferences = bpy.context.preferences
-    save_preferences_state = preferences.use_preferences_save
-
-    # Turn use_preferences_save off and set header background alpha.
-    preferences.use_preferences_save = False
-    preferences.themes['Default'].view_3d.space.header[3] = 0.8
-
-    # Restore the original use_preferences_save status.
-    preferences.use_preferences_save = save_preferences_state
-
-
 @persistent
 def load_handler(_):
     update_factory_startup_screens()
     update_factory_startup_scenes()
     update_factory_startup_grease_pencils()
-    update_factory_startup_theme()
 
 
 def register():

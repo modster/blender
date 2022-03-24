@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #ifdef WITH_CUDA
 
@@ -41,13 +28,19 @@ CUDADeviceQueue::~CUDADeviceQueue()
 
 int CUDADeviceQueue::num_concurrent_states(const size_t state_size) const
 {
-  int num_states = max(cuda_device_->get_num_multiprocessors() *
-                           cuda_device_->get_max_num_threads_per_multiprocessor() * 16,
-                       1048576);
+  const int max_num_threads = cuda_device_->get_num_multiprocessors() *
+                              cuda_device_->get_max_num_threads_per_multiprocessor();
+  int num_states = max(max_num_threads, 65536) * 16;
 
   const char *factor_str = getenv("CYCLES_CONCURRENT_STATES_FACTOR");
   if (factor_str) {
-    num_states = max((int)(num_states * atof(factor_str)), 1024);
+    const float factor = (float)atof(factor_str);
+    if (factor != 0.0f) {
+      num_states = max((int)(num_states * factor), 1024);
+    }
+    else {
+      VLOG(3) << "CYCLES_CONCURRENT_STATES_FACTOR evaluated to 0";
+    }
   }
 
   VLOG(3) << "GPU queue concurrent states: " << num_states << ", using up to "
@@ -83,7 +76,9 @@ bool CUDADeviceQueue::kernel_available(DeviceKernel kernel) const
   return cuda_device_->kernels.available(kernel);
 }
 
-bool CUDADeviceQueue::enqueue(DeviceKernel kernel, const int work_size, void *args[])
+bool CUDADeviceQueue::enqueue(DeviceKernel kernel,
+                              const int work_size,
+                              DeviceKernelArguments const &args)
 {
   if (cuda_device_->have_error()) {
     return false;
@@ -107,6 +102,8 @@ bool CUDADeviceQueue::enqueue(DeviceKernel kernel, const int work_size, void *ar
     case DEVICE_KERNEL_INTEGRATOR_TERMINATED_PATHS_ARRAY:
     case DEVICE_KERNEL_INTEGRATOR_SORTED_PATHS_ARRAY:
     case DEVICE_KERNEL_INTEGRATOR_COMPACT_PATHS_ARRAY:
+    case DEVICE_KERNEL_INTEGRATOR_TERMINATED_SHADOW_PATHS_ARRAY:
+    case DEVICE_KERNEL_INTEGRATOR_COMPACT_SHADOW_PATHS_ARRAY:
       /* See parall_active_index.h for why this amount of shared memory is needed. */
       shared_mem_bytes = (num_threads_per_block + 1) * sizeof(int);
       break;
@@ -125,7 +122,7 @@ bool CUDADeviceQueue::enqueue(DeviceKernel kernel, const int work_size, void *ar
                                 1,
                                 shared_mem_bytes,
                                 cuda_stream_,
-                                args,
+                                const_cast<void **>(args.values),
                                 0),
                  "enqueue");
 

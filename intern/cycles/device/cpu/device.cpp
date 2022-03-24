@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #include "device/cpu/device.h"
 #include "device/cpu/device_impl.h"
@@ -20,7 +7,7 @@
 /* Used for `info.denoisers`. */
 /* TODO(sergey): The denoisers are probably to be moved completely out of the device into their
  * own class. But until then keep API consistent with how it used to work before. */
-#include "util/util_openimagedenoise.h"
+#include "util/openimagedenoise.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -38,7 +25,6 @@ void device_cpu_info(vector<DeviceInfo> &devices)
   info.id = "CPU";
   info.num = 0;
   info.has_osl = true;
-  info.has_half_images = true;
   info.has_nanovdb = true;
   info.has_profiling = true;
   if (openimagedenoise_supported()) {

@@ -1,31 +1,39 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2020 Blender Foundation. All rights reserved. */
 
 #include "BKE_appdir.h"
 #include "BKE_asset_catalog.hh"
 #include "BKE_asset_library.hh"
+#include "BKE_callbacks.h"
+
+#include "asset_library_service.hh"
+
+#include "CLG_log.h"
 
 #include "testing/testing.h"
 
 namespace blender::bke::tests {
 
-TEST(AssetLibraryTest, load_and_free_c_functions)
+class AssetLibraryTest : public testing::Test {
+ public:
+  static void SetUpTestSuite()
+  {
+    CLG_init();
+    BKE_callback_global_init();
+  }
+  static void TearDownTestSuite()
+  {
+    CLG_exit();
+    BKE_callback_global_finalize();
+  }
+
+  void TearDown() override
+  {
+    AssetLibraryService::destroy();
+  }
+};
+
+TEST_F(AssetLibraryTest, bke_asset_library_load)
 {
   const std::string test_files_dir = blender::tests::flags_test_asset_dir();
   if (test_files_dir.empty()) {
@@ -44,17 +52,15 @@ TEST(AssetLibraryTest, load_and_free_c_functions)
   ASSERT_NE(nullptr, service);
 
   /* Check that the catalogs defined in the library are actually loaded. This just tests one single
-   * catalog, as that indicates the file has been loaded. Testing that that loading went OK is for
+   * catalog, as that indicates the file has been loaded. Testing that loading went OK is for
    * the asset catalog service tests. */
   const bUUID uuid_poses_ellie("df60e1f6-2259-475b-93d9-69a1b4a8db78");
   AssetCatalog *poses_ellie = service->find_catalog(uuid_poses_ellie);
   ASSERT_NE(nullptr, poses_ellie) << "unable to find POSES_ELLIE catalog";
   EXPECT_EQ("character/Ellie/poselib", poses_ellie->path.str());
-
-  BKE_asset_library_free(library_c_ptr);
 }
 
-TEST(AssetLibraryTest, load_nonexistent_directory)
+TEST_F(AssetLibraryTest, load_nonexistent_directory)
 {
   const std::string test_files_dir = blender::tests::flags_test_asset_dir();
   if (test_files_dir.empty()) {
@@ -75,8 +81,6 @@ TEST(AssetLibraryTest, load_nonexistent_directory)
 
   /* Check that the catalog service doesn't have any catalogs. */
   EXPECT_TRUE(service->is_empty());
-
-  BKE_asset_library_free(library_c_ptr);
 }
 
 }  // namespace blender::bke::tests

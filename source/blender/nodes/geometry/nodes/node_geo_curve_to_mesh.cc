@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BKE_spline.hh"
 
@@ -23,71 +9,67 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::node_geo_curve_to_mesh_cc {
 
-static void geo_node_curve_to_mesh_declare(NodeDeclarationBuilder &b)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Curve");
-  b.add_input<decl::Geometry>("Profile Curve");
-  b.add_output<decl::Geometry>("Mesh");
+  b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
+  b.add_input<decl::Geometry>(N_("Profile Curve"))
+      .only_realized_data()
+      .supported_type(GEO_COMPONENT_TYPE_CURVE);
+  b.add_input<decl::Bool>(N_("Fill Caps"))
+      .description(
+          N_("If the profile spline is cyclic, fill the ends of the generated mesh with N-gons"));
+  b.add_output<decl::Geometry>(N_("Mesh"));
 }
 
-static void geometry_set_curve_to_mesh(GeometrySet &geometry_set, const GeometrySet &profile_set)
+static void geometry_set_curve_to_mesh(GeometrySet &geometry_set,
+                                       const GeometrySet &profile_set,
+                                       const bool fill_caps)
 {
-  const CurveEval *profile_curve = profile_set.get_curve_for_read();
+  const std::unique_ptr<CurveEval> curve = curves_to_curve_eval(
+      *geometry_set.get_curves_for_read());
+  const Curves *profile_curves = profile_set.get_curves_for_read();
 
-  if (profile_curve == nullptr) {
-    Mesh *mesh = bke::curve_to_wire_mesh(*geometry_set.get_curve_for_read());
+  if (profile_curves == nullptr) {
+    Mesh *mesh = bke::curve_to_wire_mesh(*curve);
     geometry_set.replace_mesh(mesh);
   }
   else {
-    Mesh *mesh = bke::curve_to_mesh_sweep(*geometry_set.get_curve_for_read(), *profile_curve);
+    const std::unique_ptr<CurveEval> profile_curve = curves_to_curve_eval(*profile_curves);
+    Mesh *mesh = bke::curve_to_mesh_sweep(*curve, *profile_curve, fill_caps);
     geometry_set.replace_mesh(mesh);
   }
 }
 
-static void geo_node_curve_to_mesh_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet curve_set = params.extract_input<GeometrySet>("Curve");
   GeometrySet profile_set = params.extract_input<GeometrySet>("Profile Curve");
+  const bool fill_caps = params.extract_input<bool>("Fill Caps");
 
-  if (profile_set.has_instances()) {
-    params.error_message_add(NodeWarningType::Error,
-                             TIP_("Instances are not supported in the profile input"));
-    params.set_output("Mesh", GeometrySet());
-    return;
-  }
-
-  if (!profile_set.has_curve() && !profile_set.is_empty()) {
-    params.error_message_add(NodeWarningType::Warning,
-                             TIP_("No curve data available in the profile input"));
-  }
-
-  bool has_curve = false;
+  bool has_curves = false;
   curve_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
-    if (geometry_set.has_curve()) {
-      has_curve = true;
-      geometry_set_curve_to_mesh(geometry_set, profile_set);
+    if (geometry_set.has_curves()) {
+      has_curves = true;
+      geometry_set_curve_to_mesh(geometry_set, profile_set, fill_caps);
     }
     geometry_set.keep_only({GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_INSTANCES});
   });
 
-  if (!has_curve && !curve_set.is_empty()) {
-    params.error_message_add(NodeWarningType::Warning,
-                             TIP_("No curve data available in curve input"));
-  }
-
   params.set_output("Mesh", std::move(curve_set));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_curve_to_mesh_cc
 
 void register_node_type_geo_curve_to_mesh()
 {
+  namespace file_ns = blender::nodes::node_geo_curve_to_mesh_cc;
+
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_TO_MESH, "Curve to Mesh", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_curve_to_mesh_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_curve_to_mesh_exec;
+  geo_node_type_base(&ntype, GEO_NODE_CURVE_TO_MESH, "Curve to Mesh", NODE_CLASS_GEOMETRY);
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
   nodeRegisterType(&ntype);
 }

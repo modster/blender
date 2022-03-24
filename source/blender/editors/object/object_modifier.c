@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup edobj
@@ -53,12 +37,12 @@
 #include "BKE_armature.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
+#include "BKE_curves.h"
 #include "BKE_displist.h"
 #include "BKE_editmesh.h"
 #include "BKE_effect.h"
 #include "BKE_global.h"
 #include "BKE_gpencil_modifier.h"
-#include "BKE_hair.h"
 #include "BKE_key.h"
 #include "BKE_lattice.h"
 #include "BKE_lib_id.h"
@@ -84,9 +68,12 @@
 #include "DEG_depsgraph_build.h"
 #include "DEG_depsgraph_query.h"
 
+#include "BLT_translation.h"
+
 #include "RNA_access.h"
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
+#include "RNA_prototypes.h"
 
 #include "ED_armature.h"
 #include "ED_mesh.h"
@@ -124,14 +111,14 @@ static void object_force_modifier_update_for_bind(Depsgraph *depsgraph, Object *
   else if (ob->type == OB_MBALL) {
     BKE_displist_make_mball(depsgraph, scene_eval, ob_eval);
   }
-  else if (ELEM(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
+  else if (ELEM(ob->type, OB_CURVES_LEGACY, OB_SURF, OB_FONT)) {
     BKE_displist_make_curveTypes(depsgraph, scene_eval, ob_eval, false);
   }
   else if (ob->type == OB_GPENCIL) {
     BKE_gpencil_modifiers_calc(depsgraph, scene_eval, ob_eval);
   }
-  else if (ob->type == OB_HAIR) {
-    BKE_hair_data_update(depsgraph, scene_eval, ob);
+  else if (ob->type == OB_CURVES) {
+    BKE_curves_data_update(depsgraph, scene_eval, ob);
   }
   else if (ob->type == OB_POINTCLOUD) {
     BKE_pointcloud_data_update(depsgraph, scene_eval, ob);
@@ -152,12 +139,6 @@ static void object_force_modifier_bind_simple_options(Depsgraph *depsgraph,
   md_eval->mode = mode;
 }
 
-/**
- * Add a modifier to given object, including relevant extra processing needed by some physics types
- * (particles, simulations...).
- *
- * \param scene: is only used to set current frame in some cases, and may be NULL.
- */
 ModifierData *ED_object_modifier_add(
     ReportList *reports, Main *bmain, Scene *scene, Object *ob, const char *name, int type)
 {
@@ -264,14 +245,6 @@ static bool object_has_modifier(const Object *ob, const ModifierData *exclude, M
   return false;
 }
 
-/* If the object data of 'orig_ob' has other users, run 'callback' on
- * each of them.
- *
- * If include_orig is true, the callback will run on 'orig_ob' too.
- *
- * If the callback ever returns true, iteration will stop and the
- * function value will be true. Otherwise the function returns false.
- */
 bool ED_object_iter_other(Main *bmain,
                           Object *orig_ob,
                           const bool include_orig,
@@ -314,9 +287,6 @@ static bool object_has_modifier_cb(Object *ob, void *data)
   return object_has_modifier(ob, NULL, type);
 }
 
-/* Use with ED_object_iter_other(). Sets the total number of levels
- * for any multires modifiers on the object to the int pointed to by
- * callback_data. */
 bool ED_object_multires_update_totlevels_cb(Object *ob, void *totlevel_v)
 {
   int totlevel = *((char *)totlevel_v);
@@ -666,12 +636,13 @@ bool ED_object_modifier_convert(ReportList *UNUSED(reports),
 static Mesh *modifier_apply_create_mesh_for_modifier(Depsgraph *depsgraph,
                                                      Object *object,
                                                      ModifierData *md_eval,
+                                                     bool use_virtual_modifiers,
                                                      bool build_shapekey_layers)
 {
   Scene *scene_eval = DEG_get_evaluated_scene(depsgraph);
   Object *object_eval = DEG_get_evaluated_object(depsgraph, object);
   Mesh *mesh_applied = BKE_mesh_create_derived_for_modifier(
-      depsgraph, scene_eval, object_eval, md_eval, build_shapekey_layers);
+      depsgraph, scene_eval, object_eval, md_eval, use_virtual_modifiers, build_shapekey_layers);
   return mesh_applied;
 }
 
@@ -708,7 +679,8 @@ static bool modifier_apply_shape(Main *bmain,
       return false;
     }
 
-    Mesh *mesh_applied = modifier_apply_create_mesh_for_modifier(depsgraph, ob, md_eval, false);
+    Mesh *mesh_applied = modifier_apply_create_mesh_for_modifier(
+        depsgraph, ob, md_eval, true, false);
     if (!mesh_applied) {
       BKE_report(reports, RPT_ERROR, "Modifier is disabled or returned error, skipping apply");
       return false;
@@ -729,7 +701,7 @@ static bool modifier_apply_shape(Main *bmain,
     BKE_id_free(NULL, mesh_applied);
   }
   else {
-    /* TODO: implement for hair, point-clouds and volumes. */
+    /* TODO: implement for hair, point clouds and volumes. */
     BKE_report(reports, RPT_ERROR, "Cannot apply modifier for this object type");
     return false;
   }
@@ -767,7 +739,8 @@ static bool modifier_apply_obdata(
       }
     }
     else {
-      Mesh *mesh_applied = modifier_apply_create_mesh_for_modifier(depsgraph, ob, md_eval, true);
+      Mesh *mesh_applied = modifier_apply_create_mesh_for_modifier(
+          depsgraph, ob, md_eval, true, true);
       if (!mesh_applied) {
         BKE_report(reports, RPT_ERROR, "Modifier returned error, skipping apply");
         return false;
@@ -777,12 +750,15 @@ static bool modifier_apply_obdata(
       BKE_object_material_from_eval_data(bmain, ob, &mesh_applied->id);
       BKE_mesh_nomain_to_mesh(mesh_applied, me, ob, &CD_MASK_MESH, true);
 
+      /* Anonymous attributes shouldn't be available on the applied geometry. */
+      BKE_mesh_anonymous_attributes_remove(me);
+
       if (md_eval->type == eModifierType_Multires) {
         multires_customdata_delete(me);
       }
     }
   }
-  else if (ELEM(ob->type, OB_CURVE, OB_SURF)) {
+  else if (ELEM(ob->type, OB_CURVES_LEGACY, OB_SURF)) {
     Object *object_eval = DEG_get_evaluated_object(depsgraph, ob);
     Curve *curve = ob->data;
     Curve *curve_eval = (Curve *)object_eval->data;
@@ -827,7 +803,7 @@ static bool modifier_apply_obdata(
     DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
   }
   else {
-    /* TODO: implement for hair, point-clouds and volumes. */
+    /* TODO: implement for hair, point clouds and volumes. */
     BKE_report(reports, RPT_ERROR, "Cannot apply modifier for this object type");
     return false;
   }
@@ -1529,7 +1505,7 @@ static char *modifier_apply_as_shapekey_get_description(struct bContext *UNUSED(
   bool keep = RNA_boolean_get(values, "keep_modifier");
 
   if (keep) {
-    return BLI_strdup("Apply modifier as a new shapekey and keep it in the stack");
+    return BLI_strdup(TIP_("Apply modifier as a new shapekey and keep it in the stack"));
   }
 
   return NULL;
@@ -1693,6 +1669,8 @@ void OBJECT_OT_modifier_set_active(wmOperatorType *ot)
 }
 
 /** \} */
+
+/* ------------------------------------------------------------------- */
 /** \name Copy Modifier To Selected Operator
  * \{ */
 
@@ -2241,7 +2219,7 @@ static int multires_unsubdivide_exec(bContext *C, wmOperator *op)
 
   int new_levels = multiresModifier_rebuild_subdiv(depsgraph, object, mmd, 1, true);
   if (new_levels == 0) {
-    BKE_report(op->reports, RPT_ERROR, "Not valid subdivisions found to rebuild a lower level");
+    BKE_report(op->reports, RPT_ERROR, "No valid subdivisions found to rebuild a lower level");
     return OPERATOR_CANCELLED;
   }
 
@@ -2692,6 +2670,7 @@ void OBJECT_OT_skin_armature_create(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
   edit_modifier_properties(ot);
 }
+
 /** \} */
 
 /* ------------------------------------------------------------------- */

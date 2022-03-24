@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup blenloader
@@ -88,6 +74,7 @@
 #include "BKE_main.h"
 #include "BKE_mesh.h"
 #include "BKE_node.h"
+#include "BKE_node_tree_update.h"
 #include "BKE_paint.h"
 #include "BKE_pointcache.h"
 #include "BKE_report.h"
@@ -348,7 +335,7 @@ static void do_version_scene_collection_convert(
   LISTBASE_FOREACH (LinkData *, link, &sc->objects) {
     Object *ob = link->data;
     if (ob) {
-      BKE_collection_object_add(bmain, collection, ob);
+      BKE_collection_object_add_notest(bmain, collection, ob);
       id_us_min(&ob->id);
     }
   }
@@ -400,6 +387,8 @@ static void do_version_scene_collection_to_collection(Main *bmain, Scene *scene)
 
     do_version_layer_collection_pre(
         view_layer, &view_layer->layer_collections, enabled_set, selectable_set);
+
+    BKE_layer_collection_doversion_2_80(scene, view_layer);
 
     BKE_layer_collection_sync(scene, view_layer);
 
@@ -456,7 +445,7 @@ static void do_version_layers_to_collections(Main *bmain, Scene *scene)
 
         /* Note usually this would do slow collection syncing for view layers,
          * but since no view layers exists yet at this point it's fast. */
-        BKE_collection_object_add(bmain, collections[layer], base->object);
+        BKE_collection_object_add_notest(bmain, collections[layer], base->object);
       }
 
       if (base->flag & SELECT) {
@@ -896,7 +885,7 @@ static void do_versions_material_convert_legacy_blend_mode(bNodeTree *ntree, cha
   }
 
   if (need_update) {
-    ntreeUpdateTree(NULL, ntree);
+    version_socket_update_is_used(ntree);
   }
 }
 
@@ -1232,7 +1221,7 @@ void do_versions_after_linking_280(Main *bmain, ReportList *UNUSED(reports))
             (*collection_hidden)->flag |= COLLECTION_HIDE_VIEWPORT | COLLECTION_HIDE_RENDER;
           }
 
-          BKE_collection_object_add(bmain, *collection_hidden, ob);
+          BKE_collection_object_add_notest(bmain, *collection_hidden, ob);
           BKE_collection_object_remove(bmain, collection, ob, true);
         }
       }
@@ -1561,7 +1550,7 @@ void do_versions_after_linking_280(Main *bmain, ReportList *UNUSED(reports))
 
   if (!MAIN_VERSION_ATLEAST(bmain, 280, 69)) {
     /* Unify DOF settings (EEVEE part only) */
-    const int SCE_EEVEE_DOF_ENABLED = (1 << 7);
+    enum { SCE_EEVEE_DOF_ENABLED = (1 << 7) };
     LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
       if (STREQ(scene->r.engine, RE_engine_id_BLENDER_EEVEE)) {
         if (scene->eevee.flag & SCE_EEVEE_DOF_ENABLED) {
@@ -1717,18 +1706,8 @@ void do_versions_after_linking_280(Main *bmain, ReportList *UNUSED(reports))
     }
   }
 
-  /**
-   * Versioning code until next subversion bump goes here.
-   *
-   * \note Be sure to check when bumping the version:
-   * - #blo_do_versions_280 in this file.
-   * - "versioning_userdef.c", #blo_do_versions_userdef
-   * - "versioning_userdef.c", #do_versions_theme
-   *
-   * \note Keep this message at the bottom of the function.
-   */
-  {
-    /* Keep this block, even when empty. */
+  /* Old forgotten versioning code. */
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 39)) {
     /* Paint Brush. This ensure that the brush paints by default. Used during the development and
      * patch review of the initial Sculpt Vertex Colors implementation (D5975) */
     LISTBASE_FOREACH (Brush *, brush, &bmain->brushes) {
@@ -1747,6 +1726,20 @@ void do_versions_after_linking_280(Main *bmain, ReportList *UNUSED(reports))
         brush->disconnected_distance_max = 0.1f;
       }
     }
+  }
+
+  /**
+   * Versioning code until next subversion bump goes here.
+   *
+   * \note Be sure to check when bumping the version:
+   * - #blo_do_versions_280 in this file.
+   * - "versioning_userdef.c", #blo_do_versions_userdef
+   * - "versioning_userdef.c", #do_versions_theme
+   *
+   * \note Keep this message at the bottom of the function.
+   */
+  {
+    /* Keep this block, even when empty. */
   }
 }
 
@@ -2319,7 +2312,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
     } \
   } \
   ((void)0)
-        const int SCE_EEVEE_DOF_ENABLED = (1 << 7);
+        enum { SCE_EEVEE_DOF_ENABLED = (1 << 7) };
         IDProperty *props = IDP_GetPropertyFromGroup(scene->layer_properties,
                                                      RE_engine_id_BLENDER_EEVEE);
         // EEVEE_GET_BOOL(props, volumetric_enable, SCE_EEVEE_VOLUMETRIC_ENABLED);
@@ -3718,7 +3711,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
             STRNCPY(node->idname, "ShaderNodeOutputLight");
           }
           if (node->type == SH_NODE_BSDF_PRINCIPLED && node->custom2 == 0) {
-            node->custom2 = SHD_SUBSURFACE_DIFFUSION;
+            node->custom2 = SHD_SUBSURFACE_BURLEY;
           }
         }
       }
@@ -4039,7 +4032,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
   if (!MAIN_VERSION_ATLEAST(bmain, 280, 70)) {
     /* New image alpha modes. */
     LISTBASE_FOREACH (Image *, image, &bmain->images) {
-      const int IMA_IGNORE_ALPHA = (1 << 12);
+      enum { IMA_IGNORE_ALPHA = (1 << 12) };
       if (image->flag & IMA_IGNORE_ALPHA) {
         image->alpha_mode = IMA_ALPHA_IGNORE;
         image->flag &= ~IMA_IGNORE_ALPHA;
@@ -4504,7 +4497,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
           clmd->sim_parms->max_internal_tension = 15.0f;
           clmd->sim_parms->internal_compression = 15.0f;
           clmd->sim_parms->max_internal_compression = 15.0f;
-          clmd->sim_parms->internal_spring_max_diversion = M_PI / 4.0f;
+          clmd->sim_parms->internal_spring_max_diversion = M_PI_4;
         }
       }
     }
@@ -4513,7 +4506,6 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
     if (!DNA_struct_elem_find(fd->filesdna, "Image", "ListBase", "tiles")) {
       for (Image *ima = bmain->images.first; ima; ima = ima->id.next) {
         ImageTile *tile = MEM_callocN(sizeof(ImageTile), "Image Tile");
-        tile->ok = 1;
         tile->tile_number = 1001;
         BLI_addtail(&ima->tiles, tile);
       }
@@ -5066,17 +5058,8 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  /**
-   * Versioning code until next subversion bump goes here.
-   *
-   * \note Be sure to check when bumping the version:
-   * - #do_versions_after_linking_280 in this file.
-   * - "versioning_userdef.c", #blo_do_versions_userdef
-   * - "versioning_userdef.c", #do_versions_theme
-   *
-   * \note Keep this message at the bottom of the function.
-   */
-  {
+  /* Old forgotten versioning code. */
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 39)) {
     /* Set the cloth wind factor to 1 for old forces. */
     if (!DNA_struct_elem_find(fd->filesdna, "PartDeflect", "float", "f_wind_factor")) {
       LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
@@ -5096,10 +5079,22 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
     for (wmWindowManager *wm = bmain->wm.first; wm; wm = wm->id.next) {
       /* Don't rotate light with the viewer by default, make it fixed. Shading settings can't be
-       * edited and this flag should always be set. So we can always execute this. */
+       * edited and this flag should always be set. */
       wm->xr.session_settings.shading.flag |= V3D_SHADING_WORLD_ORIENTATION;
     }
+  }
 
+  /**
+   * Versioning code until next subversion bump goes here.
+   *
+   * \note Be sure to check when bumping the version:
+   * - #do_versions_after_linking_280 in this file.
+   * - "versioning_userdef.c", #blo_do_versions_userdef
+   * - "versioning_userdef.c", #do_versions_theme
+   *
+   * \note Keep this message at the bottom of the function.
+   */
+  {
     /* Keep this block, even when empty. */
   }
 }

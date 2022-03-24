@@ -1,24 +1,11 @@
-/*
- * Copyright 2021 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2021-2022 Blender Foundation */
 
 #include "integrator/path_trace_display.h"
 
-#include "render/buffers.h"
+#include "session/buffers.h"
 
-#include "util/util_logging.h"
+#include "util/log.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -26,33 +13,25 @@ PathTraceDisplay::PathTraceDisplay(unique_ptr<DisplayDriver> driver) : driver_(m
 {
 }
 
-void PathTraceDisplay::reset(const BufferParams &buffer_params)
+void PathTraceDisplay::reset(const BufferParams &buffer_params, const bool reset_rendering)
 {
   thread_scoped_lock lock(mutex_);
 
-  const DisplayDriver::Params old_params = params_;
-
-  params_.full_offset = make_int2(buffer_params.full_x, buffer_params.full_y);
+  params_.full_offset = make_int2(buffer_params.full_x + buffer_params.window_x,
+                                  buffer_params.full_y + buffer_params.window_y);
   params_.full_size = make_int2(buffer_params.full_width, buffer_params.full_height);
-  params_.size = make_int2(buffer_params.width, buffer_params.height);
-
-  /* If the parameters did change tag texture as unusable. This avoids drawing old texture content
-   * in an updated configuration of the viewport. For example, avoids drawing old frame when render
-   * border did change.
-   * If the parameters did not change, allow drawing the current state of the texture, which will
-   * not count as an up-to-date redraw. This will avoid flickering when doping camera navigation by
-   * showing a previously rendered frame for until the new one is ready. */
-  if (old_params.modified(params_)) {
-    texture_state_.is_usable = false;
-  }
+  params_.size = make_int2(buffer_params.window_width, buffer_params.window_height);
 
   texture_state_.is_outdated = true;
+
+  if (!reset_rendering) {
+    driver_->next_tile_begin();
+  }
 }
 
 void PathTraceDisplay::mark_texture_updated()
 {
   texture_state_.is_outdated = false;
-  texture_state_.is_usable = true;
 }
 
 /* --------------------------------------------------------------------
@@ -248,21 +227,22 @@ bool PathTraceDisplay::draw()
    * The drawing itself is non-blocking however, for better performance and to avoid
    * potential deadlocks due to locks held by the subclass. */
   DisplayDriver::Params params;
-  bool is_usable;
   bool is_outdated;
 
   {
     thread_scoped_lock lock(mutex_);
     params = params_;
-    is_usable = texture_state_.is_usable;
     is_outdated = texture_state_.is_outdated;
   }
 
-  if (is_usable) {
-    driver_->draw(params);
-  }
+  driver_->draw(params);
 
   return !is_outdated;
+}
+
+void PathTraceDisplay::flush()
+{
+  driver_->flush();
 }
 
 CCL_NAMESPACE_END

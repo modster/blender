@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Peter Schlaile <peter [at] schlaile [dot] de> 2010
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2010 Peter Schlaile <peter [at] schlaile [dot] de>. */
 
 /** \file
  * \ingroup bke
@@ -151,7 +136,7 @@ static float seq_cache_timeline_frame_to_frame_index(Sequence *seq, float timeli
   /* With raw images, map timeline_frame to strip input media frame range. This means that static
    * images or extended frame range of movies will only generate one cache entry. No special
    * treatment in converting frame index to timeline_frame is needed. */
-  if (type == SEQ_CACHE_STORE_RAW || type == SEQ_CACHE_STORE_THUMBNAIL) {
+  if (ELEM(type, SEQ_CACHE_STORE_RAW, SEQ_CACHE_STORE_THUMBNAIL)) {
     return seq_give_frame_index(seq, timeline_frame);
   }
 
@@ -453,9 +438,6 @@ static SeqCacheKey *seq_cache_get_item_for_removal(Scene *scene)
   return finalkey;
 }
 
-/* Find only "base" keys.
- * Sources(other types) for a frame must be freed all at once.
- */
 bool seq_cache_recycle_item(Scene *scene)
 {
   SeqCache *cache = seq_cache_get_from_scene(scene);

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup edtransform
@@ -34,6 +18,7 @@
 
 #include "ED_markers.h"
 
+#include "SEQ_animation.h"
 #include "SEQ_edit.h"
 #include "SEQ_effects.h"
 #include "SEQ_iterator.h"
@@ -302,7 +287,7 @@ static SeqCollection *extract_standalone_strips(SeqCollection *transformed_strip
   return collection;
 }
 
-/* Query strips positioned after left edge of transformed strips boundbox. */
+/* Query strips positioned after left edge of transformed strips bound-box. */
 static SeqCollection *query_right_side_strips(ListBase *seqbase, SeqCollection *transformed_strips)
 {
   int minframe = MAXFRAME;
@@ -351,7 +336,7 @@ static ListBase *seqbase_active_get(const TransInfo *t)
   return SEQ_active_seqbase_get(ed);
 }
 
-/* Offset all strips positioned after left edge of transformed strips boundbox by amount equal
+/* Offset all strips positioned after left edge of transformed strips bound-box by amount equal
  * to overlap of transformed strips. */
 static void seq_transform_handle_expand_to_fit(TransInfo *t, SeqCollection *transformed_strips)
 {
@@ -458,6 +443,7 @@ static void seq_transform_handle_overwrite_split(const TransInfo *t,
   SEQ_edit_strip_split(
       bmain, scene, seqbase, split_strip, transformed->enddisp, SEQ_SPLIT_SOFT, NULL);
   SEQ_edit_flag_for_removal(scene, seqbase_active_get(t), split_strip);
+  SEQ_edit_remove_flagged_sequences(t->scene, seqbase_active_get(t));
 }
 
 /* Trim strips by adjusting handle position.
@@ -498,8 +484,8 @@ static void seq_transform_handle_overwrite_trim(const TransInfo *t,
 static void seq_transform_handle_overwrite(const TransInfo *t, SeqCollection *transformed_strips)
 {
   SeqCollection *targets = query_overwrite_targets(t, transformed_strips);
+  SeqCollection *strips_to_delete = SEQ_collection_create(__func__);
 
-  bool strips_delete = false;
   Sequence *target;
   Sequence *transformed;
   SEQ_ITERATOR_FOREACH (target, targets) {
@@ -511,13 +497,10 @@ static void seq_transform_handle_overwrite(const TransInfo *t, SeqCollection *tr
       const eOvelapDescrition overlap = overlap_description_get(transformed, target);
 
       if (overlap == STRIP_OVERLAP_IS_FULL) {
-        /* Remove covered strip. */
-        SEQ_edit_flag_for_removal(t->scene, seqbase_active_get(t), target);
-        strips_delete = true;
+        SEQ_collection_append_strip(target, strips_to_delete);
       }
       else if (overlap == STRIP_OVERLAP_IS_INSIDE) {
         seq_transform_handle_overwrite_split(t, transformed, target);
-        strips_delete = true;
       }
       else if (ELEM(overlap, STRIP_OVERLAP_LEFT_SIDE, STRIP_OVERLAP_RIGHT_SIDE)) {
         seq_transform_handle_overwrite_trim(t, transformed, target, overlap);
@@ -527,9 +510,16 @@ static void seq_transform_handle_overwrite(const TransInfo *t, SeqCollection *tr
 
   SEQ_collection_free(targets);
 
-  if (strips_delete) {
+  /* Remove covered strips. This must be done in separate loop, because `SEQ_edit_strip_split()`
+   * also uses `SEQ_edit_remove_flagged_sequences()`. See T91096. */
+  if (SEQ_collection_len(strips_to_delete) > 0) {
+    Sequence *seq;
+    SEQ_ITERATOR_FOREACH (seq, strips_to_delete) {
+      SEQ_edit_flag_for_removal(t->scene, seqbase_active_get(t), seq);
+    }
     SEQ_edit_remove_flagged_sequences(t->scene, seqbase_active_get(t));
   }
+  SEQ_collection_free(strips_to_delete);
 }
 
 static void seq_transform_handle_overlap_shuffle(const TransInfo *t,
@@ -784,7 +774,6 @@ static void flushTransSeq(TransInfo *t)
   SEQ_collection_free(transformed_strips);
 }
 
-/* helper for recalcData() - for sequencer transforms */
 void recalcData_sequencer(TransInfo *t)
 {
   TransData *td;

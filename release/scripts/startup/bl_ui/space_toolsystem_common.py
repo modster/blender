@@ -1,20 +1,4 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # <pep8 compliant>
 import bpy
@@ -64,14 +48,14 @@ from collections import namedtuple
 ToolDef = namedtuple(
     "ToolDef",
     (
-        # Unique tool name (withing space & mode context).
+        # Unique tool name (within space & mode context).
         "idname",
         # The name to display in the interface.
         "label",
         # Description (for tool-tip), when not set, use the description of 'operator',
         # may be a string or a 'function(context, item, key-map) -> string'.
         "description",
-        # The name of the icon to use (found in ``release/datafiles/icons``) or None for no icon.
+        # The name of the icon to use (found in `release/datafiles/icons`) or None for no icon.
         "icon",
         # An optional cursor to use when this tool is active.
         "cursor",
@@ -81,12 +65,12 @@ ToolDef = namedtuple(
         "widget",
         # Optional key-map for tool, possible values are:
         #
-        # - ``None`` when the tool doesn't have a key-map.
+        # - `None` when the tool doesn't have a key-map.
         #   Also the default value when no key-map value is defined.
         #
         # - A string literal for the key-map name, the key-map items are located in the default key-map.
         #
-        # - ``()`` an empty tuple for a default name.
+        # - `()` an empty tuple for a default name.
         #   This is convenience functionality for generating a key-map name.
         #   So if a tool name is "Bone Size", in "Edit Armature" mode for the "3D View",
         #   All of these values are combined into an id, e.g:
@@ -98,7 +82,7 @@ ToolDef = namedtuple(
         # - A function that populates a key-maps passed in as an argument.
         #
         # - A tuple filled with triple's of:
-        #   ``(operator_id, operator_properties, keymap_item_args)``.
+        #   `(operator_id, operator_properties, keymap_item_args)`.
         #
         #   Use this to define the key-map in-line.
         #
@@ -106,7 +90,7 @@ ToolDef = namedtuple(
         #   Keep this functionality since it's likely useful for add-on key-maps.
         #
         # Warning: currently 'from_dict' this is a list of one item,
-        # so internally we can swap the key-map function for the key-map it's self.
+        # so internally we can swap the key-map function for the key-map itself.
         # This isn't very nice and may change, tool definitions shouldn't care about this.
         "keymap",
         # Optional data-block associated with this tool.
@@ -190,7 +174,7 @@ class ToolActivePanelHelper:
         ToolSelectPanelHelper.draw_active_tool_header(
             context,
             layout.column(),
-            show_tool_icon=True,
+            show_tool_icon_always=True,
             tool_key=ToolSelectPanelHelper._tool_key_from_context(context, space_type=self.bl_space_type),
         )
 
@@ -202,12 +186,40 @@ class ToolSelectPanelHelper:
     - keymap_prefix:
       The text prefix for each key-map for this spaces tools.
     - tools_all():
-      Returns (context_mode, tools) tuple pair for all tools defined.
+      Generator (context_mode, tools) tuple pairs for all tools defined.
     - tools_from_context(context, mode=None):
-      Returns tools available in this context.
+      A generator for all tools available in the current context.
 
-    Each tool is a 'ToolDef' or None for a separator in the toolbar, use ``None``.
+    Tool Sequence Structure
+    =======================
+
+    Sequences of tools as returned by tools_all() and tools_from_context() are comprised of:
+
+    - A `ToolDef` instance (representing a tool that can be activated).
+    - None (a visual separator in the tool list).
+    - A tuple of `ToolDef` or None values
+      (representing a group of tools that can be selected between using a click-drag action).
+      Note that only a single level of nesting is supported (groups cannot contain sub-groups).
+    - A callable which takes a single context argument and returns a tuple of values described above.
+      When the context is None, all potential tools must be returned.
     """
+
+    @classmethod
+    def tools_all(cls):
+        """
+        Return all tools for this toolbar, this must include all available tools ignoring the current context.
+        The value is must be a sequence of (mode, tool_list) pairs, where mode may be object-mode edit-mode etc.
+        The mode may be None for tool-bars that don't make use of sub-modes.
+        """
+        raise Exception("Sub-class %r must implement this method!" % cls)
+
+    @classmethod
+    def tools_from_context(cls, context, mode=None):
+        """
+        Return all tools for the current context,
+        this result is used at run-time and may filter out tools to display.
+        """
+        raise Exception("Sub-class %r must implement this method!" % cls)
 
     @staticmethod
     def _tool_class_from_space_type(space_type):
@@ -781,7 +793,7 @@ class ToolSelectPanelHelper:
     def draw_active_tool_header(
             context, layout,
             *,
-            show_tool_icon=False,
+            show_tool_icon_always=False,
             tool_key=None,
     ):
         if tool_key is None:
@@ -798,11 +810,15 @@ class ToolSelectPanelHelper:
             return None
         # Note: we could show 'item.text' here but it makes the layout jitter when switching tools.
         # Add some spacing since the icon is currently assuming regular small icon size.
-        if show_tool_icon:
+        if show_tool_icon_always:
             layout.label(text="    " + item.label, icon_value=icon_value)
             layout.separator()
         else:
-            layout.label(text=item.label)
+            if context.space_data.show_region_toolbar:
+                layout.template_icon(icon_value=0, scale=0.5)
+            else:
+                layout.template_icon(icon_value=icon_value, scale=0.5)
+            layout.separator()
 
         draw_settings = item.draw_settings
         if draw_settings is not None:
@@ -1037,9 +1053,6 @@ def _activate_by_item(context, space_type, item, index, *, as_fallback=False):
         if props is None:
             print("Error:", gizmo_group, "could not access properties!")
         else:
-            for key in props.bl_rna.properties.keys():
-                props.property_unset(key)
-
             gizmo_properties = item.widget_properties
             if gizmo_properties is not None:
                 if not isinstance(gizmo_properties, list):

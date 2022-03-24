@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 /* CPU kernel entry points */
 
@@ -64,7 +51,7 @@ CCL_NAMESPACE_BEGIN
 
 /* Memory Copy */
 
-void kernel_const_copy(KernelGlobals *kg, const char *name, void *host, size_t)
+void kernel_const_copy(KernelGlobalsCPU *kg, const char *name, void *host, size_t)
 {
   if (strcmp(name, "__data") == 0) {
     kg->__data = *(KernelData *)host;
@@ -74,7 +61,7 @@ void kernel_const_copy(KernelGlobals *kg, const char *name, void *host, size_t)
   }
 }
 
-void kernel_global_memory_copy(KernelGlobals *kg, const char *name, void *mem, size_t size)
+void kernel_global_memory_copy(KernelGlobalsCPU *kg, const char *name, void *mem, size_t size)
 {
   if (0) {
   }
@@ -85,7 +72,7 @@ void kernel_global_memory_copy(KernelGlobals *kg, const char *name, void *mem, s
     kg->tname.data = (type *)mem; \
     kg->tname.width = size; \
   }
-#include "kernel/kernel_textures.h"
+#include "kernel/textures.h"
   else {
     assert(0);
   }
