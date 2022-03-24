@@ -34,7 +34,6 @@ FIND_PATH(WEBP_INCLUDE_DIR
 
 SET(_webp_FIND_COMPONENTS
     webp
-    webpdecoder
     webpmux
     webpdemux
   )
