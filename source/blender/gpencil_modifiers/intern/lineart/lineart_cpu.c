@@ -1833,6 +1833,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
                        obi->original_me,
                        &((struct BMeshFromMeshParams){
                            .calc_face_normal = true,
+                           .calc_vert_normal = true,
                        }));
   }
 

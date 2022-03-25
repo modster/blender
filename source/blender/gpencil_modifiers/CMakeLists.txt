@@ -32,6 +32,8 @@ set(INC
 
   # dna_type_offsets.h in BLO_read_write.h
   ${CMAKE_BINARY_DIR}/source/blender/makesdna/intern
+  # RNA_prototypes.h
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
@@ -56,6 +58,7 @@ set(SRC
   intern/MOD_gpencilbuild.c
   intern/MOD_gpencilcolor.c
   intern/MOD_gpencildash.c
+  intern/MOD_gpencilenvelope.c
   intern/MOD_gpencilhook.c
   intern/MOD_gpencillattice.c
   intern/MOD_gpencillength.c
@@ -101,3 +104,5 @@ add_definitions(${GL_DEFINITIONS})
 blender_add_lib(bf_gpencil_modifiers "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
 add_dependencies(bf_gpencil_modifiers bf_dna)
+# RNA_prototypes.h
+add_dependencies(bf_gpencil_modifiers bf_rna)
