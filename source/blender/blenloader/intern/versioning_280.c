@@ -618,16 +618,6 @@ static void do_versions_remove_regions_by_type(ListBase *regionbase, int regiont
   }
 }
 
-static ARegion *do_versions_find_region_or_null(ListBase *regionbase, int regiontype)
-{
-  LISTBASE_FOREACH (ARegion *, region, regionbase) {
-    if (region->regiontype == regiontype) {
-      return region;
-    }
-  }
-  return NULL;
-}
-
 static ARegion *do_versions_find_region(ListBase *regionbase, int regiontype)
 {
   ARegion *region = do_versions_find_region_or_null(regionbase, regiontype);
@@ -3871,7 +3861,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
                                                                  &sl->regionbase;
           /* All spaces that use tools must be eventually added. */
           ARegion *region = NULL;
-          if (ELEM(sl->spacetype, SPACE_VIEW3D, SPACE_IMAGE, SPACE_SEQ, SPACE_CLIP) &&
+          if (ELEM(sl->spacetype, SPACE_VIEW3D, SPACE_IMAGE, SPACE_SEQ) &&
               ((region = do_versions_find_region_or_null(regionbase, RGN_TYPE_TOOL_HEADER)) ==
                NULL)) {
             /* Add tool header. */

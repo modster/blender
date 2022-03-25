@@ -15,6 +15,8 @@ struct bNodeTree;
 extern "C" {
 #endif
 
+struct ARegion *do_versions_find_region_or_null(struct ListBase *regionbase, int regiontype);
+
 struct ARegion *do_versions_add_region_if_not_found(struct ListBase *regionbase,
                                                     int region_type,
                                                     const char *name,

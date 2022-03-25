@@ -26,6 +26,16 @@
 
 using blender::StringRef;
 
+ARegion *do_versions_find_region_or_null(ListBase *regionbase, int regiontype)
+{
+  LISTBASE_FOREACH (ARegion *, region, regionbase) {
+    if (region->regiontype == regiontype) {
+      return region;
+    }
+  }
+  return nullptr;
+}
+
 ARegion *do_versions_add_region_if_not_found(ListBase *regionbase,
                                              int region_type,
                                              const char *name,
