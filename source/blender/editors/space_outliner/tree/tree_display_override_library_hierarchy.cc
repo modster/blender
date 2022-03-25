@@ -167,20 +167,23 @@ static int build_hierarchy_foreach_ID_cb(LibraryIDLinkCallbackData *cb_data)
   if (real_override_id->override_library->hierarchy_root != &build_data.override_root_id) {
     return IDWALK_RET_NOP;
   }
-  /* ID was added already, don't add it again to avoid (endless) recursion. We might want to still
-   * add an element for this but don't recurse further into it, to show that this ID is used
-   * multiple times in the hierarchy. */
-  /* TODO is this correct? Shouldn't we only check if the ID is one of the ancestors, not anywhere
-   * in the hierarchy? */
-  if (build_data.added_elems.contains(&id)) {
-    return IDWALK_RET_STOP_RECURSION;
-  }
 
   TreeElement *te_to_expand = &build_data.root_id_te.getLegacyElement();
   /* If there is already an element for the ID linking to the current one, use that as parent. */
   if (TreeElement *parent_te_id = build_data.added_elems.lookup_default(cb_data->id_self,
                                                                         nullptr)) {
     te_to_expand = parent_te_id;
+  }
+
+  /* Check if an ancestor of this element is already the ID we want to add, this would mean an ID
+   * recurses into itself. Don't add the element and stop recursing in that case. */
+  for (TreeElement *parent_iter_te = te_to_expand; parent_iter_te;
+       parent_iter_te = parent_iter_te->parent) {
+    if (TreeElementID *id_te = tree_element_cast<TreeElementID>(parent_iter_te)) {
+      if (&id_te->get_ID() == &id) {
+        return IDWALK_RET_STOP_RECURSION;
+      }
+    }
   }
 
   TreeElement *new_te = outliner_add_element(
