@@ -2221,7 +2221,7 @@ class VIEW3D_PT_gpencil_brush_presets(Panel, PresetPanel):
 class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
     bl_category = "Tool"
     bl_context = ".sculpt_mode"  # dot on purpose (access from topbar)
-    bl_label = "Painting Canvas"
+    bl_label = "Canvas"
 
     @classmethod
     def poll(cls, context):
@@ -2248,19 +2248,14 @@ class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
         ob = context.active_object
         settings = context.tool_settings.paint_mode
 
-        layout.prop(settings, "canvas_type")
-        match settings.canvas_type:
-            case 'VERTEX':
+        layout.prop(settings, "canvas_source")
+        match settings.canvas_source:
+            case 'COLOR_ATTRIBUTE':
                 me = ob.data
                 layout.template_list("MESH_UL_vcols", "vcols", me, "vertex_colors", me.vertex_colors, "active_index", rows=2)
 
             case 'MATERIAL':
-                layout.template_list(
-                    "MATERIAL_UL_matslots", "",
-                    ob, "material_slots",
-                    ob, "active_material_index",
-                    rows=2,
-                )
+                layout.prop(settings, "canvas")
 
             case 'IMAGE':
                 layout.template_ID(settings, "image", new="image.new", open="image.open")
