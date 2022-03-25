@@ -6546,8 +6546,8 @@ def km_clip_editor_tool_add_marker_tweak(params):
         {"items": [
             ("clip.change_frame", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
             ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
             ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'}, None),
         ]},
     )
 
