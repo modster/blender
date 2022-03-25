@@ -1117,11 +1117,21 @@ static bool is_spline_nearby(ViewContext *vc,
 }
 
 /* Move segment to mouse pointer. */
-static void move_segment(ViewContext *vc, MoveSegmentData *seg_data, const wmEvent *event)
+static void move_segment(ViewContext *vc,
+                         MoveSegmentData *seg_data,
+                         const wmEvent *event,
+                         const bool free_toggle)
 {
   Nurb *nu = seg_data->nu;
   BezTriple *bezt1 = nu->bezt + seg_data->bezt_index;
   BezTriple *bezt2 = BKE_nurb_bezt_get_next(nu, bezt1);
+
+  if (free_toggle) {
+    bezt1->h1 = bezt1->h2 = bezt2->h1 = bezt2->h2 = HD_FREE;
+  }
+  else {
+    bezt1->h1 = bezt1->h2 = bezt2->h1 = bezt2->h2 = HD_ALIGN;
+  }
 
   const float t = max_ff(min_ff(seg_data->t, 0.9f), 0.1f);
 
@@ -1511,23 +1521,27 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   if (event->type == EVT_MODAL_MAP) {
     if (event->val == PEN_MODAL_FREE_ALIGN_TOGGLE) {
-      toggle_bezt_free_align_handles(nurbs);
       cpd->free_toggle = !cpd->free_toggle;
     }
-    else if (event->val == PEN_MODAL_LINK_HANDLES) {
-      cpd->link_handles = !cpd->link_handles;
-      if (cpd->link_handles) {
-        move_all_selected_points(&vc, event, cpd, nurbs, false);
+    if (cpd->msd == NULL) {
+      if (event->val == PEN_MODAL_FREE_ALIGN_TOGGLE) {
+        toggle_bezt_free_align_handles(nurbs);
       }
-    }
-    else if (event->val == PEN_MODAL_MOVE_ENTIRE) {
-      cpd->move_entire = !cpd->move_entire;
-    }
-    else if (event->val == PEN_MODAL_MOVE_ADJACENT) {
-      cpd->move_adjacent = !cpd->move_adjacent;
-    }
-    else if (event->val == PEN_MODAL_LOCK_ANGLE) {
-      cpd->lock_angle = !cpd->lock_angle;
+      else if (event->val == PEN_MODAL_LINK_HANDLES) {
+        cpd->link_handles = !cpd->link_handles;
+        if (cpd->link_handles) {
+          move_all_selected_points(&vc, event, cpd, nurbs, false);
+        }
+      }
+      else if (event->val == PEN_MODAL_MOVE_ENTIRE) {
+        cpd->move_entire = !cpd->move_entire;
+      }
+      else if (event->val == PEN_MODAL_MOVE_ADJACENT) {
+        cpd->move_adjacent = !cpd->move_adjacent;
+      }
+      else if (event->val == PEN_MODAL_LOCK_ANGLE) {
+        cpd->lock_angle = !cpd->lock_angle;
+      }
     }
   }
 
@@ -1544,7 +1558,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     if (cpd->dragging) {
       if (cpd->spline_nearby && move_seg && cpd->msd != NULL) {
         MoveSegmentData *seg_data = cpd->msd;
-        move_segment(&vc, seg_data, event);
+        move_segment(&vc, seg_data, event, cpd->free_toggle);
         cpd->acted = true;
         if (seg_data->nu && seg_data->nu->type == CU_BEZIER) {
           BKE_nurb_handles_calc(seg_data->nu);
