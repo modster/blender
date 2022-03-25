@@ -1249,10 +1249,9 @@ static void clip_tools_region_draw(const bContext *C, ARegion *region)
 {
   ED_region_panels(C, region);
 }
-static void clip_tools_region_listener(const wmRegionListenerParams *params)
+
+static void clip_tools_region_listener(const wmRegionListenerParams *UNUSED(params))
 {
-  ARegion *region = params->region;
-  wmNotifier *wmn = params->notifier;
 }
 
 /****************** properties region ******************/
