@@ -1186,7 +1186,7 @@ static void move_segment(ViewContext *vc, MoveSegmentData *seg_data, const wmEve
   }
 }
 
-/* Toggle between #free and #align handles of the given #BezTriple */
+/* Toggle between #free and #align handles of the all selected #BezTriple */
 static void toggle_bezt_free_align_handles(ListBase *nurbs)
 {
   FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
@@ -1196,8 +1196,6 @@ static void toggle_bezt_free_align_handles(ListBase *nurbs)
   else {
     bezt->h1 = bezt->h2 = HD_ALIGN;
   }
-
-  BKE_nurb_handles_calc(nu);
   FOREACH_SELECTED_BEZT_END
 }
 
