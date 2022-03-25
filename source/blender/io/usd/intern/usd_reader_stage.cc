@@ -21,6 +21,7 @@
 
 #if PXR_VERSION >= 2111
 #  include <pxr/usd/usdLux/boundableLightBase.h>
+#  include <pxr/usd/usdLux/nonboundableLightBase.h>
 #else
 #  include <pxr/usd/usdLux/light.h>
 #endif
@@ -61,14 +62,13 @@ USDPrimReader *USDStageReader::create_reader_if_allowed(const pxr::UsdPrim &prim
     return new USDMeshReader(prim, params_, settings_);
   }
 #if PXR_VERSION >= 2111
-  if (params_.import_lights && prim.IsA<pxr::UsdLuxBoundableLightBase>()) {
-    return new USDLightReader(prim, params_, settings_);
-  }
+  if (params_.import_lights && (prim.IsA<pxr::UsdLuxBoundableLightBase>() ||
+                                prim.IsA<pxr::UsdLuxNonboundableLightBase>())) {
 #else
   if (params_.import_lights && prim.IsA<pxr::UsdLuxLight>()) {
+#endif
     return new USDLightReader(prim, params_, settings_);
   }
-#endif
   if (params_.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
     return new USDVolumeReader(prim, params_, settings_);
   }
@@ -93,7 +93,11 @@ USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim)
   if (prim.IsA<pxr::UsdGeomMesh>()) {
     return new USDMeshReader(prim, params_, settings_);
   }
-  if (prim.IsA<pxr::UsdGeomBoundable>()) {
+#if PXR_VERSION >= 2111
+  if (prim.IsA<pxr::UsdLuxBoundableLightBase>() || prim.IsA<pxr::UsdLuxNonboundableLightBase>()) {
+#else
+  if (prim.IsA<pxr::UsdLuxLight>()) {
+#endif
     return new USDLightReader(prim, params_, settings_);
   }
   if (prim.IsA<pxr::UsdVolVolume>()) {

@@ -64,7 +64,7 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
 static float calc_min_radius_v3v3(float p1[3], float p2[3], float dir[3])
 {
   /* Use plane-conic-intersections to choose the maximal radius.
-   * The conic is deifned in 4D as f({x,y,z,t}) = x*x + y*y + z*z - t*t = 0
+   * The conic is defined in 4D as f({x,y,z,t}) = x*x + y*y + z*z - t*t = 0
    * Then a plane is defined parametrically as
    * {p}(u, v) = {p1,0}*u + {p2,0}*(1-u) + {dir,1}*v with 0 <= u <= 1 and v >= 0
    * Now compute the intersection point with the smallest t.
@@ -281,7 +281,7 @@ static void apply_stroke_envelope(
 
     float fac = use_dist * weight;
     /* The 50 is an internal constant for the default pixel size. The result can be messed up if
-     * bGPdata.pixfactor is not default, but I think modifiers shouldn't access that. */
+     * #bGPdata.pixfactor is not default, but I think modifiers shouldn't access that. */
     point->pressure += fac * 50.0f * GP_DEFAULT_PIX_FACTOR;
     interp_v3_v3v3(&point->x, &point->x, new_center, fac / len_v3v3(closest, closest2));
   }
@@ -570,7 +570,6 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
-  uiLayout *row;
   uiLayout *layout = panel->layout;
 
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
@@ -600,7 +599,7 @@ static void panelRegister(ARegionType *region_type)
 {
   PanelType *panel_type = gpencil_modifier_panel_register(
       region_type, eGpencilModifierType_Envelope, panel_draw);
-  PanelType *mask_panel_type = gpencil_modifier_subpanel_register(
+  gpencil_modifier_subpanel_register(
       region_type, "mask", "Influence", NULL, mask_panel_draw, panel_type);
 }
 
