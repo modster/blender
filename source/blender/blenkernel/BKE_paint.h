@@ -620,6 +620,11 @@ typedef struct SculptSession {
       struct MDeformVert *dvert_prev;
     } wpaint;
 
+    struct {
+      uint16_t material_slot;
+      uint16_t resource_index;
+    } paint;
+
     /* TODO: identify sculpt-only fields */
     // struct { ... } sculpt;
   } mode;

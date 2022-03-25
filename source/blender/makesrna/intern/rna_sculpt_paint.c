@@ -26,7 +26,6 @@
 #include "BKE_paint.h"
 
 #include "ED_image.h"
-#include "ED_paint.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -559,45 +558,7 @@ static bool rna_PaintModeSettings_image_poll(PointerRNA *UNUSED(ptr), PointerRNA
   return !ELEM(image->type, IMA_TYPE_COMPOSITE, IMA_TYPE_R_RESULT);
 }
 
-static int rna_PaintModeSettings_canvas_get(PointerRNA *ptr)
-{
-  return 0;
-}
-
-static void rna_PaintModeSettings_canvas_set(PointerRNA *ptr, int value)
-{
-}
-
-static const EnumPropertyItem *rna_PaintModeSettings_canvas_itemf(bContext *C,
-                                                                  PointerRNA *ptr,
-                                                                  PropertyRNA *UNUSED(prop),
-                                                                  bool *r_free)
-{
-  EnumPropertyItem *items = NULL;
-  int totitem = 0;
-
-  PaintModeSettings *settings = ptr->data;
-  switch (settings->canvas_source) {
-    case PAINT_CANVAS_IMAGE:
-      /* Nothing to add. Images are selected using template_ID, due to the number of images that
-       * can be selected. */
-      break;
-
-    case PAINT_CANVAS_COLOR_ATTRIBUTE:
-      /* Nothing to add. Color attributes are selected using a list template. */
-      break;
-
-    case PAINT_CANVAS_MATERIAL:
-      ED_paint_canvas_material_itemf(C, settings, &items, &totitem);
-      break;
-  }
-
-  RNA_enum_item_end(&items, &totitem);
-  *r_free = true;
-  return items;
-}
-
-/** \} */
+/* \} */
 
 static bool rna_ImaPaint_detect_data(ImagePaintSettings *imapaint)
 {
@@ -1040,14 +1001,6 @@ static void rna_def_paint_mode(BlenderRNA *brna)
   RNA_def_property_enum_sdna(prop, NULL, "canvas_source");
   RNA_def_property_enum_items(prop, rna_enum_canvas_type_items);
   RNA_def_property_ui_text(prop, "Source", "Source to select canvas from");
-
-  prop = RNA_def_property(srna, "canvas", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
-  RNA_def_property_enum_funcs(prop,
-                              "rna_PaintModeSettings_canvas_get",
-                              "rna_PaintModeSettings_canvas_set",
-                              "rna_PaintModeSettings_canvas_itemf");
-  RNA_def_property_ui_text(prop, "Canvas", "Canvas used as for painting");
 
   prop = RNA_def_property(srna, "image", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_PaintModeSettings_image_poll");

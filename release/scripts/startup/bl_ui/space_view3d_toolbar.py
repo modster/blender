@@ -2255,7 +2255,7 @@ class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
                 layout.template_list("MESH_UL_vcols", "vcols", me, "vertex_colors", me.vertex_colors, "active_index", rows=2)
 
             case 'MATERIAL':
-                layout.prop(settings, "canvas")
+                layout.prop(ob, "paint_canvas")
 
             case 'IMAGE':
                 layout.template_ID(settings, "image", new="image.new", open="image.open")
