@@ -3176,7 +3176,6 @@ def km_clip_editor(params):
         ("clip.lock_tracks", {"type": 'L', "value": 'PRESS', "alt": True},
          {"properties": [("action", 'UNLOCK')]}),
         *_template_items_hide_reveal_actions("clip.hide_tracks", "clip.hide_tracks_clear"),
-        ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'}, None),
         ("clip.keyframe_insert", {"type": 'I', "value": 'PRESS'}, None),
         ("clip.keyframe_delete", {"type": 'I', "value": 'PRESS', "alt": True}, None),
         ("clip.join_tracks", {"type": 'J', "value": 'PRESS', "ctrl": True}, None),
@@ -6505,6 +6504,8 @@ def km_clip_editor_tool_select(params):
         "Clip Editor: Tweak",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
         {"items": [
+            ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
             ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
              {"properties": [("extend", False), ("deselect_all", not params.legacy)]}),
         ]},
