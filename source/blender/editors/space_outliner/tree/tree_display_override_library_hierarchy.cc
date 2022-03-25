@@ -46,7 +46,7 @@ ListBase TreeDisplayOverrideLibraryHierarchy::buildTree(const TreeSourceData &so
 
   /* First step: Build "Current File" hierarchy. */
   TreeElement *current_file_te = outliner_add_element(
-      &space_outliner_, &tree, source_data.bmain, nullptr, TSE_ID_BASE, 0);
+      &space_outliner_, &tree, source_data.bmain, nullptr, TSE_ID_BASE, -1);
   current_file_te->name = IFACE_("Current File");
   {
     AbstractTreeElement::uncollapse_by_default(current_file_te);
