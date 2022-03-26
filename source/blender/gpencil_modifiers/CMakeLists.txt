@@ -36,7 +36,7 @@ set(INC
   ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
-set(INC_SYS
+list(APPEND INC_SYS
   ${ZLIB_INCLUDE_DIRS}
 )
 
