@@ -88,7 +88,6 @@ static void ED_curve_pick_vert__do_closest(void *userData,
   UNUSED_VARS_NDEBUG(handles_visible);
 }
 
-/* \param sel_dist_mul: A multiplier on the default select distance. */
 bool ED_curve_pick_vert_ex(ViewContext *vc,
                            short sel,
                            const float sel_dist_mul,

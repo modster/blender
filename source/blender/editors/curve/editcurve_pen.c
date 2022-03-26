@@ -63,7 +63,9 @@
 
 #define SEL_DIST 0.2f
 
-/* Data structure to keep track of details about the cut location */
+/**
+ * Data structure to keep track of details about the cut location
+ */
 typedef struct CutData {
   /* Index of the last #BezTriple or BPoint before the cut. */
   int bezt_index, bp_index;
@@ -81,7 +83,9 @@ typedef struct CutData {
   float mval[2];
 } CutData;
 
-/* Data required for segment altering functionality. */
+/**
+ * Data required for segment altering functionality.
+ */
 typedef struct MoveSegmentData {
   /* Nurb being altered. */
   Nurb *nu;
@@ -152,23 +156,23 @@ static void update_location_for_2d_curve(const ViewContext *vc, float location[3
   if (CU_IS_2D(cu)) {
     const float eps = 1e-6f;
 
-    /* get the view vector to 'location' */
+    /* Get the view vector to `location`. */
     float view_dir[3];
     ED_view3d_global_to_vector(vc->rv3d, location, view_dir);
 
-    /* get the plane */
+    /* Get the plane. */
     float plane[4];
-    /* only normalize to avoid precision errors */
+    /* Only normalize to avoid precision errors. */
     normalize_v3_v3(plane, vc->obedit->obmat[2]);
     plane[3] = -dot_v3v3(plane, vc->obedit->obmat[3]);
 
     if (fabsf(dot_v3v3(view_dir, plane)) < eps) {
-      /* can't project on an aligned plane. */
+      /* Can't project on an aligned plane. */
     }
     else {
       float lambda;
       if (isect_ray_plane_v3(location, view_dir, plane, &lambda, false)) {
-        /* check if we're behind the viewport */
+        /* Check if we're behind the viewport */
         float location_test[3];
         madd_v3_v3v3fl(location_test, location, view_dir, lambda);
         if ((vc->rv3d->is_persp == false) ||
@@ -223,7 +227,9 @@ static void move_bezt_by_displacement(BezTriple *bezt, const float disp_3d[3])
   add_v3_v3(bezt->vec[2], disp_3d);
 }
 
-/* Move entire control point to given worldspace location. */
+/**
+ * Move entire control point to given worldspace location.
+ */
 static void move_bezt_to_location(BezTriple *bezt, const float location[3])
 {
   float disp_3d[3];
@@ -231,7 +237,9 @@ static void move_bezt_to_location(BezTriple *bezt, const float location[3])
   move_bezt_by_displacement(bezt, disp_3d);
 }
 
-/* Alter handle types to allow free movement (Set handles to #FREE or #ALIGN). */
+/**
+ * Alter handle types to allow free movement (Set handles to #FREE or #ALIGN).
+ */
 static void remove_handle_movement_constraints(BezTriple *bezt, const bool f1, const bool f3)
 {
   if (f1) {
@@ -306,9 +314,11 @@ static void move_bp_to_location(const ViewContext *vc, BPoint *bp, const float m
   copy_v3_v3(bp->vec, location);
 }
 
-/* Get the average position of selected points.
- * \param mid_only: Use only the middle point of the three points on a BezTriple.
- * \param bezt_only: Use only points of Bezier splines. */
+/**
+ * Get the average position of selected points.
+ * \param mid_only: Use only the middle point of the three points on a #BezTriple.
+ * \param bezt_only: Use only points of Bezier splines.
+ */
 static bool get_selected_center(const ListBase *nurbs,
                                 const bool mid_only,
                                 const bool bezt_only,
@@ -361,7 +371,9 @@ static bool get_selected_center(const ListBase *nurbs,
   return false;
 }
 
-/* Move all selected points by an amount equivalent to the distance moved by mouse. */
+/**
+ * Move all selected points by an amount equivalent to the distance moved by mouse.
+ */
 static void move_all_selected_points(const ViewContext *vc,
                                      const wmEvent *event,
                                      CurvePenData *cpd,
@@ -458,8 +470,10 @@ static void delete_bp_from_nurb(const BPoint *bp, Nurb *nu)
   memmove(nu->bp + index, nu->bp + index + 1, (nu->pntsu - index) * sizeof(BPoint));
 }
 
-/* Get closest vertex in all nurbs in given #ListBase to a given point.
- * Returns true if point is found. */
+/**
+ * Get closest vertex in all nurbs in given #ListBase to a given point.
+ * Returns true if point is found.
+ */
 static bool get_closest_vertex_to_point_in_nurbs(const ViewContext *vc,
                                                  const ListBase *nurbs,
                                                  const float point[2],
@@ -544,7 +558,9 @@ static bool get_closest_vertex_to_point_in_nurbs(const ViewContext *vc,
   return false;
 }
 
-/* Interpolate along the Bezier segment by a parameter (between 0 and 1) and get its location. */
+/**
+ * Interpolate along the Bezier segment by a parameter (between 0 and 1) and get its location.
+ */
 static void get_bezier_interpolated_point(const BezTriple *bezt1,
                                           const BezTriple *bezt2,
                                           const float parameter,
@@ -559,7 +575,9 @@ static void get_bezier_interpolated_point(const BezTriple *bezt1,
   interp_v3_v3v3(r_point, tmp1, tmp2, parameter);
 }
 
-/* Calculate handle positions of added and adjacent control points such that shape is preserved. */
+/**
+ * Calculate handle positions of added and adjacent control points such that shape is preserved.
+ */
 static void calculate_new_bezier_point(const float point_prev[3],
                                        float handle_prev[3],
                                        float new_left_handle[3],
@@ -581,7 +599,9 @@ static bool is_cyclic(const Nurb *nu)
   return nu->flagu & CU_NURB_CYCLIC;
 }
 
-/* Insert a #BezTriple to a nurb at the location specified by `data`. */
+/**
+ * Insert a #BezTriple to a nurb at the location specified by `data`.
+ */
 static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
@@ -635,7 +655,9 @@ static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   BEZT_SEL_ALL(new_bezt);
 }
 
-/* Insert a #BPoint to a nurb at the location specified by `op_data`. */
+/**
+ * Insert a #BPoint to a nurb at the location specified by `op_data`.
+ */
 static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
@@ -678,7 +700,8 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   new_bp->f1 |= SELECT;
 }
 
-/* Update r_min_dist, r_min_i, and r_param based on the edge and the external point.
+/**
+ * Update r_min_dist, r_min_i, and r_param based on the edge and the external point.
  * \param point: External point
  * \param point1: One end of the edge
  * \param point2: The other end of the edge
@@ -686,7 +709,8 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
  * \param resolu_idx: Index of the edge on a Bezier segment (zero for non-Bezier edges)
  * \param r_min_dist: minimum distance from point to edge
  * \param r_min_i: index of closest point on Nurb
- * \param r_param: the fraction along the edge at which the closest point lies */
+ * \param r_param: the fraction along the edge at which the closest point lies
+ */
 static void get_updated_data_for_edge(const float point[2],
                                       const float point1[2],
                                       const float point2[2],
@@ -725,7 +749,9 @@ static void get_updated_data_for_edge(const float point[2],
   }
 }
 
-/* Update #CutData for a single Nurb. */
+/**
+ * Update #CutData for a single #Nurb.
+ */
 static void update_cut_data_for_nurb(
     const ViewContext *vc, CutData *cd, Nurb *nu, const int resolu, const float point[2])
 {
@@ -856,8 +882,10 @@ static bool insert_point_to_segment(const ViewContext *vc, const wmEvent *event)
   return near_spline;
 }
 
-/* Get the first selected point from the curve. If more than one selected point is found,
- * define and return only the first detected nu. */
+/**
+ * Get the first selected point from the curve. If more than one selected point is found,
+ * define and return only the first detected nu.
+ */
 static void get_first_selected_point(
     Curve *cu, View3D *v3d, Nurb **r_nu, BezTriple **r_bezt, BPoint **r_bp)
 {
@@ -1012,7 +1040,9 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
   }
 }
 
-/* Deselect all vertices that are not endpoints. */
+/**
+ * Deselect all vertices that are not endpoints.
+ */
 static void deselect_all_center_vertices(ListBase *nurbs)
 {
   LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
@@ -1043,7 +1073,9 @@ static bool is_last_bezt(const Nurb *nu, const BezTriple *bezt)
   return nu->pntsu > 1 && nu->bezt + nu->pntsu - 1 == bezt && !is_cyclic(nu);
 }
 
-/* Add new vertices connected to the selected vertices. */
+/**
+ * Add new vertices connected to the selected vertices.
+ */
 static void extrude_points_from_selected_vertices(const ViewContext *vc,
                                                   const wmEvent *event,
                                                   const int extrude_handle)
@@ -1091,7 +1123,9 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
   FOREACH_SELECTED_BEZT_END
 }
 
-/* Check if a spline segment is nearby. */
+/**
+ * Check if a spline segment is nearby.
+ */
 static bool is_spline_nearby(ViewContext *vc,
                              struct wmOperator *op,
                              const wmEvent *event,
@@ -1118,7 +1152,6 @@ static bool is_spline_nearby(ViewContext *vc,
   return false;
 }
 
-/* Move segment to mouse pointer. */
 static void move_segment(ViewContext *vc,
                          MoveSegmentData *seg_data,
                          const wmEvent *event,
@@ -1198,7 +1231,9 @@ static void move_segment(ViewContext *vc,
   }
 }
 
-/* Toggle between #free and #align handles of the all selected #BezTriple */
+/**
+ * Toggle between #HD_FREE and #HD_ALIGN handles of the all selected #BezTriple
+ */
 static void toggle_bezt_free_align_handles(ListBase *nurbs)
 {
   FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
@@ -1211,7 +1246,9 @@ static void toggle_bezt_free_align_handles(ListBase *nurbs)
   FOREACH_SELECTED_BEZT_END
 }
 
-/* If a point is found under mouse, delete point and return true. Else return false. */
+/**
+ * If a point is found under mouse, delete point and return true. Else return false.
+ */
 static bool delete_point_under_mouse(ViewContext *vc, const wmEvent *event)
 {
   BezTriple *bezt = NULL;
@@ -1297,7 +1334,9 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase
   FOREACH_SELECTED_BEZT_END
 }
 
-/* Close the spline if endpoints are selected consecutively. Return true if cycle was created. */
+/**
+ * Close the spline if endpoints are selected consecutively. Return true if cycle was created.
+ */
 static bool make_cyclic_if_endpoints(ViewContext *vc,
                                      Nurb *sel_nu,
                                      BezTriple *sel_bezt,
@@ -1633,7 +1672,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           cpd->spline_nearby = true;
 
           /* If move segment is disabled, then insert point on key press and set
-          "new_point" to true so that the new point's handles can be controlled. */
+           * "new_point" to true so that the new point's handles can be controlled. */
           if (insert_point && !move_seg) {
             insert_point_to_segment(&vc, event);
             cpd->new_point = cpd->acted = cpd->link_handles = true;

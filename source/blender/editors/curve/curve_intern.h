@@ -199,6 +199,9 @@ bool ED_curve_pick_vert(struct ViewContext *vc,
                         struct BPoint **r_bp,
                         short *r_handle,
                         struct Base **r_base);
+/**
+ * \param sel_dist_mul: A multiplier on the default select distance.
+ */
 bool ED_curve_pick_vert_ex(struct ViewContext *vc,
                            short sel,
                            float sel_dist_mul,

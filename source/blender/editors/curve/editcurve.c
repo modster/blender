@@ -4730,7 +4730,6 @@ bool ED_curve_editnurb_select_pick(bContext *C,
   return ED_curve_editnurb_select_pick_ex(C, mval, 1.0f, params);
 }
 
-/* \param sel_dist_mul: A multiplier on the default select distance. */
 bool ED_curve_editnurb_select_pick_ex(bContext *C,
                                       const int mval[2],
                                       const float sel_dist_mul,
