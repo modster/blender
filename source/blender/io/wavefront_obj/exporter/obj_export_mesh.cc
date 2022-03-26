@@ -33,7 +33,7 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
 {
   /* We need to copy the object because it may be in temporary space. */
   Object *obj_eval = DEG_get_evaluated_object(depsgraph, mesh_object);
-  export_object_eval_ = *obj_eval;
+  export_object_eval_ = dna::shallow_copy(*obj_eval);
   export_mesh_eval_ = export_params.apply_modifiers ?
                           BKE_object_get_evaluated_mesh(&export_object_eval_) :
                           BKE_object_get_pre_modified_mesh(&export_object_eval_);
@@ -382,8 +382,8 @@ void OBJMesh::store_normal_coords_and_indices()
   normal_to_index.reserve(export_mesh_eval_->totpoly);
   loop_to_normal_index_.resize(export_mesh_eval_->totloop);
   loop_to_normal_index_.fill(-1);
-  const float(*lnors)[3] = (const float(*)[3])(
-      CustomData_get_layer(&export_mesh_eval_->ldata, CD_NORMAL));
+  const float(
+      *lnors)[3] = (const float(*)[3])(CustomData_get_layer(&export_mesh_eval_->ldata, CD_NORMAL));
   for (int poly_index = 0; poly_index < export_mesh_eval_->totpoly; ++poly_index) {
     const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
     bool need_per_loop_normals = lnors != nullptr || (mpoly.flag & ME_SMOOTH);

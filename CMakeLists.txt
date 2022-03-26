@@ -284,6 +284,7 @@ option(WITH_IMAGE_TIFF          "Enable LibTIFF Support" ON)
 option(WITH_IMAGE_DDS           "Enable DDS Image Support" ON)
 option(WITH_IMAGE_CINEON        "Enable CINEON and DPX Image Support" ON)
 option(WITH_IMAGE_HDR           "Enable HDR Image Support" ON)
+option(WITH_IMAGE_WEBP          "Enable WebP Image Support" OFF)
 
 # Audio/Video format support
 option(WITH_CODEC_AVI           "Enable Blenders own AVI file support (raw/jpeg)" ON)
@@ -1973,7 +1974,7 @@ if(FIRST_RUN)
 
     set(_msg "  - ${_setting}")
     string(LENGTH "${_msg}" _len)
-    while("32" GREATER "${_len}")
+    while("36" GREATER "${_len}")
       string(APPEND _msg " ")
       math(EXPR _len "${_len} + 1")
     endwhile()
