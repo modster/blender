@@ -116,13 +116,13 @@ typedef struct CurvePenData {
 
   /* Whether the current handle type of the moved handle is free. */
   bool free_toggle;
-  /* Whether the shortcut for moving the adjacent handle is pressed. */
+  /* Whether the intcut for moving the adjacent handle is pressed. */
   bool move_adjacent;
   /* Whether the current state of the moved handle is linked. */
   bool link_handles;
   /* Whether the current state of the handle angle is locked. */
   bool lock_angle;
-  /* Whether the shortcut for moving the entire point is pressed. */
+  /* Whether the intcut for moving the entire point is pressed. */
   bool move_entire;
 
   /* Data about found point. Used for closing splines. */
@@ -292,7 +292,7 @@ static void move_bezt_handle_or_vertex_by_displacement(const ViewContext *vc,
         /* Move the handle on the opposite side. */
         float handle_vec[3];
         sub_v3_v3v3(handle_vec, bezt->vec[1], location);
-        const short other_handle = bezt_idx == 2 ? 0 : 2;
+        const int other_handle = bezt_idx == 2 ? 0 : 2;
         normalize_v3_length(handle_vec, len_v3v3(bezt->vec[1], bezt->vec[other_handle]));
         add_v3_v3v3(bezt->vec[other_handle], bezt->vec[1], handle_vec);
       }
@@ -480,14 +480,14 @@ static bool get_closest_vertex_to_point_in_nurbs(const ViewContext *vc,
                                                  Nurb **r_nu,
                                                  BezTriple **r_bezt,
                                                  BPoint **r_bp,
-                                                 short *r_bezt_idx)
+                                                 int *r_bezt_idx)
 {
   *r_nu = NULL;
   *r_bezt = NULL;
   *r_bp = NULL;
 
   float min_dist_bezt = FLT_MAX;
-  short closest_handle = 0;
+  int closest_handle = 0;
   BezTriple *closest_bezt = NULL;
   Nurb *closest_bezt_nu = NULL;
 
@@ -500,7 +500,7 @@ static bool get_closest_vertex_to_point_in_nurbs(const ViewContext *vc,
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = &nu->bezt[i];
         float bezt_vec[2];
-        short start = 0, end = 3;
+        int start = 0, end = 3;
 
         /* Consider handles only if visible. Else only consider the middle point of the triple. */
         int handle_display = vc->v3d->overlay.handle_display;
@@ -510,7 +510,7 @@ static bool get_closest_vertex_to_point_in_nurbs(const ViewContext *vc,
         }
 
         /* Loop over each of the 3 points of the #BezTriple and update data of closest bezt. */
-        for (short j = start; j < end; j++) {
+        for (int j = start; j < end; j++) {
           if (worldspace_to_screenspace(vc, bezt->vec[j], bezt_vec)) {
             const float dist = len_manhattan_v2v2(bezt_vec, point);
             if (dist < min_dist_bezt) {
@@ -1258,7 +1258,7 @@ static bool delete_point_under_mouse(ViewContext *vc, const wmEvent *event)
   BezTriple *bezt = NULL;
   BPoint *bp = NULL;
   Nurb *nu = NULL;
-  short temp = 0;
+  int temp = 0;
   Curve *cu = vc->obedit->data;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
   const float mouse_point[2] = {UNPACK2(event->mval)};
@@ -1275,7 +1275,7 @@ static bool delete_point_under_mouse(ViewContext *vc, const wmEvent *event)
         BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
         if (next_bezt && prev_bezt) {
           const int bez_index = BKE_curve_nurb_vert_index_get(nu, bezt);
-          uint span_step[2] = {bez_index, bez_index};
+          const int span_step[2] = {bez_index, bez_index};
           ed_dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
         }
         delete_bezt_from_nurb(bezt, nu);
@@ -1364,7 +1364,7 @@ static bool make_cyclic_if_endpoints(ViewContext *vc,
     BezTriple *bezt = NULL;
     BPoint *bp = NULL;
     Curve *cu = vc->obedit->data;
-    short bezt_idx;
+    int bezt_idx;
     const float mval_fl[2] = {UNPACK2(vc->mval)};
 
     get_closest_vertex_to_point_in_nurbs(
@@ -1397,7 +1397,7 @@ static void init_selected_bezt_handles(ListBase *nurbs)
   FOREACH_SELECTED_BEZT_END;
 }
 
-static void toggle_select_bezt(BezTriple *bezt, const short bezt_idx, Curve *cu, Nurb *nu)
+static void toggle_select_bezt(BezTriple *bezt, const int bezt_idx, Curve *cu, Nurb *nu)
 {
   if (bezt_idx == 1) {
     if (BEZT_ISSEL_IDX(bezt, 1)) {
@@ -1432,7 +1432,7 @@ static void toggle_select_bp(BPoint *bp, Curve *cu, Nurb *nu)
   }
 }
 
-static void toggle_handle_types(BezTriple *bezt, short bezt_idx, CurvePenData *cpd)
+static void toggle_handle_types(BezTriple *bezt, int bezt_idx, CurvePenData *cpd)
 {
   if (bezt_idx == 0) {
     if (bezt->h1 == HD_VECT) {
@@ -1644,7 +1644,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       Nurb *nu1;
       BezTriple *bezt1;
       BPoint *bp1;
-      short bezt_idx = 0;
+      int bezt_idx = 0;
       cpd->found_point = get_closest_vertex_to_point_in_nurbs(
           &vc, nurbs, mval_fl, &nu1, &bezt1, &bp1, &bezt_idx);
 
@@ -1722,7 +1722,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
 
       if (!cpd->acted && toggle_vector) {
-        short bezt_idx;
+        int bezt_idx;
         get_closest_vertex_to_point_in_nurbs(&vc, nurbs, mval_fl, &nu, &bezt, &bp, &bezt_idx);
         if (bezt) {
           if (bezt_idx == 1 && cycle_handle_type) {
@@ -1741,7 +1741,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
       if (!cpd->selection_made && !cpd->acted) {
         if (cpd->select_multi) {
-          short bezt_idx;
+          int bezt_idx;
           get_closest_vertex_to_point_in_nurbs(&vc, nurbs, mval_fl, &nu, &bezt, &bp, &bezt_idx);
           if (bezt) {
             toggle_select_bezt(bezt, bezt_idx, cu, nu);
