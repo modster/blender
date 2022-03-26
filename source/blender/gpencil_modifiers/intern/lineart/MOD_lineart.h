@@ -135,6 +135,7 @@ typedef struct LineartEdge {
   int v1_obindex, v2_obindex;
   struct LineartTriangle *t1, *t2;
   ListBase segments;
+  char lock_id;
   char min_occ;
 
   /** Also for line type determination on chaining. */
@@ -240,6 +241,8 @@ typedef struct LineartOcclusionPair {
   LineartElementLinkNode *eln_triangle;
   LineartEdge *e;
   LineartTriangle *t;
+  double cut_l;
+  double cut_r;
 } LineartOcclusionPair;
 
 typedef struct LineartOcclusionPairRecord {
@@ -250,6 +253,9 @@ typedef struct LineartOcclusionPairRecord {
 } LineartOcclusionPairRecord;
 
 typedef struct LineartThreadOcclusionData LineartThreadOcclusionData;
+typedef struct LineartThreadOcclusionDataCombined LineartThreadOcclusionDataCombined;
+
+#define LRT_LOCK_COUNT_OCCLUSION 100
 
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
@@ -303,6 +309,7 @@ typedef struct LineartRenderBuffer {
   RTCScene rtcscene_view;
 
   struct LineartThreadOcclusionData *thread_occlusion_data;
+  struct LineartThreadOcclusionDataCombined *thread_occlusion_data_storage;
   LineartMeshRecord mesh_record;
   LineartOcclusionPairRecord occlusion_record;
 
@@ -320,6 +327,9 @@ typedef struct LineartRenderBuffer {
 
   /* For managing calculation tasks for multiple threads. */
   SpinLock lock_task;
+
+  /* A series of locks to give threads more breathing room while applying occlusion results. */
+  SpinLock lock_occlusion[100];
 
   /*  settings */
 
@@ -793,9 +803,15 @@ void lineart_thread_add_occlusion_pair(LineartThreadOcclusionData *data,
                                        LineartElementLinkNode *eln_edge,
                                        LineartElementLinkNode *eln_triangle,
                                        LineartEdge *e,
-                                       LineartTriangle *t);
-LineartOcclusionPair *lineart_thread_finalize_occlusion_result(LineartThreadOcclusionData *data,
-                                                               int *result_count);
+                                       LineartTriangle *t,
+                                       double cut_l,
+                                       double cut_r);
+LineartOcclusionPair *lineart_thread_finalize_occlusion_result(
+    LineartThreadOcclusionData *data,
+    int *result_count,
+    LineartThreadOcclusionDataCombined **r_combined_storage);
+void lineart_thread_clear_occlusion_result(LineartThreadOcclusionData *data,
+                                           LineartThreadOcclusionDataCombined *combined_storage);
 
 #ifdef __cplusplus
 }

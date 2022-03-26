@@ -497,27 +497,28 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
     LineartOcclusionPairRecord *rec = &rb->occlusion_record;
     for (size_t i = rti->ocpair_index_start; i < rti->ocpair_index_end; i++) {
       LineartOcclusionPair *op = &rec->array[i];
-      if (lineart_triangle_edge_image_space_occlusion(&rb->lock_task,
-                                                      op->t,
-                                                      op->e,
-                                                      rb->camera_pos,
-                                                      rb->cam_is_persp,
-                                                      rb->allow_overlapping_edges,
-                                                      rb->view_projection,
-                                                      rb->view_vector,
-                                                      rb->shift_x,
-                                                      rb->shift_y,
-                                                      &l,
-                                                      &r)) {
-        BLI_spin_lock(&rb->lock_task);
-        lineart_edge_cut(rb, op->e, l, r, op->t->material_mask_bits, op->t->mat_occlusion);
-        BLI_spin_unlock(&rb->lock_task);
-        if (op->e->min_occ > rb->max_occlusion_level) {
-          /* No need to calculate any longer on this line because no level more than set value is
-           * going to show up in the rendered result. */
-          continue;
-        }
+      // if (lineart_triangle_edge_image_space_occlusion(&rb->lock_task,
+      //                                                op->t,
+      //                                                op->e,
+      //                                                rb->camera_pos,
+      //                                                rb->cam_is_persp,
+      //                                                rb->allow_overlapping_edges,
+      //                                                rb->view_projection,
+      //                                                rb->view_vector,
+      //                                                rb->shift_x,
+      //                                                rb->shift_y,
+      //                                                &l,
+      //                                                &r)) {
+      if (op->e->min_occ > rb->max_occlusion_level) {
+        /* No need to calculate any longer on this line because no level more than set value is
+         * going to show up in the rendered result. */
+        continue;
       }
+      BLI_spin_lock(&rb->lock_occlusion[op->e->lock_id]);
+      lineart_edge_cut(
+          rb, op->e, op->cut_l, op->cut_r, op->t->material_mask_bits, op->t->mat_occlusion);
+      BLI_spin_unlock(&rb->lock_occlusion[op->e->lock_id]);
+      // }
     }
 
 #else
@@ -2027,6 +2028,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
 
   la_e = o_la_e;
   la_s = o_la_s;
+  int lock_i = 0;
   for (i = 0; i < bm->totedge; i++) {
     e = BM_edge_at_index(bm, i);
 
@@ -2043,6 +2045,10 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
       if (!(use_type & e->head.hflag)) {
         continue;
       }
+
+      la_e->lock_id = lock_i;
+      lock_i++;
+      lock_i %= LRT_LOCK_COUNT_OCCLUSION;
 
       la_e->v1 = &orv[BM_elem_index_get(e->v1)];
       la_e->v2 = &orv[BM_elem_index_get(e->v2)];
@@ -2390,7 +2396,7 @@ static void lineart_embree_clear_mesh_record(LineartRenderBuffer *rb)
   rb->mesh_record.intersection_pair_max = rb->mesh_record.intersection_pair_next = 0;
 
   if (rb->occlusion_record.array) {
-    MEM_freeN(rb->occlusion_record.array);
+    // MEM_freeN(rb->occlusion_record.array);
   }
   rb->occlusion_record.array = NULL;
   rb->occlusion_record.max_length = rb->occlusion_record.next = 0;
@@ -2426,9 +2432,9 @@ static void lineart_embree_init_mesh_record(LineartRenderBuffer *rb)
                                                         rb->mesh_record.intersection_pair_max,
                                                     "Lineart intersection_record");
 
-  rb->occlusion_record.max_length = 100;
-  rb->occlusion_record.array = MEM_callocN(
-      sizeof(LineartOcclusionPair) * rb->occlusion_record.max_length, "Lineart occlusion_record");
+  // rb->occlusion_record.max_length = 100;
+  // rb->occlusion_record.array = MEM_callocN(
+  // sizeof(LineartOcclusionPair) * rb->occlusion_record.max_length, "Lineart occlusion_record");
 }
 
 static void lineart_embree_mesh_bounds_func(const struct RTCBoundsFunctionArguments *args)
@@ -2532,7 +2538,7 @@ static void lineart_embree_generate_occlusion_pairs(LineartRenderBuffer *rb)
   rtcCollide(rb->rtcscene_view, rb->rtcscene_geom, OcclusionCollideFunc, rb);
 
   rb->occlusion_record.array = lineart_thread_finalize_occlusion_result(
-      tod, &rb->occlusion_record.next);
+      tod, &rb->occlusion_record.next, &rb->thread_occlusion_data_storage);
 }
 
 static void lineart_main_load_geometries(
@@ -2871,8 +2877,22 @@ OcclusionCollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned in
     if (lineart_isect_tri_tri_v3_check_overlap(
             &pa[0], &pa[3], &pa[6], &pb[0], &pb[3], &pb[6], i1, i2)) {
       // lineart_add_occlusion_pair_thread(rb, eln_edge, eln_triangle, prim_edge, prim_triangle);
-      lineart_thread_add_occlusion_pair(
-          rb->thread_occlusion_data, eln_edge, eln_triangle, prim_edge, prim_triangle);
+      double l, r;
+      if (lineart_triangle_edge_image_space_occlusion(NULL,
+                                                      prim_triangle,
+                                                      prim_edge,
+                                                      rb->camera_pos,
+                                                      rb->cam_is_persp,
+                                                      rb->allow_overlapping_edges,
+                                                      rb->view_projection,
+                                                      rb->view_vector,
+                                                      rb->shift_x,
+                                                      rb->shift_y,
+                                                      &l,
+                                                      &r)) {
+        lineart_thread_add_occlusion_pair(
+            rb->thread_occlusion_data, eln_edge, eln_triangle, prim_edge, prim_triangle, l, r);
+      }
     }
   }
 }
@@ -3751,6 +3771,10 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   BLI_spin_end(&rb->lock_cuts);
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
+  for (int i = 0; i < LRT_LOCK_COUNT_OCCLUSION; i++) {
+    BLI_spin_end(&rb->lock_occlusion[i]);
+  }
+
   lineart_mem_destroy(&rb->render_data_pool);
 }
 
@@ -3889,6 +3913,10 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   BLI_spin_init(&rb->lock_task);
   BLI_spin_init(&rb->lock_cuts);
   BLI_spin_init(&rb->render_data_pool.lock_mem);
+
+  for (int i = 0; i < LRT_LOCK_COUNT_OCCLUSION; i++) {
+    BLI_spin_init(&rb->lock_occlusion[i]);
+  }
 
   return rb;
 }
@@ -4949,6 +4977,9 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
     /* Occlusion is work-and-wait. This call will not return before work is completed. */
     lineart_main_occlusion_begin(rb);
+
+    lineart_thread_clear_occlusion_result(rb->thread_occlusion_data,
+                                          rb->thread_occlusion_data_storage);
 
 #ifdef LINEART_USE_EMBREE
     /* Do this after occlusion because we need occlusion pairs available. */
