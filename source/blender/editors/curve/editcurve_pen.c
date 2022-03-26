@@ -1156,24 +1156,13 @@ static bool is_spline_nearby(ViewContext *vc,
   return false;
 }
 
-static void move_segment(ViewContext *vc,
-                         MoveSegmentData *seg_data,
-                         const wmEvent *event,
-                         const bool free_toggle)
+static void move_segment(ViewContext *vc, MoveSegmentData *seg_data, const wmEvent *event)
 {
   Nurb *nu = seg_data->nu;
   BezTriple *bezt1 = nu->bezt + seg_data->bezt_index;
   BezTriple *bezt2 = BKE_nurb_bezt_get_next(nu, bezt1);
 
-  if (free_toggle) {
-    bezt1->h1 = bezt1->h2 = bezt2->h1 = bezt2->h2 = HD_FREE;
-  }
-  else {
-    bezt1->h1 = bezt1->h2 = bezt2->h1 = bezt2->h2 = HD_ALIGN;
-  }
-
   const float t = max_ff(min_ff(seg_data->t, 0.9f), 0.1f);
-
   const float t_sq = t * t;
   const float t_cu = t_sq * t;
   const float one_minus_t = 1 - t;
@@ -1236,18 +1225,26 @@ static void move_segment(ViewContext *vc,
 }
 
 /**
+ * Toggle between #HD_FREE and #HD_ALIGN handles of the given #BezTriple
+ */
+static void toggle_bezt_free_align_handles(BezTriple *bezt)
+{
+  if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
+    bezt->h1 = bezt->h2 = HD_FREE;
+  }
+  else {
+    bezt->h1 = bezt->h2 = HD_ALIGN;
+  }
+}
+
+/**
  * Toggle between #HD_FREE and #HD_ALIGN handles of the all selected #BezTriple
  */
-static void toggle_bezt_free_align_handles(ListBase *nurbs)
+static void toggle_sel_bezt_free_align_handles(ListBase *nurbs)
 {
   FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
   {
-    if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
-      bezt->h1 = bezt->h2 = HD_FREE;
-    }
-    else {
-      bezt->h1 = bezt->h2 = HD_ALIGN;
-    }
+    toggle_bezt_free_align_handles(bezt);
   }
   FOREACH_SELECTED_BEZT_END;
 }
@@ -1577,12 +1574,9 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   if (event->type == EVT_MODAL_MAP) {
-    if (event->val == PEN_MODAL_FREE_ALIGN_TOGGLE) {
-      cpd->free_toggle = !cpd->free_toggle;
-    }
     if (cpd->msd == NULL) {
       if (event->val == PEN_MODAL_FREE_ALIGN_TOGGLE) {
-        toggle_bezt_free_align_handles(nurbs);
+        toggle_sel_bezt_free_align_handles(nurbs);
       }
       else if (event->val == PEN_MODAL_LINK_HANDLES) {
         cpd->link_handles = !cpd->link_handles;
@@ -1600,6 +1594,14 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         cpd->lock_angle = !cpd->lock_angle;
       }
     }
+    else {
+      if (event->val == PEN_MODAL_FREE_ALIGN_TOGGLE) {
+        BezTriple *bezt1 = cpd->msd->nu->bezt + cpd->msd->bezt_index;
+        BezTriple *bezt2 = BKE_nurb_bezt_get_next(cpd->msd->nu, bezt1);
+        toggle_bezt_free_align_handles(bezt1);
+        toggle_bezt_free_align_handles(bezt2);
+      }
+    }
   }
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
@@ -1615,7 +1617,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     if (cpd->dragging) {
       if (cpd->spline_nearby && move_seg && cpd->msd != NULL) {
         MoveSegmentData *seg_data = cpd->msd;
-        move_segment(&vc, seg_data, event, cpd->free_toggle);
+        move_segment(&vc, seg_data, event);
         cpd->acted = true;
         if (seg_data->nu && seg_data->nu->type == CU_BEZIER) {
           BKE_nurb_handles_calc(seg_data->nu);
