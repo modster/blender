@@ -5104,7 +5104,7 @@ void CURVE_OT_spin(wmOperatorType *ot)
 /** \name Extrude Vertex Operator
  * \{ */
 
-bool ed_editcurve_extrude(Curve *cu, EditNurb *editnurb, View3D *v3d)
+static bool ed_editcurve_extrude(Curve *cu, EditNurb *editnurb, View3D *v3d)
 {
   bool changed = false;
 

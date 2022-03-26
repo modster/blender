@@ -132,7 +132,6 @@ struct GHash *ED_curve_keyindex_hash_duplicate(struct GHash *keyindex);
 void ED_curve_keyindex_update_nurb(struct EditNurb *editnurb, struct Nurb *nu, struct Nurb *newnu);
 
 /* exported for editcurve_pen.c */
-bool ed_editcurve_extrude(Curve *cu, EditNurb *editnurb, View3D *v3d);
 int ed_editcurve_addvert(Curve *cu, EditNurb *editnurb, View3D *v3d, const float location_init[3]);
 bool curve_toggle_cyclic(View3D *v3d, ListBase *editnurb, int direction);
 void ed_dissolve_bez_segment(BezTriple *bezt_prev,
