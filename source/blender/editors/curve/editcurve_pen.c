@@ -52,7 +52,7 @@
     if (nu->type == CU_BEZIER) { \
       for (int i = 0; i < nu->pntsu; i++) { \
         BezTriple *bezt = nu->bezt + i; \
-        if (BEZT_ISSEL_ANY(bezt) && (bezt->hide == 0))
+        if (BEZT_ISSEL_ANY(bezt) && !bezt->hide)
 
 #define FOREACH_SELECTED_BEZT_END \
   } \
@@ -330,7 +330,7 @@ static bool get_selected_center(const ListBase *nurbs,
     if (nu->type == CU_BEZIER) {
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = nu->bezt + i;
-        if (bezt->hide == 1) {
+        if (bezt->hide) {
           continue;
         }
         if (mid_only) {
@@ -357,7 +357,7 @@ static bool get_selected_center(const ListBase *nurbs,
     }
     else if (!bezt_only) {
       for (int i = 0; i < nu->pntsu; i++) {
-        if ((nu->bp->hide == 0) && (nu->bp + i)->f1 & SELECT) {
+        if (!nu->bp->hide && (nu->bp + i)->f1 & SELECT) {
           add_v3_v3(r_center, (nu->bp + i)->vec);
           end_count++;
         }
@@ -401,7 +401,7 @@ static void move_all_selected_points(const ViewContext *vc,
     if (nu->type == CU_BEZIER) {
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = nu->bezt + i;
-        if (bezt->hide == 1) {
+        if (bezt->hide) {
           continue;
         }
         if (BEZT_ISSEL_IDX(bezt, 1) || (move_entire && BEZT_ISSEL_ANY(bezt))) {
@@ -425,7 +425,7 @@ static void move_all_selected_points(const ViewContext *vc,
     else if (!bezt_only) {
       for (int i = 0; i < nu->pntsu; i++) {
         BPoint *bp = nu->bp + i;
-        if ((bp->hide == 0) && (bp->f1 & SELECT)) {
+        if (!bp->hide && (bp->f1 & SELECT)) {
           float pos[2], dst[2];
           worldspace_to_screenspace(vc, bp->vec, pos);
           add_v2_v2v2(dst, pos, disp_2d);
