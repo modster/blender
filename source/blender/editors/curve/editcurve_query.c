@@ -152,7 +152,7 @@ bool ED_curve_pick_vert(ViewContext *vc,
                         short *r_handle,
                         Base **r_base)
 {
-  return ED_curve_pick_vert_ex(vc, 1, 1.0f, r_nurb, r_bezt, r_bp, r_handle, r_base);
+  return ED_curve_pick_vert_ex(vc, sel, 1.0f, r_nurb, r_bezt, r_bp, r_handle, r_base);
 }
 
 /** \} */
