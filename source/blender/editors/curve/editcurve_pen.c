@@ -116,13 +116,13 @@ typedef struct CurvePenData {
 
   /* Whether the current handle type of the moved handle is free. */
   bool free_toggle;
-  /* Whether the intcut for moving the adjacent handle is pressed. */
+  /* Whether the shortcut for moving the adjacent handle is pressed. */
   bool move_adjacent;
   /* Whether the current state of the moved handle is linked. */
   bool link_handles;
   /* Whether the current state of the handle angle is locked. */
   bool lock_angle;
-  /* Whether the intcut for moving the entire point is pressed. */
+  /* Whether the shortcut for moving the entire point is pressed. */
   bool move_entire;
 
   /* Data about found point. Used for closing splines. */
@@ -1631,69 +1631,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
-    if (ELEM(event->val, KM_PRESS, KM_DBL_CLICK)) {
-      /* Get the details of points selected at the start of the operation.
-       * Used for closing the spline when endpoints are clicked consecutively and for selecting a
-       * single point. */
-      get_first_selected_point(cu, vc.v3d, &nu, &bezt, &bp);
-      cpd->nu = nu;
-      cpd->bezt = bezt;
-      cpd->bp = bp;
-
-      /* Get the details of the vertex closest to the mouse at the start of the operation. */
-      Nurb *nu1;
-      BezTriple *bezt1;
-      BPoint *bp1;
-      int bezt_idx = 0;
-      cpd->found_point = get_closest_vertex_to_point_in_nurbs(
-          &vc, nurbs, mval_fl, &nu1, &bezt1, &bp1, &bezt_idx);
-
-      if (move_point && nu1 &&
-          (bezt || (bezt1 && !BEZT_ISSEL_IDX(bezt1, bezt_idx)) || (bp1 && !(bp1->f1 & SELECT)))) {
-        /* Select the closest bezt or bp. */
-        ED_curve_deselect_all(cu->editnurb);
-        if (bezt1) {
-          if (bezt_idx == 1) {
-            BEZT_SEL_ALL(bezt1);
-          }
-          else {
-            BEZT_SEL_IDX(bezt1, bezt_idx);
-          }
-          BKE_curve_nurb_vert_active_set(cu, nu1, bezt1);
-        }
-        else if (bp1) {
-          bp1->f1 |= SELECT;
-          BKE_curve_nurb_vert_active_set(cu, nu1, bp1);
-        }
-
-        cpd->selection_made = true;
-      }
-      if (cpd->found_point) {
-        /* Close the spline on press. */
-        if (close_spline && close_spline_method == ON_PRESS && cpd->nu && !is_cyclic(cpd->nu)) {
-          copy_v2_v2_int(vc.mval, event->mval);
-          cpd->new_point = cpd->acted = cpd->link_handles = make_cyclic_if_endpoints(
-              &vc, cpd->nu, cpd->bezt, cpd->bp);
-        }
-      }
-      else if (!cpd->acted) {
-        if (is_spline_nearby(&vc, op, event, SEL_DIST * ED_view3d_select_dist_px())) {
-          cpd->spline_nearby = true;
-
-          /* If move segment is disabled, then insert point on key press and set
-           * "new_point" to true so that the new point's handles can be controlled. */
-          if (insert_point && !move_seg) {
-            insert_point_to_segment(&vc, event);
-            cpd->new_point = cpd->acted = cpd->link_handles = true;
-          }
-        }
-        else if (extrude_point) {
-          extrude_points_from_selected_vertices(&vc, event, extrude_handle);
-          cpd->new_point = cpd->acted = cpd->link_handles = true;
-        }
-      }
-    }
-    else if (event->val == KM_RELEASE) {
+    if (ELEM(event->val, KM_RELEASE, KM_DBL_CLICK)) {
       if (delete_point && !cpd->new_point && !cpd->dragging) {
         if (ED_curve_editnurb_select_pick_ex(C, event->mval, SEL_DIST, &params)) {
           cpd->acted = delete_point_under_mouse(&vc, event);
@@ -1775,11 +1713,94 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  int ret = curve_pen_modal(C, op, event);
-  BLI_assert(ret == OPERATOR_RUNNING_MODAL);
+  ViewContext vc;
+  ED_view3d_viewcontext_init(C, &vc, CTX_data_ensure_evaluated_depsgraph(C));
+  Curve *cu = vc.obedit->data;
+  ListBase *nurbs = &cu->editnurb->nurbs;
+
+  BezTriple *bezt = NULL;
+  BPoint *bp = NULL;
+  Nurb *nu = NULL;
+
+  CurvePenData *cpd;
+  op->customdata = cpd = MEM_callocN(sizeof(CurvePenData), __func__);
+
+  /* Distance threshold for mouse clicks to affect the spline or its points */
+  const float mval_fl[2] = {UNPACK2(event->mval)};
+
+  const bool extrude_point = RNA_boolean_get(op->ptr, "extrude_point");
+  const bool insert_point = RNA_boolean_get(op->ptr, "insert_point");
+  const bool move_seg = RNA_boolean_get(op->ptr, "move_segment");
+  const bool move_point = RNA_boolean_get(op->ptr, "move_point");
+  const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
+  const int close_spline_method = RNA_enum_get(op->ptr, "close_spline_method");
+  const int extrude_handle = RNA_enum_get(op->ptr, "extrude_handle");
+
+  if (ELEM(event->type, LEFTMOUSE) && ELEM(event->val, KM_PRESS, KM_DBL_CLICK)) {
+    /* Get the details of points selected at the start of the operation.
+     * Used for closing the spline when endpoints are clicked consecutively and for selecting a
+     * single point. */
+    get_first_selected_point(cu, vc.v3d, &nu, &bezt, &bp);
+    cpd->nu = nu;
+    cpd->bezt = bezt;
+    cpd->bp = bp;
+
+    /* Get the details of the vertex closest to the mouse at the start of the operation. */
+    Nurb *nu1;
+    BezTriple *bezt1;
+    BPoint *bp1;
+    int bezt_idx = 0;
+    cpd->found_point = get_closest_vertex_to_point_in_nurbs(
+        &vc, nurbs, mval_fl, &nu1, &bezt1, &bp1, &bezt_idx);
+
+    if (move_point && nu1 &&
+        (bezt || (bezt1 && !BEZT_ISSEL_IDX(bezt1, bezt_idx)) || (bp1 && !(bp1->f1 & SELECT)))) {
+      /* Select the closest bezt or bp. */
+      ED_curve_deselect_all(cu->editnurb);
+      if (bezt1) {
+        if (bezt_idx == 1) {
+          BEZT_SEL_ALL(bezt1);
+        }
+        else {
+          BEZT_SEL_IDX(bezt1, bezt_idx);
+        }
+        BKE_curve_nurb_vert_active_set(cu, nu1, bezt1);
+      }
+      else if (bp1) {
+        bp1->f1 |= SELECT;
+        BKE_curve_nurb_vert_active_set(cu, nu1, bp1);
+      }
+
+      cpd->selection_made = true;
+    }
+    if (cpd->found_point) {
+      /* Close the spline on press. */
+      if (close_spline && close_spline_method == ON_PRESS && cpd->nu && !is_cyclic(cpd->nu)) {
+        copy_v2_v2_int(vc.mval, event->mval);
+        cpd->new_point = cpd->acted = cpd->link_handles = make_cyclic_if_endpoints(
+            &vc, cpd->nu, cpd->bezt, cpd->bp);
+      }
+    }
+    else if (!cpd->acted) {
+      if (is_spline_nearby(&vc, op, event, SEL_DIST * ED_view3d_select_dist_px())) {
+        cpd->spline_nearby = true;
+
+        /* If move segment is disabled, then insert point on key press and set
+         * "new_point" to true so that the new point's handles can be controlled. */
+        if (insert_point && !move_seg) {
+          insert_point_to_segment(&vc, event);
+          cpd->new_point = cpd->acted = cpd->link_handles = true;
+        }
+      }
+      else if (extrude_point) {
+        extrude_points_from_selected_vertices(&vc, event, extrude_handle);
+        cpd->new_point = cpd->acted = cpd->link_handles = true;
+      }
+    }
+  }
   WM_event_add_modal_handler(C, op);
 
-  return ret;
+  return OPERATOR_RUNNING_MODAL;
 }
 
 void CURVE_OT_pen(wmOperatorType *ot)
