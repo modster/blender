@@ -856,7 +856,7 @@ static bool insert_point_to_segment(const ViewContext *vc, const wmEvent *event)
   const bool near_spline = update_cut_data_for_all_nurbs(
       vc, BKE_curve_editNurbs_get(cu), mval, SEL_DIST * ED_view3d_select_dist_px(), &cd);
 
-  if (near_spline) {
+  if (near_spline && !cd.nurb->hide) {
     Nurb *nu = cd.nurb;
     if (nu->type == CU_BEZIER) {
       cd.min_dist = FLT_MAX;
@@ -877,9 +877,10 @@ static bool insert_point_to_segment(const ViewContext *vc, const wmEvent *event)
                      cd.parameter);
       insert_bp_to_nurb(nu, &cd, cu);
     }
+    return true;
   }
 
-  return near_spline;
+  return false;
 }
 
 /**
@@ -1035,6 +1036,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         cu->actnu = nu_index;
         cu->actvert = nu1->pntsu - 1;
       }
+      BKE_curve_nurb_vert_active_validate(cu);
     }
     nu_index++;
   }
@@ -1753,7 +1755,7 @@ static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     cpd->found_point = get_closest_vertex_to_point_in_nurbs(
         &vc, nurbs, mval_fl, &nu1, &bezt1, &bp1, &bezt_idx);
 
-    if (move_point && nu1 &&
+    if (move_point && nu1 && !nu1->hide &&
         (bezt || (bezt1 && !BEZT_ISSEL_IDX(bezt1, bezt_idx)) || (bp1 && !(bp1->f1 & SELECT)))) {
       /* Select the closest bezt or bp. */
       ED_curve_deselect_all(cu->editnurb);
