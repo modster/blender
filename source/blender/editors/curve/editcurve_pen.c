@@ -52,14 +52,14 @@
     if (nu->type == CU_BEZIER) { \
       for (int i = 0; i < nu->pntsu; i++) { \
         BezTriple *bezt = nu->bezt + i; \
-        if (BEZT_ISSEL_ANY(bezt) && (bezt->hide == 0)) {
+        if (BEZT_ISSEL_ANY(bezt) && (bezt->hide == 0))
 
 #define FOREACH_SELECTED_BEZT_END \
   } \
   } \
-  } \
   BKE_nurb_handles_calc(nu); \
-  }
+  } \
+  ((void)0)
 
 #define SEL_DIST 0.2f
 
@@ -1116,11 +1116,13 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
   }
 
   FOREACH_SELECTED_BEZT_BEGIN(bezt, &cu->editnurb->nurbs)
-  if (bezt) {
-    bezt->h1 = extrude_handle;
-    bezt->h2 = extrude_handle;
+  {
+    if (bezt) {
+      bezt->h1 = extrude_handle;
+      bezt->h2 = extrude_handle;
+    }
   }
-  FOREACH_SELECTED_BEZT_END
+  FOREACH_SELECTED_BEZT_END;
 }
 
 /**
@@ -1237,13 +1239,15 @@ static void move_segment(ViewContext *vc,
 static void toggle_bezt_free_align_handles(ListBase *nurbs)
 {
   FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
-  if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
-    bezt->h1 = bezt->h2 = HD_FREE;
+  {
+    if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
+      bezt->h1 = bezt->h2 = HD_FREE;
+    }
+    else {
+      bezt->h1 = bezt->h2 = HD_ALIGN;
+    }
   }
-  else {
-    bezt->h1 = bezt->h2 = HD_ALIGN;
-  }
-  FOREACH_SELECTED_BEZT_END
+  FOREACH_SELECTED_BEZT_END;
 }
 
 /**
@@ -1298,40 +1302,43 @@ static bool delete_point_under_mouse(ViewContext *vc, const wmEvent *event)
 static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase *nurbs)
 {
   FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
-  BezTriple *adj_bezt;
-  int bezt_idx;
-  if (nu->pntsu == 1) {
-    continue;
-  }
-  if (nu->bezt == bezt) {
-    adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
-    bezt_idx = 0;
-  }
-  else if (nu->bezt + nu->pntsu - 1 == bezt) {
-    adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
-    bezt_idx = 2;
-  }
-  else {
-    if (BEZT_ISSEL_IDX(bezt, 0)) {
-      adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
-      bezt_idx = 2;
+  {
+    BezTriple *adj_bezt;
+    int bezt_idx;
+    if (nu->pntsu == 1) {
+      continue;
     }
-    else if (BEZT_ISSEL_IDX(bezt, 2)) {
+    if (nu->bezt == bezt) {
       adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
       bezt_idx = 0;
     }
-    else {
-      continue;
+    else if (nu->bezt + nu->pntsu - 1 == bezt) {
+      adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+      bezt_idx = 2;
     }
-  }
-  adj_bezt->h1 = adj_bezt->h2 = HD_FREE;
+    else {
+      if (BEZT_ISSEL_IDX(bezt, 0)) {
+        adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+        bezt_idx = 2;
+      }
+      else if (BEZT_ISSEL_IDX(bezt, 2)) {
+        adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
+        bezt_idx = 0;
+      }
+      else {
+        continue;
+      }
+    }
+    adj_bezt->h1 = adj_bezt->h2 = HD_FREE;
 
-  int displacement[2];
-  sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
-  const float disp_fl[2] = {UNPACK2(displacement)};
-  move_bezt_handle_or_vertex_by_displacement(vc, adj_bezt, bezt_idx, disp_fl, 0.0f, false, false);
-  BKE_nurb_handles_calc(nu);
-  FOREACH_SELECTED_BEZT_END
+    int displacement[2];
+    sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
+    const float disp_fl[2] = {UNPACK2(displacement)};
+    move_bezt_handle_or_vertex_by_displacement(
+        vc, adj_bezt, bezt_idx, disp_fl, 0.0f, false, false);
+    BKE_nurb_handles_calc(nu);
+  }
+  FOREACH_SELECTED_BEZT_END;
 }
 
 /**
@@ -1380,12 +1387,14 @@ static bool make_cyclic_if_endpoints(ViewContext *vc,
 static void init_selected_bezt_handles(ListBase *nurbs)
 {
   FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
-  bezt->h1 = bezt->h2 = HD_ALIGN;
-  copy_v3_v3(bezt->vec[0], bezt->vec[1]);
-  copy_v3_v3(bezt->vec[2], bezt->vec[1]);
-  BEZT_DESEL_ALL(bezt);
-  BEZT_SEL_IDX(bezt, is_last_bezt(nu, bezt) ? 2 : 0);
-  FOREACH_SELECTED_BEZT_END
+  {
+    bezt->h1 = bezt->h2 = HD_ALIGN;
+    copy_v3_v3(bezt->vec[0], bezt->vec[1]);
+    copy_v3_v3(bezt->vec[2], bezt->vec[1]);
+    BEZT_DESEL_ALL(bezt);
+    BEZT_SEL_IDX(bezt, is_last_bezt(nu, bezt) ? 2 : 0);
+  }
+  FOREACH_SELECTED_BEZT_END;
 }
 
 static void toggle_select_bezt(BezTriple *bezt, const short bezt_idx, Curve *cu, Nurb *nu)
