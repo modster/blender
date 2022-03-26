@@ -435,7 +435,7 @@ static void delete_nurb(Curve *cu, Nurb *nu)
   ListBase *nurbs = &editnurb->nurbs;
   const int nu_index = get_nurb_index(nurbs, nu);
   if (cu->actnu == nu_index) {
-    cu->actnu = CU_ACT_NONE;
+    BKE_curve_nurb_vert_active_set(cu, NULL, NULL);
   }
 
   BLI_remlink(nurbs, nu);
@@ -603,8 +603,7 @@ static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   }
 
   nu->pntsu += 1;
-  cu->actvert = index;
-  cu->actnu = get_nurb_index(BKE_curve_editNurbs_get(cu), nu);
+  BKE_curve_nurb_vert_active_set(cu, nu, nu->bezt + index);
 
   BezTriple *next_bezt;
   if (is_cyclic(nu) && (index == nu->pntsu - 1)) {
@@ -657,8 +656,7 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   }
 
   nu->pntsu += 1;
-  cu->actvert = index;
-  cu->actnu = get_nurb_index(BKE_curve_editNurbs_get(cu), nu);
+  BKE_curve_nurb_vert_active_set(cu, nu, nu->bp + index);
 
   BPoint *next_bp;
   if (is_cyclic(nu) && (index == nu->pntsu - 1)) {
@@ -947,6 +945,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
           nu1->pntsu++;
         }
         cu->actnu = nu_index;
+        cu->actvert = 0;
       }
       else if (last_sel) {
         BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BezTriple),
@@ -959,6 +958,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         nu1->bezt = new_bezt;
         nu1->pntsu++;
         cu->actnu = nu_index;
+        cu->actvert = nu1->pntsu - 1;
       }
     }
     else {
@@ -991,6 +991,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         }
         BKE_nurb_knot_calc_u(nu1);
         cu->actnu = nu_index;
+        cu->actvert = 0;
       }
       else if (last_sel) {
         BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
@@ -1004,6 +1005,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         nu1->pntsu++;
         BKE_nurb_knot_calc_u(nu1);
         cu->actnu = nu_index;
+        cu->actvert = nu1->pntsu - 1;
       }
     }
     nu_index++;
@@ -1347,7 +1349,7 @@ static void init_selected_bezt_handles(ListBase *nurbs)
   FOREACH_SELECTED_BEZT_END
 }
 
-static void toggle_select_bezt(BezTriple *bezt, const short bezt_idx)
+static void toggle_select_bezt(BezTriple *bezt, const short bezt_idx, Curve *cu, Nurb *nu)
 {
   if (bezt_idx == 1) {
     if (BEZT_ISSEL_IDX(bezt, 1)) {
@@ -1365,15 +1367,20 @@ static void toggle_select_bezt(BezTriple *bezt, const short bezt_idx)
       BEZT_SEL_IDX(bezt, bezt_idx);
     }
   }
+
+  if (BEZT_ISSEL_ANY(bezt)) {
+    BKE_curve_nurb_vert_active_set(cu, nu, bezt);
+  }
 }
 
-static void toggle_select_bp(BPoint *bp)
+static void toggle_select_bp(BPoint *bp, Curve *cu, Nurb *nu)
 {
   if (bp->f1 & SELECT) {
     bp->f1 &= ~SELECT;
   }
   else {
     bp->f1 |= SELECT;
+    BKE_curve_nurb_vert_active_set(cu, nu, bp);
   }
 }
 
@@ -1604,11 +1611,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           else {
             BEZT_SEL_IDX(bezt1, bezt_idx);
           }
-          cu->actnu = get_nurb_index(nurbs, nu1);
+          BKE_curve_nurb_vert_active_set(cu, nu1, bezt1);
         }
         else if (bp1) {
           bp1->f1 |= SELECT;
-          cu->actnu = get_nurb_index(nurbs, nu1);
+          BKE_curve_nurb_vert_active_set(cu, nu1, bp1);
         }
 
         cpd->selection_made = true;
@@ -1689,12 +1696,10 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           short bezt_idx;
           get_closest_vertex_to_point_in_nurbs(&vc, nurbs, mval_fl, &nu, &bezt, &bp, &bezt_idx);
           if (bezt) {
-            toggle_select_bezt(bezt, bezt_idx);
-            cu->actnu = get_nurb_index(nurbs, nu);
+            toggle_select_bezt(bezt, bezt_idx, cu, nu);
           }
           else if (bp) {
-            toggle_select_bp(bp);
-            cu->actnu = get_nurb_index(nurbs, nu);
+            toggle_select_bp(bp, cu, nu);
           }
           else {
             ED_curve_deselect_all(cu->editnurb);
