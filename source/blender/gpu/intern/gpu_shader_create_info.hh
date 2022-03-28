@@ -283,6 +283,7 @@ struct ShaderCreateInfo {
   /** Manually set generated code. */
   std::string vertex_source_generated = "";
   std::string fragment_source_generated = "";
+  std::string geometry_source_generated = "";
   std::string typedef_source_generated = "";
   /** Manually set generated dependencies. */
   Vector<const char *, 0> dependencies_generated;

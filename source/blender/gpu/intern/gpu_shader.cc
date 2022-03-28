@@ -357,6 +357,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     sources.append(resources.c_str());
     sources.append(layout.c_str());
     sources.append(interface.c_str());
+    sources.append(info.geometry_source_generated.c_str());
     sources.extend(code);
 
     shader->geometry_shader_from_glsl(sources);
