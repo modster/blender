@@ -174,6 +174,15 @@ struct MaterialCanvas {
     return V3D_SHADING_MATERIAL_COLOR;
   }
 
+  Image *image() const
+  {
+    switch (node->type) {
+      case SH_NODE_TEX_IMAGE:
+        return static_cast<Image *>(static_cast<void *>(node->id));
+    }
+    return nullptr;
+  }
+
   static bool supports(const Object *ob, bNode *node)
   {
     switch (node->type) {
@@ -218,16 +227,6 @@ struct MaterialCanvases {
   {
     for (const MaterialCanvas &item : items) {
       if (item.resource_index() == resource_index) {
-        return item;
-      }
-    }
-    return std::nullopt;
-  }
-
-  std::optional<MaterialCanvas> active()
-  {
-    for (const MaterialCanvas &item : items) {
-      if ((item.node->flag & NODE_ACTIVE) != 0) {
         return item;
       }
     }
@@ -362,6 +361,15 @@ static std::optional<MaterialWrapper> get_active_material(Object *ob)
   return get_material_in_slot(ob, material_slot);
 }
 
+static std::optional<MaterialCanvas> get_active_canvas(Object *ob)
+{
+  std::optional<MaterialWrapper> material = get_active_material(ob);
+  if (!material.has_value()) {
+    return std::nullopt;
+  }
+  return material->active_canvas(ob);
+}
+
 }  // namespace blender::ed::sculpt_paint::canvas
 
 extern "C" {
@@ -371,15 +379,11 @@ using namespace blender::ed::sculpt_paint::canvas;
 
 int ED_paint_canvas_material_get(Object *ob)
 {
-  std::optional<MaterialWrapper> material = get_active_material(ob);
-  if (!material.has_value()) {
+  std::optional<MaterialCanvas> canvas = get_active_canvas(ob);
+  if (!canvas.has_value()) {
     return 0;
   }
-  std::optional<MaterialCanvas> resource = material->canvases(ob).active();
-  if (!resource.has_value()) {
-    return 0;
-  }
-  return resource->rna_enum_item.value;
+  return canvas->rna_enum_item.value;
 }
 
 void ED_paint_canvas_material_set(Object *ob, int new_value)
@@ -428,11 +432,7 @@ eV3DShadingColorType ED_paint_draw_color_override(const PaintModeSettings *setti
       override = V3D_SHADING_TEXTURE_COLOR;
       break;
     case PAINT_CANVAS_SOURCE_MATERIAL: {
-      std::optional<MaterialWrapper> material = get_active_material(ob);
-      if (!material.has_value()) {
-        break;
-      }
-      std::optional<MaterialCanvas> canvas = material->active_canvas(ob);
+      std::optional<MaterialCanvas> canvas = get_active_canvas(ob);
       if (!canvas.has_value()) {
         break;
       }
@@ -451,5 +451,57 @@ eV3DShadingColorType ED_paint_draw_color_override(const PaintModeSettings *setti
   }
 
   return override;
+}
+
+Image *ED_paint_canvas_image_get(const struct PaintModeSettings *settings, struct Object *ob)
+{
+  switch (settings->canvas_source) {
+    case PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE:
+      return nullptr;
+    case PAINT_CANVAS_SOURCE_IMAGE:
+      return settings->image;
+    case PAINT_CANVAS_SOURCE_MATERIAL: {
+      std::optional<MaterialCanvas> canvas = get_active_canvas(ob);
+      if (!canvas.has_value()) {
+        break;
+      }
+      return canvas->image();
+    }
+  }
+  return nullptr;
+}
+
+int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settings,
+                                          struct Object *ob)
+{
+  switch (settings->canvas_source) {
+    case PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE:
+      return -1;
+    case PAINT_CANVAS_SOURCE_IMAGE: {
+      /* Use active uv map of the object. */
+      if (ob->type != OB_MESH) {
+        return -1;
+      }
+
+      const Mesh *mesh = static_cast<Mesh *>(ob->data);
+      return CustomData_get_active_layer_index(&mesh->ldata, CD_MLOOPUV);
+    }
+    case PAINT_CANVAS_SOURCE_MATERIAL: {
+      /* Use uv map of the canvas. */
+      std::optional<MaterialCanvas> canvas = get_active_canvas(ob);
+      if (!canvas.has_value()) {
+        break;
+      }
+
+      if (ob->type != OB_MESH) {
+        return -1;
+      }
+
+      /* TODO: when uv is directly linked with a uv map node we could that one. */
+      const Mesh *mesh = static_cast<Mesh *>(ob->data);
+      return CustomData_get_active_layer_index(&mesh->ldata, CD_MLOOPUV);
+    }
+  }
+  return -1;
 }
 }

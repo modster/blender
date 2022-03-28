@@ -3244,6 +3244,7 @@ static void rna_def_object(BlenderRNA *brna)
                               "rna_Object_paint_canvas_get",
                               "rna_Object_paint_canvas_set",
                               "rna_Object_paint_canvas_itemf");
+  RNA_def_property_ui_text(prop, "Canvas", "Material canvas to paint on");
   RNA_def_property_update(prop, 0, "rna_Object_paint_canvas_update");
 
   /* transform */

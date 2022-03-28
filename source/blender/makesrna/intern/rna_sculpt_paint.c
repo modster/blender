@@ -561,7 +561,8 @@ static bool rna_PaintModeSettings_image_poll(PointerRNA *UNUSED(ptr), PointerRNA
 static int rna_PaintModeSettings_canvas_source_get(PointerRNA *ptr)
 {
   PaintModeSettings *settings = ptr->data;
-  if (!U.experimental.use_sculpt_texture_paint && settings->canvas_source == PAINT_CANVAS_SOURCE_IMAGE) {
+  if (!U.experimental.use_sculpt_texture_paint &&
+      settings->canvas_source == PAINT_CANVAS_SOURCE_IMAGE) {
     return PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE;
   }
 
@@ -587,6 +588,22 @@ static const EnumPropertyItem *rna_PaintModeSettings_canvas_source_itemf(bContex
   RNA_enum_item_end(&items, &totitem);
   *r_free = false;
   return items;
+}
+
+static void rna_PaintModeSettings_canvas_source_update(Main *main,
+                                                       Scene *UNUSED(scene),
+                                                       PointerRNA *UNUSED(ptr))
+{
+  /* When canvas source changes the pbvh would require updates when switching between color
+   * attributes.  */
+  LISTBASE_FOREACH (Object *, ob, &main->objects) {
+    if (ob->sculpt == NULL) {
+      continue;
+    }
+
+    DEG_id_tag_update(&ob->id, 0);
+    WM_main_add_notifier(NC_GEOM | ND_DATA, &ob->id);
+  }
 }
 
 /* \} */
@@ -1036,6 +1053,7 @@ static void rna_def_paint_mode(BlenderRNA *brna)
                               NULL,
                               "rna_PaintModeSettings_canvas_source_itemf");
   RNA_def_property_ui_text(prop, "Source", "Source to select canvas from");
+  RNA_def_property_update(prop, 0, "rna_PaintModeSettings_canvas_source_update");
 
   prop = RNA_def_property(srna, "image", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_PaintModeSettings_image_poll");
