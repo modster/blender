@@ -82,14 +82,14 @@ static const EnumPropertyItem rna_enum_gpencil_paint_mode[] = {
      "Paint the material with custom vertex color"},
     {0, NULL, 0, NULL, NULL},
 };
+#endif
 
-static const EnumPropertyItem rna_enum_canvas_type_items[] = {
+static const EnumPropertyItem rna_enum_canvas_source_items[] = {
     {PAINT_CANVAS_COLOR_ATTRIBUTE, "COLOR_ATTRIBUTE", 0, "Color Attribute", ""},
     {PAINT_CANVAS_MATERIAL, "MATERIAL", 0, "Material", ""},
     {PAINT_CANVAS_IMAGE, "IMAGE", 0, "Image", ""},
     {0, NULL, 0, NULL, NULL},
 };
-#endif
 
 const EnumPropertyItem rna_enum_symmetrize_direction_items[] = {
     {BMO_SYMMETRIZE_NEGATIVE_X, "NEGATIVE_X", 0, "-X to +X", ""},
@@ -558,6 +558,37 @@ static bool rna_PaintModeSettings_image_poll(PointerRNA *UNUSED(ptr), PointerRNA
   return !ELEM(image->type, IMA_TYPE_COMPOSITE, IMA_TYPE_R_RESULT);
 }
 
+static int rna_PaintModeSettings_canvas_source_get(PointerRNA *ptr)
+{
+  PaintModeSettings *settings = ptr->data;
+  if (!U.experimental.use_sculpt_texture_paint && settings->canvas_source == PAINT_CANVAS_IMAGE) {
+    return PAINT_CANVAS_COLOR_ATTRIBUTE;
+  }
+
+  return settings->canvas_source;
+}
+
+static const EnumPropertyItem *rna_PaintModeSettings_canvas_source_itemf(bContext *UNUSED(C),
+                                                                         PointerRNA *UNUSED(ptr),
+                                                                         PropertyRNA *UNUSED(prop),
+                                                                         bool *r_free)
+{
+  EnumPropertyItem *items = NULL;
+  int totitem = 0;
+
+  for (int index = 0; rna_enum_canvas_source_items[index].identifier != NULL; index++) {
+    if (!U.experimental.use_sculpt_texture_paint &&
+        rna_enum_canvas_source_items[index].value == PAINT_CANVAS_IMAGE) {
+      continue;
+    }
+    RNA_enum_item_add(&items, &totitem, &rna_enum_canvas_source_items[index]);
+  }
+
+  RNA_enum_item_end(&items, &totitem);
+  *r_free = false;
+  return items;
+}
+
 /* \} */
 
 static bool rna_ImaPaint_detect_data(ImagePaintSettings *imapaint)
@@ -999,7 +1030,11 @@ static void rna_def_paint_mode(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "canvas_source", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "canvas_source");
-  RNA_def_property_enum_items(prop, rna_enum_canvas_type_items);
+  RNA_def_property_enum_items(prop, rna_enum_canvas_source_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_PaintModeSettings_canvas_source_get",
+                              NULL,
+                              "rna_PaintModeSettings_canvas_source_itemf");
   RNA_def_property_ui_text(prop, "Source", "Source to select canvas from");
 
   prop = RNA_def_property(srna, "image", PROP_POINTER, PROP_NONE);

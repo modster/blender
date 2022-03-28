@@ -2225,20 +2225,21 @@ class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        if not context.preferences.experimental.use_sculpt_texture_paint:
+        if not context.preferences.experimental.use_sculpt_vertex_colors:
             return False
 
         if context.active_object is None:
             return False
 
-        brush = context.tool_settings.sculpt.brush
-        if brush:
-            return brush.sculpt_tool in [
-                'PAINT',
-            ]
+        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        tool_context = ToolSelectPanelHelper.tool_active_from_context(context)
+        if not tool_context:
+            return False
 
-        # TODO: check active tool... but when migrating to paint mode this might not be needed.
-        return True
+        return tool_context.idname in [
+            "builtin_brush.Paint",
+            "builtin.color_filter",
+        ]
 
     def draw(self, context):
         layout = self.layout
@@ -2252,6 +2253,7 @@ class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
         match settings.canvas_source:
             case 'COLOR_ATTRIBUTE':
                 me = ob.data
+                # TODO(jbakker): When vertex colors are committed change to color attributes
                 layout.template_list("MESH_UL_vcols", "vcols", me, "vertex_colors", me.vertex_colors, "active_index", rows=2)
 
             case 'MATERIAL':

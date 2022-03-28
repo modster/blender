@@ -130,6 +130,9 @@ struct MaterialCanvas {
   {
     switch (node->type) {
       case SH_NODE_TEX_IMAGE:
+        if (!U.experimental.use_sculpt_texture_paint) {
+          return false;
+        }
         return node->id != nullptr;
 
       case SH_NODE_ATTRIBUTE: {
