@@ -9,11 +9,11 @@
 
 namespace blender::bke::curves::catmull_rom {
 
-int calculate_evaluated_size(const int size, const bool cyclic, const int resolution)
+int calculate_evaluated_size(const int points_num, const bool cyclic, const int resolution)
 {
-  const int eval_size = resolution * curve_segment_size(size, cyclic);
+  const int eval_size = resolution * curve_segment_size(points_num, cyclic);
   /* If the curve isn't cyclic, one last point is added to the final point. */
-  return (cyclic && size > 2) ? eval_size : eval_size + 1;
+  return (cyclic && points_num > 2) ? eval_size : eval_size + 1;
 }
 
 /* Adapted from Cycles #catmull_rom_basis_eval function. */
@@ -96,10 +96,10 @@ static void interpolate_to_evaluated(const Span<T> src,
   });
 }
 
-void interpolate_to_evaluated(const fn::GSpan src,
+void interpolate_to_evaluated(const GSpan src,
                               const bool cyclic,
                               const int resolution,
-                              fn::GMutableSpan dst)
+                              GMutableSpan dst)
 {
   attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
     using T = decltype(dummy);
