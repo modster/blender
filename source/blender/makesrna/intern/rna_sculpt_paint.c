@@ -85,9 +85,9 @@ static const EnumPropertyItem rna_enum_gpencil_paint_mode[] = {
 #endif
 
 static const EnumPropertyItem rna_enum_canvas_source_items[] = {
-    {PAINT_CANVAS_COLOR_ATTRIBUTE, "COLOR_ATTRIBUTE", 0, "Color Attribute", ""},
-    {PAINT_CANVAS_MATERIAL, "MATERIAL", 0, "Material", ""},
-    {PAINT_CANVAS_IMAGE, "IMAGE", 0, "Image", ""},
+    {PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE, "COLOR_ATTRIBUTE", 0, "Color Attribute", ""},
+    {PAINT_CANVAS_SOURCE_MATERIAL, "MATERIAL", 0, "Material", ""},
+    {PAINT_CANVAS_SOURCE_IMAGE, "IMAGE", 0, "Image", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -561,8 +561,8 @@ static bool rna_PaintModeSettings_image_poll(PointerRNA *UNUSED(ptr), PointerRNA
 static int rna_PaintModeSettings_canvas_source_get(PointerRNA *ptr)
 {
   PaintModeSettings *settings = ptr->data;
-  if (!U.experimental.use_sculpt_texture_paint && settings->canvas_source == PAINT_CANVAS_IMAGE) {
-    return PAINT_CANVAS_COLOR_ATTRIBUTE;
+  if (!U.experimental.use_sculpt_texture_paint && settings->canvas_source == PAINT_CANVAS_SOURCE_IMAGE) {
+    return PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE;
   }
 
   return settings->canvas_source;
@@ -578,7 +578,7 @@ static const EnumPropertyItem *rna_PaintModeSettings_canvas_source_itemf(bContex
 
   for (int index = 0; rna_enum_canvas_source_items[index].identifier != NULL; index++) {
     if (!U.experimental.use_sculpt_texture_paint &&
-        rna_enum_canvas_source_items[index].value == PAINT_CANVAS_IMAGE) {
+        rna_enum_canvas_source_items[index].value == PAINT_CANVAS_SOURCE_IMAGE) {
       continue;
     }
     RNA_enum_item_add(&items, &totitem, &rna_enum_canvas_source_items[index]);

@@ -930,7 +930,7 @@ typedef struct PaintModeSettings {
   char canvas_source;
   char _pad[7];
 
-  /** Selected image when canvas_source=PAINT_CANVAS_IMAGE. */
+  /** Selected image when canvas_source=PAINT_CANVAS_SOURCE_IMAGE. */
   Image *image;
 
 } PaintModeSettings;
@@ -2292,11 +2292,11 @@ typedef enum eImagePaintMode {
 /** PaintModeSettings.canvas_source */
 typedef enum ePaintCanvasSource {
   /** Paint on the active color attribute (vertex color) layer. */
-  PAINT_CANVAS_COLOR_ATTRIBUTE = 0,
-  /** Paint on the active texture of the active material slot. */
-  PAINT_CANVAS_MATERIAL = 1,
+  PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE = 0,
+  /** Paint on the active node of the active material slot. */
+  PAINT_CANVAS_SOURCE_MATERIAL = 1,
   /** Paint on a selected image. */
-  PAINT_CANVAS_IMAGE = 2,
+  PAINT_CANVAS_SOURCE_IMAGE = 2,
 } ePaintCanvasSource;
 
 /** #ImagePaintSettings.interp */

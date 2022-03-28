@@ -27,19 +27,19 @@
 namespace blender::ed::sculpt_paint::canvas {
 
 /**
- * @brief Store a material slot and resource index encoded as an int.
+ * @brief Store a material slot and index encoded as an int.
  */
-struct MaterialResourceIndex {
+struct MaterialCanvasIndex {
  private:
   int32_t encoded_;
 
  public:
-  MaterialResourceIndex(int32_t encoded) : encoded_(encoded)
+  MaterialCanvasIndex(int32_t encoded) : encoded_(encoded)
   {
   }
 
-  MaterialResourceIndex(uint16_t material_slot, uint16_t resource_index)
-      : encoded_(MaterialResourceIndex::encode(material_slot, resource_index))
+  MaterialCanvasIndex(uint16_t material_slot, uint16_t resource_index)
+      : encoded_(MaterialCanvasIndex::encode(material_slot, resource_index))
   {
   }
 
@@ -85,20 +85,20 @@ struct MaterialResourceIndex {
 };
 
 struct MaterialCanvas {
-  MaterialResourceIndex material_resource;
+  MaterialCanvasIndex index;
 
   bNode *node;
   EnumPropertyItem rna_enum_item;
 
   MaterialCanvas(uint16_t material_slot, uint16_t resource_index, bNode *node)
-      : material_resource(material_slot, resource_index), node(node)
+      : index(material_slot, resource_index), node(node)
   {
     init_rna_enum_item();
   }
 
   uint16_t resource_index() const
   {
-    return material_resource.resource_index();
+    return index.resource_index();
   }
 
  private:
@@ -123,7 +123,7 @@ struct MaterialCanvas {
   void init_rna_enum_item_image(Image *image)
   {
     BLI_assert(image != nullptr);
-    rna_enum_item.value = material_resource.encoded();
+    rna_enum_item.value = index.encoded();
     rna_enum_item.identifier = image->id.name + 2;
     rna_enum_item.icon = ICON_IMAGE;
     rna_enum_item.name = image->id.name + 2;
@@ -132,7 +132,7 @@ struct MaterialCanvas {
 
   void init_rna_enum_item_color_attribute(const NodeShaderAttribute *attribute)
   {
-    rna_enum_item.value = material_resource.encoded();
+    rna_enum_item.value = index.encoded();
     rna_enum_item.identifier = attribute->name;
     rna_enum_item.icon = ICON_COLOR;
     rna_enum_item.name = attribute->name;
@@ -384,7 +384,7 @@ int ED_paint_canvas_material_get(Object *ob)
 
 void ED_paint_canvas_material_set(Object *ob, int new_value)
 {
-  const MaterialResourceIndex material_resource(new_value);
+  const MaterialCanvasIndex material_resource(new_value);
 
   std::optional<MaterialWrapper> material = get_material_in_slot(
       ob, material_resource.material_slot());
@@ -421,13 +421,13 @@ eV3DShadingColorType ED_paint_draw_color_override(const PaintModeSettings *setti
 
   eV3DShadingColorType override = orig_color_type;
   switch (settings->canvas_source) {
-    case PAINT_CANVAS_COLOR_ATTRIBUTE:
+    case PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE:
       override = V3D_SHADING_VERTEX_COLOR;
       break;
-    case PAINT_CANVAS_IMAGE:
+    case PAINT_CANVAS_SOURCE_IMAGE:
       override = V3D_SHADING_TEXTURE_COLOR;
       break;
-    case PAINT_CANVAS_MATERIAL: {
+    case PAINT_CANVAS_SOURCE_MATERIAL: {
       std::optional<MaterialWrapper> material = get_active_material(ob);
       if (!material.has_value()) {
         break;
