@@ -1528,7 +1528,6 @@ static void rna_Object_paint_canvas_update(Main *UNUSED(main),
                                            PointerRNA *ptr)
 {
   Object *ob = ptr->data;
-  // PBVH should be recalced. It could still point to an incorrect vertex color layer.
   if (ob->id.us > 0) {
     DEG_id_tag_update(&ob->id, 0);
     WM_main_add_notifier(NC_GEOM | ND_DATA, &ob->id);
