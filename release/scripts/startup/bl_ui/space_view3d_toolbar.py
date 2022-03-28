@@ -2231,11 +2231,12 @@ class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
         if context.active_object is None:
             return False
 
+        # TODO: connect to ED_paint_tool_use_canvas.
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
         tool_context = ToolSelectPanelHelper.tool_active_from_context(context)
         if not tool_context:
             return False
-
+            
         return tool_context.idname in [
             "builtin_brush.Paint",
             "builtin.color_filter",

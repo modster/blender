@@ -318,8 +318,13 @@ static eV3DShadingColorType workbench_color_type_get(WORKBENCH_PrivateData *wpd,
   }
 
   if (is_sculpt_pbvh) {
-    color_type = ED_paint_draw_color_override(
-        &wpd->scene->toolsettings->paint_mode, ob, color_type);
+    /* Bad call C is required to access the tool system that is context aware. Cast to non-const
+     * due to current API. */
+    bContext *C = (bContext *)DRW_context_state_get()->evil_C;
+    if (C != NULL) {
+      color_type = ED_paint_draw_color_override(
+          C, &wpd->scene->toolsettings->paint_mode, ob, color_type);
+    }
   }
 
   if (r_draw_shadow) {

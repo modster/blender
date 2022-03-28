@@ -11,6 +11,7 @@
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_node_types.h"
+#include "DNA_workspace_types.h"
 
 #include "BKE_context.h"
 #include "BKE_customdata.h"
@@ -23,6 +24,8 @@
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+
+#include "WM_toolsystem.h"
 
 namespace blender::ed::sculpt_paint::canvas {
 
@@ -415,11 +418,12 @@ void ED_paint_canvas_material_itemf(Object *ob, struct EnumPropertyItem **r_item
   }
 }
 
-eV3DShadingColorType ED_paint_draw_color_override(const PaintModeSettings *settings,
+eV3DShadingColorType ED_paint_draw_color_override(bContext *C,
+                                                  const PaintModeSettings *settings,
                                                   Object *ob,
                                                   eV3DShadingColorType orig_color_type)
 {
-  if (ob->sculpt == nullptr) {
+  if (!ED_paint_tool_use_canvas(C, ob)) {
     return orig_color_type;
   }
 
@@ -503,5 +507,25 @@ int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settin
     }
   }
   return -1;
+}
+
+bool ED_paint_tool_use_canvas(struct bContext *C, struct Object *ob)
+{
+  /* Quick exit, only sculpt tools can use canvas. */
+  if (ob->sculpt == nullptr) {
+    return false;
+  }
+
+  bToolRef *tref = WM_toolsystem_ref_from_context(C);
+  if (tref != nullptr) {
+    if (STREQ(tref->idname, "builtin_brush.Paint")) {
+      return true;
+    }
+    if (STREQ(tref->idname, "builtin.color_filter")) {
+      return true;
+    }
+  }
+
+  return false;
 }
 }

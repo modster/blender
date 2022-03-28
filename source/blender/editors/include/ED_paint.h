@@ -119,13 +119,17 @@ void ED_paint_canvas_material_itemf(struct Object *ob,
                                     int *r_totitem);
 struct Image *ED_paint_canvas_image_get(const struct PaintModeSettings *settings,
                                         struct Object *ob);
-int  ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settings,
+int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settings,
                                           struct Object *ob);
 
 /** Color type of an object can be overridden in sculpt/paint mode. */
-eV3DShadingColorType ED_paint_draw_color_override(const struct PaintModeSettings *settings,
+eV3DShadingColorType ED_paint_draw_color_override(struct bContext *C,
+                                                  const struct PaintModeSettings *settings,
                                                   struct Object *ob,
                                                   eV3DShadingColorType orig_color_type);
+
+/** Does the active tool uses a paint canvas for the given object. */
+bool ED_paint_tool_use_canvas(struct bContext *C, struct Object *ob);
 
 #ifdef __cplusplus
 }
