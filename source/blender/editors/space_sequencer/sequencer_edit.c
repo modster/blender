@@ -1772,23 +1772,10 @@ static int sequencer_delete_exec(bContext *C, wmOperator *UNUSED(op))
   DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
   DEG_relations_tag_update(bmain);
   WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
+  SpaceSeq *sseq = CTX_wm_space_seq(C);
+  sseq->flag |= SPACE_SEQ_CLAMP_SMOOTH;
+
   return OPERATOR_FINISHED;
-}
-
-static int sequencer_delete_invoke(bContext *C, wmOperator *op, const wmEvent *event)
-{
-  ARegion *region = CTX_wm_region(C);
-
-  if (region->regiontype == RGN_TYPE_WINDOW) {
-    /* Bounding box of 30 pixels is used for markers shortcuts,
-     * prevent conflict with markers shortcuts here.
-     */
-    if (event->mval[1] <= 30) {
-      return OPERATOR_PASS_THROUGH;
-    }
-  }
-
-  return sequencer_delete_exec(C, op);
 }
 
 void SEQUENCER_OT_delete(wmOperatorType *ot)
@@ -1800,7 +1787,6 @@ void SEQUENCER_OT_delete(wmOperatorType *ot)
   ot->description = "Erase selected strips from the sequencer";
 
   /* Api callbacks. */
-  ot->invoke = sequencer_delete_invoke;
   ot->exec = sequencer_delete_exec;
   ot->poll = sequencer_edit_poll;
 
