@@ -15,6 +15,7 @@
 #include "DNA_vfont_types.h"
 
 #include "BLI_iterator.h"
+#include "BLI_listbase.h"
 #include "BLI_math.h"
 
 #include "BLT_translation.h"
@@ -34,6 +35,7 @@
 #include "rna_internal.h"
 
 #include "SEQ_add.h"
+#include "SEQ_channels.h"
 #include "SEQ_effects.h"
 #include "SEQ_iterator.h"
 #include "SEQ_modifier.h"
@@ -1374,6 +1376,25 @@ static void rna_Sequence_separate(ID *id, Sequence *seqm, Main *bmain)
   WM_main_add_notifier(NC_SCENE | ND_SEQUENCER, scene);
 }
 
+static char *rna_SeqTimelineChannel_path(PointerRNA *ptr)
+{
+  SeqTimelineChannel *channel = (SeqTimelineChannel *)ptr->data;
+
+  /* Find channel owner. If NULL, owner is `Editing`, otherwise it's `Sequence`. */
+  Sequence *channel_owner = NULL;
+
+  if (channel_owner == NULL) {
+    return BLI_sprintfN("sequence_editor.channels[%d]", SEQ_channel_index_get(channel));
+  }
+  else {
+    char owner_name_esc[(sizeof(channel_owner->name) - 2) * 2];
+    BLI_str_escape(owner_name_esc, channel_owner->name + 2, sizeof(owner_name_esc));
+    return BLI_sprintfN("sequence_editor.sequences_all[\"%s\"].channels[\"%d\"]",
+                        owner_name_esc,
+                        SEQ_channel_index_get(channel));
+  }
+}
+
 #else
 
 static void rna_def_strip_element(BlenderRNA *brna)
@@ -2081,6 +2102,32 @@ static void rna_def_sequence(BlenderRNA *brna)
   RNA_api_sequence_strip(srna);
 }
 
+static void rna_def_channel(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "SequenceTimelineChannel", NULL);
+  RNA_def_struct_sdna(srna, "SeqTimelineChannel");
+  RNA_def_struct_path_func(srna, "rna_SeqTimelineChannel_path");
+  RNA_def_struct_ui_text(srna, "Channel", "");
+
+  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_maxlength(prop, sizeof(((SeqTimelineChannel *)NULL)->name));
+  RNA_def_property_ui_text(prop, "Name", "");
+  RNA_def_struct_name_property(srna, prop);
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, NULL);
+
+  prop = RNA_def_property(srna, "lock", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_CHANNEL_LOCK);
+  RNA_def_property_ui_text(prop, "Lock channel", "");
+
+  prop = RNA_def_property(srna, "mute", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_CHANNEL_MUTE);
+  RNA_def_property_ui_text(prop, "Mute channel", "");
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, NULL);
+}
+
 static void rna_def_editor(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -2128,6 +2175,11 @@ static void rna_def_editor(BlenderRNA *brna)
       prop, "Meta Stack", "Meta strip stack, last is currently edited meta strip");
   RNA_def_property_collection_funcs(
       prop, NULL, NULL, NULL, "rna_SequenceEditor_meta_stack_get", NULL, NULL, NULL, NULL);
+
+  prop = RNA_def_property(srna, "channels", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_collection_sdna(prop, NULL, "channels", NULL);
+  RNA_def_property_struct_type(prop, "SequenceTimelineChannel");
+  RNA_def_property_ui_text(prop, "Channels", "");
 
   prop = RNA_def_property(srna, "active_strip", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "act_seq");
@@ -2474,6 +2526,11 @@ static void rna_def_meta(BlenderRNA *brna)
   RNA_def_property_struct_type(prop, "Sequence");
   RNA_def_property_ui_text(prop, "Sequences", "Sequences nested in meta strip");
   RNA_api_sequences(brna, prop, true);
+
+  prop = RNA_def_property(srna, "channels", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_collection_sdna(prop, NULL, "channels", NULL);
+  RNA_def_property_struct_type(prop, "SequenceTimelineChannel");
+  RNA_def_property_ui_text(prop, "Channels", "");
 
   func = RNA_def_function(srna, "separate", "rna_Sequence_separate");
   RNA_def_function_flag(func, FUNC_USE_SELF_ID | FUNC_USE_MAIN);
@@ -3472,6 +3529,7 @@ void RNA_def_sequencer(BlenderRNA *brna)
 
   rna_def_sequence(brna);
   rna_def_editor(brna);
+  rna_def_channel(brna);
 
   rna_def_image(brna);
   rna_def_meta(brna);

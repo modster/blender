@@ -2997,6 +2997,22 @@ def km_sequencerpreview(params):
     return keymap
 
 
+def km_sequencer_channels(params):
+    items = []
+    keymap = (
+        "Sequencer Channels",
+        {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
+        {"items": items},
+    )
+
+    items.extend([
+        # Rename.
+        ("sequencer.channel_rename", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+        ("sequencer.channel_rename", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK'}, None),
+        ])
+    return keymap
+
+
 # ------------------------------------------------------------------------------
 # Editor (Console)
 
@@ -7781,6 +7797,7 @@ def generate_keymaps(params=None):
         km_sequencercommon(params),
         km_sequencer(params),
         km_sequencerpreview(params),
+        km_sequencer_channels(params),
         km_console(params),
         km_clip(params),
         km_clip_editor(params),

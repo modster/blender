@@ -52,6 +52,8 @@
 
 #include "BLO_read_write.h"
 
+#include "SEQ_channels.h"
+#include "SEQ_render.h"
 #include "SEQ_sequencer.h"
 #include "SEQ_sound.h"
 

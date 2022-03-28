@@ -27,6 +27,7 @@
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
 
+#include "SEQ_channels.h"
 #include "SEQ_edit.h"
 #include "SEQ_effects.h"
 #include "SEQ_iterator.h"
@@ -134,6 +135,10 @@ Sequence *SEQ_sequence_alloc(ListBase *lb, int timeline_frame, int machine, int 
   seq->stereo3d_format = MEM_callocN(sizeof(Stereo3dFormat), "Sequence Stereo Format");
 
   seq->color_tag = SEQUENCE_COLOR_NONE;
+
+  if (seq->type == SEQ_TYPE_META) {
+    SEQ_channels_ensure(&seq->channels);
+  }
 
   SEQ_relations_session_uuid_generate(seq);
 
@@ -386,6 +391,7 @@ MetaStack *SEQ_meta_stack_alloc(Editing *ed, Sequence *seq_meta)
   BLI_addtail(&ed->metastack, ms);
   ms->parseq = seq_meta;
   ms->oldbasep = ed->seqbasep;
+  ms->old_channels = ed->active_channels;
   copy_v2_v2_int(ms->disp_range, &ms->parseq->startdisp);
   return ms;
 }
@@ -460,6 +466,9 @@ static Sequence *seq_dupli(const Scene *scene_src,
     BLI_listbase_clear(&seqn->seqbase);
     /* WARNING: This meta-strip is not recursively duplicated here - do this after! */
     // seq_dupli_recursive(&seq->seqbase, &seqn->seqbase);
+
+    BLI_listbase_clear(&seqn->channels);
+    SEQ_channels_duplicate(&seqn->channels, &seq->channels);
   }
   else if (seq->type == SEQ_TYPE_SCENE) {
     seqn->strip->stripdata = NULL;
@@ -686,6 +695,10 @@ static bool seq_write_data_cb(Sequence *seq, void *userdata)
   }
 
   SEQ_modifier_blend_write(writer, &seq->modifiers);
+
+  LISTBASE_FOREACH (SeqTimelineChannel *, channel, &seq->channels) {
+    BLO_write_struct(writer, SeqTimelineChannel, channel);
+  }
   return true;
 }
 
@@ -753,6 +766,8 @@ static bool seq_read_data_cb(Sequence *seq, void *user_data)
   }
 
   SEQ_modifier_blend_read_data(reader, &seq->modifiers);
+
+  BLO_read_list(reader, &seq->channels);
   return true;
 }
 void SEQ_blend_read(BlendDataReader *reader, ListBase *seqbase)

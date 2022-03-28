@@ -2950,10 +2950,10 @@ typedef enum eFontStyle_Align {
   UI_STYLE_TEXT_RIGHT = 2,
 } eFontStyle_Align;
 
-struct uiFontStyleDraw_Params {
+typedef struct uiFontStyleDraw_Params {
   eFontStyle_Align align;
   uint word_wrap : 1;
-};
+} uiFontStyleDraw_Params;
 
 /* Styled text draw */
 void UI_fontstyle_set(const struct uiFontStyle *fs);
