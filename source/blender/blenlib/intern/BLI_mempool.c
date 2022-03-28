@@ -355,32 +355,7 @@ void BLI_mempool_free(BLI_mempool *pool, void *addr)
 {
   BLI_freenode *newhead = addr;
 
-#ifndef NDEBUG
-  {
-    BLI_mempool_chunk *chunk;
-    bool found = false;
-    for (chunk = pool->chunks; chunk; chunk = chunk->next) {
-      if (ARRAY_HAS_ITEM((char *)addr, (char *)CHUNK_DATA(chunk), pool->csize)) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      BLI_assert_msg(0, "Attempt to free data which is not in pool.\n");
-    }
-  }
-
-  /* Enable for debugging. */
-  if (UNLIKELY(mempool_debug_memset)) {
-    memset(addr, 255, pool->esize);
-  }
-#endif
-
   if (pool->flag & BLI_MEMPOOL_ALLOW_ITER) {
-#ifndef NDEBUG
-    /* This will detect double free's. */
-    BLI_assert(newhead->freeword != FREEWORD);
-#endif
     newhead->freeword = FREEWORD;
   }
 

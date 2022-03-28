@@ -16,6 +16,14 @@
 
 #include <math.h>
 
+typedef struct EdgeFacePair {
+  int v1;
+  int v2;
+  int f1;
+  int f2;
+  uint16_t eflag;
+} EdgeFacePair;
+
 typedef struct LineartStaticMemPoolNode {
   Link item;
   size_t size;
@@ -474,7 +482,7 @@ typedef struct LineartObjectInfo {
 
 typedef struct LineartObjectLoadTaskInfo {
   struct LineartRenderBuffer *rb;
-  struct Depsgraph *dg;
+  int thread_id;
   /* LinkNode styled list */
   LineartObjectInfo *pending;
   /* Used to spread the load across several threads. This can not overflow. */
