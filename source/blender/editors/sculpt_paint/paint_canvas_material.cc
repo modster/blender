@@ -27,45 +27,78 @@
 namespace blender::ed::sculpt_paint::canvas {
 
 /**
- * Encode the given material slot and resource index into a single int32_t.
- *
- * Result is used in rna enums.
+ * @brief Store a material slot and resource index encoded as an int.
  */
-int32_t encode(uint16_t material_slot, uint16_t resource_index)
-{
-  int encoded = material_slot;
-  encoded <<= 16;
-  encoded |= resource_index;
-  return encoded;
-}
+struct MaterialResourceIndex {
+ private:
+  int32_t encoded_;
 
-/**
- * Decode the given encoded value into a material slot.
- */
-uint16_t decode_material_slot(int32_t encoded_value)
-{
-  return encoded_value >> 16;
-}
+ public:
+  MaterialResourceIndex(int32_t encoded) : encoded_(encoded)
+  {
+  }
 
-/**
- * Decide the given encoded value into a resource index.
- */
-uint16_t decode_resource_index(int32_t encoded_value)
-{
-  return encoded_value & 65535;
-}
+  MaterialResourceIndex(uint16_t material_slot, uint16_t resource_index)
+      : encoded_(MaterialResourceIndex::encode(material_slot, resource_index))
+  {
+  }
+
+  /**
+   * Decode the given encoded value into a material slot.
+   */
+  uint16_t material_slot() const
+  {
+    return encoded_ >> 16;
+  }
+
+  /**
+   * Decode the given encoded value into a resource index.
+   */
+  uint16_t resource_index() const
+  {
+    return encoded_ & 65535;
+  }
+
+  /**
+   * @brief Get the encoded value.
+   *
+   * @return int32_t
+   */
+  int32_t encoded() const
+  {
+    return encoded_;
+  }
+
+ private:
+  /**
+   * Encode the given material slot and resource index into a single int32_t.
+   *
+   * Result is used in rna enums.
+   */
+  int32_t encode(uint16_t material_slot, uint16_t resource_index)
+  {
+    int encoded = material_slot;
+    encoded <<= 16;
+    encoded |= resource_index;
+    return encoded;
+  }
+};
 
 struct MaterialCanvas {
-  uint16_t material_slot;
-  uint16_t resource_index;
+  MaterialResourceIndex material_resource;
 
   bNode *node;
   EnumPropertyItem rna_enum_item;
 
   MaterialCanvas(uint16_t material_slot, uint16_t resource_index, bNode *node)
-      : material_slot(material_slot), resource_index(resource_index), node(node)
+      : material_resource(material_slot, resource_index), node(node)
   {
     init_rna_enum_item();
+  }
+
+  uint16_t resource_index() const
+  {
+    return material_resource.resource_index();
   }
 
  private:
@@ -90,7 +123,7 @@ struct MaterialCanvas {
   void init_rna_enum_item_image(Image *image)
   {
     BLI_assert(image != nullptr);
-    rna_enum_item.value = encode(material_slot, resource_index);
+    rna_enum_item.value = material_resource.encoded();
     rna_enum_item.identifier = image->id.name + 2;
     rna_enum_item.icon = ICON_IMAGE;
     rna_enum_item.name = image->id.name + 2;
@@ -99,7 +132,7 @@ struct MaterialCanvas {
 
   void init_rna_enum_item_color_attribute(const NodeShaderAttribute *attribute)
   {
-    rna_enum_item.value = encode(material_slot, resource_index);
+    rna_enum_item.value = material_resource.encoded();
     rna_enum_item.identifier = attribute->name;
     rna_enum_item.icon = ICON_COLOR;
     rna_enum_item.name = attribute->name;
@@ -184,7 +217,7 @@ struct MaterialCanvases {
   const std::optional<MaterialCanvas> find(uint16_t resource_index) const
   {
     for (const MaterialCanvas &item : items) {
-      if (item.resource_index == resource_index) {
+      if (item.resource_index() == resource_index) {
         return item;
       }
     }
@@ -351,21 +384,15 @@ int ED_paint_canvas_material_get(Object *ob)
 
 void ED_paint_canvas_material_set(Object *ob, int new_value)
 {
-  const uint16_t resource_index = decode_resource_index(new_value);
-  const uint16_t material_slot = decode_material_slot(new_value);
+  const MaterialResourceIndex material_resource(new_value);
 
-  SculptSession *ss = ob->sculpt;
-  if (ss != nullptr) {
-    ss->mode.paint.resource_index = resource_index;
-    ss->mode.paint.material_slot = material_slot;
-  }
-
-  std::optional<MaterialWrapper> material = get_material_in_slot(ob, material_slot);
+  std::optional<MaterialWrapper> material = get_material_in_slot(
+      ob, material_resource.material_slot());
   if (!material.has_value()) {
     return;
   }
   material->activate(ob);
-  material->activate(ob, resource_index);
+  material->activate(ob, material_resource.resource_index());
 }
 
 void ED_paint_canvas_material_itemf(Object *ob, struct EnumPropertyItem **r_items, int *r_totitem)
