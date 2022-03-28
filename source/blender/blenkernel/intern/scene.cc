@@ -535,7 +535,7 @@ static void scene_foreach_paint(LibraryForeachIDData *data,
      *    this is equivalent to simply looping over slots from `paint`.
      *  - In case we do `undo_restore`, we only want to consider the slots from the old one, since
      *    those are the one we keep in the end.
-     *    + In case the new data has less valid slots, we feed in a dummy nullptr pointer.
+     *    + In case the new data has less valid slots, we feed in a dummy null pointer.
      *    + In case the new data has more valid slots, the extra ones are ignored.
      */
     Brush *brush_tmp = nullptr;
