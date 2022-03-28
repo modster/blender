@@ -123,7 +123,22 @@ struct MaterialCanvas {
         }
         break;
       }
+
+      default:
+        BLI_assert_unreachable();
     }
+  }
+
+  eV3DShadingColorType shading_color_override() const
+  {
+    switch (node->type) {
+      case SH_NODE_TEX_IMAGE:
+        return V3D_SHADING_TEXTURE_COLOR;
+      case SH_NODE_ATTRIBUTE:
+        return V3D_SHADING_VERTEX_COLOR;
+    }
+    BLI_assert_unreachable();
+    return V3D_SHADING_MATERIAL_COLOR;
   }
 
   static bool supports(const Object *ob, bNode *node)
@@ -216,6 +231,27 @@ struct MaterialWrapper {
     std::sort(result.items.begin(), result.items.end());
 
     return result;
+  }
+
+  std::optional<MaterialCanvas> active_canvas(const Object *ob) const
+  {
+    if (!ma->use_nodes) {
+      return std::nullopt;
+    }
+
+    uint16_t resource_index = 0;
+    LISTBASE_FOREACH (bNode *, node, &ma->nodetree->nodes) {
+      if (!MaterialCanvas::supports(ob, node)) {
+        continue;
+      }
+      if ((node->flag & NODE_ACTIVE) == 0) {
+        resource_index += 1;
+        continue;
+      }
+      return MaterialCanvas(material_slot, resource_index, node);
+    }
+
+    return std::nullopt;
   }
 
   void append_rna_itemf(struct EnumPropertyItem **r_items, int *r_totitem)
@@ -346,5 +382,47 @@ void ED_paint_canvas_material_itemf(Object *ob, struct EnumPropertyItem **r_item
       RNA_enum_item_add(r_items, r_totitem, &canvas.rna_enum_item);
     }
   }
+}
+
+eV3DShadingColorType ED_paint_draw_color_override(const PaintModeSettings *settings,
+                                                  Object *ob,
+                                                  eV3DShadingColorType orig_color_type)
+{
+  if (ob->sculpt == nullptr) {
+    return orig_color_type;
+  }
+
+  eV3DShadingColorType override = orig_color_type;
+  switch (settings->canvas_source) {
+    case PAINT_CANVAS_COLOR_ATTRIBUTE:
+      override = V3D_SHADING_VERTEX_COLOR;
+      break;
+    case PAINT_CANVAS_IMAGE:
+      override = V3D_SHADING_TEXTURE_COLOR;
+      break;
+    case PAINT_CANVAS_MATERIAL: {
+      std::optional<MaterialWrapper> material = get_active_material(ob);
+      if (!material.has_value()) {
+        break;
+      }
+      std::optional<MaterialCanvas> canvas = material->active_canvas(ob);
+      if (!canvas.has_value()) {
+        break;
+      }
+
+      override = canvas->shading_color_override();
+      break;
+    }
+  }
+
+  /* Reset to original color based on enabled experimental features */
+  if (!U.experimental.use_sculpt_vertex_colors && override == V3D_SHADING_VERTEX_COLOR) {
+    return orig_color_type;
+  }
+  if (!U.experimental.use_sculpt_texture_paint && override == V3D_SHADING_TEXTURE_COLOR) {
+    return orig_color_type;
+  }
+
+  return override;
 }
 }

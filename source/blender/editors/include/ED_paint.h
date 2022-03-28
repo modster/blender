@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "DNA_view3d_enums.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -115,6 +117,11 @@ void ED_paint_canvas_material_set(struct Object *ob, int new_value);
 void ED_paint_canvas_material_itemf(struct Object *ob,
                                     struct EnumPropertyItem **r_items,
                                     int *r_totitem);
+
+/** Color type of an object can be overridden in sculpt/paint mode. */
+eV3DShadingColorType ED_paint_draw_color_override(const struct PaintModeSettings *settings,
+                                                  struct Object *ob,
+                                                  eV3DShadingColorType orig_color_type);
 
 #ifdef __cplusplus
 }
