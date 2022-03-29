@@ -8,9 +8,12 @@
 #include <stdlib.h>
 
 #include "DNA_material_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_texture_types.h"
 
 #include "BLI_math.h"
+
+#include "BKE_customdata.h"
 
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
@@ -136,10 +139,9 @@ static void rna_Material_texpaint_begin(CollectionPropertyIterator *iter, Pointe
       iter, (void *)ma->texpaintslot, sizeof(TexPaintSlot), ma->tot_slots, 0, NULL);
 }
 
-static void rna_Material_active_paint_texture_index_update(Main *bmain,
-                                                           Scene *UNUSED(scene),
-                                                           PointerRNA *ptr)
+static void rna_Material_active_paint_texture_index_update(bContext *C, PointerRNA *ptr)
 {
+  Main *bmain = CTX_data_main(C);
   bScreen *screen;
   Material *ma = (Material *)ptr->owner_id;
 
@@ -152,24 +154,45 @@ static void rna_Material_active_paint_texture_index_update(Main *bmain,
   }
 
   if (ma->texpaintslot) {
-    Image *image = ma->texpaintslot[ma->paint_active_slot].ima;
-    for (screen = bmain->screens.first; screen; screen = screen->id.next) {
-      wmWindow *win = ED_screen_window_find(screen, bmain->wm.first);
-      if (win == NULL) {
-        continue;
-      }
+    TexPaintSlot *slot = &ma->texpaintslot[ma->paint_active_slot];
+    Image *image = slot->ima;
+    if (image) {
+      for (screen = bmain->screens.first; screen; screen = screen->id.next) {
+        wmWindow *win = ED_screen_window_find(screen, bmain->wm.first);
+        if (win == NULL) {
+          continue;
+        }
 
-      ScrArea *area;
-      for (area = screen->areabase.first; area; area = area->next) {
-        SpaceLink *sl;
-        for (sl = area->spacedata.first; sl; sl = sl->next) {
-          if (sl->spacetype == SPACE_IMAGE) {
-            SpaceImage *sima = (SpaceImage *)sl;
-            if (!sima->pin) {
-              ED_space_image_set(bmain, sima, image, true);
+        ScrArea *area;
+        for (area = screen->areabase.first; area; area = area->next) {
+          SpaceLink *sl;
+          for (sl = area->spacedata.first; sl; sl = sl->next) {
+            if (sl->spacetype == SPACE_IMAGE) {
+              SpaceImage *sima = (SpaceImage *)sl;
+              if (!sima->pin) {
+                ED_space_image_set(bmain, sima, image, true);
+              }
             }
           }
         }
+      }
+    }
+
+    /* For compatibility reasons with sculpt vertex paint we make the color attribute active.
+     * TODO(jbakker): In the future we should migrate vertex painting to use TexPaintSlots
+     * directly.
+     */
+    if (slot->attribute_name) {
+      Object *ob = CTX_data_active_object(C);
+      if (ob != NULL && ob->type == OB_MESH) {
+        Mesh *mesh = ob->data;
+        int layer = CustomData_get_named_layer_index(
+            &mesh->vdata, CD_PROP_COLOR, slot->attribute_name);
+        if (layer != -1) {
+          CustomData_set_layer_active_index(&mesh->vdata, CD_PROP_COLOR, layer);
+        }
+        DEG_id_tag_update(&ob->id, 0);
+        WM_main_add_notifier(NC_GEOM | ND_DATA, &ob->id);
       }
     }
   }
@@ -302,7 +325,7 @@ static int rna_TexPaintSlot_name_length(PointerRNA *ptr)
 {
   TexPaintSlot *data = (TexPaintSlot *)(ptr->data);
   if (data->ima != NULL) {
-    return strlen(data->ima->id.name);
+    return strlen(data->ima->id.name) - 2;
   }
   if (data->attribute_name != NULL) {
     return strlen(data->attribute_name);
@@ -1056,6 +1079,7 @@ void rna_def_texpaint_slots(BlenderRNA *brna, StructRNA *srna)
   RNA_def_property_range(prop, 0, SHRT_MAX);
   RNA_def_property_ui_text(
       prop, "Active Paint Texture Index", "Index of active texture paint slot");
+  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
   RNA_def_property_update(
       prop, NC_MATERIAL | ND_SHADING_LINKS, "rna_Material_active_paint_texture_index_update");
 

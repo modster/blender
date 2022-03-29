@@ -36,6 +36,13 @@ static TexPaintSlot *get_active_slot(Object *ob)
   if (mat == nullptr) {
     return nullptr;
   }
+  if (mat->texpaintslot == nullptr) {
+    return nullptr;
+  }
+  if (mat->paint_active_slot >= mat->tot_slots) {
+    return nullptr;
+  }
+
   TexPaintSlot *slot = &mat->texpaintslot[mat->paint_active_slot];
   return slot;
 }
