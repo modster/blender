@@ -4718,11 +4718,11 @@ static NURBSValidationStatus nurb_check_valid(const int pnts,
   if (pnts <= 1) {
     return NURBSValidationStatus::AtLeastTwoPointsRequired;
   }
-  else if (type == CU_NURBS) {
+  if (type == CU_NURBS) {
     if (pnts < order) {
       return NURBSValidationStatus::MorePointsThanOrderRequired;
     }
-    else if (flag & CU_NURB_BEZIER) {
+    if (flag & CU_NURB_BEZIER) {
       int points_needed = 0;
       if (flag & CU_NURB_CYCLIC) {
         const int remainder = pnts % (order - 1);
@@ -4765,7 +4765,7 @@ bool BKE_nurb_valid_message(const int pnts,
         message_dst[0] = 0;
         return false;
       }
-      msg_template = TIP_("At least two points required.");
+      msg_template = TIP_("At least two points required");
       break;
     case NURBSValidationStatus::MorePointsThanOrderRequired:
       msg_template = TIP_("Must have more control points than Order");

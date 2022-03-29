@@ -465,6 +465,7 @@ typedef struct ImageFormatData {
 #define R_IMF_IMTYPE_XVID 32
 #define R_IMF_IMTYPE_THEORA 33
 #define R_IMF_IMTYPE_PSD 34
+#define R_IMF_IMTYPE_WEBP 35
 
 #define R_IMF_IMTYPE_INVALID 255
 
@@ -1989,7 +1990,7 @@ enum {
 
 /* sequencer seq_prev_type seq_rend_type */
 
-/** #RenderData.engine (scene.c) */
+/** #RenderData.engine (scene.cc) */
 extern const char *RE_engine_id_BLENDER_EEVEE;
 extern const char *RE_engine_id_BLENDER_WORKBENCH;
 extern const char *RE_engine_id_CYCLES;
