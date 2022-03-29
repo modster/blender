@@ -1,13 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include <optional>
-
 #include "ED_paint.h"
 
-#include "BLI_string_ref.hh"
-#include "BLI_vector.hh"
-
-#include "DNA_image_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_node_types.h"
@@ -16,16 +10,10 @@
 #include "BKE_context.h"
 #include "BKE_customdata.h"
 #include "BKE_material.h"
-#include "BKE_paint.h"
 
 #include "DEG_depsgraph.h"
 
 #include "NOD_shader.h"
-
-#include "UI_resources.h"
-
-#include "RNA_access.h"
-#include "RNA_define.h"
 
 #include "WM_toolsystem.h"
 
