@@ -3145,7 +3145,7 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   BLI_spin_end(&rb->lock_cuts);
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
-  for (int i = 0; i < rb->thread_count; i++) {
+  for (int i = 0; i < rb->bounding_area_initial_count; i++) {
     BLI_spin_end(&rb->lock_bounding_areas[i]);
   }
 
@@ -3313,11 +3313,6 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
 
   rb->thread_count = BKE_render_num_threads(&scene->r);
 
-  rb->lock_bounding_areas = lineart_mem_acquire(&rb->render_data_pool,
-                                                sizeof(SpinLock) * rb->thread_count);
-  for (int i = 0; i < rb->thread_count; i++) {
-    BLI_spin_init(&rb->lock_bounding_areas[i]);
-  }
   return rb;
 }
 
@@ -3347,9 +3342,14 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
   rb->width_per_tile = span_w;
   rb->height_per_tile = span_h;
 
-  rb->bounding_area_count = sp_w * sp_h;
+  rb->bounding_area_initial_count = sp_w * sp_h;
   rb->initial_bounding_areas = lineart_mem_acquire(
-      &rb->render_data_pool, sizeof(LineartBoundingArea) * rb->bounding_area_count);
+      &rb->render_data_pool, sizeof(LineartBoundingArea) * rb->bounding_area_initial_count);
+  rb->lock_bounding_areas = lineart_mem_acquire(
+      &rb->render_data_pool, sizeof(SpinLock) * rb->bounding_area_initial_count);
+  for (int i = 0; i < rb->bounding_area_initial_count; i++) {
+    BLI_spin_init(&rb->lock_bounding_areas[i]);
+  }
 
   int i_ba = 0;
 
@@ -3376,7 +3376,7 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
                                              sizeof(LineartEdge *) * ba->max_line_count);
 
       /* Spatial lock assignment. */
-      ba->lock = &rb->lock_bounding_areas[i_ba / lock_group_inc];
+      ba->lock = &rb->lock_bounding_areas[i_ba % rb->bounding_area_initial_count];
       i_ba++;
 
       /* Link adjacent ones. */
@@ -3648,8 +3648,6 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
           rb, &cba[3], tri, b, 0, recursive_level + 1, false, false, NULL);
     }
   }
-
-  rb->bounding_area_count += 3;
 }
 
 static bool lineart_bounding_area_edge_intersect(LineartRenderBuffer *UNUSED(fb),
