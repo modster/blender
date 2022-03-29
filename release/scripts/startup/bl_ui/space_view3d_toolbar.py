@@ -278,7 +278,7 @@ class VIEW3D_PT_tools_posemode_options(View3DPanel, Panel):
 class TEXTURE_UL_texpaintslots(UIList):
     def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
         # mat = data
-        
+
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             layout.prop(item, "name", text="", emboss=False, icon_value=icon)
         elif self.layout_type == 'GRID':
