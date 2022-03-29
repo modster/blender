@@ -514,7 +514,7 @@ int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settin
 bool ED_paint_tool_use_canvas(struct bContext *C, struct Object *ob)
 {
   /* Quick exit, only sculpt tools can use canvas. */
-  if (ob->sculpt == nullptr) {
+  if (ob == nullptr || ob->sculpt == nullptr) {
     return false;
   }
 

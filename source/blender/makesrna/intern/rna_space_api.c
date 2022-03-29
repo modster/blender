@@ -14,6 +14,7 @@
 #  include "BKE_global.h"
 
 #  include "ED_fileselect.h"
+#  include "ED_paint.h"
 #  include "ED_screen.h"
 #  include "ED_text.h"
 
@@ -57,6 +58,12 @@ static void rna_SpaceTextEditor_region_location_from_cursor(
   }
 }
 
+static void rna_SpaceView3D_uses_paint_canvas(View3D *UNUSED(v3d), bContext *C, bool *r_result)
+{
+  Object *ob = CTX_data_active_object(C);
+  *r_result = ED_paint_tool_use_canvas(C, ob);
+}
+
 #else
 
 void RNA_api_region_view3d(StructRNA *srna)
@@ -66,6 +73,20 @@ void RNA_api_region_view3d(StructRNA *srna)
   func = RNA_def_function(srna, "update", "rna_RegionView3D_update");
   RNA_def_function_flag(func, FUNC_USE_SELF_ID | FUNC_USE_CONTEXT);
   RNA_def_function_ui_description(func, "Recalculate the view matrices");
+}
+
+void RNA_api_space_view3d(StructRNA *srna)
+{
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  func = RNA_def_function(srna, "uses_paint_canvas", "rna_SpaceView3D_uses_paint_canvas");
+  RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+  RNA_def_function_ui_description(func, "Does this view have a canvas active for painting");
+  parm = RNA_def_boolean(
+      func, "result", false, "Use Paint Canvas", "Is there an active painting canvas");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  RNA_def_function_output(func, parm);
 }
 
 void RNA_api_space_node(StructRNA *srna)

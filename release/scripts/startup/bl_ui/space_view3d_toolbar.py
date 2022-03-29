@@ -2227,20 +2227,9 @@ class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
     def poll(cls, context):
         if not context.preferences.experimental.use_sculpt_vertex_colors:
             return False
-
-        if context.active_object is None:
+        if context.space_data is None:
             return False
-
-        # TODO: connect to ED_paint_tool_use_canvas.
-        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
-        tool_context = ToolSelectPanelHelper.tool_active_from_context(context)
-        if not tool_context:
-            return False
-            
-        return tool_context.idname in [
-            "builtin_brush.Paint",
-            "builtin.color_filter",
-        ]
+        return context.space_data.uses_paint_canvas()
 
     def draw(self, context):
         layout = self.layout
