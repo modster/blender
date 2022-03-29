@@ -258,7 +258,7 @@ typedef struct LineartRenderBuffer {
   float overscan;
 
   struct LineartBoundingArea *initial_bounding_areas;
-  unsigned int bounding_area_count;
+  unsigned int bounding_area_initial_count;
 
   /* Array of thread_count length for spatial locks. */
   SpinLock *lock_bounding_areas;
