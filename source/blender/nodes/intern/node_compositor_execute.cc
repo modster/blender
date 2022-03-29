@@ -421,13 +421,25 @@ void Operation::pre_execute()
 
 void Operation::evaluate_input_processors()
 {
-  /* First add all needed processors for each input. */
+  /* First, add all needed processors for each input. */
   for (const StringRef &identifier : inputs_to_results_map_.keys()) {
     add_implicit_conversion_input_processor_if_needed(identifier);
     add_realize_on_domain_input_processor_if_needed(identifier);
   }
 
-  /* Then evaluate the input processors in order. */
+  /* Then, switch the result mapped for each input of the operation to be that of the last
+   * processor for that input if any input processor exist for it. */
+  for (const StringRef &identifier : inputs_to_results_map_.keys()) {
+    Vector<ProcessorOperation *> &processors = input_processors_.lookup_or_add_default(identifier);
+    /* No input processors, nothing to do. */
+    if (processors.is_empty()) {
+      continue;
+    }
+    /* Replace the currently mapped result with the result of the last input processor. */
+    switch_result_mapped_to_input(identifier, &processors.last()->get_result());
+  }
+
+  /* Finally, evaluate the input processors in order. */
   for (const Vector<ProcessorOperation *> &processors : input_processors_.values()) {
     for (ProcessorOperation *processor : processors) {
       processor->evaluate();
@@ -530,11 +542,11 @@ void Operation::add_input_processor(StringRef identifier, ProcessorOperation *pr
    * processor or not. */
   Result &result = processors.is_empty() ? get_input(identifier) : processors.last()->get_result();
 
-  /* Set the input result of the processor, add it to the processors vector, and switch the result
-   * mapped to the input to the result of the last processor. */
+  /* Map the input result of the processor and add it to the processors vector. No need to map the
+   * result of the processor to the operation input as this will be done later in
+   * evaluate_input_processors. */
   processor->map_input_to_result(&result);
   processors.append(processor);
-  switch_result_mapped_to_input(identifier, &processor->get_result());
 }
 
 void Operation::release_inputs()

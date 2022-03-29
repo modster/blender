@@ -447,10 +447,14 @@ class Operation {
    * overridden by node operations to compute results for unlinked sockets. */
   virtual void pre_execute();
 
-  /* Add all the necessary input processors for each input, then evaluate them. This is called
-   * before executing the operation to prepare its inputs but after the pre_execute method was
-   * called. The class defines a default implementation, but derived class can override the method
-   * to have a different implementation, extend the implementation, or remove it. */
+  /* First, all the necessary input processors for each input. Then update the result mapped to
+   * each input to be that of the last processor for that input if any input processors exist for
+   * it. This is done now in a separate step after all processors were added because the operation
+   * might use the original mapped results to determine what processors needs to be added. Finally,
+   * evaluate all input processors in order. This is called before executing the operation to
+   * prepare its inputs but after the pre_execute method was called. The class defines a default
+   * implementation, but derived class can override the method to have a different
+   * implementation, extend the implementation, or remove it. */
   virtual void evaluate_input_processors();
 
   /* This method should allocate the operation results, execute the operation, and compute the
@@ -496,13 +500,10 @@ class Operation {
   /* Add the given input processor operation to the list of input processors for the input
    * identified by the given identifier. This will also involve mapping the input of the processor
    * to be the result of the last input processor or the result mapped to the input if no previous
-   * processors exists. Finally, the result mapped to the input is switched to be the result of the
-   * newly added processor. */
+   * processors exists. The result of the last input processor will not be mapped to the operation
+   * input in this method, this will be done later, see evaluate_input_processors for more
+   * information. */
   void add_input_processor(StringRef identifier, ProcessorOperation *processor);
-
-  /* Allocate all input processors in order. This is called before allocating the operation but
-   * after the pre_allocate method was called. */
-  void allocate_input_processors();
 
   /* Release the results that are mapped to the inputs of the operation. This is called after the
    * evaluation of the operation to declare that the results are no longer needed by this
