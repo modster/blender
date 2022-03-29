@@ -802,6 +802,16 @@ float MOD_lineart_chain_compute_length(LineartEdgeChain *ec);
 
 void ED_operatortypes_lineart(void);
 
+int moller_tri_tri_intersect_with_isectline(double V0[3],
+                                            double V1[3],
+                                            double V2[3],
+                                            double U0[3],
+                                            double U1[3],
+                                            double U2[3],
+                                            int *coplanar,
+                                            double isectpt1[3],
+                                            double isectpt2[3]);
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -2990,6 +2990,18 @@ static bool lineart_embree_triangle_intersect(LineartTriangle *tri,
     }
   }
   else {
+
+    int coplanar;
+    int res_moller = moller_tri_tri_intersect_with_isectline(tri->v[0]->gloc,
+                                                             tri->v[1]->gloc,
+                                                             tri->v[2]->gloc,
+                                                             testing->v[0]->gloc,
+                                                             testing->v[1]->gloc,
+                                                             testing->v[2]->gloc,
+                                                             &coplanar,
+                                                             r_v1,
+                                                             r_v2);
+    return res_moller && !coplanar;
     /* If not sharing any points, then we need to try all the possibilities. */
 
     int pcount = 0;
@@ -3546,35 +3558,35 @@ OcclusionCollideFunc(void *userPtr, struct RTCCollision *collisions, unsigned in
     float pa[9], pb[9];
     // float *pb = geom_triangle->points;
 
-    copy_v3fl_v3db(&pa[0], prim_edge->v1->gloc);
-    copy_v3fl_v3db(&pa[3], prim_edge->v2->gloc);
-    copy_v3fl_v3db(&pa[6], rb->camera_pos);
-    copy_v3fl_v3db(&pb[0], prim_triangle->v[0]->gloc);
-    copy_v3fl_v3db(&pb[3], prim_triangle->v[1]->gloc);
-    copy_v3fl_v3db(&pb[6], prim_triangle->v[2]->gloc);
+    // copy_v3fl_v3db(&pa[0], prim_edge->v1->gloc);
+    // copy_v3fl_v3db(&pa[3], prim_edge->v2->gloc);
+    // copy_v3fl_v3db(&pa[6], rb->camera_pos);
+    // copy_v3fl_v3db(&pb[0], prim_triangle->v[0]->gloc);
+    // copy_v3fl_v3db(&pb[3], prim_triangle->v[1]->gloc);
+    // copy_v3fl_v3db(&pb[6], prim_triangle->v[2]->gloc);
 
     // uint32_t *tb = geom_triangle->looptri[collisions[i].primID1].tri;
     float i1[3], i2[3];
-    if (lineart_isect_tri_tri_v3_check_overlap(
-            &pa[0], &pa[3], &pa[6], &pb[0], &pb[3], &pb[6], i1, i2)) {
-      // lineart_add_occlusion_pair_thread(rb, eln_edge, eln_triangle, prim_edge, prim_triangle);
-      double l, r;
-      if (lineart_triangle_edge_image_space_occlusion(NULL,
-                                                      prim_triangle,
-                                                      prim_edge,
-                                                      rb->camera_pos,
-                                                      rb->cam_is_persp,
-                                                      rb->allow_overlapping_edges,
-                                                      rb->view_projection,
-                                                      rb->view_vector,
-                                                      rb->shift_x,
-                                                      rb->shift_y,
-                                                      &l,
-                                                      &r)) {
-        lineart_thread_add_occlusion_pair(
-            rb->thread_occlusion_data, eln_edge, eln_triangle, prim_edge, prim_triangle, l, r);
-      }
+    // if (lineart_isect_tri_tri_v3_check_overlap(
+    //        &pa[0], &pa[3], &pa[6], &pb[0], &pb[3], &pb[6], i1, i2)) {
+    // lineart_add_occlusion_pair_thread(rb, eln_edge, eln_triangle, prim_edge, prim_triangle);
+    double l, r;
+    if (lineart_triangle_edge_image_space_occlusion(NULL,
+                                                    prim_triangle,
+                                                    prim_edge,
+                                                    rb->camera_pos,
+                                                    rb->cam_is_persp,
+                                                    rb->allow_overlapping_edges,
+                                                    rb->view_projection,
+                                                    rb->view_vector,
+                                                    rb->shift_x,
+                                                    rb->shift_y,
+                                                    &l,
+                                                    &r)) {
+      lineart_thread_add_occlusion_pair(
+          rb->thread_occlusion_data, eln_edge, eln_triangle, prim_edge, prim_triangle, l, r);
     }
+    //}
   }
 }
 
