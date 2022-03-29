@@ -2756,8 +2756,8 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
   //- Assign the number of objects instead of number of threads
   printf("thread start: %d\n", olti->thread_id);
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
-    lineart_geometry_object_load_no_bmesh(obi, olti->rb);
-    // lineart_geometry_object_load(obi, olti->rb);
+    // lineart_geometry_object_load_no_bmesh(obi, olti->rb);
+    lineart_geometry_object_load(obi, olti->rb);
     printf("thread id: %d processed: %d\n", olti->thread_id, obi->original_me->totpoly);
   }
   printf("thread end: %d\n", olti->thread_id);
@@ -3823,7 +3823,7 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
 
   BLI_spin_end(&rb->lock_task);
   BLI_spin_end(&rb->lock_cuts);
-  BLI_spin_end(&rb->render_data_pool.lock_mem);
+  // BLI_spin_end(&rb->render_data_pool.lock_mem);
 
   for (int i = 0; i < rb->bounding_area_initial_count; i++) {
     BLI_spin_end(&rb->lock_bounding_areas[i]);
@@ -3989,7 +3989,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
 
   BLI_spin_init(&rb->lock_task);
   BLI_spin_init(&rb->lock_cuts);
-  BLI_spin_init(&rb->render_data_pool.lock_mem);
+  // BLI_spin_init(&rb->render_data_pool.lock_mem);
 
   rb->thread_count = BKE_render_num_threads(&scene->r);
 
@@ -4093,7 +4093,7 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
 {
   LineartBoundingArea *ba = root->child, *tba;
   LinkData *lip2, *next_lip;
-  LineartStaticMemPool *mph = &rb->render_data_pool;
+  LineartMemPool *mph = &rb->render_data_pool;
 
   /* Inter-connection with newly created 4 child bounding areas. */
   lineart_list_append_pointer_pool(&ba[1].rp, mph, &ba[0]);

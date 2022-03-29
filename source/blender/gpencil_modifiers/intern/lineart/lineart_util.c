@@ -21,7 +21,7 @@
 
 /* Line art memory and list helper */
 
-void *lineart_list_append_pointer_pool(ListBase *list, LineartStaticMemPool *smp, void *data)
+void *lineart_list_append_pointer_pool(ListBase *list, LineartMemPool *smp, void *data)
 {
   LinkData *lip;
   if (list == NULL) {
@@ -33,7 +33,7 @@ void *lineart_list_append_pointer_pool(ListBase *list, LineartStaticMemPool *smp
   return lip;
 }
 void *lineart_list_append_pointer_pool_sized(ListBase *list,
-                                             LineartStaticMemPool *smp,
+                                             LineartMemPool *smp,
                                              void *data,
                                              int size)
 {
@@ -46,9 +46,7 @@ void *lineart_list_append_pointer_pool_sized(ListBase *list,
   BLI_addtail(list, lip);
   return lip;
 }
-void *lineart_list_append_pointer_pool_thread(ListBase *list,
-                                              LineartStaticMemPool *smp,
-                                              void *data)
+void *lineart_list_append_pointer_pool_thread(ListBase *list, LineartMemPool *smp, void *data)
 {
   LinkData *lip;
   if (list == NULL) {
@@ -60,7 +58,7 @@ void *lineart_list_append_pointer_pool_thread(ListBase *list,
   return lip;
 }
 void *lineart_list_append_pointer_pool_sized_thread(ListBase *list,
-                                                    LineartStaticMemPool *smp,
+                                                    LineartMemPool *smp,
                                                     void *data,
                                                     int size)
 {
@@ -90,7 +88,7 @@ void lineart_list_remove_pointer_item_no_free(ListBase *list, LinkData *lip)
   BLI_remlink(list, (void *)lip);
 }
 
-LineartStaticMemPoolNode *lineart_mem_new_static_pool(LineartStaticMemPool *smp, size_t size)
+LineartStaticMemPoolNode *lineart_mem_new_static_pool(_LineartMemPool *smp, size_t size)
 {
   size_t set_size = size;
   if (set_size < LRT_MEMORY_POOL_1MB) {
@@ -103,8 +101,14 @@ LineartStaticMemPoolNode *lineart_mem_new_static_pool(LineartStaticMemPool *smp,
   BLI_addhead(&smp->pools, smpn);
   return smpn;
 }
-void *lineart_mem_acquire(LineartStaticMemPool *smp, size_t size)
+void *lineart_mem_acquire(LineartMemPool *mp, size_t size)
 {
+  if (!(*mp)) {
+    (*mp) = lineart_mem_init();
+  }
+
+  _LineartMemPool *smp = lineart_mem_local(*mp);
+
   LineartStaticMemPoolNode *smpn = smp->pools.first;
   void *ret;
 
@@ -118,11 +122,14 @@ void *lineart_mem_acquire(LineartStaticMemPool *smp, size_t size)
 
   return ret;
 }
-void *lineart_mem_acquire_thread(LineartStaticMemPool *smp, size_t size)
+void *lineart_mem_acquire_thread(LineartMemPool *mp, size_t size)
 {
+  /* Do not to automatic initialization in thread calls. */
+  BLI_assert((*mp) != NULL);
+
   void *ret;
 
-  BLI_spin_lock(&smp->lock_mem);
+  _LineartMemPool *smp = lineart_mem_local(*mp);
 
   LineartStaticMemPoolNode *smpn = smp->pools.first;
 
@@ -134,16 +141,12 @@ void *lineart_mem_acquire_thread(LineartStaticMemPool *smp, size_t size)
 
   smpn->used_byte += size;
 
-  BLI_spin_unlock(&smp->lock_mem);
-
   return ret;
 }
-void lineart_mem_destroy(LineartStaticMemPool *smp)
+
+void lineart_mem_destroy(LineartMemPool *mp)
 {
-  LineartStaticMemPoolNode *smpn;
-  while ((smpn = BLI_pophead(&smp->pools)) != NULL) {
-    MEM_freeN(smpn);
-  }
+  lineart_mem_destroy_internal(mp);
 }
 
 void lineart_prepend_edge_direct(void **list_head, void *node)
@@ -153,7 +156,7 @@ void lineart_prepend_edge_direct(void **list_head, void *node)
   (*list_head) = e_n;
 }
 
-void lineart_prepend_pool(LinkNode **first, LineartStaticMemPool *smp, void *link)
+void lineart_prepend_pool(LinkNode **first, LineartMemPool *smp, void *link)
 {
   LinkNode *ln = lineart_mem_acquire_thread(smp, sizeof(LinkNode));
   ln->next = (*first);
@@ -220,7 +223,9 @@ void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer *rb)
   size_t sum_this = 0;
   size_t count_this = 0;
 
-  LISTBASE_FOREACH (LineartStaticMemPoolNode *, smpn, &rb->render_data_pool.pools) {
+  _LineartMemPool *mp = lineart_mem_local(rb->render_data_pool);
+
+  LISTBASE_FOREACH (LineartStaticMemPoolNode *, smpn, &mp->pools) {
     count_this++;
     sum_this += LRT_MEMORY_POOL_1MB;
   }
