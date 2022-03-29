@@ -1350,7 +1350,8 @@ static bNode *nodetree_uv_node_recursive(bNode *node)
 typedef bool (*ForEachTexNodeCallback)(bNode *node, void *userdata);
 static bool ntree_foreach_texnode_recursive(bNodeTree *nodetree,
                                             ForEachTexNodeCallback callback,
-                                            void *userdata)
+                                            void *userdata,
+                                            const bool do_color_attributes)
 {
   LISTBASE_FOREACH (bNode *, node, &nodetree->nodes) {
     if (node->typeinfo->nclass == NODE_CLASS_TEXTURE &&
@@ -1359,9 +1360,15 @@ static bool ntree_foreach_texnode_recursive(bNodeTree *nodetree,
         return false;
       }
     }
+    if (do_color_attributes && node->typeinfo->type == SH_NODE_ATTRIBUTE) {
+      if (!callback(node, userdata)) {
+        return false;
+      }
+    }
     else if (ELEM(node->type, NODE_GROUP, NODE_CUSTOM_GROUP) && node->id) {
       /* recurse into the node group and see if it contains any textures */
-      if (!ntree_foreach_texnode_recursive((bNodeTree *)node->id, callback, userdata)) {
+      if (!ntree_foreach_texnode_recursive(
+              (bNodeTree *)node->id, callback, userdata, do_color_attributes)) {
         return false;
       }
     }
@@ -1375,10 +1382,11 @@ static bool count_texture_nodes_cb(bNode *UNUSED(node), void *userdata)
   return true;
 }
 
-static int count_texture_nodes_recursive(bNodeTree *nodetree)
+static int count_texture_nodes_recursive(bNodeTree *nodetree, const bool do_color_attributes)
 {
   int tex_nodes = 0;
-  ntree_foreach_texnode_recursive(nodetree, count_texture_nodes_cb, &tex_nodes);
+  ntree_foreach_texnode_recursive(
+      nodetree, count_texture_nodes_cb, &tex_nodes, do_color_attributes);
 
   return tex_nodes;
 }
@@ -1402,21 +1410,35 @@ static bool fill_texpaint_slots_cb(bNode *node, void *userdata)
     ma->paint_active_slot = index;
   }
 
-  ma->texpaintslot[index].ima = (Image *)node->id;
-  ma->texpaintslot[index].interp = ((NodeTexImage *)node->storage)->interpolation;
+  switch (node->type) {
+    case SH_NODE_TEX_IMAGE: {
+      TexPaintSlot *slot = &ma->texpaintslot[index];
+      slot->ima = (Image *)node->id;
+      slot->interp = ((NodeTexImage *)node->storage)->interpolation;
+      /* for new renderer, we need to traverse the treeback in search of a UV node */
+      bNode *uvnode = nodetree_uv_node_recursive(node);
 
-  /* for new renderer, we need to traverse the treeback in search of a UV node */
-  bNode *uvnode = nodetree_uv_node_recursive(node);
+      if (uvnode) {
+        NodeShaderUVMap *storage = (NodeShaderUVMap *)uvnode->storage;
+        slot->uvname = storage->uv_map;
+        /* set a value to index so UI knows that we have a valid pointer for the mesh */
+        slot->valid = true;
+      }
+      else {
+        /* just invalidate the index here so UV map does not get displayed on the UI */
+        slot->valid = false;
+      }
+      break;
+    }
 
-  if (uvnode) {
-    NodeShaderUVMap *storage = (NodeShaderUVMap *)uvnode->storage;
-    ma->texpaintslot[index].uvname = storage->uv_map;
-    /* set a value to index so UI knows that we have a valid pointer for the mesh */
-    ma->texpaintslot[index].valid = true;
-  }
-  else {
-    /* just invalidate the index here so UV map does not get displayed on the UI */
-    ma->texpaintslot[index].valid = false;
+    case SH_NODE_ATTRIBUTE: {
+      TexPaintSlot *slot = &ma->texpaintslot[index];
+      NodeShaderAttribute *storage = node->storage;
+      slot->attribute_name = storage->name;
+      /* TODO(jbakker): check if attribute is a known color attribute for the active object... */
+      slot->valid = true;
+      break;
+    }
   }
 
   return fill_data->index != fill_data->slot_len;
@@ -1425,13 +1447,15 @@ static bool fill_texpaint_slots_cb(bNode *node, void *userdata)
 static void fill_texpaint_slots_recursive(bNodeTree *nodetree,
                                           bNode *active_node,
                                           Material *ma,
-                                          int slot_len)
+                                          int slot_len,
+                                          const bool do_color_attributes)
 {
   struct FillTexPaintSlotsData fill_data = {active_node, ma, 0, slot_len};
-  ntree_foreach_texnode_recursive(nodetree, fill_texpaint_slots_cb, &fill_data);
+  ntree_foreach_texnode_recursive(
+      nodetree, fill_texpaint_slots_cb, &fill_data, do_color_attributes);
 }
 
-void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma)
+void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma, const bool do_color_attributes)
 {
   int count = 0;
 
@@ -1460,7 +1484,7 @@ void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma)
     return;
   }
 
-  count = count_texture_nodes_recursive(ma->nodetree);
+  count = count_texture_nodes_recursive(ma->nodetree, do_color_attributes);
 
   if (count == 0) {
     ma->paint_active_slot = 0;
@@ -1472,7 +1496,7 @@ void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma)
 
   bNode *active_node = nodeGetActiveTexture(ma->nodetree);
 
-  fill_texpaint_slots_recursive(ma->nodetree, active_node, ma, count);
+  fill_texpaint_slots_recursive(ma->nodetree, active_node, ma, count, do_color_attributes);
 
   ma->tot_slots = count;
 
@@ -1487,9 +1511,11 @@ void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma)
 
 void BKE_texpaint_slots_refresh_object(Scene *scene, struct Object *ob)
 {
+  const bool do_color_attributes = (ob->mode == OB_MODE_SCULPT) &&
+                                   U.experimental.use_sculpt_vertex_colors;
   for (int i = 1; i < ob->totcol + 1; i++) {
     Material *ma = BKE_object_material_get(ob, i);
-    BKE_texpaint_slot_refresh_cache(scene, ma);
+    BKE_texpaint_slot_refresh_cache(scene, ma, do_color_attributes);
   }
 }
 
@@ -1513,7 +1539,7 @@ static bool texpaint_slot_node_find_cb(bNode *node, void *userdata)
 bNode *BKE_texpaint_slot_material_find_node(Material *ma, short texpaint_slot)
 {
   struct FindTexPaintNodeData find_data = {ma->texpaintslot[texpaint_slot].ima, NULL};
-  ntree_foreach_texnode_recursive(ma->nodetree, texpaint_slot_node_find_cb, &find_data);
+  ntree_foreach_texnode_recursive(ma->nodetree, texpaint_slot_node_find_cb, &find_data, true);
 
   return find_data.r_node;
 }

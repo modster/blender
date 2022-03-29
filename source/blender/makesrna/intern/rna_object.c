@@ -1508,49 +1508,6 @@ static void rna_Object_material_slots_end(CollectionPropertyIterator *UNUSED(ite
 {
 }
 
-/** \name Paint canvas
- * \{ */
-
-static int rna_Object_paint_canvas_get(PointerRNA *ptr)
-{
-  Object *ob = ptr->data;
-  return ED_paint_canvas_material_get(ob);
-}
-
-static void rna_Object_paint_canvas_set(PointerRNA *ptr, int value)
-{
-  Object *ob = ptr->data;
-  ED_paint_canvas_material_set(ob, value);
-}
-
-static void rna_Object_paint_canvas_update(Main *UNUSED(main),
-                                           Scene *UNUSED(scene),
-                                           PointerRNA *ptr)
-{
-  Object *ob = ptr->data;
-  if (ob->id.us > 0) {
-    DEG_id_tag_update(&ob->id, 0);
-    WM_main_add_notifier(NC_GEOM | ND_DATA, &ob->id);
-  }
-}
-
-static const EnumPropertyItem *rna_Object_paint_canvas_itemf(bContext *UNUSED(C),
-                                                             PointerRNA *ptr,
-                                                             PropertyRNA *UNUSED(prop),
-                                                             bool *r_free)
-{
-  EnumPropertyItem *items = NULL;
-  int totitem = 0;
-
-  Object *ob = ptr->data;
-  ED_paint_canvas_material_itemf(ob, &items, &totitem);
-  RNA_enum_item_end(&items, &totitem);
-  *r_free = true;
-  return items;
-}
-
-/** \} */
-
 static PointerRNA rna_Object_display_get(PointerRNA *ptr)
 {
   return rna_pointer_inherit_refine(ptr, &RNA_ObjectDisplay, ptr->data);
@@ -3237,15 +3194,6 @@ static void rna_def_object(BlenderRNA *brna)
                              "rna_Object_active_material_index_range");
   RNA_def_property_ui_text(prop, "Active Material Index", "Index of active material slot");
   RNA_def_property_update(prop, NC_MATERIAL | ND_SHADING_LINKS, "rna_MaterialIndex_update");
-
-  prop = RNA_def_property(srna, "paint_canvas", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
-  RNA_def_property_enum_funcs(prop,
-                              "rna_Object_paint_canvas_get",
-                              "rna_Object_paint_canvas_set",
-                              "rna_Object_paint_canvas_itemf");
-  RNA_def_property_ui_text(prop, "Canvas", "Material canvas to paint on");
-  RNA_def_property_update(prop, 0, "rna_Object_paint_canvas_update");
 
   /* transform */
   prop = RNA_def_property(srna, "location", PROP_FLOAT, PROP_TRANSLATION);

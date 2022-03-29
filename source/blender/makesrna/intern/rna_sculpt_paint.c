@@ -590,17 +590,14 @@ static const EnumPropertyItem *rna_PaintModeSettings_canvas_source_itemf(bContex
   return items;
 }
 
-static void rna_PaintModeSettings_canvas_source_update(Main *main,
-                                                       Scene *UNUSED(scene),
-                                                       PointerRNA *UNUSED(ptr))
+static void rna_PaintModeSettings_canvas_source_update(bContext *C, PointerRNA *UNUSED(ptr))
 {
+  Scene *scene = CTX_data_scene(C);
+  Object *ob = CTX_data_active_object(C);
   /* When canvas source changes the pbvh would require updates when switching between color
    * attributes.  */
-  LISTBASE_FOREACH (Object *, ob, &main->objects) {
-    if (ob->sculpt == NULL) {
-      continue;
-    }
-
+  if (ob && ob->type == OB_MESH) {
+    BKE_texpaint_slots_refresh_object(scene, ob);
     DEG_id_tag_update(&ob->id, 0);
     WM_main_add_notifier(NC_GEOM | ND_DATA, &ob->id);
   }
@@ -1045,9 +1042,11 @@ static void rna_def_paint_mode(BlenderRNA *brna)
   RNA_def_struct_path_func(srna, "rna_PaintModeSettings_path");
   RNA_def_struct_ui_text(srna, "Paint Mode", "Properties of paint mode");
 
-  prop = RNA_def_property(srna, "canvas_source", PROP_ENUM, PROP_NONE);
+  /* property mode, sync API name with TexPaintSettings.mode */
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "canvas_source");
   RNA_def_property_enum_items(prop, rna_enum_canvas_source_items);
+  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
   RNA_def_property_enum_funcs(prop,
                               "rna_PaintModeSettings_canvas_source_get",
                               NULL,
@@ -1055,7 +1054,9 @@ static void rna_def_paint_mode(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Source", "Source to select canvas from");
   RNA_def_property_update(prop, 0, "rna_PaintModeSettings_canvas_source_update");
 
-  prop = RNA_def_property(srna, "image", PROP_POINTER, PROP_NONE);
+  /* property mode, sync API name with TexPaintSettings.canvas */
+  prop = RNA_def_property(srna, "canvas", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_sdna(prop, NULL, "image");
   RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_PaintModeSettings_image_poll");
   RNA_def_property_flag(prop, PROP_EDITABLE | PROP_CONTEXT_UPDATE);
   RNA_def_property_ui_text(prop, "Texture", "Image used as as painting target");

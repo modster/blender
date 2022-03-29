@@ -278,7 +278,7 @@ class VIEW3D_PT_tools_posemode_options(View3DPanel, Panel):
 class TEXTURE_UL_texpaintslots(UIList):
     def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
         # mat = data
-
+        
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             layout.prop(item, "name", text="", emboss=False, icon_value=icon)
         elif self.layout_type == 'GRID':
@@ -456,67 +456,67 @@ class VIEW3D_MT_tools_projectpaint_uvlayer(Menu):
             props.value = i
 
 
-class VIEW3D_PT_slots_projectpaint(View3DPanel, Panel):
+class VIEW3D_PT_slots_projectpaint_base:
     bl_category = "Tool"
-    bl_context = ".imagepaint"  # dot on purpose (access from topbar)
-    bl_label = "Texture Slots"
-
-    @classmethod
-    def poll(cls, context):
-        brush = context.tool_settings.image_paint.brush
-        return (brush is not None and context.active_object is not None)
-
     def draw(self, context):
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
 
         settings = context.tool_settings.image_paint
+        mode_settings = self.get_mode_settings(context)
 
         ob = context.active_object
 
-        layout.prop(settings, "mode", text="Mode")
+        layout.prop(mode_settings, "mode", text="Mode")
         layout.separator()
 
-        if settings.mode == 'MATERIAL':
-            if len(ob.material_slots) > 1:
-                layout.template_list("MATERIAL_UL_matslots", "layers",
-                                     ob, "material_slots",
-                                     ob, "active_material_index", rows=2)
-            mat = ob.active_material
-            if mat and mat.texture_paint_images:
-                row = layout.row()
-                row.template_list("TEXTURE_UL_texpaintslots", "",
-                                  mat, "texture_paint_images",
-                                  mat, "paint_active_slot", rows=2)
+        have_image = False
 
-                if mat.texture_paint_slots:
-                    slot = mat.texture_paint_slots[mat.paint_active_slot]
+        match mode_settings.mode:
+            case 'MATERIAL':
+                if len(ob.material_slots) > 1:
+                    layout.template_list("MATERIAL_UL_matslots", "layers",
+                                        ob, "material_slots",
+                                        ob, "active_material_index", rows=2)
+                mat = ob.active_material
+                if mat and mat.texture_paint_images:
+                    row = layout.row()
+                    row.template_list("TEXTURE_UL_texpaintslots", "",
+                                    mat, "texture_paint_slots",
+                                    mat, "paint_active_slot", rows=2)
+
+                    if mat.texture_paint_slots:
+                        slot = mat.texture_paint_slots[mat.paint_active_slot]
+                    else:
+                        slot = None
+
+                    have_image = slot is not None
                 else:
-                    slot = None
+                    row = layout.row()
 
-                have_image = slot is not None
-            else:
-                row = layout.row()
+                    box = row.box()
+                    box.label(text="No Textures")
 
-                box = row.box()
-                box.label(text="No Textures")
-                have_image = False
+                sub = row.column(align=True)
+                sub.operator_menu_enum("paint.add_texture_paint_slot", "type", icon='ADD', text="")
 
-            sub = row.column(align=True)
-            sub.operator_menu_enum("paint.add_texture_paint_slot", "type", icon='ADD', text="")
+            case 'IMAGE':
+                mesh = ob.data
+                uv_text = mesh.uv_layers.active.name if mesh.uv_layers.active else ""
+                layout.template_ID(mode_settings, "canvas", new="image.new", open="image.open")
+                if settings.missing_uvs:
+                    layout.operator("paint.add_simple_uvs", icon='ADD', text="Add UVs")
+                else:
+                    layout.menu("VIEW3D_MT_tools_projectpaint_uvlayer", text=uv_text, translate=False)
+                have_image = settings.canvas is not None
+                
+                self.draw_image_interpolation(layout=layout, mode_settings=mode_settings)
 
-        elif settings.mode == 'IMAGE':
-            mesh = ob.data
-            uv_text = mesh.uv_layers.active.name if mesh.uv_layers.active else ""
-            layout.template_ID(settings, "canvas", new="image.new", open="image.open")
-            if settings.missing_uvs:
-                layout.operator("paint.add_simple_uvs", icon='ADD', text="Add UVs")
-            else:
-                layout.menu("VIEW3D_MT_tools_projectpaint_uvlayer", text=uv_text, translate=False)
-            have_image = settings.canvas is not None
-
-            layout.prop(settings, "interpolation", text="")
+            case 'COLOR_ATTRIBUTE':
+                me = ob.data
+                # TODO(jbakker): When vertex colors are committed change to color attributes
+                layout.template_list("MESH_UL_vcols", "vcols", me, "vertex_colors", me.vertex_colors, "active_index", rows=2)
 
         if settings.missing_uvs:
             layout.separator()
@@ -526,6 +526,43 @@ class VIEW3D_PT_slots_projectpaint(View3DPanel, Panel):
         elif have_image:
             layout.separator()
             layout.operator("image.save_all_modified", text="Save All Images", icon='FILE_TICK')
+
+
+class VIEW3D_PT_slots_projectpaint(VIEW3D_PT_slots_projectpaint_base, View3DPanel, Panel):
+    bl_category = "Tool"
+    bl_context = ".imagepaint"  # dot on purpose (access from topbar)
+    bl_label = "Texture Slots"
+
+    @classmethod
+    def poll(cls, context):
+        brush = context.tool_settings.image_paint.brush
+        return (brush is not None and context.active_object is not None)
+
+    def get_mode_settings(self, context):
+        return context.tool_settings.image_paint
+
+    def draw_image_interpolation(self, layout, mode_settings):
+        layout.prop(mode_settings, "interpolation", text="")
+
+
+
+class VIEW3D_PT_slots_paint_canvas(VIEW3D_PT_slots_projectpaint_base, View3DPanel, Panel):
+    bl_category = "Tool"
+    bl_context = ".sculpt_mode"  # dot on purpose (access from topbar)
+    bl_label = "Canvas"
+
+    @classmethod
+    def poll(cls, context):
+        if not context.preferences.experimental.use_sculpt_vertex_colors:
+            return False
+        if context.space_data is None:
+            return False
+        return context.space_data.uses_paint_canvas()
+
+    def get_mode_settings(self, context):
+        return context.tool_settings.paint_mode
+    def draw_image_interpolation(self, **kwargs):
+        pass
 
 
 class VIEW3D_PT_mask(View3DPanel, Panel):
@@ -2218,42 +2255,6 @@ class VIEW3D_PT_gpencil_brush_presets(Panel, PresetPanel):
     preset_add_operator = "scene.gpencil_brush_preset_add"
 
 
-class VIEW3D_PT_tools_paint_canvas(View3DPanel, Panel):
-    bl_category = "Tool"
-    bl_context = ".sculpt_mode"  # dot on purpose (access from topbar)
-    bl_label = "Canvas"
-
-    @classmethod
-    def poll(cls, context):
-        if not context.preferences.experimental.use_sculpt_vertex_colors:
-            return False
-        if context.space_data is None:
-            return False
-        return context.space_data.uses_paint_canvas()
-
-    def draw(self, context):
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-
-        ob = context.active_object
-        settings = context.tool_settings.paint_mode
-
-        layout.prop(settings, "canvas_source")
-        match settings.canvas_source:
-            case 'COLOR_ATTRIBUTE':
-                me = ob.data
-                # TODO(jbakker): When vertex colors are committed change to color attributes
-                layout.template_list("MESH_UL_vcols", "vcols", me, "vertex_colors", me.vertex_colors, "active_index", rows=2)
-
-            case 'MATERIAL':
-                layout.prop(ob, "paint_canvas")
-
-            case 'IMAGE':
-                layout.template_ID(settings, "image", new="image.new", open="image.open")
-                layout.menu("VIEW3D_MT_tools_projectpaint_uvlayer", text="UV Map")
-
-
 classes = (
     VIEW3D_MT_brush_context_menu,
     VIEW3D_MT_brush_gpencil_context_menu,
@@ -2266,6 +2267,7 @@ classes = (
     VIEW3D_PT_tools_posemode_options,
 
     VIEW3D_PT_slots_projectpaint,
+    VIEW3D_PT_slots_paint_canvas,
     VIEW3D_PT_tools_brush_select,
     VIEW3D_PT_tools_brush_settings,
     VIEW3D_PT_tools_brush_color,
@@ -2342,8 +2344,6 @@ classes = (
     VIEW3D_PT_tools_grease_pencil_brush_vertex_color,
     VIEW3D_PT_tools_grease_pencil_brush_vertex_palette,
     VIEW3D_PT_tools_grease_pencil_brush_vertex_falloff,
-
-    VIEW3D_PT_tools_paint_canvas,
 )
 
 if __name__ == "__main__":  # only for live edit.

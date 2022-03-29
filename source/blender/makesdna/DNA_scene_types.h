@@ -2283,21 +2283,21 @@ typedef enum eSculptFlags {
   SCULPT_HIDE_FACE_SETS = (1 << 17),
 } eSculptFlags;
 
-/** #ImagePaintSettings.mode */
-typedef enum eImagePaintMode {
-  IMAGEPAINT_MODE_MATERIAL = 0, /* detect texture paint slots from the material */
-  IMAGEPAINT_MODE_IMAGE = 1,    /* select texture paint image directly */
-} eImagePaintMode;
-
-/** PaintModeSettings.canvas_source */
+/** PaintModeSettings.mode */
 typedef enum ePaintCanvasSource {
-  /** Paint on the active color attribute (vertex color) layer. */
-  PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE = 0,
   /** Paint on the active node of the active material slot. */
-  PAINT_CANVAS_SOURCE_MATERIAL = 1,
+  PAINT_CANVAS_SOURCE_MATERIAL = 0,
   /** Paint on a selected image. */
-  PAINT_CANVAS_SOURCE_IMAGE = 2,
+  PAINT_CANVAS_SOURCE_IMAGE = 1,
+  /** Paint on the active color attribute (vertex color) layer. */
+  PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE = 2,
 } ePaintCanvasSource;
+
+/** #ImagePaintSettings.mode */
+/* Defines to let old texture painting use the new enum. */
+/* TODO(jbakker): rename usages. */
+#define IMAGEPAINT_MODE_MATERIAL PAINT_CANVAS_SOURCE_MATERIAL
+#define IMAGEPAINT_MODE_IMAGE PAINT_CANVAS_SOURCE_IMAGE
 
 /** #ImagePaintSettings.interp */
 enum {

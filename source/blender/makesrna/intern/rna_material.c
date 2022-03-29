@@ -281,6 +281,36 @@ static void rna_TexPaintSlot_uv_layer_set(PointerRNA *ptr, const char *value)
   }
 }
 
+static void rna_TexPaintSlot_name_get(PointerRNA *ptr, char *value)
+{
+  TexPaintSlot *data = (TexPaintSlot *)(ptr->data);
+
+  if (data->ima != NULL) {
+    BLI_strncpy_utf8(value, data->ima->id.name + 2, 64);
+    return;
+  }
+
+  if (data->attribute_name != NULL) {
+    BLI_strncpy_utf8(value, data->attribute_name, 64);
+    return;
+  }
+
+  value[0] = '\0';
+}
+
+static int rna_TexPaintSlot_name_length(PointerRNA *ptr)
+{
+  TexPaintSlot *data = (TexPaintSlot *)(ptr->data);
+  if (data->ima != NULL) {
+    return strlen(data->ima->id.name);
+  }
+  if (data->attribute_name != NULL) {
+    return strlen(data->attribute_name);
+  }
+
+  return 0;
+}
+
 static bool rna_is_grease_pencil_get(PointerRNA *ptr)
 {
   Material *ma = (Material *)ptr->data;
@@ -962,6 +992,13 @@ static void rna_def_tex_slot(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "TexPaintSlot", NULL);
   RNA_def_struct_ui_text(
       srna, "Texture Paint Slot", "Slot that contains information about texture painting");
+
+  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_maxlength(prop, 64); /* else it uses the pointer size! */
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_string_funcs(
+      prop, "rna_TexPaintSlot_name_get", "rna_TexPaintSlot_name_length", NULL);
+  RNA_def_property_ui_text(prop, "Name", "Name of the slot");
 
   prop = RNA_def_property(srna, "uv_layer", PROP_STRING, PROP_NONE);
   RNA_def_property_string_maxlength(prop, 64); /* else it uses the pointer size! */

@@ -281,7 +281,7 @@ static void imapaint_pick_uv(
   float p[2], w[3], absw, minabsw;
   float matrix[4][4], proj[4][4];
   int view[4];
-  const eImagePaintMode mode = scene->toolsettings->imapaint.mode;
+  const ePaintCanvasSource mode = scene->toolsettings->imapaint.mode;
 
   const MLoopTri *lt = BKE_mesh_runtime_looptri_ensure(me_eval);
   const int tottri = me_eval->runtime.looptris.len;
@@ -317,7 +317,7 @@ static void imapaint_pick_uv(
         copy_v3_v3(tri_co[j], mvert[mloop[lt->tri[j]].v].co);
       }
 
-      if (mode == IMAGEPAINT_MODE_MATERIAL) {
+      if (mode == PAINT_CANVAS_SOURCE_MATERIAL) {
         const Material *ma;
         const TexPaintSlot *slot;
 

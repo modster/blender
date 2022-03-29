@@ -114,11 +114,6 @@ void ED_paintcurve_undo_push_end(struct bContext *C);
 void ED_paintcurve_undosys_type(struct UndoType *ut);
 
 /* paint_canvas.cc */
-int ED_paint_canvas_material_get(struct Object *ob);
-void ED_paint_canvas_material_set(struct Object *ob, int new_value);
-void ED_paint_canvas_material_itemf(struct Object *ob,
-                                    struct EnumPropertyItem **r_items,
-                                    int *r_totitem);
 struct Image *ED_paint_canvas_image_get(const struct PaintModeSettings *settings,
                                         struct Object *ob);
 int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settings,

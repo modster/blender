@@ -6336,7 +6336,10 @@ bool ED_paint_proj_mesh_data_check(
           hasmat = true;
           if (ma->texpaintslot == NULL) {
             /* refresh here just in case */
-            BKE_texpaint_slot_refresh_cache(scene, ma);
+            const bool do_color_attributes = (ob->mode == OB_MODE_SCULPT) &&
+                                             U.experimental.use_sculpt_vertex_colors;
+
+            BKE_texpaint_slot_refresh_cache(scene, ma, do_color_attributes);
           }
           if (ma->texpaintslot != NULL &&
               (ma->texpaintslot[ma->paint_active_slot].ima == NULL ||
@@ -6606,7 +6609,7 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
     nodePositionPropagate(out_node);
 
     if (ima) {
-      BKE_texpaint_slot_refresh_cache(scene, ma);
+      BKE_texpaint_slot_refresh_cache(scene, ma, false);
       BKE_image_signal(bmain, ima, NULL, IMA_SIGNAL_USER_NEW_IMAGE);
       WM_event_add_notifier(C, NC_IMAGE | NA_ADDED, ima);
     }
