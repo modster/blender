@@ -1351,10 +1351,12 @@ typedef bool (*ForEachTexNodeCallback)(bNode *node, void *userdata);
 static bool ntree_foreach_texnode_recursive(bNodeTree *nodetree,
                                             ForEachTexNodeCallback callback,
                                             void *userdata,
-                                            const bool do_color_attributes)
+                                            ePaintSlotFilter slot_filter)
 {
+  const bool do_image_nodes = (slot_filter & PAINT_SLOT_IMAGE) != 0;
+  const bool do_color_attributes = (slot_filter & PAINT_SLOT_COLOR_ATTRIBUTE) != 0;
   LISTBASE_FOREACH (bNode *, node, &nodetree->nodes) {
-    if (node->typeinfo->nclass == NODE_CLASS_TEXTURE &&
+    if (do_image_nodes && node->typeinfo->nclass == NODE_CLASS_TEXTURE &&
         node->typeinfo->type == SH_NODE_TEX_IMAGE && node->id) {
       if (!callback(node, userdata)) {
         return false;
@@ -1382,11 +1384,10 @@ static bool count_texture_nodes_cb(bNode *UNUSED(node), void *userdata)
   return true;
 }
 
-static int count_texture_nodes_recursive(bNodeTree *nodetree, const bool do_color_attributes)
+static int count_texture_nodes_recursive(bNodeTree *nodetree, ePaintSlotFilter slot_filter)
 {
   int tex_nodes = 0;
-  ntree_foreach_texnode_recursive(
-      nodetree, count_texture_nodes_cb, &tex_nodes, do_color_attributes);
+  ntree_foreach_texnode_recursive(nodetree, count_texture_nodes_cb, &tex_nodes, slot_filter);
 
   return tex_nodes;
 }
@@ -1448,20 +1449,36 @@ static void fill_texpaint_slots_recursive(bNodeTree *nodetree,
                                           bNode *active_node,
                                           Material *ma,
                                           int slot_len,
-                                          const bool do_color_attributes)
+                                          ePaintSlotFilter slot_filter)
 {
   struct FillTexPaintSlotsData fill_data = {active_node, ma, 0, slot_len};
-  ntree_foreach_texnode_recursive(
-      nodetree, fill_texpaint_slots_cb, &fill_data, do_color_attributes);
+  ntree_foreach_texnode_recursive(nodetree, fill_texpaint_slots_cb, &fill_data, slot_filter);
 }
 
-void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma, const bool do_color_attributes)
+/** Check which type of paint slots should be filled for the given object. */
+static ePaintSlotFilter material_paint_slot_filter(const struct Object *ob)
+{
+  ePaintSlotFilter slot_filter = 0;
+  if (ob->mode == OB_MODE_SCULPT) {
+    SET_FLAG_FROM_TEST(
+        slot_filter, U.experimental.use_sculpt_vertex_colors, PAINT_SLOT_COLOR_ATTRIBUTE);
+    SET_FLAG_FROM_TEST(slot_filter, U.experimental.use_sculpt_texture_paint, PAINT_SLOT_IMAGE);
+  }
+  else if (ob->mode == OB_MODE_TEXTURE_PAINT) {
+    slot_filter = PAINT_SLOT_IMAGE;
+  }
+  return slot_filter;
+}
+
+void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma, const struct Object *ob)
 {
   int count = 0;
 
   if (!ma) {
     return;
   }
+
+  const ePaintSlotFilter slot_filter = material_paint_slot_filter(ob);
 
   /* COW needed when adding texture slot on an object with no materials. */
   DEG_id_tag_update(&ma->id, ID_RECALC_SHADING | ID_RECALC_COPY_ON_WRITE);
@@ -1484,7 +1501,7 @@ void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma, const bool do_c
     return;
   }
 
-  count = count_texture_nodes_recursive(ma->nodetree, do_color_attributes);
+  count = count_texture_nodes_recursive(ma->nodetree, slot_filter);
 
   if (count == 0) {
     ma->paint_active_slot = 0;
@@ -1496,7 +1513,7 @@ void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma, const bool do_c
 
   bNode *active_node = nodeGetActiveTexture(ma->nodetree);
 
-  fill_texpaint_slots_recursive(ma->nodetree, active_node, ma, count, do_color_attributes);
+  fill_texpaint_slots_recursive(ma->nodetree, active_node, ma, count, slot_filter);
 
   ma->tot_slots = count;
 
@@ -1511,11 +1528,9 @@ void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma, const bool do_c
 
 void BKE_texpaint_slots_refresh_object(Scene *scene, struct Object *ob)
 {
-  const bool do_color_attributes = (ob->mode == OB_MODE_SCULPT) &&
-                                   U.experimental.use_sculpt_vertex_colors;
   for (int i = 1; i < ob->totcol + 1; i++) {
     Material *ma = BKE_object_material_get(ob, i);
-    BKE_texpaint_slot_refresh_cache(scene, ma, do_color_attributes);
+    BKE_texpaint_slot_refresh_cache(scene, ma, ob);
   }
 }
 

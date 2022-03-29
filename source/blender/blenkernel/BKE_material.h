@@ -7,6 +7,7 @@
  * \ingroup bke
  * \brief General operations, lookup, etc. for materials.
  */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,6 +18,12 @@ struct Material;
 struct Object;
 struct Scene;
 struct bNode;
+
+/** Bitwise filter for updating paint slots. */
+typedef enum ePaintSlotFilter {
+  PAINT_SLOT_IMAGE = 1 << 0,
+  PAINT_SLOT_COLOR_ATTRIBUTE = 1 << 1,
+} ePaintSlotFilter;
 
 /* -------------------------------------------------------------------- */
 /** \name Module
@@ -106,7 +113,7 @@ struct MaterialGPencilStyle *BKE_gpencil_material_settings(struct Object *ob, sh
 
 void BKE_texpaint_slot_refresh_cache(struct Scene *scene,
                                      struct Material *ma,
-                                     const bool do_color_attributes);
+                                     const struct Object *ob);
 void BKE_texpaint_slots_refresh_object(struct Scene *scene, struct Object *ob);
 struct bNode *BKE_texpaint_slot_material_find_node(struct Material *ma, short texpaint_slot);
 
