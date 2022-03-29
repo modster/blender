@@ -44,7 +44,6 @@
 
 #include "BLI_sys_types.h" /* needed for intptr_t used in ED_mesh.h */
 #include "ED_mesh.h"
-#include "ED_paint.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
