@@ -43,15 +43,15 @@ typedef enum AttributeDomainMask {
   ATTR_DOMAIN_MASK_ALL = (1 << 5) - 1
 } AttributeDomainMask;
 
-/* All domains that support color attributes */
+/* All domains that support color attributes. */
 #define ATTR_DOMAIN_MASK_COLOR \
   ((AttributeDomainMask)((ATTR_DOMAIN_MASK_POINT | ATTR_DOMAIN_MASK_CORNER)))
 
-/* Attributes */
+/* Attributes. */
 
 bool BKE_id_attributes_supported(struct ID *id);
 
-/**  Create a new attribute layer
+/**  Create a new attribute layer.
  */
 struct CustomDataLayer *BKE_id_attribute_new(
     struct ID *id, const char *name, int type, AttributeDomain domain, struct ReportList *reports);

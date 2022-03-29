@@ -266,7 +266,7 @@ static void rna_Attribute_update_data(Main *UNUSED(bmain), Scene *UNUSED(scene),
 {
   ID *id = ptr->owner_id;
 
-  /* cheating way for importers to avoid slow updates */
+  /* Cheating way for importers to avoid slow updates. */
   if (id->us > 0) {
     DEG_id_tag_update(id, 0);
     WM_main_add_notifier(NC_GEOM | ND_DATA, id);
@@ -383,7 +383,7 @@ void rna_AttributeGroup_iterator_next(CollectionPropertyIterator *iter)
 
 PointerRNA rna_AttributeGroup_iterator_get(CollectionPropertyIterator *iter)
 {
-  /* refine to the proper type */
+  /* Refine to the proper type. */
   CustomDataLayer *layer = rna_iterator_array_get(iter);
   StructRNA *type = srna_by_custom_data_layer_type(layer->type);
   if (type == NULL) {
@@ -410,7 +410,7 @@ void rna_AttributeGroup_color_iterator_next(CollectionPropertyIterator *iter)
 
 PointerRNA rna_AttributeGroup_color_iterator_get(CollectionPropertyIterator *iter)
 {
-  /* refine to the proper type */
+  /* Refine to the proper type. */
   CustomDataLayer *layer = rna_iterator_array_get(iter);
   StructRNA *type = srna_by_custom_data_layer_type(layer->type);
   if (type == NULL) {
@@ -531,7 +531,7 @@ static void rna_AttributeGroup_update_active_color(Main *bmain, Scene *scene, Po
 {
   ID *id = ptr->owner_id;
 
-  /* cheating way for importers to avoid slow updates */
+  /* Cheating way for importers to avoid slow updates. */
   if (id->us > 0) {
     DEG_id_tag_update(id, 0);
     WM_main_add_notifier(NC_GEOM | ND_DATA, id);
@@ -552,7 +552,7 @@ static bool rna_Attribute_active_render_get(PointerRNA *ptr)
   }
 
   if (GS(id->name) != ID_ME) {
-    /* only meshes for now */
+    /* Only meshes for now. */
     return false;
   }
 
@@ -602,7 +602,7 @@ static void rna_Attribute_active_render_set(PointerRNA *ptr, bool value)
   }
 
   if (GS(id->name) != ID_ME) {
-    /* only meshes for now */
+    /* Only meshes for now. */
     return;
   }
 
