@@ -11,6 +11,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_map.hh"
+#include "BLI_set.hh"
 
 #include "BLT_translation.h"
 
@@ -82,7 +83,6 @@ ListBase TreeDisplayOverrideLibraryHierarchy::buildTree(const TreeSourceData &so
   return tree;
 }
 
-/* TODO rename? */
 ListBase TreeDisplayOverrideLibraryHierarchy::build_hierarchy_for_lib_or_main(
     Main *bmain, TreeElement &parent_te, Library *lib)
 {
@@ -125,21 +125,29 @@ ListBase TreeDisplayOverrideLibraryHierarchy::build_hierarchy_for_lib_or_main(
 }
 
 struct BuildHierarchyForeachIDCbData {
+  /* Don't allow copies, the sets below would need deep copying. */
+  BuildHierarchyForeachIDCbData(const BuildHierarchyForeachIDCbData &) = delete;
+
+  Main &bmain;
   SpaceOutliner &space_outliner;
   ID &override_root_id;
-  TreeElementID &root_id_te;
-  Map<ID *, TreeElement *> added_elems{};
+
+  /* The tree element to expand. Changes with every level of recursion. */
+  TreeElementID *parent_te;
+  /* The ancestor IDs leading to the current ID, to avoid IDs recursing into themselves. Changes
+   * with every level of recursion. */
+  Set<ID *> parent_ids{};
+  /* The IDs that were already added to #parent_te, to avoid duplicates. Entirely new set with
+   * every level of recursion. */
+  Set<ID *> sibling_ids{};
 };
 
 static int build_hierarchy_foreach_ID_cb(LibraryIDLinkCallbackData *cb_data)
 {
-  if (cb_data->cb_flag & IDWALK_CB_LOOPBACK) {
-    /* We should never have anything to do with loop-back pointers here. */
-    return IDWALK_RET_NOP;
-  }
   if (!*cb_data->id_pointer) {
     return IDWALK_RET_NOP;
   }
+
   BuildHierarchyForeachIDCbData &build_data = *reinterpret_cast<BuildHierarchyForeachIDCbData *>(
       cb_data->user_data);
   /* Note that this may be an embedded ID (see #real_override_id). */
@@ -168,29 +176,36 @@ static int build_hierarchy_foreach_ID_cb(LibraryIDLinkCallbackData *cb_data)
     return IDWALK_RET_NOP;
   }
 
-  TreeElement *te_to_expand = &build_data.root_id_te.getLegacyElement();
-  /* If there is already an element for the ID linking to the current one, use that as parent. */
-  if (TreeElement *parent_te_id = build_data.added_elems.lookup_default(cb_data->id_self,
-                                                                        nullptr)) {
-    te_to_expand = parent_te_id;
+  /* Avoid endless recursion: If there is an ancestor for this ID already, it recurses into itself.
+   */
+  if (build_data.parent_ids.lookup_key_default(&id, nullptr)) {
+    return IDWALK_RET_NOP;
   }
 
-  /* Check if an ancestor of this element is already the ID we want to add, this would mean an ID
-   * recurses into itself. Don't add the element and stop recursing in that case. */
-  for (TreeElement *parent_iter_te = te_to_expand; parent_iter_te;
-       parent_iter_te = parent_iter_te->parent) {
-    if (TreeElementID *id_te = tree_element_cast<TreeElementID>(parent_iter_te)) {
-      if (&id_te->get_ID() == &id) {
-        return IDWALK_RET_STOP_RECURSION;
-      }
-    }
+  /* Avoid duplicates: If there is an sibling for this ID already, the same ID is just used
+   * multiple times by the same parent. */
+  if (build_data.sibling_ids.lookup_key_default(&id, nullptr)) {
+    return IDWALK_RET_NOP;
   }
 
-  TreeElement *new_te = outliner_add_element(
-      &build_data.space_outliner, &te_to_expand->subtree, &id, te_to_expand, TSE_SOME_ID, 0);
+  TreeElement *new_te = outliner_add_element(&build_data.space_outliner,
+                                             &build_data.parent_te->getLegacyElement().subtree,
+                                             &id,
+                                             &build_data.parent_te->getLegacyElement(),
+                                             TSE_SOME_ID,
+                                             0);
   remove_expanded_children(*new_te);
+  build_data.sibling_ids.add(&id);
 
-  build_data.added_elems.add(&id, new_te);
+  BuildHierarchyForeachIDCbData child_build_data{build_data.bmain,
+                                                 build_data.space_outliner,
+                                                 build_data.override_root_id,
+                                                 tree_element_cast<TreeElementID>(new_te)};
+  child_build_data.parent_ids = build_data.parent_ids;
+  child_build_data.parent_ids.add(&id);
+  child_build_data.sibling_ids.reserve(10);
+  BKE_library_foreach_ID_link(
+      &build_data.bmain, &id, build_hierarchy_foreach_ID_cb, &child_build_data, IDWALK_READONLY);
 
   return IDWALK_RET_NOP;
 }
@@ -199,11 +214,11 @@ void TreeDisplayOverrideLibraryHierarchy::build_hierarchy_for_ID(Main *bmain,
                                                                  ID &override_root_id,
                                                                  TreeElementID &te_id) const
 {
-  BuildHierarchyForeachIDCbData build_data{space_outliner_, override_root_id, te_id};
-  ID &id = te_id.get_ID();
+  BuildHierarchyForeachIDCbData build_data{*bmain, space_outliner_, override_root_id, &te_id};
+  build_data.parent_ids.add(&override_root_id);
 
   BKE_library_foreach_ID_link(
-      bmain, &id, build_hierarchy_foreach_ID_cb, &build_data, IDWALK_RECURSE | IDWALK_READONLY);
+      bmain, &te_id.get_ID(), build_hierarchy_foreach_ID_cb, &build_data, IDWALK_READONLY);
 }
 
 }  // namespace blender::ed::outliner
