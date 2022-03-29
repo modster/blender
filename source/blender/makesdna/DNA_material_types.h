@@ -31,9 +31,9 @@ typedef struct TexPaintSlot {
   struct Image *ima;
   /** Custom-data index for uv layer, #MAX_NAME. */
   char *uvname;
-  /* color attribute name. */
+  /** Color attribute name when painting using color attributes. */
   char *attribute_name;
-  /** Do we have a valid image and UV map. */
+  /** Do we have a valid image and UV map or attribute. */
   int valid;
   /** Copy of node interpolation setting. */
   int interp;
