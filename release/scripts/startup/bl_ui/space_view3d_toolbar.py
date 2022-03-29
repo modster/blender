@@ -456,7 +456,7 @@ class VIEW3D_MT_tools_projectpaint_uvlayer(Menu):
             props.value = i
 
 
-class VIEW3D_PT_slots_projectpaint_base:
+class SelectPaintSlotHelper:
     bl_category = "Tool"
     def draw(self, context):
         layout = self.layout
@@ -528,7 +528,7 @@ class VIEW3D_PT_slots_projectpaint_base:
             layout.operator("image.save_all_modified", text="Save All Images", icon='FILE_TICK')
 
 
-class VIEW3D_PT_slots_projectpaint(VIEW3D_PT_slots_projectpaint_base, View3DPanel, Panel):
+class VIEW3D_PT_slots_projectpaint(SelectPaintSlotHelper, View3DPanel, Panel):
     bl_category = "Tool"
     bl_context = ".imagepaint"  # dot on purpose (access from topbar)
     bl_label = "Texture Slots"
@@ -546,7 +546,7 @@ class VIEW3D_PT_slots_projectpaint(VIEW3D_PT_slots_projectpaint_base, View3DPane
 
 
 
-class VIEW3D_PT_slots_paint_canvas(VIEW3D_PT_slots_projectpaint_base, View3DPanel, Panel):
+class VIEW3D_PT_slots_paint_canvas(SelectPaintSlotHelper, View3DPanel, Panel):
     bl_category = "Tool"
     bl_context = ".sculpt_mode"  # dot on purpose (access from topbar)
     bl_label = "Canvas"
