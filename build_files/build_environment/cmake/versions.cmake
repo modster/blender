@@ -514,3 +514,9 @@ set(BROTLI_URI https://github.com/google/brotli/archive/refs/tags/${BROTLI_VERSI
 set(BROTLI_HASH f9e8d81d0405ba66d181529af42a3354f838c939095ff99930da6aa9cdf6fe46)
 set(BROTLI_HASH_TYPE SHA256)
 set(BROTLI_FILE brotli-${BROTLI_VERSION}.tar.gz)
+
+set(LEVEL_ZERO_VERSION v1.7.15)
+set(LEVEL_ZERO_URI https://github.com/oneapi-src/level-zero/archive/refs/tags/${LEVEL_ZERO_VERSION}.tar.gz)
+set(LEVEL_ZERO_HASH c39bb05a8e5898aa6c444e1704105b93d3f1888b9c333f8e7e73825ffbfb2617)
+set(LEVEL_ZERO_HASH_TYPE SHA256)
+set(LEVEL_ZERO_FILE level-zero-${LEVEL_ZERO_VERSION}.tar.gz)
