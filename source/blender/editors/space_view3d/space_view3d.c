@@ -43,6 +43,7 @@
 
 #include "ED_object.h"
 #include "ED_outliner.h"
+#include "ED_paint.h"
 #include "ED_render.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"
@@ -1275,6 +1276,12 @@ static void view3d_main_region_message_subscribe(const wmRegionMessageSubscribeP
       .notify = ED_region_do_msg_notify_tag_redraw,
   };
 
+  wmMsgSubscribeValue msg_sub_value_pbvh_refresh = {
+      .owner = region,
+      .user_data = region,
+      .notify = ED_paint_do_msg_notify_active_tool_changed,
+  };
+
   for (int i = 0; i < ARRAY_SIZE(type_array); i++) {
     msg_key_params.ptr.type = type_array[i];
     WM_msg_subscribe_rna_params(mbus, &msg_key_params, &msg_sub_value_region_tag_redraw, __func__);
@@ -1307,6 +1314,10 @@ static void view3d_main_region_message_subscribe(const wmRegionMessageSubscribeP
     switch (obact->mode) {
       case OB_MODE_PARTICLE_EDIT:
         WM_msg_subscribe_rna_anon_type(mbus, ParticleEdit, &msg_sub_value_region_tag_redraw);
+        break;
+
+      case OB_MODE_SCULPT:
+        WM_msg_subscribe_rna_anon_prop(mbus, WorkSpace, tools, &msg_sub_value_pbvh_refresh);
         break;
       default:
         break;

@@ -18,6 +18,8 @@
 #include "BKE_material.h"
 #include "BKE_paint.h"
 
+#include "DEG_depsgraph.h"
+
 #include "NOD_shader.h"
 
 #include "UI_resources.h"
@@ -527,5 +529,16 @@ bool ED_paint_tool_use_canvas(struct bContext *C, struct Object *ob)
   }
 
   return false;
+}
+
+void ED_paint_do_msg_notify_active_tool_changed(struct bContext *C,
+                                                struct wmMsgSubscribeKey *msg_key,
+                                                struct wmMsgSubscribeValue *msg_val)
+{
+  Object *ob = CTX_data_active_object(C);
+  if (ob == nullptr) {
+    return;
+  }
+  DEG_id_tag_update(&ob->id, ID_RECALC_SHADING);
 }
 }
