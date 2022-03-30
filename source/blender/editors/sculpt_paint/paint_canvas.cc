@@ -42,10 +42,10 @@ extern "C" {
 using namespace blender;
 using namespace blender::ed::sculpt_paint::canvas;
 
-eV3DShadingColorType ED_paint_draw_color_override(bContext *C,
-                                                  const PaintModeSettings *settings,
-                                                  Object *ob,
-                                                  eV3DShadingColorType orig_color_type)
+eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
+                                                     const PaintModeSettings *settings,
+                                                     Object *ob,
+                                                     eV3DShadingColorType orig_color_type)
 {
   if (!ED_paint_tool_use_canvas(C, ob)) {
     return orig_color_type;

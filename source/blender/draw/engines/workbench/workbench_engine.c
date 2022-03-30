@@ -322,7 +322,7 @@ static eV3DShadingColorType workbench_color_type_get(WORKBENCH_PrivateData *wpd,
      * due to current API. */
     bContext *C = (bContext *)DRW_context_state_get()->evil_C;
     if (C != NULL) {
-      color_type = ED_paint_draw_color_override(
+      color_type = ED_paint_shading_color_override(
           C, &wpd->scene->toolsettings->paint_mode, ob, color_type);
     }
   }
