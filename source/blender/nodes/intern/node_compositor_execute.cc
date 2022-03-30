@@ -130,6 +130,11 @@ Domain::Domain(int2 size, Transformation2D transformation)
 {
 }
 
+void Domain::transform(const Transformation2D &input_transformation)
+{
+  transformation = input_transformation * transformation;
+}
+
 Domain Domain::identity()
 {
   return Domain(int2(1), Transformation2D::identity());
@@ -154,20 +159,21 @@ Result::Result(ResultType type, TexturePool &texture_pool)
 {
 }
 
-void Result::allocate_texture(int2 size)
+void Result::allocate_texture(Domain domain)
 {
   is_single_value_ = false;
   switch (type_) {
     case ResultType::Float:
-      texture_ = texture_pool_->acquire_float(size);
-      return;
+      texture_ = texture_pool_->acquire_float(domain.size);
+      break;
     case ResultType::Vector:
-      texture_ = texture_pool_->acquire_vector(size);
-      return;
+      texture_ = texture_pool_->acquire_vector(domain.size);
+      break;
     case ResultType::Color:
-      texture_ = texture_pool_->acquire_color(size);
-      return;
+      texture_ = texture_pool_->acquire_color(domain.size);
+      break;
   }
+  domain_ = domain;
 }
 
 void Result::allocate_single_value()
@@ -178,14 +184,15 @@ void Result::allocate_single_value()
   switch (type_) {
     case ResultType::Float:
       texture_ = texture_pool_->acquire_float(texture_size);
-      return;
+      break;
     case ResultType::Vector:
       texture_ = texture_pool_->acquire_vector(texture_size);
-      return;
+      break;
     case ResultType::Color:
       texture_ = texture_pool_->acquire_color(texture_size);
-      return;
+      break;
   }
+  domain_ = Domain::identity();
 }
 
 void Result::bind_as_texture(GPUShader *shader, const char *texture_name) const
@@ -224,7 +231,7 @@ void Result::pass_through(Result &target)
 
 void Result::transform(const Transformation2D &transformation)
 {
-  transformation_ = transformation * transformation_;
+  domain_.transform(transformation);
 }
 
 float Result::get_float_value() const
@@ -340,19 +347,9 @@ int Result::reference_count() const
   return reference_count_;
 }
 
-int2 Result::size() const
+const Domain &Result::domain() const
 {
-  return int2{GPU_texture_width(texture_), GPU_texture_height(texture_)};
-}
-
-Transformation2D Result::transformation() const
-{
-  return transformation_;
-}
-
-Domain Result::domain() const
-{
-  return Domain(size(), transformation_);
+  return domain_;
 }
 
 /* --------------------------------------------------------------------
@@ -752,7 +749,7 @@ void ConversionProcessorOperation::execute()
     return;
   }
 
-  result.allocate_texture(input.size());
+  result.allocate_texture(input.domain());
 
   GPUShader *shader = get_conversion_shader();
   GPU_shader_bind(shader);
@@ -760,7 +757,7 @@ void ConversionProcessorOperation::execute()
   input.bind_as_texture(shader, shader_input_sampler_name);
   result.bind_as_image(shader, shader_output_image_name);
 
-  const int2 size = result.size();
+  const int2 size = result.domain().size;
   GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
   input.unbind_as_texture();
@@ -924,17 +921,17 @@ void RealizeOnDomainProcessorOperation::execute()
     return;
   }
 
-  result.allocate_texture(domain_.size);
+  result.allocate_texture(domain_);
 
   GPUShader *shader = get_realization_shader();
   GPU_shader_bind(shader);
 
   /* Transform the input space into the domain space. */
-  const Transformation2D local_transformation = input.transformation() *
+  const Transformation2D local_transformation = input.domain().transformation *
                                                 domain_.transformation.inverted();
 
   /* Set the pivot of the transformation to be the center of the domain.  */
-  const float2 pivot = float2(result.size()) / 2.0f;
+  const float2 pivot = float2(domain_.size) / 2.0f;
   const Transformation2D pivoted_transformation = local_transformation.set_pivot(pivot);
 
   /* Invert the transformation because the shader transforms the domain coordinates instead of the
@@ -950,7 +947,7 @@ void RealizeOnDomainProcessorOperation::execute()
   input.bind_as_texture(shader, "input_sampler");
   result.bind_as_image(shader, "domain");
 
-  const int2 size = result.size();
+  const int2 size = result.domain().size;
   GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
   input.unbind_as_texture();
@@ -1112,10 +1109,9 @@ GPUMaterialOperation::~GPUMaterialOperation()
 
 void GPUMaterialOperation::execute()
 {
-  const int2 size = compute_domain().size;
   for (StringRef identifier : output_socket_to_output_identifier_map_.values()) {
     Result &result = get_result(identifier);
-    result.allocate_texture(size);
+    result.allocate_texture(compute_domain());
   }
 
   GPUShader *shader = GPU_material_get_shader(material_);
@@ -1125,6 +1121,7 @@ void GPUMaterialOperation::execute()
   bind_inputs(shader);
   bind_outputs(shader);
 
+  const int2 size = compute_domain().size;
   GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
   GPU_texture_unbind_all();

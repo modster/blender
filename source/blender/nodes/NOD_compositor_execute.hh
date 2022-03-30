@@ -194,6 +194,10 @@ class Domain {
 
   Domain(int2 size, Transformation2D transformation);
 
+  /* Transform the domain by the given transformation. This effectively pre-multiply the given
+   * transformation by the current transformation of the domain. */
+  void transform(const Transformation2D &transformation);
+
   /* Returns a domain of size 1x1 and an identity transformation. */
   static Domain identity();
 };
@@ -240,9 +244,9 @@ class Result {
    * initialize the first three array elements. This member is uninitialized if the result is a
    * texture. */
   float value_[4];
-  /* The transformation of the result. This only matters if the result was a texture. See the
-   * Domain class. */
-  Transformation2D transformation_ = Transformation2D::identity();
+  /* The domain of the result. This only matters if the result was a texture. See the Domain class
+   * for more information. */
+  Domain domain_ = Domain::identity();
   /* If not nullptr, then this result wraps and uses the texture of another master result. In this
    * case, calls to texture-related methods like increment_reference_count and release should
    * operate on the master result as opposed to this result. This member is typically set upon
@@ -251,14 +255,18 @@ class Result {
   Result *master_ = nullptr;
 
  public:
+  /* Construct a result of the given type with the given texture pool that will be used to allocate
+   * and release the result's texture. */
   Result(ResultType type, TexturePool &texture_pool);
 
-  /* Declare the result to be a texture result and allocate a texture of an appropriate type with
-   * the given size from the given texture pool. */
-  void allocate_texture(int2 size);
+  /* Declare the result to be a texture result, allocate a texture of an appropriate type with
+   * the size of the given domain from the result's texture pool, and set the domain of the result
+   * to the given domain. */
+  void allocate_texture(Domain domain);
 
-  /* Declare the result to be a single value result and allocate a texture of an appropriate
-   * type with size 1x1 from the given texture pool. See class description for more information. */
+  /* Declare the result to be a single value result, allocate a texture of an appropriate
+   * type with size 1x1 from the result's texture pool, and set the domain to be an identity
+   * domain. See class description for more information. */
   void allocate_single_value();
 
   /* Bind the texture of the result to the texture image unit with the given name in the currently
@@ -283,13 +291,12 @@ class Result {
    * incremented by the reference count of the target result. This is typically called in the
    * allocate method of an operation whose input texture will not change and can be passed to the
    * output directly. It should be noted that such operations can still adjust other properties of
-   * the result, like its transformation. So for instance, the transform operation passes its input
-   * through to its output because it will not change it, however, it may adjusts its
-   * transformation. */
+   * the result, like its domain. So for instance, the transform operation passes its input through
+   * to its output because it will not change it, however, it may adjusts its domain. */
   void pass_through(Result &target);
 
   /* Transform the result by the given transformation. This effectively pre-multiply the given
-   * transformation by the current transformation of the result. */
+   * transformation by the current transformation of the domain of the result. */
   void transform(const Transformation2D &transformation);
 
   /* If the result is a single value result of type float, return its float value. Otherwise, an
@@ -352,14 +359,8 @@ class Result {
    * reference count of the master result is returned instead. */
   int reference_count() const;
 
-  /* Returns the size of the allocated texture. */
-  int2 size() const;
-
-  /* Returns the transformation of the result. */
-  Transformation2D transformation() const;
-
   /* Returns the domain of the result. See the Domain class. */
-  Domain domain() const;
+  const Domain &domain() const;
 };
 
 /* --------------------------------------------------------------------

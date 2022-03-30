@@ -487,7 +487,7 @@ class ImageOperation : public NodeOperation {
 
     const int width = GPU_texture_width(image_texture);
     const int height = GPU_texture_height(image_texture);
-    result.allocate_texture(int2(width, height));
+    result.allocate_texture(Domain(int2(width, height)));
 
     GPUShader *shader = GPU_shader_create_from_info_name(shader_name);
     GPU_shader_bind(shader);
@@ -497,8 +497,7 @@ class ImageOperation : public NodeOperation {
 
     result.bind_as_image(shader, "output_image");
 
-    const int2 size = result.size();
-    GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
+    GPU_compute_dispatch(shader, width / 16 + 1, height / 16 + 1, 1);
 
     GPU_shader_unbind();
     GPU_texture_unbind(image_texture);
@@ -696,7 +695,7 @@ class RenderLayerOperation : public NodeOperation {
     const int height = GPU_texture_height(pass_texture);
 
     Result &result = get_result("Image");
-    result.allocate_texture(int2(width, height));
+    result.allocate_texture(Domain(int2(width, height)));
     GPU_texture_copy(result.texture(), pass_texture);
   }
 };
