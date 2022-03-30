@@ -1042,7 +1042,7 @@ static void rna_def_paint_mode(BlenderRNA *brna)
   RNA_def_struct_path_func(srna, "rna_PaintModeSettings_path");
   RNA_def_struct_ui_text(srna, "Paint Mode", "Properties of paint mode");
 
-  /* property mode, sync API name with TexPaintSettings.mode */
+  /* Property mode, sync API name with TexPaintSettings.mode */
   prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "canvas_source");
   RNA_def_property_enum_items(prop, rna_enum_canvas_source_items);
@@ -1054,7 +1054,7 @@ static void rna_def_paint_mode(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Source", "Source to select canvas from");
   RNA_def_property_update(prop, 0, "rna_PaintModeSettings_canvas_source_update");
 
-  /* property mode, sync API name with TexPaintSettings.canvas */
+  /* Property canvas, sync API name with TexPaintSettings.canvas */
   prop = RNA_def_property(srna, "canvas", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "image");
   RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_PaintModeSettings_image_poll");
