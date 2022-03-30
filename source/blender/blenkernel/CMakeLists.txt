@@ -242,6 +242,7 @@ set(SRC
   intern/particle_system.c
   intern/pbvh.c
   intern/pbvh_bmesh.c
+  intern/pbvh_pixels.cc
   intern/pointcache.c
   intern/pointcloud.cc
   intern/preferences.c
