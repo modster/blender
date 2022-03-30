@@ -14,6 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include <limits>
 #include <string>
 
 #include "BLI_assert.h"
@@ -155,7 +156,7 @@ Result::Result(ResultType type, TexturePool &texture_pool)
 
 void Result::allocate_texture(int2 size)
 {
-  is_texture_ = true;
+  is_single_value_ = false;
   switch (type_) {
     case ResultType::Float:
       texture_ = texture_pool_->acquire_float(size);
@@ -171,7 +172,7 @@ void Result::allocate_texture(int2 size)
 
 void Result::allocate_single_value()
 {
-  is_texture_ = false;
+  is_single_value_ = true;
   /* Single values are stored in 1x1 textures. */
   const int2 texture_size{1, 1};
   switch (type_) {
@@ -314,12 +315,12 @@ ResultType Result::type() const
 
 bool Result::is_texture() const
 {
-  return is_texture_;
+  return !is_single_value_;
 }
 
 bool Result::is_single_value() const
 {
-  return !is_texture_;
+  return is_single_value_;
 }
 
 GPUTexture *Result::texture() const
@@ -392,27 +393,29 @@ void Operation::map_input_to_result(StringRef identifier, Result *result)
 
 Domain Operation::compute_domain()
 {
-  /* If any of the inputs is a domain input and not a single value, return the domain of the first
-   * one. */
+  /* In case no domain input was found, likely because all inputs are single values, then return an
+   * identity domain. */
+  Domain operation_domain = Domain::identity();
+  int current_domain_priority = std::numeric_limits<int>::max();
+
   for (StringRef identifier : input_descriptors_.keys()) {
     const Result &result = get_input(identifier);
-    bool is_domain = get_input_descriptor(identifier).is_domain;
-    if (is_domain && result.is_texture()) {
-      return result.domain();
+    const InputDescriptor &descriptor = get_input_descriptor(identifier);
+
+    /* A single value input can't be a domain input. */
+    if (result.is_single_value() || descriptor.expects_single_value) {
+      continue;
+    }
+
+    /* Notice that the lower the domain priority value is, the higher the priority is, hence the
+     * less than comparison. */
+    if (descriptor.domain_priority < current_domain_priority) {
+      operation_domain = result.domain();
+      current_domain_priority = descriptor.domain_priority;
     }
   }
 
-  /* No domain inputs or all of them are single values, so return the domain of the first non
-   * single input. */
-  for (StringRef identifier : input_descriptors_.keys()) {
-    const Result &result = get_input(identifier);
-    if (result.is_texture()) {
-      return result.domain();
-    }
-  }
-
-  /* All inputs are single values. Return an identity domain. */
-  return Domain::identity();
+  return operation_domain;
 }
 
 void Operation::pre_execute()
@@ -513,20 +516,24 @@ void Operation::add_realize_on_domain_input_processor_if_needed(StringRef identi
     return;
   }
 
-  /* Input is a domain input and does not need realization. */
-  if (descriptor.is_domain) {
+  /* The input expects a single value and if no single value is provided, it will be ignored and a
+   * default value will be used, so no need to realize it. */
+  if (descriptor.expects_single_value) {
     return;
   }
 
-  const Result result = get_input(identifier);
+  const Result &result = get_input(identifier);
   /* Input result is a single value and does not need realization. */
   if (result.is_single_value()) {
     return;
   }
 
-  /* Realization is needed. It could be that the input domain is identical to the operation domain
-   * and thus realization will not be needed, but this is handled during execution because
-   * transformation is only known at execution time, not allocation time. */
+  /* The input have an identical domain to the operation domain, so no need to realize it. */
+  if (result.domain() == compute_domain()) {
+    return;
+  }
+
+  /* Realization is needed. */
   ProcessorOperation *processor = new RealizeOnDomainProcessorOperation(
       context(), compute_domain(), descriptor.type);
   add_input_processor(identifier, processor);
@@ -590,8 +597,10 @@ NodeOperation::NodeOperation(Context &context, DNode node) : Operation(context),
   for (const InputSocketRef *input : node->inputs()) {
     InputDescriptor input_descriptor;
     input_descriptor.type = get_node_socket_result_type(input);
-    input_descriptor.is_domain =
-        node->declaration()->inputs()[input->index()]->is_compositor_domain_input();
+    const nodes::SocketDeclarationPtr &socket_declaration =
+        input->node().declaration()->inputs()[input->index()];
+    input_descriptor.domain_priority = socket_declaration->compositor_domain_priority();
+    input_descriptor.expects_single_value = socket_declaration->compositor_expects_single_value();
     declare_input_descriptor(input->identifier(), input_descriptor);
   }
 
@@ -768,7 +777,7 @@ ConvertFloatToVectorProcessorOperation::ConvertFloatToVectorProcessorOperation(C
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Float;
-  input_descriptor.is_domain = true;
+  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Vector, texture_pool()));
 }
@@ -794,7 +803,7 @@ ConvertFloatToColorProcessorOperation::ConvertFloatToColorProcessorOperation(Con
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Float;
-  input_descriptor.is_domain = true;
+  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Color, texture_pool()));
 }
@@ -820,7 +829,7 @@ ConvertColorToFloatProcessorOperation::ConvertColorToFloatProcessorOperation(Con
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Color;
-  input_descriptor.is_domain = true;
+  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Float, texture_pool()));
 }
@@ -845,7 +854,7 @@ ConvertVectorToFloatProcessorOperation::ConvertVectorToFloatProcessorOperation(C
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Vector;
-  input_descriptor.is_domain = true;
+  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Float, texture_pool()));
 }
@@ -872,7 +881,7 @@ ConvertVectorToColorProcessorOperation::ConvertVectorToColorProcessorOperation(C
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Vector;
-  input_descriptor.is_domain = true;
+  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Color, texture_pool()));
 }
@@ -1277,8 +1286,10 @@ void GPUMaterialOperation::declare_material_input_if_needed(DInputSocket input,
   /* Construct an input descriptor from the socket declaration. */
   InputDescriptor input_descriptor;
   input_descriptor.type = get_node_socket_result_type(input.socket_ref());
-  input_descriptor.is_domain =
-      input.node()->declaration()->inputs()[input->index()]->is_compositor_domain_input();
+  const nodes::SocketDeclarationPtr &socket_declaration =
+      input.node()->declaration()->inputs()[input->index()];
+  input_descriptor.domain_priority = socket_declaration->compositor_domain_priority();
+  input_descriptor.expects_single_value = socket_declaration->compositor_expects_single_value();
 
   /* Declare the input descriptor. */
   StringRef identifier = GPU_material_get_link_texture(input_texture_link)->sampler_name;

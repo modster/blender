@@ -137,11 +137,11 @@ class Context {
  * operation domain. To abstract away the different domains of the inputs, any input that have a
  * different domain than the operation domain is realized on the operation domain through a
  * RealizeOnDomainProcessorOperation, except inputs whose descriptor sets skip_realization or
- * is_domain, see InputDescriptor. The realization process simply projects the input domain on the
- * operation domain, copies the area of input that intersects the operation domain, and fill the
- * rest with zeros. This process is illustrated below. It follows that operations should expect all
- * their inputs to have the same domain and consequently size, except possibly for inputs that skip
- * realization.
+ * expects_single_value, see InputDescriptor for more information. The realization process simply
+ * projects the input domain on the operation domain, copies the area of input that intersects the
+ * operation domain, and fill the rest with zeros. This process is illustrated below. It follows
+ * that operations should expect all their inputs to have the same domain and consequently size,
+ * except for inputs that explicitly skip realization.
  *
  *                                   Realized Result
  *             +-------------+       +-------------+
@@ -151,18 +151,16 @@ class Context {
  *       +-----------+       |       |-----+       |
  *       |     |  C  |       |       |  C  |       |
  *       |     +-----|-------+       +-----|-------+
- *       | Input     |
- *       | Domain    |
+ *       | Domain Of |
+ *       |   Input   |
  *       +-----------+
  *
  * Each operation can define an arbitrary operation domain, but in most cases, the operation domain
  * is inferred from the inputs. By default, the operation domain is computed as follows. Typically,
- * one input of the operation is said to be a domain input and it defines the operation domain. So
- * if the operation have an input whose descriptor sets is_domain and is not a single value input,
- * then the operation domain will be the same domain as the first such input. See the
- * InputDescriptor class. Otherwise, if no domain inputs exists or all are single value inputs,
- * then the first non single value input is used to define the operation domain. If all inputs are
- * single values, then the operation domain is irrelevant and an identity domain is set. See
+ * one input of the operation is said to be the domain input and the operation domain is inferred
+ * from it. The domain input is determined to be the non-single value input that have the highest
+ * domain priority, a zero value being the highest priority. If all inputs are single values, then
+ * the operation domain is irrelevant and an identity domain is set. See
  * NodeOperation::compute_domain.
  *
  * The aforementioned logic for operation domain computation is only a default that works for most
@@ -171,15 +169,17 @@ class Context {
  * identity transformation, their operation domain doesn't depend on the inputs at all.
  *
  * For instance, a filter operation have two inputs, a factor and a color, the latter of which
- * is a domain input. If the color input is not a single value, then the domain of this operation
- * is computed to be the same size and transformation as the color input. And if the factor input
+ * has a domain priority of 0 and the former has a domain priority of 1. If the color input is not
+ * a single value, then the domain of this operation is computed to be the same size and
+ * transformation as the color input, because it has the highest priority. And if the factor input
  * have a different size and/or transformation from the computed domain of the operation, it will
  * be projected and realized on it to have the same size as described above. It follows that the
- * color input, which is a domain input, will not need to be realized because it already has the
- * same size and transformation as the domain of the operation, because the operation domain is
- * derived from it. On the other hand, if the color input is a single value input, then the
- * operation domain will be the same as the domain of the factor input. Finally, if both inputs are
- * single value inputs, the operation domain will be an identity and is irrelevant. */
+ * color input, will not need to be realized because it already has the same size and
+ * transformation as the domain of the operation, because the operation domain is inferred from it.
+ * On the other hand, if the color input is a single value input, then the operation domain will be
+ * the same as the domain of the factor input, because it has the second highest domain priority.
+ * Finally, if both inputs are single value inputs, the operation domain will be an identity and is
+ * irrelevant. */
 class Domain {
  public:
   /* The size of the domain in pixels. */
@@ -220,8 +220,8 @@ class Result {
  private:
   /* The base type of the texture or the type of the single value. */
   ResultType type_;
-  /* If true, the result is a texture, otherwise, the result is a single value. */
-  bool is_texture_;
+  /* If true, the result is a single value, otherwise, the result is a texture. */
+  bool is_single_value_;
   /* A GPU texture storing the result data. This will be a 1x1 texture if the result is a single
    * value, the value of which will be identical to that of the value member. See class description
    * for more information. */
@@ -375,10 +375,16 @@ class InputDescriptor {
   /* If true, then the input does not need to be realized on the domain of the operation before its
    * execution. See the Domain class for more information. */
   bool skip_realization = false;
-  /* If true, then the input is considered to be a domain input that is used by default to define
-   * the domain of the operation, this is typically the main input of the operation. See the Domain
-   * class for more information. */
-  bool is_domain = false;
+  /* The priority of the input for determining the operation domain. The non-single value input
+   * with the highest priority will be used to infer the operation domain, the highest priority
+   * being zero. See the Domain class for more information. */
+  int domain_priority = 0;
+  /* If true, the input expects a single value, and if a non-single value is provided, a default
+   * single value will be used instead, see the get_*_value_default methods in the Result
+   * class. It follows that this also imply skip_realization, because we don't need to realize a
+   * result that will be discarded anyways. If false, the input can work with both single and
+   * non-single values. */
+  bool expects_single_value = false;
 };
 
 /* --------------------------------------------------------------------

@@ -36,17 +36,28 @@ namespace blender::nodes::node_composite_transform_cc {
 
 static void cmp_node_transform_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Color>(N_("Image"))
-      .default_value({0.8f, 0.8f, 0.8f, 1.0f})
-      .is_compositor_domain_input();
-  b.add_input<decl::Float>(N_("X")).default_value(0.0f).min(-10000.0f).max(10000.0f);
-  b.add_input<decl::Float>(N_("Y")).default_value(0.0f).min(-10000.0f).max(10000.0f);
+  b.add_input<decl::Color>(N_("Image")).default_value({0.8f, 0.8f, 0.8f, 1.0f});
+  b.add_input<decl::Float>(N_("X"))
+      .default_value(0.0f)
+      .min(-10000.0f)
+      .max(10000.0f)
+      .compositor_expects_single_value();
+  b.add_input<decl::Float>(N_("Y"))
+      .default_value(0.0f)
+      .min(-10000.0f)
+      .max(10000.0f)
+      .compositor_expects_single_value();
   b.add_input<decl::Float>(N_("Angle"))
       .default_value(0.0f)
       .min(-10000.0f)
       .max(10000.0f)
-      .subtype(PROP_ANGLE);
-  b.add_input<decl::Float>(N_("Scale")).default_value(1.0f).min(0.0001f).max(CMP_SCALE_MAX);
+      .subtype(PROP_ANGLE)
+      .compositor_expects_single_value();
+  b.add_input<decl::Float>(N_("Scale"))
+      .default_value(1.0f)
+      .min(0.0001f)
+      .max(CMP_SCALE_MAX)
+      .compositor_expects_single_value();
   b.add_output<decl::Color>(N_("Image"));
 }
 
