@@ -182,8 +182,8 @@ static int build_hierarchy_foreach_ID_cb(LibraryIDLinkCallbackData *cb_data)
     return IDWALK_RET_NOP;
   }
 
-  /* Avoid duplicates: If there is an sibling for this ID already, the same ID is just used
-   * multiple times by the same parent. */
+  /* Avoid duplicates: If there is a sibling for this ID already, the same ID is just used multiple
+   * times by the same parent. */
   if (build_data.sibling_ids.lookup_key_default(&id, nullptr)) {
     return IDWALK_RET_NOP;
   }

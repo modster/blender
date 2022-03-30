@@ -3598,7 +3598,8 @@ static void rna_def_space_outliner(BlenderRNA *brna)
        "PROPERTIES",
        ICON_NONE,
        "Properties",
-       "Display all data-blocks with their overridden properties and buttons do edit them"},
+       "Display all local override data-blocks with their overridden properties and buttons do "
+       "edit them"},
       {SO_LIB_OVERRIDE_VIEW_HIERARCHY,
        "HIERARCHY",
        ICON_NONE,
