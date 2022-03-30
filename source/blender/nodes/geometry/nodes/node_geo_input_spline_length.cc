@@ -3,7 +3,6 @@
 #include "node_geometry_util.hh"
 
 #include "BKE_curves.hh"
-#include "BKE_spline.hh"
 
 namespace blender::nodes::node_geo_input_spline_length_cc {
 
@@ -23,21 +22,24 @@ static VArray<float> construct_spline_length_gvarray(const CurveComponent &compo
   if (!component.has_curves()) {
     return {};
   }
-  const std::unique_ptr<CurveEval> curve = curves_to_curve_eval(*component.get_for_read());
+  const Curves &curves_id = *component.get_for_read();
+  const bke::CurvesGeometry &curves = bke::CurvesGeometry::wrap(curves_id.geometry);
 
-  Span<SplinePtr> splines = curve->splines();
-  Array<float> spline_lenghts(splines.size());
-  for (const int i : splines.index_range()) {
-    spline_lenghts[i] = splines[i]->length();
-  }
+  curves.ensure_evaluated_lengths();
+
+  VArray<bool> cyclic = curves.cyclic();
+  VArray<float> lengths = VArray<float>::ForFunc(
+      curves.curves_num(), [&curves, cyclic = std::move(cyclic)](int64_t index) {
+        return curves.evaluated_length_total_for_curve(index, cyclic[index]);
+      });
 
   if (domain == ATTR_DOMAIN_CURVE) {
-    return VArray<float>::ForContainer(std::move(spline_lenghts));
+    return lengths;
   }
+
   if (domain == ATTR_DOMAIN_POINT) {
-    VArray<float> length = VArray<float>::ForContainer(std::move(spline_lenghts));
     return component.attribute_try_adapt_domain<float>(
-        std::move(length), ATTR_DOMAIN_CURVE, ATTR_DOMAIN_POINT);
+        std::move(lengths), ATTR_DOMAIN_CURVE, ATTR_DOMAIN_POINT);
   }
 
   return {};
@@ -86,13 +88,13 @@ static VArray<int> construct_spline_count_gvarray(const CurveComponent &componen
   const Curves &curves_id = *component.get_for_read();
   const bke::CurvesGeometry &curves = bke::CurvesGeometry::wrap(curves_id.geometry);
 
-  auto count_fn = [curves](int64_t i) { return curves.range_for_curve(i).size(); };
+  auto count_fn = [curves](int64_t i) { return curves.points_for_curve(i).size(); };
 
   if (domain == ATTR_DOMAIN_CURVE) {
-    return VArray<int>::ForFunc(curves.curves_size(), count_fn);
+    return VArray<int>::ForFunc(curves.curves_num(), count_fn);
   }
   if (domain == ATTR_DOMAIN_POINT) {
-    VArray<int> count = VArray<int>::ForFunc(curves.curves_size(), count_fn);
+    VArray<int> count = VArray<int>::ForFunc(curves.curves_num(), count_fn);
     return component.attribute_try_adapt_domain<int>(
         std::move(count), ATTR_DOMAIN_CURVE, ATTR_DOMAIN_POINT);
   }

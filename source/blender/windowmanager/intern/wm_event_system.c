@@ -1063,7 +1063,7 @@ static void wm_operator_finished(bContext *C, wmOperator *op, const bool repeat,
   if (hud_status != NOP) {
     if (hud_status == SET) {
       ScrArea *area = CTX_wm_area(C);
-      if (area) {
+      if (area && ((area->flag & AREA_FLAG_OFFSCREEN) == 0)) {
         ED_area_type_hud_ensure(C, area);
       }
     }
@@ -1295,6 +1295,23 @@ static wmOperator *wm_operator_create(wmWindowManager *wm,
   WM_operator_properties_sanitize(op->ptr, 0);
 
   return op;
+}
+
+/**
+ * This isn't very nice but needed to redraw gizmos which are hidden while tweaking,
+ * See #WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK for details.
+ */
+static void wm_region_tag_draw_on_gizmo_delay_refresh_for_tweak(wmWindow *win, bScreen *screen)
+{
+  ED_screen_areas_iter (win, screen, area) {
+    LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+      if (region->gizmo_map != NULL) {
+        if (WM_gizmomap_tag_delay_refresh_for_tweak_check(region->gizmo_map)) {
+          ED_region_tag_redraw(region);
+        }
+      }
+    }
+  }
 }
 
 static void wm_region_mouse_co(bContext *C, wmEvent *event)
@@ -3711,6 +3728,7 @@ void wm_event_do_handlers(bContext *C)
           event->flag |= WM_EVENT_FORCE_DRAG_THRESHOLD;
         }
       }
+      const bool event_queue_check_drag_prev = win->event_queue_check_drag;
 
       /* Active screen might change during handlers, update pointer. */
       screen = WM_window_get_active_screen(win);
@@ -3868,6 +3886,10 @@ void wm_event_do_handlers(bContext *C)
       if (win->event_queue_check_drag_handled) {
         win->event_queue_check_drag = false;
         win->event_queue_check_drag_handled = false;
+      }
+
+      if (event_queue_check_drag_prev && (win->event_queue_check_drag == false)) {
+        wm_region_tag_draw_on_gizmo_delay_refresh_for_tweak(win, screen);
       }
 
       /* Update previous mouse position for following events to use. */
@@ -4428,6 +4450,9 @@ void WM_event_add_mousemove(wmWindow *win)
 /** \name Ghost Event Conversion
  * \{ */
 
+/**
+ * \return The WM enum for key or #EVENT_NONE (which should be ignored).
+ */
 static int convert_key(GHOST_TKey key)
 {
   if (key >= GHOST_kKeyA && key <= GHOST_kKeyZ) {
@@ -4451,7 +4476,7 @@ static int convert_key(GHOST_TKey key)
     case GHOST_kKeyLinefeed:
       return EVT_LINEFEEDKEY;
     case GHOST_kKeyClear:
-      return 0;
+      return EVENT_NONE;
     case GHOST_kKeyEnter:
       return EVT_RETKEY;
 
@@ -4506,9 +4531,9 @@ static int convert_key(GHOST_TKey key)
     case GHOST_kKeyCapsLock:
       return EVT_CAPSLOCKKEY;
     case GHOST_kKeyNumLock:
-      return 0;
+      return EVENT_NONE;
     case GHOST_kKeyScrollLock:
-      return 0;
+      return EVENT_NONE;
 
     case GHOST_kKeyLeftArrow:
       return EVT_LEFTARROWKEY;
@@ -4520,7 +4545,7 @@ static int convert_key(GHOST_TKey key)
       return EVT_DOWNARROWKEY;
 
     case GHOST_kKeyPrintScreen:
-      return 0;
+      return EVENT_NONE;
     case GHOST_kKeyPause:
       return EVT_PAUSEKEY;
 
@@ -4562,9 +4587,28 @@ static int convert_key(GHOST_TKey key)
     case GHOST_kKeyMediaLast:
       return EVT_MEDIALAST;
 
-    default:
-      return EVT_UNKNOWNKEY; /* #GHOST_kKeyUnknown (this could be asserted). */
+    case GHOST_kKeyUnknown:
+      return EVT_UNKNOWNKEY;
+
+#if defined(__GNUC__) || defined(__clang__)
+      /* Ensure all members of this enum are handled, otherwise generate a compiler warning.
+       * Note that these members have been handled, these ranges are to satisfy the compiler. */
+    case GHOST_kKeyF1 ... GHOST_kKeyF24:
+    case GHOST_kKeyA ... GHOST_kKeyZ:
+    case GHOST_kKeyNumpad0 ... GHOST_kKeyNumpad9:
+    case GHOST_kKey0 ... GHOST_kKey9: {
+      BLI_assert_unreachable();
+      break;
+    }
+#else
+    default: {
+      break;
+    }
+#endif
   }
+
+  CLOG_WARN(WM_LOG_EVENTS, "unknown event type %d from ghost", (int)key);
+  return EVENT_NONE;
 }
 
 static void wm_eventemulation(wmEvent *event, bool test_only)
@@ -5087,6 +5131,10 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
     case GHOST_kEventKeyUp: {
       GHOST_TEventKeyData *kd = customdata;
       event.type = convert_key(kd->key);
+      if (UNLIKELY(event.type == EVENT_NONE)) {
+        break;
+      }
+
       event.ascii = kd->ascii;
       /* Might be not NULL terminated. */
       memcpy(event.utf8_buf, kd->utf8_buf, sizeof(event.utf8_buf));

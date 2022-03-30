@@ -502,6 +502,10 @@ class _draw_tool_settings_context_mode:
                 header=True
             )
 
+        if brush.curves_sculpt_tool == 'COMB':
+            layout.prop(brush, "falloff_shape", expand=True)
+            layout.prop(brush, "curve_preset")
+
         if brush.curves_sculpt_tool == 'ADD':
             layout.prop(brush, "use_frontface")
             layout.prop(brush, "falloff_shape", expand=True)
@@ -509,6 +513,10 @@ class _draw_tool_settings_context_mode:
             layout.prop(tool_settings.curves_sculpt, "curve_length")
             layout.prop(tool_settings.curves_sculpt, "interpolate_length")
             layout.prop(tool_settings.curves_sculpt, "interpolate_shape")
+
+        if brush.curves_sculpt_tool == 'SNAKE_HOOK':
+            layout.prop(brush, "falloff_shape", expand=True)
+            layout.prop(brush, "curve_preset")
 
         if brush.curves_sculpt_tool == 'TEST1':
             layout.prop(tool_settings.curves_sculpt, "distance")
@@ -5293,6 +5301,8 @@ class VIEW3D_MT_pivot_pie(Menu):
         pie.prop_enum(context.scene.tool_settings, "transform_pivot_point", value='ACTIVE_ELEMENT')
         if (obj is None) or (mode in {'OBJECT', 'POSE', 'WEIGHT_PAINT'}):
             pie.prop(context.scene.tool_settings, "use_transform_pivot_point_align")
+        if mode == 'EDIT_GPENCIL':
+            pie.prop(context.scene.tool_settings.gpencil_sculpt, "use_scale_thickness")
 
 
 class VIEW3D_MT_orientations_pie(Menu):

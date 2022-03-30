@@ -588,7 +588,13 @@ char *WM_context_path_resolve_property_full(const bContext *C,
       if (data_path != NULL) {
         if (prop != NULL) {
           char *prop_str = RNA_path_property_py(ptr, prop, index);
-          member_id_data_path = BLI_string_join_by_sep_charN('.', member_id, data_path, prop_str);
+          if (prop_str[0] == '[') {
+            member_id_data_path = BLI_string_joinN(member_id, ".", data_path, prop_str);
+          }
+          else {
+            member_id_data_path = BLI_string_join_by_sep_charN(
+                '.', member_id, data_path, prop_str);
+          }
           MEM_freeN(prop_str);
         }
         else {
@@ -600,7 +606,12 @@ char *WM_context_path_resolve_property_full(const bContext *C,
     else {
       if (prop != NULL) {
         char *prop_str = RNA_path_property_py(ptr, prop, index);
-        member_id_data_path = BLI_string_join_by_sep_charN('.', member_id, prop_str);
+        if (prop_str[0] == '[') {
+          member_id_data_path = BLI_string_joinN(member_id, prop_str);
+        }
+        else {
+          member_id_data_path = BLI_string_join_by_sep_charN('.', member_id, prop_str);
+        }
         MEM_freeN(prop_str);
       }
       else {
@@ -1991,7 +2002,7 @@ static void WM_OT_window_fullscreen_toggle(wmOperatorType *ot)
 {
   ot->name = "Toggle Window Fullscreen";
   ot->idname = "WM_OT_window_fullscreen_toggle";
-  ot->description = "Toggle the current window fullscreen";
+  ot->description = "Toggle the current window full-screen";
 
   ot->exec = wm_window_fullscreen_toggle_exec;
   ot->poll = WM_operator_winactive;

@@ -1569,10 +1569,10 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         LISTBASE_FOREACH (ModifierData *, md, &ob->modifiers) {
           if (md->type == eModifierType_SurfaceDeform) {
             SurfaceDeformModifierData *smd = (SurfaceDeformModifierData *)md;
-            if (smd->num_bind_verts && smd->verts) {
-              smd->num_mesh_verts = smd->num_bind_verts;
+            if (smd->bind_verts_num && smd->verts) {
+              smd->mesh_verts_num = smd->bind_verts_num;
 
-              for (unsigned int i = 0; i < smd->num_bind_verts; i++) {
+              for (unsigned int i = 0; i < smd->bind_verts_num; i++) {
                 smd->verts[i].vertex_idx = i;
               }
             }
@@ -2415,19 +2415,47 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
       }
     }
+
+    /* Change grease pencil smooth iterations to match old results with new algorithm. */
+    LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+      LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+        if (md->type == eGpencilModifierType_Smooth) {
+          SmoothGpencilModifierData *gpmd = (SmoothGpencilModifierData *)md;
+          if (gpmd->step == 1 && gpmd->factor <= 0.5f) {
+            gpmd->factor *= 2.0f;
+          }
+          else {
+            gpmd->step = 1 + (int)(gpmd->factor * max_ff(0.0f,
+                                                         min_ff(5.1f * sqrtf(gpmd->step) - 3.0f,
+                                                                gpmd->step + 2.0f)));
+            gpmd->factor = 1.0f;
+          }
+        }
+      }
+    }
   }
 
-  /**
-   * Versioning code until next subversion bump goes here.
-   *
-   * \note Be sure to check when bumping the version:
-   * - "versioning_userdef.c", #blo_do_versions_userdef
-   * - "versioning_userdef.c", #do_versions_theme
-   *
-   * \note Keep this message at the bottom of the function.
-   */
-  {
-    /* Keep this block, even when empty. */
+  if (!MAIN_VERSION_ATLEAST(bmain, 302, 7)) {
+    /* Generate 'system' liboverrides IDs.
+     * NOTE: This is a fairly rough process, based on very basic heuristics. Should be enough for a
+     * do_version code though, this is a new optional feature, not a critical conversion. */
+    ID *id;
+    FOREACH_MAIN_ID_BEGIN (bmain, id) {
+      if (!ID_IS_OVERRIDE_LIBRARY_REAL(id) || ID_IS_LINKED(id)) {
+        /* Ignore non-real liboverrides, and linked ones. */
+        continue;
+      }
+      if (GS(id->name) == ID_OB) {
+        /* Never 'lock' an object into a system override for now. */
+        continue;
+      }
+      if (BKE_lib_override_library_is_user_edited(id)) {
+        /* Do not 'lock' an ID already edited by the user. */
+        continue;
+      }
+      id->override_library->flag |= IDOVERRIDE_LIBRARY_FLAG_SYSTEM_DEFINED;
+    }
+    FOREACH_MAIN_ID_END;
 
     /* Initialize brush curves sculpt settings. */
     LISTBASE_FOREACH (Brush *, brush, &bmain->brushes) {
@@ -2446,5 +2474,29 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         scene->toolsettings->curves_sculpt->curve_length = 0.3f;
       }
     }
+
+    for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_OUTLINER) {
+            SpaceOutliner *space_outliner = (SpaceOutliner *)sl;
+            space_outliner->filter &= ~SO_FILTER_CLEARED_1;
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Versioning code until next subversion bump goes here.
+   *
+   * \note Be sure to check when bumping the version:
+   * - "versioning_userdef.c", #blo_do_versions_userdef
+   * - "versioning_userdef.c", #do_versions_theme
+   *
+   * \note Keep this message at the bottom of the function.
+   */
+  {
+    /* Keep this block, even when empty. */
   }
 }
