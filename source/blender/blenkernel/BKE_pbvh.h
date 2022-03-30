@@ -482,7 +482,7 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
           vi.co = vi.bm_vert->co; \
           vi.fno = vi.bm_vert->no; \
           vi.index = BM_elem_index_get(vi.bm_vert); \
-          vi.mask = (float*)BM_ELEM_CD_GET_VOID_P(vi.bm_vert, vi.cd_vert_mask_offset); \
+          vi.mask = (float *)BM_ELEM_CD_GET_VOID_P(vi.bm_vert, vi.cd_vert_mask_offset); \
         }
 
 #define BKE_pbvh_vertex_iter_end \
@@ -546,7 +546,7 @@ bool BKE_pbvh_is_drawing(const PBVH *pbvh);
 void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val);
 
 /* Do not call in PBVH_GRIDS mode */
-void BKE_pbvh_node_num_loops(PBVH *pbvh, PBVHNode *node, int *r_uniqueloop, int *r_totloop);
+void BKE_pbvh_node_num_loops(PBVH *pbvh, PBVHNode *node, int *r_totloop);
 
 void BKE_pbvh_update_active_vcol(PBVH *pbvh, const struct Mesh *mesh);
 void BKE_pbvh_pmap_set(PBVH *pbvh, const struct MeshElemMap *pmap);

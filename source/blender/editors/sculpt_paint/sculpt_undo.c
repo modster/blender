@@ -1064,7 +1064,7 @@ static SculptUndoNode *sculpt_undo_alloc_node(Object *ob, PBVHNode *node, Sculpt
   if (need_loops) {
     int totloop;
 
-    BKE_pbvh_node_num_loops(ss->pbvh, node, &totloop, NULL);
+    BKE_pbvh_node_num_loops(ss->pbvh, node, &totloop);
 
     unode->loop_index = MEM_calloc_arrayN(totloop, sizeof(int), __func__);
     unode->maxloop = 0;
@@ -1399,16 +1399,16 @@ SculptUndoNode *SCULPT_undo_push_node(Object *ob, PBVHNode *node, SculptUndoType
   }
   else {
     const int *vert_indices, *loop_indices;
-    int allvert, uniqloop;
+    int allvert, allloop;
 
     BKE_pbvh_node_num_verts(ss->pbvh, unode->node, NULL, &allvert);
     BKE_pbvh_node_get_verts(ss->pbvh, node, &vert_indices, NULL);
     memcpy(unode->index, vert_indices, sizeof(int) * allvert);
 
     if (unode->loop_index) {
-      BKE_pbvh_node_num_loops(ss->pbvh, unode->node, &uniqloop, NULL);
+      BKE_pbvh_node_num_loops(ss->pbvh, unode->node, &allloop);
       BKE_pbvh_node_get_loops(ss->pbvh, unode->node, &loop_indices, NULL);
-      memcpy(unode->loop_index, loop_indices, sizeof(int) * uniqloop);
+      memcpy(unode->loop_index, loop_indices, sizeof(int) * allloop);
 
       unode->maxloop = BKE_object_get_original_mesh(ob)->totloop;
     }
@@ -1591,7 +1591,9 @@ static void sculpt_undosys_step_encode_init(struct bContext *UNUSED(C), UndoStep
   BLI_listbase_clear(&us->data.nodes);
 }
 
-static bool sculpt_undosys_step_encode(struct bContext *UNUSED(C), struct Main *bmain, UndoStep *us_p)
+static bool sculpt_undosys_step_encode(struct bContext *UNUSED(C),
+                                       struct Main *bmain,
+                                       UndoStep *us_p)
 {
   /* Dummy, encoding is done along the way by adding tiles
    * to the current 'SculptUndoStep' added by encode_init. */

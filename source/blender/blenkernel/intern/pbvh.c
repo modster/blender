@@ -3137,13 +3137,9 @@ void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val)
   pbvh->is_drawing = val;
 }
 
-void BKE_pbvh_node_num_loops(PBVH *UNUSED(pbvh), PBVHNode *node, int *r_uniqueloop, int *r_totloop)
+void BKE_pbvh_node_num_loops(PBVH *UNUSED(pbvh), PBVHNode *node, int *r_totloop)
 {
   BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
-
-  if (r_uniqueloop) {
-    *r_uniqueloop = node->uniq_loops;
-  }
 
   if (r_totloop) {
     *r_totloop = node->face_loops;
@@ -3164,6 +3160,9 @@ void BKE_pbvh_ensure_node_loops(PBVH *pbvh, const Mesh *me)
 {
   BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
 
+  int totloop = 0;
+
+  /* Check if nodes already have loop indices. */
   for (int i = 0; i < pbvh->totnode; i++) {
     PBVHNode *node = pbvh->nodes + i;
 
@@ -3174,14 +3173,13 @@ void BKE_pbvh_ensure_node_loops(PBVH *pbvh, const Mesh *me)
     if (node->loop_indices) {
       return;
     }
+
+    totloop += node->totprim * 3;
   }
 
-  int *visit = MEM_malloc_arrayN(me->totloop, sizeof(int), __func__);
+  BLI_bitmap *visit = BLI_BITMAP_NEW(totloop, __func__);
 
-  for (int i = 0; i < me->totloop; i++) {
-    visit[i] = -1;
-  }
-
+  /* Create loop indices from node loop triangles. */
   for (int i = 0; i < pbvh->totnode; i++) {
     PBVHNode *node = pbvh->nodes + i;
 
@@ -3189,55 +3187,16 @@ void BKE_pbvh_ensure_node_loops(PBVH *pbvh, const Mesh *me)
       continue;
     }
 
-    int totloop = 0;
+    node->loop_indices = MEM_malloc_arrayN(node->totprim * 3, sizeof(int), __func__);
+    node->face_loops = 0;
 
     for (int j = 0; j < node->totprim; j++) {
       const MLoopTri *mlt = pbvh->looptri + node->prim_indices[j];
-      const MPoly *mp = pbvh->mpoly + mlt->poly;
 
-      totloop += mp->totloop;
-    }
-
-    node->loop_indices = MEM_malloc_arrayN(totloop, sizeof(int), __func__);
-    node->uniq_loops = 0;
-
-    for (int j = 0; j < node->totprim; j++) {
-      const MLoopTri *mlt = pbvh->looptri + node->prim_indices[j];
-      const MPoly *mp = pbvh->mpoly + mlt->poly;
-
-      for (int k = 0; k < mp->totloop; k++) {
-        int loop = mp->loopstart + k;
-
-        if (visit[loop] != -1) {
-          continue;
-        }
-
-        node->loop_indices[node->uniq_loops++] = loop;
-        visit[loop] = i;
-      }
-    }
-
-  }
-
-  /* Add non-unique loops at the end. */
-  for (int i = 0; i < pbvh->totnode; i++) {
-    PBVHNode *node = pbvh->nodes + i;
-
-    if (!(node->flag & PBVH_Leaf)) {
-      continue;
-    }
-
-    node->face_loops = node->uniq_loops;
-
-    for (int j = 0; j < node->totprim; j++) {
-      const MLoopTri *mlt = pbvh->looptri + node->prim_indices[j];
-      const MPoly *mp = pbvh->mpoly + mlt->poly;
-
-      for (int k = 0; k < mp->totloop; k++) {
-        int loop = mp->loopstart + k;
-
-        if (visit[loop] != i) {
-          node->loop_indices[node->face_loops++] = loop;
+      for (int k = 0; k < 3; k++) {
+        if (!BLI_BITMAP_TEST(visit, mlt->tri[k])) {
+          node->loop_indices[node->face_loops++] = mlt->tri[k];
+          BLI_BITMAP_ENABLE(visit, mlt->tri[k]);
         }
       }
     }
