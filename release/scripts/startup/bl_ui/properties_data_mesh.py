@@ -126,8 +126,7 @@ class MESH_UL_shape_keys(UIList):
 
 class MESH_UL_uvmaps(UIList):
     def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
-        # assert(isinstance(item, (bpy.types.MeshTexturePolyLayer,
-        # bpy.types.MeshLoopColorLayer)))
+        # assert(isinstance(item, (bpy.types.MeshTexturePolyLayer, bpy.types.MeshLoopColorLayer)))
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             layout.prop(item, "name", text="", emboss=False, icon='GROUP_UVS')
             icon = 'RESTRICT_RENDER_OFF' if item.active_render else 'RESTRICT_RENDER_ON'
@@ -246,7 +245,11 @@ class DATA_PT_vertex_groups(MeshButtonsPanel, Panel):
             col.operator("object.vertex_group_move", icon='TRIA_UP', text="").direction = 'UP'
             col.operator("object.vertex_group_move", icon='TRIA_DOWN', text="").direction = 'DOWN'
 
-        if (ob.vertex_groups and (ob.mode == 'EDIT' or (ob.mode == 'WEIGHT_PAINT' and ob.type == 'MESH' and ob.data.use_paint_mask_vertex))):
+        if (
+                ob.vertex_groups and
+                (ob.mode == 'EDIT' or
+                 (ob.mode == 'WEIGHT_PAINT' and ob.type == 'MESH' and ob.data.use_paint_mask_vertex))
+        ):
             row = layout.row()
 
             sub = row.row(align=True)
@@ -532,7 +535,8 @@ class DATA_PT_mesh_attributes(MeshButtonsPanel, Panel):
         row = layout.row()
 
         col = row.column()
-        col.template_list("MESH_UL_attributes",
+        col.template_list(
+            "MESH_UL_attributes",
             "attributes",
             mesh,
             "attributes",
