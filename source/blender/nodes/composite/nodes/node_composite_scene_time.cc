@@ -17,6 +17,8 @@
  * \ingroup cmpnodes
  */
 
+#include "NOD_compositor_execute.hh"
+
 #include "node_composite_util.hh"
 
 namespace blender::nodes {
@@ -27,6 +29,46 @@ static void cmp_node_scene_time_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("Frame"));
 }
 
+using namespace blender::viewport_compositor;
+
+class SceneTimeOperation : public NodeOperation {
+ public:
+  using NodeOperation::NodeOperation;
+
+  void execute() override
+  {
+    execute_seconds();
+    execute_frame();
+  }
+
+  void execute_seconds()
+  {
+    Result &result = get_result("Seconds");
+    result.allocate_single_value();
+
+    const int frame_number = static_cast<float>(context().get_scene()->r.cfra);
+    const float frame_rate = static_cast<float>(context().get_scene()->r.frs_sec) /
+                             static_cast<float>(context().get_scene()->r.frs_sec_base);
+
+    result.set_float_value(frame_number / frame_rate);
+  }
+
+  void execute_frame()
+  {
+    Result &result = get_result("Frame");
+    result.allocate_single_value();
+
+    const int frame_number = static_cast<float>(context().get_scene()->r.cfra);
+
+    result.set_float_value(frame_number);
+  }
+};
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new SceneTimeOperation(context, node);
+}
+
 }  // namespace blender::nodes
 
 void register_node_type_cmp_scene_time()
@@ -35,5 +77,7 @@ void register_node_type_cmp_scene_time()
 
   cmp_node_type_base(&ntype, CMP_NODE_SCENE_TIME, "Scene Time", NODE_CLASS_INPUT);
   ntype.declare = blender::nodes::cmp_node_scene_time_declare;
+  ntype.get_compositor_operation = blender::nodes::get_compositor_operation;
+
   nodeRegisterType(&ntype);
 }
