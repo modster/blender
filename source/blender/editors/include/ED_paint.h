@@ -12,7 +12,6 @@
 extern "C" {
 #endif
 
-struct EnumPropertyItem;
 struct PaintModeSettings;
 struct ImBuf;
 struct Image;
