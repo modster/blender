@@ -5380,8 +5380,6 @@ void CustomData_debug_info_from_layers(const CustomData *data, const char *inden
 
 namespace blender::bke {
 
-/** \} */
-
 /* -------------------------------------------------------------------- */
 /** \name Custom Data C++ API
  * \{ */
