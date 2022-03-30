@@ -31,7 +31,10 @@ typedef struct TexPaintSlot {
   struct Image *ima;
   /** Custom-data index for uv layer, #MAX_NAME. */
   char *uvname;
-  /** Color attribute name when painting using color attributes. Mutual exclusive with ima. */
+  /**
+   * Color attribute name when painting using color attributes. Mutual exclusive with ima.
+   * Points to the name of a CustomDataLayer.
+   */
   char *attribute_name;
   /** Do we have a valid image and UV map or attribute. */
   int valid;

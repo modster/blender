@@ -41,6 +41,7 @@
 #include "BKE_key.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
+#include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_runtime.h"
@@ -1601,6 +1602,12 @@ static bool sculpt_modifiers_active(Scene *scene, Sculpt *sd, Object *ob)
   return false;
 }
 
+static void sculpt_update_object_paint_slots(Depsgraph *depsgraph, Object *ob)
+{
+  Scene *scene = DEG_get_input_scene(depsgraph);
+  BKE_texpaint_slots_refresh_object(scene, ob);
+}
+
 /**
  * \param need_mask: So that the evaluated mesh that is returned has mask data.
  */
@@ -1617,6 +1624,7 @@ static void sculpt_update_object(Depsgraph *depsgraph,
   const Mesh *me = BKE_object_get_original_mesh(ob);
   MultiresModifierData *mmd = BKE_sculpt_multires_active(scene, ob);
   const bool use_face_sets = (ob->mode & OB_MODE_SCULPT) != 0;
+  const bool use_paint_slots = (ob->mode & OB_MODE_SCULPT) != 0;
 
   ss->depsgraph = depsgraph;
 
@@ -1742,6 +1750,10 @@ static void sculpt_update_object(Depsgraph *depsgraph,
         }
       }
     }
+  }
+
+  if (use_paint_slots) {
+    sculpt_update_object_paint_slots(depsgraph, ob);
   }
 }
 
