@@ -21,6 +21,8 @@
  * \ingroup cmpnodes
  */
 
+#include "BLI_math_base.h"
+
 #include "BKE_colortools.h"
 
 #include "UI_interface.h"
@@ -49,6 +51,60 @@ static void node_composit_init_curves_time(bNodeTree *UNUSED(ntree), bNode *node
   node->storage = BKE_curvemapping_add(1, 0.0f, 0.0f, 1.0f, 1.0f);
 }
 
+using namespace blender::viewport_compositor;
+
+class TimeCurveOperation : public NodeOperation {
+ public:
+  using NodeOperation::NodeOperation;
+
+  void execute() override
+  {
+    Result &result = get_result("Fac");
+    result.allocate_single_value();
+
+    CurveMapping *curve_mapping = get_curve_mapping();
+    BKE_curvemapping_init(curve_mapping);
+    const float time = BKE_curvemapping_evaluateF(curve_mapping, 0, compute_normalized_time());
+    result.set_float_value(clamp_f(time, 0.0f, 1.0f));
+  }
+
+  CurveMapping *get_curve_mapping()
+  {
+    return static_cast<CurveMapping *>(node().storage);
+  }
+
+  int get_start_time()
+  {
+    return node().custom1;
+  }
+
+  int get_end_time()
+  {
+    return node().custom2;
+  }
+
+  float compute_normalized_time()
+  {
+    const int frame_number = context().get_scene()->r.cfra;
+    if (frame_number < get_start_time()) {
+      return 0.0f;
+    }
+    if (frame_number > get_end_time()) {
+      return 1.0f;
+    }
+    if (get_start_time() == get_end_time()) {
+      return 0.0f;
+    }
+    return static_cast<float>(frame_number - get_start_time()) /
+           static_cast<float>(get_end_time() - get_start_time());
+  }
+};
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new TimeCurveOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_time_curves_cc
 
 void register_node_type_cmp_curve_time()
@@ -62,6 +118,7 @@ void register_node_type_cmp_curve_time()
   node_type_size(&ntype, 200, 140, 320);
   node_type_init(&ntype, file_ns::node_composit_init_curves_time);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

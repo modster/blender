@@ -106,6 +106,10 @@ class Context {
 
  public:
   Context(TexturePool &texture_pool);
+
+  /* Get the active compositing scene. */
+  virtual const Scene *get_scene() = 0;
+
   /* Get the texture representing the viewport where the result of the compositor should be
    * written. This should be called by output nodes to get their target texture. */
   virtual GPUTexture *get_viewport_texture() = 0;

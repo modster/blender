@@ -43,9 +43,20 @@ class DRWTexturePool : public TexturePool {
   }
 };
 
+static const Scene *get_context_scene()
+{
+  return DRW_context_state_get()->scene;
+}
+
 class DRWContext : public Context {
  public:
   using Context::Context;
+
+  const Scene *get_scene() override
+  {
+    return get_context_scene();
+  }
+
   GPUTexture *get_viewport_texture() override
   {
     return DRW_viewport_texture_list_get()->color;
@@ -58,17 +69,11 @@ class DRWContext : public Context {
   }
 };
 
-/* Get the scene which includes the compositor node tree. */
-static const Scene *get_scene()
-{
-  return DRW_context_state_get()->scene;
-}
-
 /* It is sufficient to check for the scene node tree because the engine will not be enabled when
  * the viewport shading option is disabled. */
 static bool is_compositor_enabled()
 {
-  const Scene *scene = get_scene();
+  const Scene *scene = get_context_scene();
   if (scene->use_nodes && scene->nodetree) {
     return true;
   }
@@ -86,7 +91,7 @@ static void draw()
 
   DRWTexturePool texture_pool;
   DRWContext context(texture_pool);
-  const Scene *scene = get_scene();
+  const Scene *scene = get_context_scene();
   Evaluator evaluator(context, scene->nodetree);
   evaluator.compile();
   evaluator.evaluate();
