@@ -308,11 +308,7 @@ set(GLSL_SRC
   shaders/compositor/material/gpu_shader_compositor_store_output.glsl
   shaders/compositor/material/gpu_shader_compositor_type_conversion.glsl
 
-  shaders/compositor/compositor_convert_color_to_float.glsl
-  shaders/compositor/compositor_convert_float_to_color.glsl
-  shaders/compositor/compositor_convert_vector_to_color.glsl
-  shaders/compositor/compositor_image.glsl
-  shaders/compositor/compositor_image_alpha.glsl
+  shaders/compositor/compositor_convert.glsl
   shaders/compositor/compositor_realize_on_domain.glsl
 
   shaders/material/gpu_shader_material_add_shader.glsl
@@ -496,11 +492,7 @@ set(SHADER_CREATE_INFOS
   shaders/infos/gpu_shader_text_info.hh
   shaders/infos/gpu_srgb_to_framebuffer_space_info.hh
 
-  shaders/compositor/infos/compositor_convert_color_to_float_info.hh
-  shaders/compositor/infos/compositor_convert_float_to_color_info.hh
-  shaders/compositor/infos/compositor_convert_vector_to_color_info.hh
-  shaders/compositor/infos/compositor_image_info.hh
-  shaders/compositor/infos/compositor_image_alpha_info.hh
+  shaders/compositor/infos/compositor_convert_info.hh
   shaders/compositor/infos/compositor_realize_on_domain_info.hh
 )
 

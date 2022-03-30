@@ -465,8 +465,8 @@ class ImageOperation : public NodeOperation {
 
   void execute() override
   {
-    compute_output("Image", "compositor_image");
-    compute_output("Alpha", "compositor_image_alpha");
+    compute_output("Image", "compositor_convert_color_to_half_color");
+    compute_output("Alpha", "compositor_convert_color_to_alpha");
   }
 
   void compute_output(StringRef identifier, const char *shader_name)
