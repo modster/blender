@@ -1347,6 +1347,12 @@ static bNode *nodetree_uv_node_recursive(bNode *node)
   return NULL;
 }
 
+/** Bitwise filter for updating paint slots. */
+typedef enum ePaintSlotFilter {
+  PAINT_SLOT_IMAGE = 1 << 0,
+  PAINT_SLOT_COLOR_ATTRIBUTE = 1 << 1,
+} ePaintSlotFilter;
+
 typedef bool (*ForEachTexNodeCallback)(bNode *node, void *userdata);
 static bool ntree_foreach_texnode_recursive(bNodeTree *nodetree,
                                             ForEachTexNodeCallback callback,

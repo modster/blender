@@ -7,7 +7,6 @@
  * \ingroup bke
  * \brief General operations, lookup, etc. for materials.
  */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -18,12 +17,6 @@ struct Material;
 struct Object;
 struct Scene;
 struct bNode;
-
-/** Bitwise filter for updating paint slots. */
-typedef enum ePaintSlotFilter {
-  PAINT_SLOT_IMAGE = 1 << 0,
-  PAINT_SLOT_COLOR_ATTRIBUTE = 1 << 1,
-} ePaintSlotFilter;
 
 /* -------------------------------------------------------------------- */
 /** \name Module
