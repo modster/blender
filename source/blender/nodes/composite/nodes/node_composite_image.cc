@@ -500,8 +500,6 @@ class ImageOperation : public NodeOperation {
     const int2 size = result.size();
     GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
-    GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
-
     GPU_shader_unbind();
     GPU_texture_unbind(image_texture);
     result.unbind_as_image();

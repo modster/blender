@@ -190,6 +190,9 @@ void Result::allocate_single_value()
 
 void Result::bind_as_texture(GPUShader *shader, const char *texture_name) const
 {
+  /* Make sure any prior writes to the texture are reflected before reading from it. */
+  GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
+
   const int texture_image_unit = GPU_shader_get_texture_binding(shader, texture_name);
   GPU_texture_bind(texture_, texture_image_unit);
 }
@@ -760,8 +763,6 @@ void ConversionProcessorOperation::execute()
   const int2 size = result.size();
   GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
-  GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
-
   input.unbind_as_texture();
   result.unbind_as_image();
   GPU_shader_unbind();
@@ -952,8 +953,6 @@ void RealizeOnDomainProcessorOperation::execute()
   const int2 size = result.size();
   GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
 
-  GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
-
   input.unbind_as_texture();
   result.unbind_as_image();
   GPU_shader_unbind();
@@ -1127,8 +1126,6 @@ void GPUMaterialOperation::execute()
   bind_outputs(shader);
 
   GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
-
-  GPU_memory_barrier(GPU_BARRIER_TEXTURE_FETCH);
 
   GPU_texture_unbind_all();
   GPU_texture_image_unbind_all();

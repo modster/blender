@@ -262,7 +262,8 @@ class Result {
   void allocate_single_value();
 
   /* Bind the texture of the result to the texture image unit with the given name in the currently
-   * bound given shader. */
+   * bound given shader. This also inserts a memory barrier for texture fetches to ensure any prior
+   * writes to the texture are reflected before reading from it. */
   void bind_as_texture(GPUShader *shader, const char *texture_name) const;
 
   /* Bind the texture of the result to the image unit with the given name in the currently bound
