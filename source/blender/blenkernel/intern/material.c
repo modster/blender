@@ -1376,7 +1376,7 @@ static bool ntree_foreach_texnode_recursive(bNodeTree *nodetree,
     else if (ELEM(node->type, NODE_GROUP, NODE_CUSTOM_GROUP) && node->id) {
       /* recurse into the node group and see if it contains any textures */
       if (!ntree_foreach_texnode_recursive(
-              (bNodeTree *)node->id, callback, userdata, do_color_attributes)) {
+              (bNodeTree *)node->id, callback, userdata, slot_filter)) {
         return false;
       }
     }
@@ -1517,7 +1517,7 @@ void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma, const struct Ob
 
   ma->texpaintslot = MEM_callocN(sizeof(*ma->texpaintslot) * count, "texpaint_slots");
 
-  bNode *active_node = nodeGetActiveTexture(ma->nodetree);
+  bNode *active_node = nodeGetActivePaintCanvas(ma->nodetree);
 
   fill_texpaint_slots_recursive(ma->nodetree, active_node, ma, count, slot_filter);
 
@@ -1541,17 +1541,27 @@ void BKE_texpaint_slots_refresh_object(Scene *scene, struct Object *ob)
 }
 
 struct FindTexPaintNodeData {
-  Image *ima;
+  TexPaintSlot *slot;
   bNode *r_node;
 };
 
 static bool texpaint_slot_node_find_cb(bNode *node, void *userdata)
 {
   struct FindTexPaintNodeData *find_data = userdata;
-  Image *ima = (Image *)node->id;
-  if (find_data->ima == ima) {
-    find_data->r_node = node;
-    return false;
+  if (find_data->slot->ima && node->type == SH_NODE_TEX_IMAGE) {
+    Image *node_ima = (Image *)node->id;
+    if (find_data->slot->ima == node_ima) {
+      find_data->r_node = node;
+      return false;
+    }
+  }
+
+  if (find_data->slot->attribute_name && node->type == SH_NODE_ATTRIBUTE) {
+    NodeShaderAttribute *storage = node->storage;
+    if (STREQLEN(find_data->slot->attribute_name, storage->name, sizeof(storage->name))) {
+      find_data->r_node = node;
+      return false;
+    }
   }
 
   return true;
@@ -1559,8 +1569,12 @@ static bool texpaint_slot_node_find_cb(bNode *node, void *userdata)
 
 bNode *BKE_texpaint_slot_material_find_node(Material *ma, short texpaint_slot)
 {
-  struct FindTexPaintNodeData find_data = {ma->texpaintslot[texpaint_slot].ima, NULL};
-  ntree_foreach_texnode_recursive(ma->nodetree, texpaint_slot_node_find_cb, &find_data, true);
+  TexPaintSlot *slot = &ma->texpaintslot[texpaint_slot];
+  struct FindTexPaintNodeData find_data = {slot, NULL};
+  ntree_foreach_texnode_recursive(ma->nodetree,
+                                  texpaint_slot_node_find_cb,
+                                  &find_data,
+                                  PAINT_SLOT_IMAGE | PAINT_SLOT_COLOR_ATTRIBUTE);
 
   return find_data.r_node;
 }
