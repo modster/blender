@@ -103,9 +103,9 @@ void BKE_id_attribute_subset_active_set(struct ID *id,
                                         CustomDataMask mask);
 
 /** Copies CustomData instances into a (usually stack-allocated) ID.  This is a shallow copy, the
-    purpose is to create a bride for using the C attribute API on arbitrary sets of CustomData
-    domains.
-*/
+ *  purpose is to create a bride for using the C attribute API on arbitrary sets of CustomData
+ *  domains.
+ */
 
 void BKE_id_attribute_copy_domains_temp(struct ID *temp_id,
                                         const struct CustomData *vdata,

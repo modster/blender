@@ -36,7 +36,7 @@
 
 #include "pbvh_intern.h"
 
-#include <limits.h>
+#include <climits>
 
 using IndexRange = blender::IndexRange;
 
@@ -210,7 +210,7 @@ void BKE_pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
 
 template<typename Helper, typename Setter = ColorSetter<Helper>>
 static void pbvh_set_colors(
-    PBVH *pbvh, void *color_attr, float (*colors)[4], int *indices, int totelem)
+    PBVH *UNUSED(pbvh), void *color_attr, float (*colors)[4], int *indices, int totelem)
 {
   typename Helper::ColType *col = reinterpret_cast<typename Helper::ColType *>(color_attr);
 

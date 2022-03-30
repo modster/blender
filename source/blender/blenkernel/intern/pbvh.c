@@ -3137,7 +3137,7 @@ void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val)
   pbvh->is_drawing = val;
 }
 
-void BKE_pbvh_node_num_loops(PBVH *pbvh, PBVHNode *node, int *r_uniqueloop, int *r_totloop)
+void BKE_pbvh_node_num_loops(PBVH *UNUSED(pbvh), PBVHNode *node, int *r_uniqueloop, int *r_totloop)
 {
   BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
 

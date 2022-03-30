@@ -448,7 +448,7 @@ const EnumPropertyItem rna_enum_bake_target_items[] = {
      "VERTEX_COLORS",
      0,
      "Color Attributes",
-     "Bake to active vertex color layer on meshes"},
+     "Bake to active color attribute layer on meshes"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -3157,7 +3157,7 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "uvcalc_flag", UVCALC_TRANSFORM_CORRECT);
   RNA_def_property_ui_text(prop,
                            "Correct Face Attributes",
-                           "Correct data such as UV's and vertex colors when transforming");
+                           "Correct data such as UV's and color attributes when transforming");
   RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL);
 
   prop = RNA_def_property(srna, "use_transform_correct_keep_connected", PROP_BOOLEAN, PROP_NONE);

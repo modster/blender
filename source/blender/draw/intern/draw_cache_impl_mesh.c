@@ -659,7 +659,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
           case CD_MCOL:
           case CD_MLOOPCOL:
           case CD_PROP_COLOR: {
-            CustomDataLayer *layer = NULL;
+            CustomDataLayer *layer2 = NULL;
 
             if (name[0]) {
               int layer_i = 0;
@@ -682,21 +682,21 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
 
               /* Note: this is not the same as the layer_i below. */
               if (layer_i != -1) {
-                layer = (domain == ATTR_DOMAIN_POINT ? cd_vdata : cd_ldata)->layers + layer_i;
+                layer2 = (domain == ATTR_DOMAIN_POINT ? cd_vdata : cd_ldata)->layers + layer_i;
               }
             }
             else {
-              layer = BKE_id_attributes_render_color_get(&query_mesh.id);
+              layer2 = BKE_id_attributes_render_color_get(&query_mesh.id);
             }
 
-            if (!layer) {
+            if (!layer2) {
               break;
             }
 
             /* Note: this is the logical index into the color attribute list,
                not the customdata index. */
             int layer_i = BKE_id_attribute_to_index(
-                (ID *)&query_mesh, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
+                (ID *)&query_mesh, layer2, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
 
             if (layer_i != -1) {
               cd_used.vcol |= 1UL << (uint)layer_i;

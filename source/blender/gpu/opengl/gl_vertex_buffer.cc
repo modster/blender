@@ -94,7 +94,6 @@ void GLVertBuf::bind()
     if (usage_ != GPU_USAGE_DEVICE_ONLY) {
       glBufferSubData(GL_ARRAY_BUFFER, 0, vbo_size_, data);
     }
-
     memory_usage += vbo_size_;
 
     if (usage_ == GPU_USAGE_STATIC) {

@@ -2437,7 +2437,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  /* rebuild active/render color attribute references*/
+  /* Rebuild active/render color attribute references. */
   if (!MAIN_VERSION_ATLEAST(bmain, 302, 6)) {
     LISTBASE_FOREACH (Brush *, br, &bmain->brushes) {
       /* buggy code in wm_toolsystem broke smear in old files,

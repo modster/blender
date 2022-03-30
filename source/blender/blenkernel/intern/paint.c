@@ -1668,19 +1668,19 @@ static void sculpt_update_object(Depsgraph *depsgraph,
     ss->multires.level = 0;
     ss->vmask = CustomData_get_layer(&me->vdata, CD_PAINT_MASK);
 
-    CustomDataLayer *cl;
+    CustomDataLayer *layer;
     AttributeDomain domain;
 
-    if (BKE_pbvh_get_color_layer(me, &cl, &domain)) {
-      if (cl->type == CD_PROP_COLOR) {
-        ss->vcol = cl->data;
+    if (BKE_pbvh_get_color_layer(me, &layer, &domain)) {
+      if (layer->type == CD_PROP_COLOR) {
+        ss->vcol = layer->data;
       }
       else {
-        ss->mcol = cl->data;
+        ss->mcol = layer->data;
       }
 
       ss->vcol_domain = domain;
-      ss->vcol_type = cl->type;
+      ss->vcol_type = layer->type;
     }
     else {
       ss->vcol = NULL;
@@ -1835,12 +1835,12 @@ void BKE_sculpt_color_layer_create_if_needed(struct Object *object)
   }
 
   CustomData_add_layer(&orig_me->vdata, CD_PROP_COLOR, CD_DEFAULT, NULL, orig_me->totvert);
-  CustomDataLayer *cl = orig_me->vdata.layers +
+  CustomDataLayer *layer = orig_me->vdata.layers +
                         CustomData_get_layer_index(&orig_me->vdata, CD_PROP_COLOR);
 
   BKE_mesh_update_customdata_pointers(orig_me, true);
 
-  BKE_id_attributes_active_color_set(&orig_me->id, cl);
+  BKE_id_attributes_active_color_set(&orig_me->id, layer);
   DEG_id_tag_update(&orig_me->id, ID_RECALC_GEOMETRY_ALL_MODES);
 }
 
@@ -2054,8 +2054,8 @@ void BKE_sculpt_sync_face_sets_visibility_to_grids(Mesh *mesh, SubdivCCG *subdiv
     const bool is_hidden = (face_sets[face_index] < 0);
 
     /* Avoid creating and modifying the grid_hidden bitmap if the base mesh face is visible and
-     * there is not bitmap for the grid. This is because missing grid_hidden implies grid is
-     * fully visible. */
+     * there is not bitmap for the grid. This is because missing grid_hidden implies grid is fully
+     * visible. */
     if (is_hidden) {
       BKE_subdiv_ccg_grid_hidden_ensure(subdiv_ccg, i);
     }
@@ -2088,8 +2088,8 @@ void BKE_sculpt_ensure_orig_mesh_data(Scene *scene, Object *object)
     object->sculpt->face_sets = CustomData_get_layer(&mesh->pdata, CD_SCULPT_FACE_SETS);
 
     /* NOTE: In theory we could add that on the fly when required by sculpt code.
-     * But this then requires proper update of depsgraph etc. For now we play safe, optimization
-     * is always possible later if it's worth it. */
+     * But this then requires proper update of depsgraph etc. For now we play safe, optimization is
+     * always possible later if it's worth it. */
     BKE_sculpt_mask_layers_ensure(object, mmd);
   }
 

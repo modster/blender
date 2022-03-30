@@ -11,14 +11,12 @@
 #include "DNA_meshdata_types.h"
 #include "DNA_scene_types.h"
 
-#include "BLI_math.h"
-
 #include "BKE_attribute.h"
 #include "BKE_context.h"
 #include "BKE_deform.h"
 #include "BKE_geometry_set.hh"
-#include "BKE_mesh.h"
 #include "BKE_lib_id.h"
+#include "BKE_mesh.h"
 #include "BKE_object_deform.h"
 #include "BKE_report.h"
 
@@ -27,8 +25,6 @@
 #include "RNA_enum_types.h"
 
 #include "DEG_depsgraph.h"
-
-#include "DNA_mesh_types.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -225,7 +221,7 @@ static int geometry_color_attribute_add_exec(bContext *C, wmOperator *op)
   AttributeDomain domain = (AttributeDomain)RNA_enum_get(op->ptr, "domain");
   CustomDataLayer *layer = BKE_id_attribute_new(id, name, type, domain, op->reports);
 
-  if (layer == NULL) {
+  if (layer == nullptr) {
     return OPERATOR_CANCELLED;
   }
 
@@ -384,13 +380,13 @@ void GEOMETRY_OT_color_attribute_add(wmOperatorType *ot)
   prop = RNA_def_string(ot->srna, "name", "Color", MAX_NAME, "Name", "Name of color attribute");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 
-  static EnumPropertyItem domains[3] = {{ATTR_DOMAIN_POINT, "POINT", -1, "Point", ""},
-                                        {ATTR_DOMAIN_CORNER, "CORNER", -1, "Face Corner", ""},
-                                        {0, NULL, 0, NULL, NULL}};
+  static EnumPropertyItem domains[3] = {{ATTR_DOMAIN_POINT, "POINT", 0, "Point", ""},
+                                        {ATTR_DOMAIN_CORNER, "CORNER", 0, "Face Corner", ""},
+                                        {0, nullptr, 0, nullptr, nullptr}};
 
-  static EnumPropertyItem types[3] = {{CD_PROP_COLOR, "COLOR", -1, "Color", ""},
-                                      {CD_MLOOPCOL, "BYTE_COLOR", -1, "Byte Color", ""},
-                                      {0, NULL, 0, NULL, NULL}};
+  static EnumPropertyItem types[3] = {{CD_PROP_COLOR, "COLOR", 0, "Color", ""},
+                                      {CD_MLOOPCOL, "BYTE_COLOR", 0, "Byte Color", ""},
+                                      {0, nullptr, 0, nullptr, nullptr}};
 
   prop = RNA_def_enum(ot->srna,
                       "domain",
@@ -410,13 +406,59 @@ void GEOMETRY_OT_color_attribute_add(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
+static int geometry_color_attribute_set_render_exec(bContext *C, wmOperator *op)
+{
+  Object *ob = ED_object_context(C);
+  ID *id = static_cast<ID *>(ob->data);
+
+  char name[MAX_NAME];
+  RNA_string_get(op->ptr, "name", name);
+
+  CustomDataLayer *layer = BKE_id_attribute_find(id, name, CD_PROP_COLOR, ATTR_DOMAIN_POINT);
+  layer = !layer ? BKE_id_attribute_find(id, name, CD_MLOOPCOL, ATTR_DOMAIN_POINT) : layer;
+  layer = !layer ? BKE_id_attribute_find(id, name, CD_PROP_COLOR, ATTR_DOMAIN_CORNER) : layer;
+  layer = !layer ? BKE_id_attribute_find(id, name, CD_MLOOPCOL, ATTR_DOMAIN_CORNER) : layer;
+
+  if (layer) {
+    BKE_id_attributes_render_color_set(id, layer);
+
+    DEG_id_tag_update(id, ID_RECALC_GEOMETRY);
+    WM_main_add_notifier(NC_GEOM | ND_DATA, id);
+
+    return OPERATOR_FINISHED;
+  }
+
+  return OPERATOR_CANCELLED;
+}
+
+void GEOMETRY_OT_color_attribute_render_set(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Set Render Color Attribute";
+  ot->description = "Set default color attribute used for rendering";
+  ot->idname = "GEOMETRY_OT_color_attribute_render_set";
+
+  /* api callbacks */
+  ot->poll = geometry_attributes_poll;
+  ot->exec = geometry_color_attribute_set_render_exec;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_INTERNAL;
+
+  /* properties */
+  PropertyRNA *prop;
+
+  prop = RNA_def_string(ot->srna, "name", "Color", MAX_NAME, "Name", "Name of color attribute");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+}
+
 static int geometry_color_attribute_remove_exec(bContext *C, wmOperator *op)
 {
   Object *ob = ED_object_context(C);
   ID *id = static_cast<ID *>(ob->data);
   CustomDataLayer *layer = BKE_id_attributes_active_color_get(id);
 
-  if (layer == NULL) {
+  if (layer == nullptr) {
     return OPERATOR_CANCELLED;
   }
 
@@ -444,9 +486,9 @@ static bool geometry_color_attributes_remove_poll(bContext *C)
   }
 
   Object *ob = ED_object_context(C);
-  ID *data = ob ? static_cast<ID *>(ob->data) : NULL;
+  ID *data = ob ? static_cast<ID *>(ob->data) : nullptr;
 
-  if (BKE_id_attributes_active_color_get(data) != NULL) {
+  if (BKE_id_attributes_active_color_get(data) != nullptr) {
     return true;
   }
 

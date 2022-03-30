@@ -204,8 +204,8 @@ static void extract_vcol_init(const MeshRenderData *mr,
       int totloop = mr->loop_len;
       int idx = CustomData_get_named_layer_index(cdata, ref.layer->type, ref.layer->name);
 
-      MLoopCol *mcol = NULL;
-      MPropCol *pcol = NULL;
+      MLoopCol *mcol = nullptr;
+      MPropCol *pcol = nullptr;
       const MLoop *mloop = mr->mloop;
 
       if (ref.layer->type == CD_PROP_COLOR) {
@@ -300,8 +300,8 @@ static void extract_vcol_init_subdiv(const DRWSubdivCache *subdiv_cache,
       continue;
     }
 
-    MLoopCol *mcol = NULL;
-    MPropCol *pcol = NULL;
+    MLoopCol *mcol = nullptr;
+    MPropCol *pcol = nullptr;
 
     if (ref.layer->type == CD_PROP_COLOR) {
       pcol = static_cast<MPropCol *>(cdata->layers[layer_i].data);

@@ -1365,9 +1365,6 @@ static const EnumPropertyItem *rna_DataTransferModifier_layers_select_src_itemf(
     Object *ob_src = dtmd->ob_source;
 
     if (ob_src) {
-      Mesh *me_eval;
-      int num_data, i;
-
       AttributeDomain domain = STREQ(RNA_property_identifier(prop),
                                      "layers_vcol_select_vert_src") ?
                                    ATTR_DOMAIN_POINT :
@@ -1379,6 +1376,8 @@ static const EnumPropertyItem *rna_DataTransferModifier_layers_select_src_itemf(
 
       CustomData_MeshMasks cddata_masks = CD_MASK_BAREMESH;
       CustomData *cdata;
+
+      Mesh *me_eval = mesh_get_eval_final(depsgraph, scene_eval, ob_src_eval, &cddata_masks);
 
       if (domain == ATTR_DOMAIN_POINT) {
         cddata_masks.vmask |= CD_MASK_COLOR_ALL;
@@ -1392,10 +1391,8 @@ static const EnumPropertyItem *rna_DataTransferModifier_layers_select_src_itemf(
       CustomDataType types[2] = {CD_PROP_COLOR, CD_MLOOPCOL};
 
       int idx = 0;
-
       for (int i = 0; i < 2; i++) {
-        me_eval = mesh_get_eval_final(depsgraph, scene_eval, ob_src_eval, &cddata_masks);
-        num_data = CustomData_number_of_layers(cdata, types[i]);
+        int num_data = CustomData_number_of_layers(cdata, types[i]);
 
         RNA_enum_item_add_separator(&item, &totitem);
 
@@ -1487,18 +1484,16 @@ static const EnumPropertyItem *rna_DataTransferModifier_layers_select_dst_itemf(
       Object *ob_dst = CTX_data_active_object(C); /* XXX Is this OK? */
 
       if (ob_dst && ob_dst->data) {
-        Mesh *me_dst;
-        int num_data, i, idx = 0;
-
         CustomDataType types[2] = {CD_PROP_COLOR, CD_MLOOPCOL};
 
-        me_dst = ob_dst->data;
+        Mesh *me_dst = ob_dst->data;
         CustomData *cdata = STREQ(RNA_property_identifier(prop), "layers_vcol_vert_select_dst") ?
                                 &me_dst->vdata :
                                 &me_dst->ldata;
 
+        int idx = 0;
         for (int i = 0; i < 2; i++) {
-          num_data = CustomData_number_of_layers(cdata, types[i]);
+          int num_data = CustomData_number_of_layers(cdata, types[i]);
 
           RNA_enum_item_add_separator(&item, &totitem);
 

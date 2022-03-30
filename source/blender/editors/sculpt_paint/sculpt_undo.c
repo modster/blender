@@ -342,8 +342,8 @@ static bool sculpt_undo_restore_color(bContext *C, SculptUndoNode *unode)
 
   bool modified = false;
 
-  /* Note: even with loop colors we still store (derived)
-   * vertex colors for original data lookup. */
+  /* Note: even with loop colors we still store derived
+   * vertex colors for original data lookup.*/
   if (unode->col && !unode->loop_col) {
     BKE_pbvh_swap_colors(ss->pbvh, unode->col, unode->index, unode->totvert);
     modified = true;
@@ -1591,7 +1591,7 @@ static void sculpt_undosys_step_encode_init(struct bContext *UNUSED(C), UndoStep
   BLI_listbase_clear(&us->data.nodes);
 }
 
-static bool sculpt_undosys_step_encode(struct bContext *C, struct Main *bmain, UndoStep *us_p)
+static bool sculpt_undosys_step_encode(struct bContext *UNUSED(C), struct Main *bmain, UndoStep *us_p)
 {
   /* Dummy, encoding is done along the way by adding tiles
    * to the current 'SculptUndoStep' added by encode_init. */
