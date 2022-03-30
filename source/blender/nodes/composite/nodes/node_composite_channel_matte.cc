@@ -38,7 +38,9 @@ namespace blender::nodes::node_composite_channel_matte_cc {
 
 static void cmp_node_channel_matte_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_input<decl::Color>(N_("Image"))
+      .default_value({1.0f, 1.0f, 1.0f, 1.0f})
+      .compositor_domain_priority(0);
   b.add_output<decl::Color>(N_("Image"));
   b.add_output<decl::Float>(N_("Matte"));
 }

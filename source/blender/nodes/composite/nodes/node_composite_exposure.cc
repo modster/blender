@@ -33,8 +33,10 @@ namespace blender::nodes::node_composite_exposure_cc {
 
 static void cmp_node_exposure_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
-  b.add_input<decl::Float>(N_("Exposure")).min(-10.0f).max(10.0f);
+  b.add_input<decl::Color>(N_("Image"))
+      .default_value({1.0f, 1.0f, 1.0f, 1.0f})
+      .compositor_domain_priority(0);
+  b.add_input<decl::Float>(N_("Exposure")).min(-10.0f).max(10.0f).compositor_domain_priority(1);
   b.add_output<decl::Color>(N_("Image"));
 }
 

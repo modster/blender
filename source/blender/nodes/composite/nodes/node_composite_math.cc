@@ -35,15 +35,21 @@ namespace blender::nodes::node_composite_math_cc {
 
 static void cmp_node_math_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Float>(N_("Value")).default_value(0.5f).min(-10000.0f).max(10000.0f);
+  b.add_input<decl::Float>(N_("Value"))
+      .default_value(0.5f)
+      .min(-10000.0f)
+      .max(10000.0f)
+      .compositor_domain_priority(0);
   b.add_input<decl::Float>(N_("Value"), "Value_001")
       .default_value(0.5f)
       .min(-10000.0f)
-      .max(10000.0f);
+      .max(10000.0f)
+      .compositor_domain_priority(1);
   b.add_input<decl::Float>(N_("Value"), "Value_002")
       .default_value(0.5f)
       .min(-10000.0f)
-      .max(10000.0f);
+      .max(10000.0f)
+      .compositor_domain_priority(2);
   b.add_output<decl::Float>(N_("Value"));
 }
 
