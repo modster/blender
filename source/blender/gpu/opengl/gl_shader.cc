@@ -867,7 +867,7 @@ static char *glsl_patch_compute_get()
   STR_CONCAT(patch, slen, "#extension GL_ARB_compute_shader :enable\n");
 
   /* Array compat. */
-  STR_CONCAT(patch, slen, "#define array(_type) _type[]\n");
+  STR_CONCAT(patch, slen, "#define array_macro(_type) _type[]\n");
 
   BLI_assert(slen < sizeof(patch));
   return patch;

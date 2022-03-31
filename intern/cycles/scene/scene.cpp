@@ -593,7 +593,7 @@ bool Scene::load_kernels(Progress &progress, bool lock_scene)
   const uint kernel_features = dscene.data.kernel_features;
 
   if (!kernels_loaded || loaded_kernel_features != kernel_features) {
-    progress.set_status("Loading render kernels (may take a few minutes the first time)");
+    progress.set_status(device->load_kernels_message(kernel_features));
 
     scoped_timer timer;
 

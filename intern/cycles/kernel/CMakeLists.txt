@@ -37,6 +37,10 @@ set(SRC_KERNEL_DEVICE_OPTIX
   device/optix/kernel_shader_raytrace.cu
 )
 
+set(SRC_KERNEL_DEVICE_ONEAPI
+  device/oneapi/kernel.cpp
+)
+
 set(SRC_KERNEL_DEVICE_CPU_HEADERS
   device/cpu/compat.h
   device/cpu/image.h
@@ -76,6 +80,13 @@ set(SRC_KERNEL_DEVICE_METAL_HEADERS
   device/metal/context_begin.h
   device/metal/context_end.h
   device/metal/globals.h
+)
+
+set(SRC_KERNEL_DEVICE_ONEAPI_HEADERS
+  device/oneapi/compat.h
+  device/oneapi/globals.h
+  device/oneapi/image.h
+  device/oneapi/kernel.h
 )
 
 set(SRC_KERNEL_CLOSURE_HEADERS
@@ -740,6 +751,7 @@ cycles_add_library(cycles_kernel "${LIB}"
   ${SRC_KERNEL_DEVICE_HIP_HEADERS}
   ${SRC_KERNEL_DEVICE_OPTIX_HEADERS}
   ${SRC_KERNEL_DEVICE_METAL_HEADERS}
+  ${SRC_KERNEL_DEVICE_ONEAPI_HEADERS}
 )
 
 source_group("bake" FILES ${SRC_KERNEL_BAKE_HEADERS})
@@ -752,6 +764,7 @@ source_group("device\\gpu" FILES ${SRC_KERNEL_DEVICE_GPU_HEADERS})
 source_group("device\\hip" FILES ${SRC_KERNEL_DEVICE_HIP} ${SRC_KERNEL_DEVICE_HIP_HEADERS})
 source_group("device\\optix" FILES ${SRC_KERNEL_DEVICE_OPTIX} ${SRC_KERNEL_DEVICE_OPTIX_HEADERS})
 source_group("device\\metal" FILES ${SRC_KERNEL_DEVICE_METAL} ${SRC_KERNEL_DEVICE_METAL_HEADERS})
+source_group("device\\oneapi" FILES ${SRC_KERNEL_DEVICE_ONEAPI} ${SRC_KERNEL_DEVICE_ONEAPI_HEADERS})
 source_group("film" FILES ${SRC_KERNEL_FILM_HEADERS})
 source_group("geom" FILES ${SRC_KERNEL_GEOM_HEADERS})
 source_group("integrator" FILES ${SRC_KERNEL_INTEGRATOR_HEADERS})

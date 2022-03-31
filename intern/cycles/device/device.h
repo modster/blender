@@ -40,6 +40,7 @@ enum DeviceType {
   DEVICE_OPTIX,
   DEVICE_HIP,
   DEVICE_METAL,
+  DEVICE_ONEAPI,
   DEVICE_DUMMY,
 };
 
@@ -49,6 +50,7 @@ enum DeviceTypeMask {
   DEVICE_MASK_OPTIX = (1 << DEVICE_OPTIX),
   DEVICE_MASK_HIP = (1 << DEVICE_HIP),
   DEVICE_MASK_METAL = (1 << DEVICE_METAL),
+  DEVICE_MASK_ONEAPI = (1 << DEVICE_ONEAPI),
   DEVICE_MASK_ALL = ~0
 };
 
@@ -153,6 +155,12 @@ class Device {
   virtual bool load_kernels(uint /*kernel_features*/)
   {
     return true;
+  }
+
+  /* Message, which will be shown during loading/compiling of kernels */
+  virtual string load_kernels_message(uint /*kernel_features*/)
+  {
+    return "Loading render kernels (may take a few minutes the first time)";
   }
 
   /* GPU device only functions.
@@ -273,6 +281,7 @@ class Device {
   static vector<DeviceInfo> cpu_devices;
   static vector<DeviceInfo> hip_devices;
   static vector<DeviceInfo> metal_devices;
+  static vector<DeviceInfo> oneapi_devices;
   static uint devices_initialized_mask;
 };
 

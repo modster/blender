@@ -257,6 +257,10 @@ if(WITH_CYCLES_DEVICE_OPTIX)
   endif()
 endif()
 
+if (WITH_CYCLES_DEVICE_ONEAPI)
+  add_definitions(-DWITH_ONEAPI)
+endif()
+
 if(WITH_CYCLES_EMBREE)
   add_definitions(-DWITH_EMBREE)
   add_definitions(-DEMBREE_STATIC_LIB)

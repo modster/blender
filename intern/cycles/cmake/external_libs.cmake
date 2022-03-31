@@ -72,6 +72,7 @@ if(CYCLES_STANDALONE_REPOSITORY)
     _set_default(TBB_ROOT_DIR "${_cycles_lib_dir}/tbb")
     _set_default(TIFF_ROOT "${_cycles_lib_dir}/tiff")
     _set_default(ZLIB_ROOT "${_cycles_lib_dir}/zlib")
+    _set_default(LEVEL_ZERO_ROOT_DIR "${_cycles_lib_dir}/level_zero")
 
     # Ignore system libraries
     set(CMAKE_IGNORE_PATH "${CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES};${CMAKE_SYSTEM_INCLUDE_PATH};${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES};${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
@@ -551,6 +552,22 @@ if(WITH_CYCLES_DEVICE_METAL)
     set(WITH_CYCLES_DEVICE_METAL OFF)
   else()
     message(STATUS "Found Metal: ${METAL_LIBRARY}")
+  endif()
+endif()
+
+###########################################################################
+# oneAPI
+###########################################################################
+if (WITH_CYCLES_DEVICE_ONEAPI)
+  find_package(SYCL)
+  find_package(LevelZero)
+
+  if (SYCL_FOUND AND LEVEL_ZERO_FOUND)
+    message(STATUS "Found oneAPI: ${SYCL_LIBRARY}")
+    message(STATUS "Found Level Zero: ${LEVEL_ZERO_LIBRARY}")
+  else()
+    message(STATUS "oneAPI or Level Zero not found, disabling oneAPI device from Cycles")
+    set(WITH_CYCLES_DEVICE_ONEAPI OFF)
   endif()
 endif()
 

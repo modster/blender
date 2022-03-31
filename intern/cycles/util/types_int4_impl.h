@@ -14,7 +14,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-#ifndef __KERNEL_GPU__
+#if !defined(__KERNEL_GPU__) || defined(__KERNEL_ONEAPI__)
 #  ifdef __KERNEL_SSE__
 __forceinline int4::int4()
 {
@@ -103,7 +103,7 @@ ccl_device_inline void print_int4(const char *label, const int4 &a)
 {
   printf("%s: %d %d %d %d\n", label, a.x, a.y, a.z, a.w);
 }
-#endif /* __KERNEL_GPU__ */
+#endif /* !defined(__KERNEL_GPU__) || defined(__KERNEL_ONEAPI__) */
 
 CCL_NAMESPACE_END
 
