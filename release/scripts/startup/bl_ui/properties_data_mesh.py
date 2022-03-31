@@ -499,13 +499,10 @@ class MESH_UL_attributes(UIList):
         attrs = getattr(data, property)
         ret = []
         idxs = []
-        idx = 0
 
-        for item in attrs:
+        for idx, item in enumerate(attrs):
             ret.append(self.bitflag_filter_item if not item.temporary else 0)
             idxs.append(idx)
-
-            idx += 1
 
         return ret, idxs
 
@@ -542,7 +539,8 @@ class DATA_PT_mesh_attributes(MeshButtonsPanel, Panel):
             "attributes",
             mesh.attributes,
             "active_index",
-            rows=3,)
+            rows=3,
+        )
 
         col = row.column(align=True)
         col.operator("geometry.attribute_add", icon='ADD', text="")
@@ -598,20 +596,17 @@ class MESH_UL_color_attributes(UIList):
         attrs = getattr(data, property)
         ret = []
         idxs = []
-        idx = 0
 
-        for item in attrs:
-            bad = item.domain not in ["POINT", "CORNER"]
-            bad = bad or item.data_type not in ["FLOAT_COLOR", "BYTE_COLOR"]
+        for idx, item in enumerate(attrs):
+            skip = item.domain not in ["POINT", "CORNER"]
+            skip = skip or item.data_type not in ["FLOAT_COLOR", "BYTE_COLOR"]
 
-            ret.append(self.bitflag_filter_item if not bad else 0)
+            ret.append(self.bitflag_filter_item if not skip else 0)
             idxs.append(idx)
-
-            idx += 1
 
         return ret, idxs
 
-    def draw_item(self, _context, layout, _data, attribute, _icon, _active_data, _active_propname, _index):
+    def draw_item(self, _context, layout, data, attribute, _icon, _active_data, _active_propname, _index):
         data_type = attribute.bl_rna.properties['data_type'].enum_items[attribute.data_type]
 
         domain_name = self.display_domain_names.get(attribute.domain, "")
@@ -620,9 +615,12 @@ class MESH_UL_color_attributes(UIList):
         split.emboss = 'NONE'
         split.prop(attribute, "name", text="")
 
-        active_render = _index == _data.color_attributes.render_color_index
+        active_render = _index == data.color_attributes.render_color_index
 
-        props = split.operator("geometry.color_attribute_render_set", text="", icon = 'RESTRICT_RENDER_OFF' if active_render else 'RESTRICT_RENDER_ON')
+        props = split.operator("geometry.color_attribute_render_set", text="", icon = 'RESTRICT_RENDER_OFF'if \
+                                active_render else 'RESTRICT_RENDER_ON'
+                               )
+
         props.name = attribute.name
 
         sub = split.row()

@@ -195,7 +195,6 @@ bool vertex_paint_mode_poll(bContext *C)
     return false;
   }
 
-  return true;
   CustomDataLayer *layer = BKE_id_attributes_active_color_get((ID *)ob->data);
   AttributeDomain domain = BKE_id_attribute_domain((ID *)ob->data, layer);
 
@@ -3568,7 +3567,7 @@ void PAINT_OT_vertex_paint(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Vertex Paint";
   ot->idname = "PAINT_OT_vertex_paint";
-  ot->description = "Paint a stroke in the active vertex color layer";
+  ot->description = "Paint a stroke in the active color attribute layer";
 
   /* api callbacks */
   ot->invoke = vpaint_invoke;

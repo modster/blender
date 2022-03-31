@@ -143,12 +143,15 @@ static void extract_vcol_init(const MeshRenderData *mr,
   CustomData *cd_vdata = (mr->extract_type == MR_EXTRACT_BMESH) ? &mr->bm->vdata : &mr->me->vdata;
   CustomData *cd_ldata = (mr->extract_type == MR_EXTRACT_BMESH) ? &mr->bm->ldata : &mr->me->ldata;
 
-  Mesh query_mesh = *mr->me;
-  BKE_id_attribute_copy_domains_temp(
-      &query_mesh.id, cd_vdata, nullptr, cd_ldata, nullptr, nullptr);
+  Mesh me_query = {0};
 
-  CustomDataLayer *active_color = BKE_id_attributes_active_color_get(&query_mesh.id);
-  CustomDataLayer *render_color = BKE_id_attributes_render_color_get(&query_mesh.id);
+  /* Copy name so ID type switch statement in BKE_id_attribute_copy_domains_temp works. */
+  BLI_strncpy(me_query.id.name, mr->me->id.name, sizeof(mr->me->id.name));
+
+  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, nullptr, cd_ldata, nullptr, nullptr);
+
+  CustomDataLayer *active_color = BKE_id_attributes_active_color_get(&me_query.id);
+  CustomDataLayer *render_color = BKE_id_attributes_render_color_get(&me_query.id);
 
   const uint32_t vcol_layers = cache->cd_used.vcol;
   init_vcol_format(&format, cache, cd_vdata, cd_ldata, active_color, render_color);
@@ -255,12 +258,11 @@ static void extract_vcol_init_subdiv(const DRWSubdivCache *subdiv_cache,
   const CustomData *cd_ldata = extract_bmesh ? &coarse_mesh->edit_mesh->bm->ldata :
                                                &coarse_mesh->ldata;
 
-  Mesh query_mesh = *coarse_mesh;
-  BKE_id_attribute_copy_domains_temp(
-      reinterpret_cast<ID *>(&query_mesh), cd_vdata, nullptr, cd_ldata, nullptr, nullptr);
+  Mesh me_query = *coarse_mesh;
+  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, nullptr, cd_ldata, nullptr, nullptr);
 
-  CustomDataLayer *active_color = BKE_id_attributes_active_color_get(&query_mesh.id);
-  CustomDataLayer *render_color = BKE_id_attributes_render_color_get(&query_mesh.id);
+  CustomDataLayer *active_color = BKE_id_attributes_active_color_get(&me_query.id);
+  CustomDataLayer *render_color = BKE_id_attributes_render_color_get(&me_query.id);
 
   GPUVertFormat format = {0};
   init_vcol_format(

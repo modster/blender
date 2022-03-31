@@ -445,9 +445,7 @@ MeshRenderData *mesh_render_data_create(Object *object,
     BLI_assert(editmesh_eval_cage && editmesh_eval_final);
     mr->bm = me->edit_mesh->bm;
     mr->edit_bmesh = me->edit_mesh;
-
     mr->me = (do_final) ? editmesh_eval_final : editmesh_eval_cage;
-
     mr->edit_data = is_mode_active ? mr->me->runtime.edit_data : NULL;
 
     if (mr->edit_data) {

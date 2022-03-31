@@ -92,7 +92,7 @@ int BKE_id_attribute_to_index(const struct ID *id,
                               AttributeDomainMask domain_mask,
                               CustomDataMask layer_mask);
 
-struct CustomDataLayer *BKE_id_attribute_subset_active_get(struct ID *id,
+struct CustomDataLayer *BKE_id_attribute_subset_active_get(const struct ID *id,
                                                            int active_flag,
                                                            AttributeDomainMask domain_mask,
                                                            CustomDataMask mask);
@@ -102,11 +102,11 @@ void BKE_id_attribute_subset_active_set(struct ID *id,
                                         AttributeDomainMask domain_mask,
                                         CustomDataMask mask);
 
-/** Copies CustomData instances into a (usually stack-allocated) ID.  This is a shallow copy, the
- *  purpose is to create a bride for using the C attribute API on arbitrary sets of CustomData
- *  domains.
+/**
+ * Copies CustomData instances into a (usually stack-allocated) ID.  This is a shallow copy, the
+ * purpose is to create a bride for using the C attribute API on arbitrary sets of CustomData
+ * domains.
  */
-
 void BKE_id_attribute_copy_domains_temp(struct ID *temp_id,
                                         const struct CustomData *vdata,
                                         const struct CustomData *edata,
@@ -114,12 +114,12 @@ void BKE_id_attribute_copy_domains_temp(struct ID *temp_id,
                                         const struct CustomData *pdata,
                                         const struct CustomData *cdata);
 
-struct CustomDataLayer *BKE_id_attributes_active_color_get(struct ID *id);
+struct CustomDataLayer *BKE_id_attributes_active_color_get(const struct ID *id);
 void BKE_id_attributes_active_color_set(struct ID *id, struct CustomDataLayer *active_layer);
-struct CustomDataLayer *BKE_id_attributes_render_color_get(struct ID *id);
+struct CustomDataLayer *BKE_id_attributes_render_color_get(const struct ID *id);
 void BKE_id_attributes_render_color_set(struct ID *id, struct CustomDataLayer *active_layer);
 
-bool BKE_id_attribute_find_unique_name(struct ID *id, const char *name, char *outname);
+bool BKE_id_attribute_calc_unique_name(struct ID *id, const char *name, char *outname);
 
 #ifdef __cplusplus
 }

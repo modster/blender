@@ -459,16 +459,19 @@ static void mesh_cd_calc_active_mloopcol_layer(const Object *object,
                                                DRW_MeshCDMask *cd_used)
 {
   const Mesh *me_final = editmesh_final_or_this(object, me);
-  Mesh query_mesh = *me_final;
+  Mesh me_query = {0};
+
+  /* Copy name so ID type switch statement in BKE_id_attribute_copy_domains_temp works. */
+  BLI_strncpy(me_query.id.name, me_final->id.name, sizeof(me_final->id.name));
 
   const CustomData *cd_vdata = mesh_cd_vdata_get_from_mesh(me_final);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
 
-  BKE_id_attribute_copy_domains_temp(&query_mesh.id, cd_vdata, NULL, cd_ldata, NULL, NULL);
+  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, NULL, cd_ldata, NULL, NULL);
 
-  CustomDataLayer *layer = BKE_id_attributes_active_color_get(&query_mesh.id);
+  CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me_query.id);
   int layer_i = BKE_id_attribute_to_index(
-      &query_mesh.id, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
+      &me_query.id, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
 
   if (layer_i != -1) {
     cd_used->vcol |= (1UL << (uint)layer_i);
@@ -505,6 +508,51 @@ static bool custom_data_match_attribute(const CustomData *custom_data,
   return false;
 }
 
+static uint mesh_cd_calc_gpu_layers_vcol_used(const Mesh *me_query,
+                                              const CustomData *cd_vdata,
+                                              const CustomData *cd_ldata,
+                                              const char name[])
+{
+  CustomDataLayer *layer = NULL;
+  AttributeDomain domain;
+
+  if (name[0]) {
+    int layer_i = 0;
+
+    domain = ATTR_DOMAIN_POINT;
+    layer_i = CustomData_get_named_layer_index(cd_vdata, CD_PROP_COLOR, name);
+    layer_i = layer_i == -1 ? CustomData_get_named_layer_index(cd_vdata, CD_MLOOPCOL, name) :
+                              layer_i;
+
+    if (layer_i == -1) {
+      domain = ATTR_DOMAIN_CORNER;
+      layer_i = layer_i == -1 ? CustomData_get_named_layer_index(cd_ldata, CD_PROP_COLOR, name) :
+                                layer_i;
+      layer_i = layer_i == -1 ? CustomData_get_named_layer_index(cd_ldata, CD_MLOOPCOL, name) :
+                                layer_i;
+    }
+
+    /* Note: this is not the same as the layer_i below. */
+    if (layer_i != -1) {
+      layer = (domain == ATTR_DOMAIN_POINT ? cd_vdata : cd_ldata)->layers + layer_i;
+    }
+  }
+  else {
+    layer = BKE_id_attributes_render_color_get(&me_query->id);
+  }
+
+  if (!layer) {
+    return -1;
+  }
+
+  /* Note: this is the logical index into the color attribute list,
+     not the customdata index. */
+  int vcol_i = BKE_id_attribute_to_index(
+      (ID *)me_query, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
+
+  return vcol_i;
+}
+
 static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
                                                    const Mesh *me,
                                                    struct GPUMaterial **gpumat_array,
@@ -517,10 +565,14 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
   const CustomData *cd_vdata = mesh_cd_vdata_get_from_mesh(me_final);
   const CustomData *cd_edata = mesh_cd_edata_get_from_mesh(me_final);
 
-  /* Create a local copy of mesh with final customdata domains
+  /* Create a mesh with final customdata domains
      we can query. */
-  Mesh query_mesh = *me;
-  BKE_id_attribute_copy_domains_temp(&query_mesh.id, cd_vdata, cd_edata, cd_ldata, cd_pdata, NULL);
+  Mesh me_query = {0};
+
+  /* Copy name so ID type switch statement in BKE_id_attribute_copy_domains_temp works. */
+  BLI_strncpy(me_query.id.name, me_final->id.name, sizeof(me_final->id.name));
+
+  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, cd_edata, cd_ldata, cd_pdata, NULL);
 
   /* See: DM_vertex_attributes_from_gpu for similar logic */
   DRW_MeshCDMask cd_used;
@@ -659,44 +711,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
           case CD_MCOL:
           case CD_MLOOPCOL:
           case CD_PROP_COLOR: {
-            CustomDataLayer *layer2 = NULL;
-
-            if (name[0]) {
-              int layer_i = 0;
-
-              domain = ATTR_DOMAIN_POINT;
-              layer_i = CustomData_get_named_layer_index(cd_vdata, CD_PROP_COLOR, name);
-              layer_i = layer_i == -1 ?
-                            CustomData_get_named_layer_index(cd_vdata, CD_MLOOPCOL, name) :
-                            layer_i;
-
-              if (layer_i == -1) {
-                domain = ATTR_DOMAIN_CORNER;
-                layer_i = layer_i == -1 ?
-                              CustomData_get_named_layer_index(cd_ldata, CD_PROP_COLOR, name) :
-                              layer_i;
-                layer_i = layer_i == -1 ?
-                              CustomData_get_named_layer_index(cd_ldata, CD_MLOOPCOL, name) :
-                              layer_i;
-              }
-
-              /* Note: this is not the same as the layer_i below. */
-              if (layer_i != -1) {
-                layer2 = (domain == ATTR_DOMAIN_POINT ? cd_vdata : cd_ldata)->layers + layer_i;
-              }
-            }
-            else {
-              layer2 = BKE_id_attributes_render_color_get(&query_mesh.id);
-            }
-
-            if (!layer2) {
-              break;
-            }
-
-            /* Note: this is the logical index into the color attribute list,
-               not the customdata index. */
-            int layer_i = BKE_id_attribute_to_index(
-                (ID *)&query_mesh, layer2, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
+            int layer_i = mesh_cd_calc_gpu_layers_vcol_used(&me_query, cd_vdata, cd_ldata, name);
 
             if (layer_i != -1) {
               cd_used.vcol |= 1UL << (uint)layer_i;
@@ -704,7 +719,6 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
 
             break;
           }
-
           case CD_PROP_FLOAT3:
           case CD_PROP_BOOL:
           case CD_PROP_INT8:
@@ -1203,16 +1217,20 @@ static void sculpt_request_active_vcol(MeshBatchCache *cache, Object *object, Me
   const CustomData *cd_vdata = mesh_cd_vdata_get_from_mesh(me_final);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
 
-  Mesh query_mesh = *me_final;
-  BKE_id_attribute_copy_domains_temp(&query_mesh.id, cd_vdata, NULL, cd_ldata, NULL, NULL);
+  Mesh me_query = {0};
 
-  CustomDataLayer *active = BKE_id_attributes_active_color_get(&query_mesh.id);
-  CustomDataLayer *render = BKE_id_attributes_render_color_get(&query_mesh.id);
+  /* Copy name so ID type switch statement in BKE_id_attribute_copy_domains_temp works. */
+  BLI_strncpy(me_query.id.name, me_final->id.name, sizeof(me_final->id.name));
+
+  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, NULL, cd_ldata, NULL, NULL);
+
+  CustomDataLayer *active = BKE_id_attributes_active_color_get(&me_query.id);
+  CustomDataLayer *render = BKE_id_attributes_render_color_get(&me_query.id);
 
   int active_i = BKE_id_attribute_to_index(
-      &query_mesh.id, active, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
+      &me_query.id, active, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
   int render_i = BKE_id_attribute_to_index(
-      &query_mesh.id, render, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
+      &me_query.id, render, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
 
   if (active_i >= 0) {
     cache->cd_used.vcol |= 1UL << (uint)active_i;

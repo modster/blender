@@ -49,7 +49,6 @@ void BKE_object_data_transfer_dttypes_to_cdmask(const int dtdata_types,
     }
 
     cddata_type = BKE_object_data_transfer_dttype_to_cdtype(dtdata_type);
-
     if (!(cddata_type & CD_FAKE)) {
       if (DT_DATATYPE_IS_VERT(dtdata_type)) {
         r_data_masks->vmask |= 1LL << cddata_type;

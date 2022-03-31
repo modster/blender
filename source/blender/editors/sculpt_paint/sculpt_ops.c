@@ -1035,7 +1035,7 @@ static int sculpt_mask_by_color_invoke(bContext *C, wmOperator *op, const wmEven
   }
 
   if (SCULPT_has_loop_colors(ob)) {
-    BKE_pbvh_ensure_node_loops(ss->pbvh, BKE_object_get_original_mesh(ob));
+    BKE_pbvh_ensure_node_loops(ss->pbvh);
   }
 
   SCULPT_vertex_random_access_ensure(ss);

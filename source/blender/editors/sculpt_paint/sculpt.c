@@ -3183,7 +3183,7 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
       return;
     }
 
-    BKE_pbvh_ensure_node_loops(ss->pbvh, BKE_object_get_original_mesh(ob));
+    BKE_pbvh_ensure_node_loops(ss->pbvh);
   }
 
   /* Build a list of all nodes that are potentially within the brush's area of influence */

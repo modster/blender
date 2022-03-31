@@ -162,7 +162,7 @@ static bool unique_name_cb(void *arg, const char *name)
   return false;
 }
 
-bool BKE_id_attribute_find_unique_name(ID *id, const char *name, char *outname)
+bool BKE_id_attribute_calc_unique_name(ID *id, const char *name, char *outname)
 {
   AttrUniqueData data = {.id = id};
 
@@ -184,7 +184,7 @@ CustomDataLayer *BKE_id_attribute_new(
   }
 
   char uniquename[MAX_CUSTOMDATA_LAYER_NAME];
-  BKE_id_attribute_find_unique_name(id, name, uniquename);
+  BKE_id_attribute_calc_unique_name(id, name, uniquename);
 
   switch (GS(id->name)) {
     case ID_ME: {
@@ -500,14 +500,14 @@ int BKE_id_attribute_to_index(const struct ID *id,
 
     CustomData *cdata = info[domains[i]].customdata;
     for (int j = 0; j < cdata->totlayer; j++) {
-      CustomDataLayer *layer2 = cdata->layers + j;
+      CustomDataLayer *layer_iter = cdata->layers + j;
 
-      if (!(CD_TYPE_AS_MASK(layer2->type) & layer_mask) ||
-          (CD_TYPE_AS_MASK(layer2->type) & CD_FLAG_TEMPORARY)) {
+      if (!(CD_TYPE_AS_MASK(layer_iter->type) & layer_mask) ||
+          (CD_TYPE_AS_MASK(layer_iter->type) & CD_FLAG_TEMPORARY)) {
         continue;
       }
 
-      if (layer == layer2) {
+      if (layer == layer_iter) {
         return index;
       }
 
@@ -518,7 +518,7 @@ int BKE_id_attribute_to_index(const struct ID *id,
   return -1;
 }
 
-CustomDataLayer *BKE_id_attribute_subset_active_get(ID *id,
+CustomDataLayer *BKE_id_attribute_subset_active_get(const ID *id,
                                                     int active_flag,
                                                     AttributeDomainMask domain_mask,
                                                     CustomDataMask mask)
@@ -578,21 +578,21 @@ void BKE_id_attribute_subset_active_set(ID *id,
     CustomData *cdata = info[domains[i]].customdata;
 
     for (int j = 0; j < cdata->totlayer; j++) {
-      CustomDataLayer *layer2 = cdata->layers + j;
+      CustomDataLayer *layer_iter = cdata->layers + j;
 
-      if (!(CD_TYPE_AS_MASK(layer2->type) & mask) ||
-          (CD_TYPE_AS_MASK(layer2->type) & CD_FLAG_TEMPORARY)) {
+      if (!(CD_TYPE_AS_MASK(layer_iter->type) & mask) ||
+          (CD_TYPE_AS_MASK(layer_iter->type) & CD_FLAG_TEMPORARY)) {
         continue;
       }
 
-      layer2->flag &= ~active_flag;
+      layer_iter->flag &= ~active_flag;
     }
   }
 
   layer->flag |= active_flag;
 }
 
-CustomDataLayer *BKE_id_attributes_active_color_get(ID *id)
+CustomDataLayer *BKE_id_attributes_active_color_get(const ID *id)
 {
   return BKE_id_attribute_subset_active_get(
       id, CD_FLAG_COLOR_ACTIVE, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
@@ -604,7 +604,7 @@ void BKE_id_attributes_active_color_set(ID *id, CustomDataLayer *active_layer)
       id, active_layer, CD_FLAG_COLOR_ACTIVE, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
 }
 
-CustomDataLayer *BKE_id_attributes_render_color_get(ID *id)
+CustomDataLayer *BKE_id_attributes_render_color_get(const ID *id)
 {
   return BKE_id_attribute_subset_active_get(
       id, CD_FLAG_COLOR_RENDER, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);

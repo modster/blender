@@ -3142,7 +3142,7 @@ void BKE_pbvh_node_num_loops(PBVH *pbvh, PBVHNode *node, int *r_totloop)
   BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
 
   if (r_totloop) {
-    *r_totloop = node->face_loops;
+    *r_totloop = node->indices_num;
   }
 }
 
@@ -3156,7 +3156,7 @@ void BKE_pbvh_pmap_set(PBVH *pbvh, const MeshElemMap *pmap)
   pbvh->pmap = pmap;
 }
 
-void BKE_pbvh_ensure_node_loops(PBVH *pbvh, const Mesh *me)
+void BKE_pbvh_ensure_node_loops(PBVH *pbvh)
 {
   BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
 
@@ -3188,14 +3188,14 @@ void BKE_pbvh_ensure_node_loops(PBVH *pbvh, const Mesh *me)
     }
 
     node->loop_indices = MEM_malloc_arrayN(node->totprim * 3, sizeof(int), __func__);
-    node->face_loops = 0;
+    node->indices_num = 0;
 
     for (int j = 0; j < node->totprim; j++) {
       const MLoopTri *mlt = pbvh->looptri + node->prim_indices[j];
 
       for (int k = 0; k < 3; k++) {
         if (!BLI_BITMAP_TEST(visit, mlt->tri[k])) {
-          node->loop_indices[node->face_loops++] = mlt->tri[k];
+          node->loop_indices[node->indices_num++] = mlt->tri[k];
           BLI_BITMAP_ENABLE(visit, mlt->tri[k]);
         }
       }

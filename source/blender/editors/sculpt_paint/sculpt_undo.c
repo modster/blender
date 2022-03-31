@@ -1408,9 +1408,12 @@ SculptUndoNode *SCULPT_undo_push_node(Object *ob, PBVHNode *node, SculptUndoType
     if (unode->loop_index) {
       BKE_pbvh_node_num_loops(ss->pbvh, unode->node, &allloop);
       BKE_pbvh_node_get_loops(ss->pbvh, unode->node, &loop_indices, NULL);
-      memcpy(unode->loop_index, loop_indices, sizeof(int) * allloop);
 
-      unode->maxloop = BKE_object_get_original_mesh(ob)->totloop;
+      if (allloop) {
+        memcpy(unode->loop_index, loop_indices, sizeof(int) * allloop);
+
+        unode->maxloop = BKE_object_get_original_mesh(ob)->totloop;
+      }
     }
   }
 

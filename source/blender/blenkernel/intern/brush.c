@@ -1833,8 +1833,7 @@ void BKE_brush_sculpt_reset(Brush *br)
       br->tip_roundness = 1.0f;
       br->density = 1.0f;
       br->flag &= ~BRUSH_SPACE_ATTEN;
-      zero_v3(br->rgb);
-      add_v3_fl(br->rgb, 1.0f);
+      copy_v3_fl(br->rgb, 1.0f);
       zero_v3(br->secondary_rgb);
       break;
     case SCULPT_TOOL_SMEAR:
