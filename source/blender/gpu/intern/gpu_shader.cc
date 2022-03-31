@@ -672,6 +672,12 @@ void GPU_shader_uniform_1i(GPUShader *sh, const char *name, int value)
   GPU_shader_uniform_int(sh, loc, value);
 }
 
+void GPU_shader_uniform_2iv(GPUShader *sh, const char *name, const int data[2])
+{
+  const int loc = GPU_shader_get_uniform(sh, name);
+  GPU_shader_uniform_vector_int(sh, loc, 2, 1, data);
+}
+
 void GPU_shader_uniform_1b(GPUShader *sh, const char *name, bool value)
 {
   GPU_shader_uniform_1i(sh, name, value ? 1 : 0);

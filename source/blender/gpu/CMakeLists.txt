@@ -311,6 +311,7 @@ set(GLSL_SRC
 
   shaders/compositor/compositor_convert.glsl
   shaders/compositor/compositor_realize_on_domain.glsl
+  shaders/compositor/compositor_split_viewer.glsl
 
   shaders/material/gpu_shader_material_add_shader.glsl
   shaders/material/gpu_shader_material_ambient_occlusion.glsl
@@ -495,6 +496,7 @@ set(SHADER_CREATE_INFOS
 
   shaders/compositor/infos/compositor_convert_info.hh
   shaders/compositor/infos/compositor_realize_on_domain_info.hh
+  shaders/compositor/infos/compositor_split_viewer_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")

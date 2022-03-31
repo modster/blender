@@ -192,6 +192,7 @@ void GPU_shader_uniform_float(GPUShader *shader, int location, float value);
 void GPU_shader_uniform_int(GPUShader *shader, int location, int value);
 
 void GPU_shader_uniform_1i(GPUShader *sh, const char *name, int value);
+void GPU_shader_uniform_2iv(GPUShader *sh, const char *name, const int data[2]);
 void GPU_shader_uniform_1b(GPUShader *sh, const char *name, bool value);
 void GPU_shader_uniform_1f(GPUShader *sh, const char *name, float value);
 void GPU_shader_uniform_2f(GPUShader *sh, const char *name, float x, float y);
