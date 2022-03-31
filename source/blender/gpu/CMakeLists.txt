@@ -306,6 +306,7 @@ set(GLSL_SRC
   shaders/compositor/material/gpu_shader_compositor_separate_combine.glsl
   shaders/compositor/material/gpu_shader_compositor_set_alpha.glsl
   shaders/compositor/material/gpu_shader_compositor_store_output.glsl
+  shaders/compositor/material/gpu_shader_compositor_texture_utils.glsl
   shaders/compositor/material/gpu_shader_compositor_type_conversion.glsl
 
   shaders/compositor/compositor_convert.glsl

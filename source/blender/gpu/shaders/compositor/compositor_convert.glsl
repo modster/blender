@@ -1,8 +1,8 @@
-/* The shader create info instance should define a CONVERT_EXPRESSION as well as an output_image
- * given the sampled texel. */
+#pragma BLENDER_REQUIRE(gpu_shader_compositor_texture_utils.glsl)
+
 void main()
 {
   ivec2 xy = ivec2(gl_GlobalInvocationID.xy);
-  vec4 texel = texelFetch(input_sampler, xy, 0);
+  vec4 texel = load_texture(input_sampler, xy);
   imageStore(output_image, xy, CONVERT_EXPRESSION);
 }

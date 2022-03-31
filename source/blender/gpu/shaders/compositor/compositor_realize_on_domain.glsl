@@ -1,3 +1,5 @@
+#pragma BLENDER_REQUIRE(gpu_shader_compositor_texture_utils.glsl)
+
 void main()
 {
   ivec2 xy = ivec2(gl_GlobalInvocationID.xy);
@@ -12,7 +14,7 @@ void main()
    * is half the difference between their sizes, because the difference in size is on both sides of
    * the centered image. */
   ivec2 domain_size = imageSize(domain);
-  ivec2 input_size = textureSize(input_sampler, 0);
+  ivec2 input_size = texture_size(input_sampler);
   vec2 offset = (domain_size - input_size) / 2.0;
 
   /* Subtract the offset and divide by the input image size to get the relevant coordinates into
