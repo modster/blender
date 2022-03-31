@@ -171,6 +171,8 @@ bool oneapi_queue_synchronize(SyclQueue *queue_)
 
 bool oneapi_trigger_runtime_compilation(SyclQueue *queue_)
 {
+  // NOTE(sirgienko) Execution of this simple kernel will check basic functionality and
+  // also trigger runtime compilation of all existing oneAPI kernels
   assert(queue_);
   sycl::queue *queue = reinterpret_cast<sycl::queue *>(queue_);
   size_t N = 8;
@@ -195,10 +197,10 @@ bool oneapi_trigger_runtime_compilation(SyclQueue *queue_)
     sycl::host_accessor A_host_acc(A, sycl::read_only);
     sycl::host_accessor B_host_acc(B, sycl::read_only);
 
-    std::cerr << "Test for oneapi broken codegen [B[i] = A[i] + i]: " << std::endl;
-    for (size_t i = (size_t)0; i < N; i++)
-      std::cerr << "  [i = " << i << "]; A[i] = " << A_host_acc[i] << "; B[i] = " << B_host_acc[i]
-                << std::endl;
+    for (size_t i = (size_t)0; i < N; i++) {
+      float result = A_host_acc[i] + B_host_acc[i];
+      (void)result;
+    }
   }
   catch (sycl::exception const &e) {
     if (s_error_cb) {
