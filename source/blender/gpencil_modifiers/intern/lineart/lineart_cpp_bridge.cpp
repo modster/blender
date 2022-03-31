@@ -48,10 +48,16 @@ LineartOcclusionPair *lineart_thread_finalize_occlusion_result(
     LineartThreadOcclusionDataCombined **r_combined_storage)
 {
   Vector<LineartOcclusionPair> *result = new Vector<LineartOcclusionPair>;
+  int count = 0;
+  for (const Vector<LineartOcclusionPair> &local : (*(_LineartThreadOcclusionData *)data)) {
+    count += local.size();
+  }
+  /* Reserve once so it's faster to extend. */
+  result->reserve(count);
   for (const Vector<LineartOcclusionPair> &local : (*(_LineartThreadOcclusionData *)data)) {
     result->extend(local);
   }
-  *result_count = result->size();
+  *result_count = count;
   *r_combined_storage = (LineartThreadOcclusionDataCombined *)result;
   return (LineartOcclusionPair *)result->data();
 };
