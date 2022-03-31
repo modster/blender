@@ -196,7 +196,7 @@ if (WITH_CYCLES_DEVICE_ONEAPI)
   if (WITH_CYCLES_ONEAPI_BINARIES AND NOT GENERATOR_IS_MULTI_CONFIG)
     #NOTE(sirginko) Disable this, when GPU AOT will work with Debug information (for Debug and RelWithDebInfo builds)
     message(STATUS "Change ONEAPI_KERNEL_BUILD_TYPE value from \"${ONEAPI_KERNEL_BUILD_TYPE}\" to \"Release\", because other builds don't work for GPU AOT yet")
-    set(ONEAPI_KERNEL_BUILD_TYPE "Debug")
+    set(ONEAPI_KERNEL_BUILD_TYPE "Release")
   endif()
 
   if (GENERATOR_IS_MULTI_CONFIG AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
