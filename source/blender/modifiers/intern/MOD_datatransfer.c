@@ -473,7 +473,7 @@ static void panelRegister(ARegionType *region_type)
 
 #undef DT_TYPES_AFFECT_MESH
 
-static void blendRead(struct BlendDataReader *reader, struct ModifierData *md)
+static void blendRead(struct BlendDataReader *UNUSED(reader), struct ModifierData *md)
 {
   DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
 

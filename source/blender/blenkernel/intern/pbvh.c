@@ -3156,7 +3156,7 @@ void BKE_pbvh_pmap_set(PBVH *pbvh, const MeshElemMap *pmap)
   pbvh->pmap = pmap;
 }
 
-void BKE_pbvh_ensure_node_loops(PBVH *pbvh, const Mesh *me)
+void BKE_pbvh_ensure_node_loops(PBVH *pbvh, const Mesh *UNUSED(me))
 {
   BLI_assert(BKE_pbvh_type(pbvh) == PBVH_FACES);
 

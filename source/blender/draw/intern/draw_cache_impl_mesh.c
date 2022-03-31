@@ -664,7 +664,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
             if (name[0]) {
               int layer_i = 0;
 
-              AttributeDomain domain = ATTR_DOMAIN_POINT;
+              domain = ATTR_DOMAIN_POINT;
               layer_i = CustomData_get_named_layer_index(cd_vdata, CD_PROP_COLOR, name);
               layer_i = layer_i == -1 ?
                             CustomData_get_named_layer_index(cd_vdata, CD_MLOOPCOL, name) :

@@ -434,7 +434,7 @@ static void do_smear_brush_task_cb_exec(void *__restrict userdata,
         sub_v3_v3v3(vertex_disp, SCULPT_vertex_co_get(ss, ni.index), vd.co);
 
         /* Weight by how close we are to our target distance from vd.co. */
-        float w = (1.0f + fabsf(len_v3(vertex_disp) / ss->cache->bstrength - 1.0));
+        float w = (1.0f + fabsf(len_v3(vertex_disp) / ss->cache->bstrength - 1.0f));
 
         /* TODO: use cotangents (or at least face areas) here. */
         float len = len_v3v3(SCULPT_vertex_co_get(ss, ni.index), nco);
