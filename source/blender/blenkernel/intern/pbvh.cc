@@ -13,6 +13,7 @@
 #include "BLI_index_range.hh"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_span.hh"
 #include "BLI_task.h"
 
 #include "DNA_mesh_types.h"
@@ -38,112 +39,69 @@
 
 #include <climits>
 
-using IndexRange = blender::IndexRange;
+using blender::IndexRange;
 
-struct MLoopColHelper {
-  using ColType = MLoopCol;
+namespace blender::bke {
 
-  static void to_float(MLoopCol *col, float r_color[4])
-  {
-    rgba_uchar_to_float(r_color, reinterpret_cast<const unsigned char *>(col));
-    srgb_to_linearrgb_v3_v3(r_color, r_color);
-  }
-
-  static void from_float(MLoopCol *col, const float color[4])
-  {
-    float temp[4];
-
-    linearrgb_to_srgb_v3_v3(temp, color);
-    temp[3] = color[3];
-
-    rgba_float_to_uchar(reinterpret_cast<unsigned char *>(col), temp);
-  }
-};
-
-struct MPropColHelper {
-  using ColType = MPropCol;
-
-  static void to_float(MPropCol *col, float r_color[4])
-  {
-    copy_v4_v4(r_color, col->color);
-  }
-
-  static void from_float(MPropCol *col, const float color[4])
-  {
-    copy_v4_v4(col->color, color);
-  }
-};
-
-template<typename Helper> struct ColorSetter {
-  using ColType = typename Helper::ColType;
-
-  static void set(ColType *dst, ColType *src)
-  {
-    *dst = *src;
-  }
-
-  static void set_float(ColType *dst, const float src[4])
-  {
-    Helper::from_float(dst, src);
-  }
-};
-
-template<typename Helper> struct ColorSwapper {
-  using ColType = typename Helper::ColType;
-
-  static void set(ColType *dst, ColType *src)
-  {
-    ColType tmp = *dst;
-
-    *dst = *src;
-    *src = tmp;
-  }
-
-  static void set_float(ColType *dst, float src[4])
-  {
-    ColType temp = *dst;
-
-    Helper::from_float(dst, src);
-    Helper::to_float(&temp, src);
-  }
-};
-
-/** Reversed setter, sets src to dst instead of dst to src. */
-template<typename Helper> struct ColorStorer {
-  using ColType = typename Helper::ColType;
-
-  static void set(ColType *dst, ColType *src)
-  {
-    *src = *dst;
-  }
-
-  static void set_float(ColType *dst, float src[4])
-  {
-    Helper::to_float(dst, src);
-  }
-};
-
-template<typename Helper>
-static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
+template<typename Func>
+inline void to_static_color_type(const CustomDataType type, const Func &func)
 {
-  if (pbvh->color_domain == ATTR_DOMAIN_CORNER) {
-    const MeshElemMap *melem = pbvh->pmap + vertex;
+  switch (type) {
+    case CD_PROP_COLOR:
+      func(MPropCol());
+      break;
+    case CD_MLOOPCOL:
+      func(MLoopCol());
+      break;
+    default:
+      BLI_assert_unreachable();
+      break;
+  }
+}
+
+template<typename T> void to_float(const T &src, float dst[4]);
+
+template<> void to_float(const MLoopCol &src, float dst[4])
+{
+  rgba_uchar_to_float(dst, reinterpret_cast<const unsigned char *>(&src));
+  srgb_to_linearrgb_v3_v3(dst, dst);
+}
+template<> void to_float(const MPropCol &src, float dst[4])
+{
+  copy_v4_v4(dst, src.color);
+}
+
+template<typename T> void from_float(const float src[4], T &dst);
+
+template<> void from_float(const float src[4], MLoopCol &dst)
+{
+  float temp[4];
+  linearrgb_to_srgb_v3_v3(temp, src);
+  temp[3] = src[3];
+  rgba_float_to_uchar(reinterpret_cast<unsigned char *>(&dst), temp);
+}
+template<> void from_float(const float src[4], MPropCol &dst)
+{
+  copy_v4_v4(dst.color, src);
+}
+
+template<typename T>
+static void pbvh_vertex_color_get(const PBVH &pbvh, int vertex, float r_color[4])
+{
+  if (pbvh.color_domain == ATTR_DOMAIN_CORNER) {
+    const MeshElemMap &melem = pbvh.pmap[vertex];
+
     int count = 0;
-
     zero_v4(r_color);
+    for (const int i_poly : Span(melem.indices, melem.count)) {
+      const MPoly &mp = pbvh.mpoly[i_poly];
+      Span<T> colors{static_cast<const T *>(pbvh.color_layer->data) + mp.loopstart, mp.totloop};
+      Span<MLoop> loops{pbvh.mloop + mp.loopstart, mp.totloop};
 
-    for (int i : IndexRange(melem->count)) {
-      const MPoly *mp = pbvh->mpoly + melem->indices[i];
-      const MLoop *ml = pbvh->mloop + mp->loopstart;
-
-      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(
-                                          pbvh->color_layer->data) +
-                                      mp->loopstart;
-
-      for (int j = 0; j < mp->totloop; j++, col++, ml++) {
-        if (ml->v == vertex) {
+      for (const int i_loop : IndexRange(mp.totloop)) {
+        if (loops[i_loop].v == vertex) {
           float temp[4];
-          Helper::to_float(col, temp);
+          to_float(colors[i_loop], temp);
 
           add_v4_v4(r_color, temp);
           count++;
@@ -156,104 +114,97 @@ static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
     }
   }
   else {
-    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->color_layer->data) +
-                                    vertex;
-    Helper::to_float(col, r_color);
+    to_float(static_cast<T *>(pbvh.color_layer->data)[vertex], r_color);
   }
 }
 
-void BKE_pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
+template<typename T>
+static void pbvh_vertex_color_set(PBVH &pbvh, int vertex, const float color[4])
 {
-  if (pbvh->color_layer->type == CD_PROP_COLOR) {
-    pbvh_vertex_color_get<MPropColHelper>(pbvh, vertex, r_color);
-  }
-  else {
-    pbvh_vertex_color_get<MLoopColHelper>(pbvh, vertex, r_color);
-  }
-}
+  if (pbvh.color_domain == ATTR_DOMAIN_CORNER) {
+    const MeshElemMap &melem = pbvh.pmap[vertex];
 
-template<typename Helper, typename Setter = ColorSetter<Helper>>
-static void pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
-{
-  if (pbvh->color_domain == ATTR_DOMAIN_CORNER) {
-    const MeshElemMap *melem = pbvh->pmap + vertex;
+    for (const int i_poly : Span(melem.indices, melem.count)) {
+      const MPoly &mp = pbvh.mpoly[i_poly];
+      MutableSpan<T> colors{static_cast<T *>(pbvh.color_layer->data) + mp.loopstart, mp.totloop};
+      Span<MLoop> loops{pbvh.mloop + mp.loopstart, mp.totloop};
 
-    for (int i : IndexRange(melem->count)) {
-      const MPoly *mp = pbvh->mpoly + melem->indices[i];
-      const MLoop *ml = pbvh->mloop + mp->loopstart;
-
-      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(
-                                          pbvh->color_layer->data) +
-                                      mp->loopstart;
-
-      for (int j = 0; j < mp->totloop; j++, col++, ml++) {
-        if (ml->v == vertex) {
-          Setter::set_float(col, color);
+      for (const int i_loop : IndexRange(mp.totloop)) {
+        if (loops[i_loop].v == vertex) {
+          from_float(color, colors[i_loop]);
         }
       }
     }
   }
   else {
-    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(
-                                        pbvh->color_layer->data) +
-                                    vertex;
-    Setter::set_float(col, color);
+    from_float(color, static_cast<T *>(pbvh.color_layer->data)[vertex]);
   }
+}
+
+}  // namespace blender::bke
+
+extern "C" {
+void BKE_pbvh_vertex_color_get(const PBVH *pbvh, int vertex, float r_color[4])
+{
+  blender::bke::to_static_color_type(CustomDataType(pbvh->color_layer->type), [&](auto dummy) {
+    using T = decltype(dummy);
+    blender::bke::pbvh_vertex_color_get<T>(*pbvh, vertex, r_color);
+  });
 }
 
 void BKE_pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
 {
-  if (pbvh->color_layer->type == CD_PROP_COLOR) {
-    pbvh_vertex_color_set<MPropColHelper>(pbvh, vertex, color);
-  }
-  else {
-    pbvh_vertex_color_set<MLoopColHelper>(pbvh, vertex, color);
-  }
+  blender::bke::to_static_color_type(CustomDataType(pbvh->color_layer->type), [&](auto dummy) {
+    using T = decltype(dummy);
+    blender::bke::pbvh_vertex_color_set<T>(*pbvh, vertex, color);
+  });
 }
 
-template<typename Helper, typename Setter = ColorSetter<Helper>>
-static void pbvh_set_colors(
-    PBVH *UNUSED(pbvh), void *color_attr, float (*colors)[4], int *indices, int indices_num)
+void BKE_pbvh_swap_colors(PBVH *pbvh,
+                          const int *indices,
+                          const int indices_num,
+                          float (*r_colors)[4])
 {
-  typename Helper::ColType *col = reinterpret_cast<typename Helper::ColType *>(color_attr);
-
-  for (int i : IndexRange(indices_num)) {
-    Setter::set_float(col + indices[i], colors[i]);
-  }
+  blender::bke::to_static_color_type(CustomDataType(pbvh->color_layer->type), [&](auto dummy) {
+    using T = decltype(dummy);
+    T *pbvh_colors = static_cast<T *>(pbvh->color_layer->data);
+    for (const int i : IndexRange(indices_num)) {
+      T temp = pbvh_colors[indices[i]];
+      blender::bke::from_float(r_colors[i], pbvh_colors[indices[i]]);
+      blender::bke::to_float(temp, r_colors[i]);
+    }
+  });
 }
 
-void BKE_pbvh_swap_colors(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num)
+void BKE_pbvh_store_colors(PBVH *pbvh,
+                           const int *indices,
+                           const int indices_num,
+                           float (*r_colors)[4])
 {
-  if (pbvh->color_layer->type == CD_PROP_COLOR) {
-    pbvh_set_colors<MPropColHelper, ColorSwapper<MPropColHelper>>(
-        pbvh, pbvh->color_layer->data, colors, indices, indices_num);
-  }
-  else {
-    pbvh_set_colors<MLoopColHelper, ColorSwapper<MLoopColHelper>>(
-        pbvh, pbvh->color_layer->data, colors, indices, indices_num);
-  }
+  blender::bke::to_static_color_type(CustomDataType(pbvh->color_layer->type), [&](auto dummy) {
+    using T = decltype(dummy);
+    T *pbvh_colors = static_cast<T *>(pbvh->color_layer->data);
+    for (const int i : IndexRange(indices_num)) {
+      blender::bke::to_float(pbvh_colors[indices[i]], r_colors[i]);
+    }
+  });
 }
 
-void BKE_pbvh_store_colors(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num)
-{
-  if (pbvh->color_layer->type == CD_PROP_COLOR) {
-    pbvh_set_colors<MPropColHelper, ColorStorer<MPropColHelper>>(
-        pbvh, pbvh->color_layer->data, colors, indices, indices_num);
-  }
-  else {
-    pbvh_set_colors<MLoopColHelper, ColorStorer<MLoopColHelper>>(
-        pbvh, pbvh->color_layer->data, colors, indices, indices_num);
-  }
-}
-
-void BKE_pbvh_store_colors_vertex(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num)
+void BKE_pbvh_store_colors_vertex(PBVH *pbvh,
+                                  const int *indices,
+                                  const int indices_num,
+                                  float (*r_colors)[4])
 {
   if (pbvh->color_domain == ATTR_DOMAIN_POINT) {
-    BKE_pbvh_store_colors(pbvh, colors, indices, indices_num);
+    BKE_pbvh_store_colors(pbvh, indices, indices_num, r_colors);
   }
   else {
-    for (int i = 0; i < indices_num; i++) {
-      BKE_pbvh_vertex_color_get(pbvh, indices[i], colors[i]);
-    }
+    blender::bke::to_static_color_type(CustomDataType(pbvh->color_layer->type), [&](auto dummy) {
+      using T = decltype(dummy);
+      for (const int i : IndexRange(indices_num)) {
+        blender::bke::pbvh_vertex_color_get<T>(*pbvh, indices[i], r_colors[i]);
+      }
+    });
   }
+}
 }

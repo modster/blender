@@ -533,14 +533,23 @@ bool BKE_pbvh_get_color_layer(const struct Mesh *me,
 
 /* Swaps colors at each element in indices (of domain pbvh->vcol_domain)
  * with values in colors. */
-void BKE_pbvh_swap_colors(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num);
+void BKE_pbvh_swap_colors(PBVH *pbvh,
+                          const int *indices,
+                          const int indices_num,
+                          float (*colors)[4]);
 
 /* Stores colors from the elements in indices (of domain pbvh->vcol_domain)
  * into colors. */
-void BKE_pbvh_store_colors(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num);
+void BKE_pbvh_store_colors(PBVH *pbvh,
+                           const int *indices,
+                           const int indices_num,
+                           float (*colors)[4]);
 
 /* Like BKE_pbvh_store_colors but handles loop->vert conversion */
-void BKE_pbvh_store_colors_vertex(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num);
+void BKE_pbvh_store_colors_vertex(PBVH *pbvh,
+                                  const int *indices,
+                                  const int indices_num,
+                                  float (*colors)[4]);
 
 bool BKE_pbvh_is_drawing(const PBVH *pbvh);
 void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val);
@@ -552,7 +561,7 @@ void BKE_pbvh_update_active_vcol(PBVH *pbvh, const struct Mesh *mesh);
 void BKE_pbvh_pmap_set(PBVH *pbvh, const struct MeshElemMap *pmap);
 
 void BKE_pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4]);
-void BKE_pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4]);
+void BKE_pbvh_vertex_color_get(const PBVH *pbvh, int vertex, float r_color[4]);
 
 void BKE_pbvh_ensure_node_loops(PBVH *pbvh);
 

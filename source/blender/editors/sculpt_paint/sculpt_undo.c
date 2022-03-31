@@ -345,14 +345,14 @@ static bool sculpt_undo_restore_color(bContext *C, SculptUndoNode *unode)
   /* Note: even with loop colors we still store derived
    * vertex colors for original data lookup.*/
   if (unode->col && !unode->loop_col) {
-    BKE_pbvh_swap_colors(ss->pbvh, unode->col, unode->index, unode->totvert);
+    BKE_pbvh_swap_colors(ss->pbvh, unode->index, unode->totvert, unode->col);
     modified = true;
   }
 
   Mesh *me = BKE_object_get_original_mesh(ob);
 
   if (unode->loop_col && unode->maxloop == me->totloop) {
-    BKE_pbvh_swap_colors(ss->pbvh, unode->loop_col, unode->loop_index, unode->totloop);
+    BKE_pbvh_swap_colors(ss->pbvh, unode->loop_index, unode->totloop, unode->loop_col);
 
     modified = true;
   }
@@ -1222,10 +1222,10 @@ static void sculpt_undo_store_color(Object *ob, SculptUndoNode *unode)
 
   /* Note: even with loop colors we still store (derived)
    * vertex colors for original data lookup. */
-  BKE_pbvh_store_colors_vertex(ss->pbvh, unode->col, unode->index, allvert);
+  BKE_pbvh_store_colors_vertex(ss->pbvh, unode->index, allvert, unode->col);
 
   if (unode->loop_col && unode->totloop) {
-    BKE_pbvh_store_colors(ss->pbvh, unode->loop_col, unode->loop_index, unode->totloop);
+    BKE_pbvh_store_colors(ss->pbvh, unode->loop_index, unode->totloop, unode->loop_col);
   }
 }
 
