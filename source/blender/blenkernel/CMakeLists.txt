@@ -39,6 +39,8 @@ set(INC
 
   # dna_type_offsets.h
   ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
+  # RNA_prototypes.h
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
@@ -102,15 +104,18 @@ set(SRC
   intern/crazyspace.c
   intern/cryptomatte.cc
   intern/curve.cc
-  intern/curves.cc
-  intern/curves_geometry.cc
   intern/curve_bevel.c
+  intern/curve_bezier.cc
+  intern/curve_catmull_rom.cc
   intern/curve_convert.c
   intern/curve_decimate.c
   intern/curve_deform.c
   intern/curve_eval.cc
+  intern/curve_nurbs.cc
   intern/curve_to_mesh_convert.cc
   intern/curveprofile.cc
+  intern/curves.cc
+  intern/curves_geometry.cc
   intern/customdata.cc
   intern/customdata_file.c
   intern/data_transfer.c
@@ -151,10 +156,11 @@ set(SRC
   intern/idprop_utils.c
   intern/idtype.c
   intern/image.cc
-  intern/image_partial_update.cc
+  intern/image_format.cc
   intern/image_gen.c
   intern/image_gpu.cc
-  intern/image_save.c
+  intern/image_partial_update.cc
+  intern/image_save.cc
   intern/ipo.c
   intern/kelvinlet.c
   intern/key.c
@@ -241,7 +247,7 @@ set(SRC
   intern/preferences.c
   intern/report.c
   intern/rigidbody.c
-  intern/scene.c
+  intern/scene.cc
   intern/screen.c
   intern/shader_fx.c
   intern/shrinkwrap.c
@@ -342,10 +348,10 @@ set(SRC
   BKE_cryptomatte.h
   BKE_cryptomatte.hh
   BKE_curve.h
-  BKE_curves.h
-  BKE_curves.hh
   BKE_curve_to_mesh.hh
   BKE_curveprofile.h
+  BKE_curves.h
+  BKE_curves.hh
   BKE_customdata.h
   BKE_customdata_file.h
   BKE_data_transfer.h
@@ -378,6 +384,7 @@ set(SRC
   BKE_idprop.hh
   BKE_idtype.h
   BKE_image.h
+  BKE_image_format.h
   BKE_image_partial_update.hh
   BKE_image_save.h
   BKE_ipo.h
@@ -592,12 +599,12 @@ if(WITH_IMAGE_CINEON)
   add_definitions(-DWITH_CINEON)
 endif()
 
-if(WITH_IMAGE_FRAMESERVER)
-  add_definitions(-DWITH_FRAMESERVER)
-endif()
-
 if(WITH_IMAGE_HDR)
   add_definitions(-DWITH_HDR)
+endif()
+
+if(WITH_IMAGE_WEBP)
+	add_definitions(-DWITH_WEBP)
 endif()
 
 if(WITH_CODEC_AVI)
@@ -794,6 +801,8 @@ blender_add_lib(bf_blenkernel "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
 # Needed so we can use dna_type_offsets.h for defaults initialization.
 add_dependencies(bf_blenkernel bf_dna)
+# RNA_prototypes.h
+add_dependencies(bf_blenkernel bf_rna)
 
 
 if(WITH_GTESTS)
@@ -811,6 +820,7 @@ if(WITH_GTESTS)
     intern/fcurve_test.cc
     intern/idprop_serialize_test.cc
     intern/image_partial_update_test.cc
+    intern/image_test.cc
     intern/lattice_deform_test.cc
     intern/layer_test.cc
     intern/lib_id_remapper_test.cc
@@ -823,4 +833,7 @@ if(WITH_GTESTS)
   )
   include(GTestTesting)
   blender_add_test_lib(bf_blenkernel_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB}")
+
+  # RNA_prototypes.h
+  add_dependencies(bf_blenkernel_tests bf_rna)
 endif()
