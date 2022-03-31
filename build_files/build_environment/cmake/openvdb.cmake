@@ -48,12 +48,6 @@ if(WIN32)
   set(OPENVDB_EXTRA_ARGS ${OPENVDB_EXTRA_ARGS}
     -DCMAKE_CXX_STANDARD_LIBRARIES="${LIBDIR}/pthreads/lib/pthreadVC3.lib"
   )
-else()
-  # OpenVDB can't find the _static libraries automatically.
-  set(OPENVDB_EXTRA_ARGS ${OPENVDB_EXTRA_ARGS}
-    -DTBB_INCLUDE_DIRS=${LIBDIR}/tbb/include
-    -DTbb_RELEASE_LIBRARIES=${LIBDIR}/tbb/lib/${LIBPREFIX}tbb_static${LIBEXT};${LIBDIR}/tbb/lib/${LIBPREFIX}tbbmalloc_static${LIBEXT};${LIBDIR}/tbb/lib/${LIBPREFIX}tbbmalloc_proxy_static${LIBEXT}
-  )
 endif()
 
 ExternalProject_Add(openvdb
