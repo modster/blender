@@ -5549,7 +5549,8 @@ static void lineart_gpencil_generate(LineartCache *cache,
         }
       }
     }
-    if (ec->type & LRT_EDGE_FLAG_INTERSECTION) {
+    if (ec->type == LRT_EDGE_FLAG_INTERSECTION &&
+        (mask_switches & LRT_GPENCIL_INTERSECTION_FILTER)) {
       if (mask_switches & LRT_GPENCIL_INTERSECTION_MATCH) {
         if (ec->intersection_mask != intersection_mask) {
           continue;
