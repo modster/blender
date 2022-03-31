@@ -3653,8 +3653,19 @@ static void lineart_embree_do_intersections(LineartRenderBuffer *rb)
     rtcCommitGeometry(geom);
   }
   rtcCommitScene(rb->rtcscene_geom);
+
+  double t_start;
+  if (G.debug_value == 4000) {
+    t_start = PIL_check_seconds_timer();
+  }
+
   rtcCollide(rb->rtcscene_geom, rb->rtcscene_geom, IntersectionCollideFunc, rb);
   lineart_intersection_lines_from_record(rb);
+
+  if (G.debug_value == 4000) {
+    double t_elapsed = PIL_check_seconds_timer() - t_start;
+    printf("Line art embree intersection time: %lf\n", t_elapsed);
+  }
 }
 
 /**
