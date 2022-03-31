@@ -212,31 +212,7 @@ bool oneapi_trigger_runtime_compilation(SyclQueue *queue_)
 
 bool oneapi_kernel_globals_size(SyclQueue *queue_, size_t &kernel_global_size)
 {
-  // NOTE(sirgienko) No need to trigger JIT compilation/recompilation yet
-  /*
-  sycl::buffer<size_t> output(1);
-
-  try {
-    queue->submit([&](sycl::handler &cgh) {
-      sycl::accessor acc(output, cgh, sycl::write_only, sycl::no_init);
-
-      cgh.single_task([=]() { acc[0] = sizeof(KernelGlobalsGPU); });
-    });
-    queue->wait_and_throw();
-  }
-  catch (sycl::exception const &e) {
-    if (s_error_cb) {
-      s_error_cb(e.what(), s_error_user_ptr);
-    }
-    return false;
-  }
-
-  sycl::host_accessor acc(output, sycl::read_only);
-  kernel_global_size = acc[0];
-  */
   kernel_global_size = sizeof(KernelGlobalsGPU);
-
-  // assert(sizeof(KernelGlobalsGPU) == kernel_global_size);
 
   return true;
 }

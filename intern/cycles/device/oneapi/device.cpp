@@ -146,11 +146,6 @@ static void device_iterator_cb(const char *id, const char *name, int num, void *
 
   // NOTE(sirgienko) Seems not possible to know from SYCL/oneAPI or Level0.
   info.display_device = false;
-  /*
-  info.description += " (Display)";
-  info.display_device = true;
-  display_devices.push_back(info);
-  */
 
   devices->push_back(info);
   VLOG(1) << "Added device \"" << name << "\" with id \"" << info.id << "\".";
