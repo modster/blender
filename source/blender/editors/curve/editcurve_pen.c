@@ -441,20 +441,22 @@ static void delete_nurb(Curve *cu, Nurb *nu)
   BKE_nurb_free(nu);
 }
 
-static void delete_bezt_from_nurb(const BezTriple *bezt, Nurb *nu)
+static void delete_bezt_from_nurb(const BezTriple *bezt, Nurb *nu, EditNurb *editnurb)
 {
   BLI_assert(nu->type == CU_BEZIER);
   const int index = BKE_curve_nurb_vert_index_get(nu, bezt);
   nu->pntsu -= 1;
   memmove(nu->bezt + index, nu->bezt + index + 1, (nu->pntsu - index) * sizeof(BezTriple));
+  BKE_curve_editNurb_keyIndex_delCV(editnurb->keyindex, nu->bezt + index);
 }
 
-static void delete_bp_from_nurb(const BPoint *bp, Nurb *nu)
+static void delete_bp_from_nurb(const BPoint *bp, Nurb *nu, EditNurb *editnurb)
 {
   BLI_assert(nu->type == CU_NURBS || nu->type == CU_POLY);
   const int index = BKE_curve_nurb_vert_index_get(nu, bp);
   nu->pntsu -= 1;
   memmove(nu->bp + index, nu->bp + index + 1, (nu->pntsu - index) * sizeof(BPoint));
+  BKE_curve_editNurb_keyIndex_delCV(editnurb->keyindex, nu->bp + index);
 }
 
 /**
@@ -1246,6 +1248,7 @@ static bool delete_point_under_mouse(ViewContext *vc, const wmEvent *event)
   Nurb *nu = NULL;
   int temp = 0;
   Curve *cu = vc->obedit->data;
+  EditNurb *editnurb = cu->editnurb;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
   const float mouse_point[2] = {UNPACK2(event->mval)};
 
@@ -1264,10 +1267,10 @@ static bool delete_point_under_mouse(ViewContext *vc, const wmEvent *event)
           const int span_step[2] = {bez_index, bez_index};
           ed_dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
         }
-        delete_bezt_from_nurb(bezt, nu);
+        delete_bezt_from_nurb(bezt, nu, editnurb);
       }
       else {
-        delete_bp_from_nurb(bp, nu);
+        delete_bp_from_nurb(bp, nu, editnurb);
       }
 
       if (nu->pntsu == 0) {
@@ -1530,7 +1533,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   Nurb *nu = NULL;
 
   const struct SelectPick_Params params = {
-      .sel_op = ED_select_op_from_booleans(false, false, false),
+      .sel_op = SEL_OP_SET,
       .deselect_all = false,
   };
 
