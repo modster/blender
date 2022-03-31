@@ -501,6 +501,10 @@ class Operation {
   TexturePool &texture_pool();
 
  private:
+  /* Add a reduce to single value input processor for the input identified by the given identifier
+   * if needed. */
+  void add_reduce_to_single_value_input_processor_if_needed(StringRef identifier);
+
   /* Add an implicit conversion input processor for the input identified by the given identifier if
    * needed. */
   void add_implicit_conversion_input_processor_if_needed(StringRef identifier);
@@ -613,6 +617,21 @@ class ProcessorOperation : public Operation {
   /* Get a reference to the descriptor of the input, this essentially calls the super
    * get_input_descriptor with the input identifier of the processor. */
   InputDescriptor &get_input_descriptor();
+};
+
+/* --------------------------------------------------------------------
+ *  Reduce To Single Value Processor Operation.
+ */
+
+/* A processor that reduces its input result into a single value output result. The input is
+ * assumed to be a texture result of size 1x1, that is, a texture composed of a single pixel, the
+ * value of which shall serve as the single value of the output result. See
+ * add_reduce_to_single_value_input_processor_if_needed. */
+class ReduceToSingleValueProcessorOperation : public ProcessorOperation {
+ public:
+  ReduceToSingleValueProcessorOperation(Context &context, ResultType type);
+
+  void execute() override;
 };
 
 /* --------------------------------------------------------------------

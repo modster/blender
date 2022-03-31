@@ -47,6 +47,8 @@
 #include "NOD_derived_node_tree.hh"
 #include "NOD_node_declaration.hh"
 
+#include "MEM_guardedalloc.h"
+
 namespace blender::viewport_compositor {
 
 /* --------------------------------------------------------------------
@@ -426,6 +428,7 @@ void Operation::evaluate_input_processors()
 {
   /* First, add all needed processors for each input. */
   for (const StringRef &identifier : inputs_to_results_map_.keys()) {
+    add_reduce_to_single_value_input_processor_if_needed(identifier);
     add_implicit_conversion_input_processor_if_needed(identifier);
     add_realize_on_domain_input_processor_if_needed(identifier);
   }
@@ -486,6 +489,25 @@ TexturePool &Operation::texture_pool()
   return context_.texture_pool();
 }
 
+void Operation::add_reduce_to_single_value_input_processor_if_needed(StringRef identifier)
+{
+  const Result &result = get_input(identifier);
+  /* Input result is already a single value. */
+  if (result.is_single_value()) {
+    return;
+  }
+
+  /* The input is a full sized texture can can't be reduced to a single value. */
+  if (result.domain().size != int2(1)) {
+    return;
+  }
+
+  /* The input is a texture of a single pixel and can be reduced to a single value. */
+  ProcessorOperation *processor = new ReduceToSingleValueProcessorOperation(context(),
+                                                                            result.type());
+  add_input_processor(identifier, processor);
+}
+
 void Operation::add_implicit_conversion_input_processor_if_needed(StringRef identifier)
 {
   ResultType result_type = get_input(identifier).type();
@@ -525,6 +547,12 @@ void Operation::add_realize_on_domain_input_processor_if_needed(StringRef identi
   const Result &result = get_input(identifier);
   /* Input result is a single value and does not need realization. */
   if (result.is_single_value()) {
+    return;
+  }
+
+  /* Input result only contains a single pixel and will be reduced to a single value result through
+   * a ReduceToSingleValueProcessorOperation, so no need to realize it. */
+  if (result.domain().size == int2(1)) {
     return;
   }
 
@@ -732,6 +760,43 @@ InputDescriptor &ProcessorOperation::get_input_descriptor()
 }
 
 /* --------------------------------------------------------------------
+ *  Reduce To Single Value Processor Operation.
+ */
+
+ReduceToSingleValueProcessorOperation::ReduceToSingleValueProcessorOperation(Context &context,
+                                                                             ResultType type)
+    : ProcessorOperation(context)
+{
+  InputDescriptor input_descriptor;
+  input_descriptor.type = type;
+  declare_input_descriptor(input_descriptor);
+  populate_result(Result(type, texture_pool()));
+}
+
+void ReduceToSingleValueProcessorOperation::execute()
+{
+  const Result &input = get_input();
+  GPU_memory_barrier(GPU_BARRIER_TEXTURE_UPDATE);
+  float *pixel = static_cast<float *>(GPU_texture_read(input.texture(), GPU_DATA_FLOAT, 0));
+
+  Result &result = get_result();
+  result.allocate_single_value();
+  switch (result.type()) {
+    case ResultType::Color:
+      result.set_color_value(pixel);
+      break;
+    case ResultType::Vector:
+      result.set_vector_value(pixel);
+      break;
+    case ResultType::Float:
+      result.set_float_value(*pixel);
+      break;
+  }
+
+  MEM_freeN(pixel);
+}
+
+/* --------------------------------------------------------------------
  *  Conversion Processor Operation.
  */
 
@@ -914,12 +979,6 @@ void RealizeOnDomainProcessorOperation::execute()
 {
   Result &input = get_input();
   Result &result = get_result();
-
-  /* The input have the same domain as the operation domain, so just pass the input through. */
-  if (input.domain() == domain_) {
-    input.pass_through(result);
-    return;
-  }
 
   result.allocate_texture(domain_);
 
