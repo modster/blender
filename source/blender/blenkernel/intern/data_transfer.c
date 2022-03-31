@@ -1239,6 +1239,7 @@ void BKE_object_data_transfer_layout(struct Depsgraph *depsgraph,
     }
 
     cddata_type = BKE_object_data_transfer_dttype_to_cdtype(dtdata_type);
+
     fromto_idx = BKE_object_data_transfer_dttype_to_srcdst_index(dtdata_type);
 
     if (fromto_idx != DT_MULTILAYER_INDEX_INVALID) {

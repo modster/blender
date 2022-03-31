@@ -546,7 +546,7 @@ static uint mesh_cd_calc_gpu_layers_vcol_used(const Mesh *me_query,
   }
 
   /* Note: this is the logical index into the color attribute list,
-     not the customdata index. */
+   * not the customdata index. */
   int vcol_i = BKE_id_attribute_to_index(
       (ID *)me_query, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
 
@@ -566,7 +566,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
   const CustomData *cd_edata = mesh_cd_edata_get_from_mesh(me_final);
 
   /* Create a mesh with final customdata domains
-     we can query. */
+   * we can query. */
   Mesh me_query = {0};
 
   /* Copy name so ID type switch statement in BKE_id_attribute_copy_domains_temp works. */
@@ -705,16 +705,16 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
           }
 
           /* Note: attr->type will always be CD_PROP_COLOR even for
-             CD_MLOOPCOL layers, see node_shader_gpu_vertex_color in
-             node_shader_vertex_color.cc.
+           * CD_MLOOPCOL layers, see node_shader_gpu_vertex_color in
+           * node_shader_vertex_color.cc.
            */
           case CD_MCOL:
           case CD_MLOOPCOL:
           case CD_PROP_COLOR: {
-            int layer_i = mesh_cd_calc_gpu_layers_vcol_used(&me_query, cd_vdata, cd_ldata, name);
+            int vcol_bit = mesh_cd_calc_gpu_layers_vcol_used(&me_query, cd_vdata, cd_ldata, name);
 
-            if (layer_i != -1) {
-              cd_used.vcol |= 1UL << (uint)layer_i;
+            if (vcol_bit != -1) {
+              cd_used.vcol |= 1UL << (uint)vcol_bit;
             }
 
             break;

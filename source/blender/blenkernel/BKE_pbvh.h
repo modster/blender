@@ -533,14 +533,14 @@ bool BKE_pbvh_get_color_layer(const struct Mesh *me,
 
 /* Swaps colors at each element in indices (of domain pbvh->vcol_domain)
  * with values in colors. */
-void BKE_pbvh_swap_colors(PBVH *pbvh, float (*colors)[4], int *indices, int elem_num);
+void BKE_pbvh_swap_colors(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num);
 
 /* Stores colors from the elements in indices (of domain pbvh->vcol_domain)
  * into colors. */
-void BKE_pbvh_store_colors(PBVH *pbvh, float (*colors)[4], int *indices, int elem_num);
+void BKE_pbvh_store_colors(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num);
 
 /* Like BKE_pbvh_store_colors but handles loop->vert conversion */
-void BKE_pbvh_store_colors_vertex(PBVH *pbvh, float (*colors)[4], int *indices, int elem_num);
+void BKE_pbvh_store_colors_vertex(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num);
 
 bool BKE_pbvh_is_drawing(const PBVH *pbvh);
 void BKE_pbvh_is_drawing_set(PBVH *pbvh, bool val);

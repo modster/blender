@@ -273,9 +273,7 @@ CustomDataLayer *BKE_id_attribute_find(const ID *id,
   return NULL;
 }
 
-int BKE_id_attributes_length(const ID *id,
-                             const AttributeDomainMask domain_mask,
-                             const CustomDataMask mask)
+int BKE_id_attributes_length(const ID *id, AttributeDomainMask domain_mask, CustomDataMask mask)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
   get_domains(id, info);

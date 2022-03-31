@@ -495,17 +495,6 @@ class MESH_UL_attributes(UIList):
         'CORNER': "Face Corner",
     }
 
-    def filter_items(self, context, data, property):
-        attrs = getattr(data, property)
-        ret = []
-        idxs = []
-
-        for idx, item in enumerate(attrs):
-            ret.append(self.bitflag_filter_item if not item.temporary else 0)
-            idxs.append(idx)
-
-        return ret, idxs
-
     def draw_item(self, _context, layout, _data, attribute, _icon, _active_data, _active_propname, _index):
         data_type = attribute.bl_rna.properties['data_type'].enum_items[attribute.data_type]
 
@@ -628,6 +617,7 @@ class MESH_UL_color_attributes(UIList):
         sub.active = False
         sub.label(text="%s ▶ %s" % (domain_name, data_type.name))
 
+
 class DATA_PT_vertex_colors(DATA_PT_mesh_attributes, Panel):
     bl_label = "Color Attributes"
     bl_options = {'DEFAULT_CLOSED'}
@@ -658,7 +648,8 @@ class DATA_PT_vertex_colors(DATA_PT_mesh_attributes, Panel):
         
         self.draw_attribute_warnings(context, layout)
 
-classes = (MESH_MT_vertex_group_context_menu,
+classes = (
+    MESH_MT_vertex_group_context_menu,
     MESH_MT_shape_key_context_menu,
     MESH_MT_attribute_context_menu,
     MESH_UL_vgroups,

@@ -126,7 +126,7 @@ template<typename Helper> struct ColorStorer {
 template<typename Helper>
 static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
 {
-  if (pbvh->vcol_domain == ATTR_DOMAIN_CORNER) {
+  if (pbvh->color_domain == ATTR_DOMAIN_CORNER) {
     const MeshElemMap *melem = pbvh->pmap + vertex;
     int count = 0;
 
@@ -136,7 +136,8 @@ static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
       const MPoly *mp = pbvh->mpoly + melem->indices[i];
       const MLoop *ml = pbvh->mloop + mp->loopstart;
 
-      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) +
+      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(
+                                          pbvh->color_layer->data) +
                                       mp->loopstart;
 
       for (int j = 0; j < mp->totloop; j++, col++, ml++) {
@@ -155,7 +156,7 @@ static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
     }
   }
   else {
-    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) +
+    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->color_layer->data) +
                                     vertex;
     Helper::to_float(col, r_color);
   }
@@ -163,7 +164,7 @@ static void pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
 
 void BKE_pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
 {
-  if (pbvh->vcol->type == CD_PROP_COLOR) {
+  if (pbvh->color_layer->type == CD_PROP_COLOR) {
     pbvh_vertex_color_get<MPropColHelper>(pbvh, vertex, r_color);
   }
   else {
@@ -174,14 +175,15 @@ void BKE_pbvh_vertex_color_get(PBVH *pbvh, int vertex, float r_color[4])
 template<typename Helper, typename Setter = ColorSetter<Helper>>
 static void pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
 {
-  if (pbvh->vcol_domain == ATTR_DOMAIN_CORNER) {
+  if (pbvh->color_domain == ATTR_DOMAIN_CORNER) {
     const MeshElemMap *melem = pbvh->pmap + vertex;
 
     for (int i : IndexRange(melem->count)) {
       const MPoly *mp = pbvh->mpoly + melem->indices[i];
       const MLoop *ml = pbvh->mloop + mp->loopstart;
 
-      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) +
+      typename Helper::ColType *col = static_cast<typename Helper::ColType *>(
+                                          pbvh->color_layer->data) +
                                       mp->loopstart;
 
       for (int j = 0; j < mp->totloop; j++, col++, ml++) {
@@ -192,7 +194,8 @@ static void pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
     }
   }
   else {
-    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(pbvh->vcol->data) +
+    typename Helper::ColType *col = static_cast<typename Helper::ColType *>(
+                                        pbvh->color_layer->data) +
                                     vertex;
     Setter::set_float(col, color);
   }
@@ -200,7 +203,7 @@ static void pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
 
 void BKE_pbvh_vertex_color_set(PBVH *pbvh, int vertex, const float color[4])
 {
-  if (pbvh->vcol->type == CD_PROP_COLOR) {
+  if (pbvh->color_layer->type == CD_PROP_COLOR) {
     pbvh_vertex_color_set<MPropColHelper>(pbvh, vertex, color);
   }
   else {
@@ -221,31 +224,31 @@ static void pbvh_set_colors(
 
 void BKE_pbvh_swap_colors(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num)
 {
-  if (pbvh->vcol->type == CD_PROP_COLOR) {
+  if (pbvh->color_layer->type == CD_PROP_COLOR) {
     pbvh_set_colors<MPropColHelper, ColorSwapper<MPropColHelper>>(
-        pbvh, pbvh->vcol->data, colors, indices, indices_num);
+        pbvh, pbvh->color_layer->data, colors, indices, indices_num);
   }
   else {
     pbvh_set_colors<MLoopColHelper, ColorSwapper<MLoopColHelper>>(
-        pbvh, pbvh->vcol->data, colors, indices, indices_num);
+        pbvh, pbvh->color_layer->data, colors, indices, indices_num);
   }
 }
 
 void BKE_pbvh_store_colors(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num)
 {
-  if (pbvh->vcol->type == CD_PROP_COLOR) {
+  if (pbvh->color_layer->type == CD_PROP_COLOR) {
     pbvh_set_colors<MPropColHelper, ColorStorer<MPropColHelper>>(
-        pbvh, pbvh->vcol->data, colors, indices, indices_num);
+        pbvh, pbvh->color_layer->data, colors, indices, indices_num);
   }
   else {
     pbvh_set_colors<MLoopColHelper, ColorStorer<MLoopColHelper>>(
-        pbvh, pbvh->vcol->data, colors, indices, indices_num);
+        pbvh, pbvh->color_layer->data, colors, indices, indices_num);
   }
 }
 
 void BKE_pbvh_store_colors_vertex(PBVH *pbvh, float (*colors)[4], int *indices, int indices_num)
 {
-  if (pbvh->vcol_domain == ATTR_DOMAIN_POINT) {
+  if (pbvh->color_domain == ATTR_DOMAIN_POINT) {
     BKE_pbvh_store_colors(pbvh, colors, indices, indices_num);
   }
   else {

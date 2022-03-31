@@ -3149,7 +3149,7 @@ void BKE_pbvh_node_num_loops(PBVH *pbvh, PBVHNode *node, int *r_totloop)
 
 void BKE_pbvh_update_active_vcol(PBVH *pbvh, const Mesh *mesh)
 {
-  BKE_pbvh_get_color_layer(mesh, &pbvh->vcol, &pbvh->vcol_domain);
+  BKE_pbvh_get_color_layer(mesh, &pbvh->color_layer, &pbvh->color_domain);
 }
 
 void BKE_pbvh_pmap_set(PBVH *pbvh, const MeshElemMap *pmap)
