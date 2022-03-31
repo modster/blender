@@ -80,6 +80,7 @@ set(SRC
   intern/kdtree_4d.c
   intern/lasso_2d.c
   intern/listbase.c
+  intern/length_parameterize.cc
   intern/math_base.c
   intern/math_base_inline.c
   intern/math_base_safe_inline.c
@@ -165,8 +166,8 @@ set(SRC
   BLI_bitmap.h
   BLI_bitmap_draw_2d.h
   BLI_blenlib.h
-  BLI_boxpack_2d.h
   BLI_bounds.hh
+  BLI_boxpack_2d.h
   BLI_buffer.h
   BLI_color.hh
   BLI_compiler_attrs.h
@@ -174,8 +175,8 @@ set(SRC
   BLI_compiler_typecheck.h
   BLI_console.h
   BLI_convexhull_2d.h
-  BLI_cpp_type_make.hh
   BLI_cpp_type.hh
+  BLI_cpp_type_make.hh
   BLI_delaunay_2d.h
   BLI_dial_2d.h
   BLI_disjoint_set.hh
@@ -225,6 +226,7 @@ set(SRC
   BLI_kdtree.h
   BLI_kdtree_impl.h
   BLI_lasso_2d.h
+  BLI_length_parameterize.hh
   BLI_linear_allocator.hh
   BLI_link_utils.h
   BLI_linklist.h
@@ -235,12 +237,13 @@ set(SRC
   BLI_map.hh
   BLI_map_slots.hh
   BLI_math.h
-  BLI_math_base.hh
   BLI_math_base.h
+  BLI_math_base.hh
   BLI_math_base_safe.h
   BLI_math_bits.h
   BLI_math_boolean.hh
   BLI_math_color.h
+  BLI_math_color.hh
   BLI_math_color_blend.h
   BLI_math_geom.h
   BLI_math_inline.h
@@ -285,6 +288,7 @@ set(SRC
   BLI_simd.h
   BLI_smallhash.h
   BLI_sort.h
+  BLI_sort.hh
   BLI_sort_utils.h
   BLI_span.hh
   BLI_stack.h
@@ -434,6 +438,7 @@ if(WITH_GTESTS)
     tests/BLI_index_range_test.cc
     tests/BLI_inplace_priority_queue_test.cc
     tests/BLI_kdopbvh_test.cc
+    tests/BLI_length_parameterize_test.cc
     tests/BLI_linear_allocator_test.cc
     tests/BLI_linklist_lockfree_test.cc
     tests/BLI_listbase_test.cc

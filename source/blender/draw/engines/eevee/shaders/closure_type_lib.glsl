@@ -25,6 +25,7 @@ struct Closure {
 #endif
 };
 
+#ifndef GPU_METAL
 /* Prototype */
 Closure nodetree_exec();
 /* Single BSDFs. */
@@ -56,6 +57,7 @@ vec2 brdf_lut(float a, float b);
 vec3 F_brdf_multi_scatter(vec3 a, vec3 b, vec2 c);
 vec3 F_brdf_single_scatter(vec3 a, vec3 b, vec2 c);
 float F_eta(float a, float b);
+#endif
 
 /* Not used */
 #define closure_weight_threshold(A, B) true

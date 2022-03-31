@@ -27,10 +27,13 @@ struct ClosureEvalGlossy {
 
 #ifdef STEP_RESOLVE /* SSR */
 /* Prototype. */
+#  ifndef GPU_METAL
+/* MSL does not require prototypes. */
 void raytrace_resolve(ClosureInputGlossy cl_in,
                       inout ClosureEvalGlossy cl_eval,
                       inout ClosureEvalCommon cl_common,
                       inout ClosureOutputGlossy cl_out);
+#  endif
 #endif
 
 ClosureEvalGlossy closure_Glossy_eval_init(inout ClosureInputGlossy cl_in,

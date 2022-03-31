@@ -26,10 +26,10 @@ set(INC
   ../windowmanager
 
   ../../../intern/atomic
+  ../../../intern/clog
   ../../../intern/glew-mx
   ../../../intern/guardedalloc
   ../../../intern/opensubdiv
-  ../../../intern/clog
 
   # dna_type_offsets.h
   ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
@@ -192,6 +192,7 @@ set(SRC
   intern/draw_cache_inline.h
   intern/draw_color_management.h
   intern/draw_common.h
+  intern/draw_common_shader_shared.h
   intern/draw_debug.h
   intern/draw_hair_private.h
   intern/draw_instance_data.h
@@ -216,15 +217,16 @@ set(SRC
   engines/eevee_next/eevee_engine.h
   engines/external/external_engine.h
   engines/image/image_batches.hh
+  engines/image/image_buffer_cache.hh
   engines/image/image_drawing_mode.hh
   engines/image/image_engine.h
   engines/image/image_instance_data.hh
   engines/image/image_partial_updater.hh
   engines/image/image_private.hh
   engines/image/image_shader_params.hh
+  engines/image/image_space.hh
   engines/image/image_space_image.hh
   engines/image/image_space_node.hh
-  engines/image/image_space.hh
   engines/image/image_texture_info.hh
   engines/image/image_usage.hh
   engines/image/image_wrappers.hh
@@ -399,6 +401,7 @@ set(GLSL_SRC
   intern/shaders/common_subdiv_vbo_sculpt_data_comp.glsl
 
   intern/draw_shader_shared.h
+  intern/draw_common_shader_shared.h
 
   engines/gpencil/shaders/gpencil_frag.glsl
   engines/gpencil/shaders/gpencil_vert.glsl

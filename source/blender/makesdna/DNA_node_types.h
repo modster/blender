@@ -761,7 +761,7 @@ typedef struct NodeImageLayer {
   /* index in the Image->layers->passes lists */
   int pass_index DNA_DEPRECATED;
   /* render pass name */
-  /** Amount defined in openexr_multi.h. */
+  /** Amount defined in IMB_openexr.h. */
   char pass_name[64];
 } NodeImageLayer;
 
@@ -1189,7 +1189,7 @@ typedef struct NodeCryptomatte {
 
   /** Legacy attributes */
   /* Number of input sockets. */
-  int num_inputs;
+  int inputs_num;
 
   char _pad[4];
   NodeCryptomatte_Runtime runtime;
