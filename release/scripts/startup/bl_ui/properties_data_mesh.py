@@ -598,8 +598,8 @@ class MESH_UL_color_attributes(UIList):
         idxs = []
 
         for idx, item in enumerate(attrs):
-            skip = item.domain not in ["POINT", "CORNER"]
-            skip = skip or item.data_type not in ["FLOAT_COLOR", "BYTE_COLOR"]
+            skip = item.domain not in {"POINT", "CORNER"}
+            skip = skip or item.data_type not in {"FLOAT_COLOR", "BYTE_COLOR"}
 
             ret.append(self.bitflag_filter_item if not skip else 0)
             idxs.append(idx)
