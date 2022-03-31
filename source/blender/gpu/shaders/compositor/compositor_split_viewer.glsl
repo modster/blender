@@ -8,6 +8,6 @@ void main()
 #elif defined(SPLIT_VERTICAL)
   bool condition = (view_size.y * split_ratio) < xy.y;
 #endif
-  vec4 color = condition ? load_texture(first_image, xy) : load_texture(second_image, xy);
+  vec4 color = condition ? texture_load(first_image, xy) : texture_load(second_image, xy);
   imageStore(output_image, xy, color);
 }
