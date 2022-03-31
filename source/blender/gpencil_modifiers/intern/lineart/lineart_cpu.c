@@ -1540,6 +1540,7 @@ typedef struct EdgeFeatData {
   LineartTriangle *tri_array;
   LineartVert *v_array;
   float crease_threshold;
+  float **poly_normals;
   bool use_auto_smooth;
 } EdgeFeatData;
 
@@ -1600,24 +1601,25 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
     edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
   }
 
-  // if (rb->use_crease) {
-  //   if (rb->sharp_as_crease && !BM_elem_flag_test(e, BM_ELEM_SMOOTH)) {
-  //     edge_flag_result |= LRT_EDGE_FLAG_CREASE;
-  //   }
-  //   else {
-  //     bool do_crease = true;
-  //     if (!rb->force_crease && !use_auto_smooth &&
-  //         (BM_elem_flag_test(ll->f, BM_ELEM_SMOOTH) && BM_elem_flag_test(lr->f,
-  //         BM_ELEM_SMOOTH))) {
-  //       do_crease = false;
-  //     }
-  //     if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
-  //       edge_flag_result |= LRT_EDGE_FLAG_CREASE;
-  //     }
-  //   }
-  // }
   Mesh *me = e_feat_data->me;
   const MLoopTri *mlooptri = e_feat_data->mlooptri;
+
+  if (rb->use_crease) {
+    // if (rb->sharp_as_crease && !BM_elem_flag_test(e, BM_ELEM_SMOOTH)) {
+    //  edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+    //}
+    // else {
+    bool do_crease = true;
+    if (!rb->force_crease && !e_feat_data->use_auto_smooth &&
+        (me->mpoly[mlooptri[e_f_pair->f1].poly].flag & ME_SMOOTH) &&
+        (me->mpoly[mlooptri[e_f_pair->f2].poly].flag & ME_SMOOTH)) {
+      do_crease = false;
+    }
+    if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < e_feat_data->crease_threshold)) {
+      edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+    }
+    //}
+  }
 
   int mat1 = me->mpoly[mlooptri[e_f_pair->f1].poly].mat_nr;
   int mat2 = me->mpoly[mlooptri[e_f_pair->f2].poly].mat_nr;
@@ -2163,6 +2165,8 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
   const MLoopTri *mlooptri = BKE_mesh_runtime_looptri_ensure(me);
   const int tot_tri = BKE_mesh_runtime_looptri_len(me);
 
+  // float **normals = BKE_mesh_poly_normals_ensure(me);
+
   // TODO
   if (0) {
     MEdge *medge = NULL;
@@ -2318,6 +2322,7 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
   edge_feat_data.v_array = la_v_arr;
   edge_feat_data.crease_threshold = use_crease;
   edge_feat_data.use_auto_smooth = use_auto_smooth;
+  // edge_feat_data.poly_normals = normals;
 
   BLI_task_parallel_range(0,
                           edge_pair_arr_len,
