@@ -1519,8 +1519,7 @@ void Scheduler::compute_schedule(DNode node)
     const DInputSocket input{node.context(), input_ref};
     input.foreach_origin_socket([&](const DSocket origin) {
       /* The origin node was added before or was already schedule, so skip it. The number of
-       * origin nodes is very small, so linear search is okay.
-       */
+       * origin nodes is very small, so linear search is okay. */
       if (sorted_origin_nodes.contains(origin.node()) || schedule_.contains(origin.node())) {
         return;
       }
@@ -1543,7 +1542,7 @@ void Scheduler::compute_schedule(DNode node)
     compute_schedule(origin_node);
   }
 
-  schedule_.add_new(node);
+  schedule_.add(node);
 }
 
 /* --------------------------------------------------------------------
