@@ -462,13 +462,16 @@ if(NOT APPLE)
   option(WITH_CYCLES_ONEAPI_BINARIES "Enable Ahead-Of-Time compilation for Cycles oneAPI device" OFF)
   option(WITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED "Enable use of SYCL host (CPU) device execution by oneAPI implementation. This option is for debugging purposes and impacts GPU execution." OFF)
 
-  SET (CYCLES_ONEAPI_SYCL_TARGET GPUTarget STRING "oneAPI offload target to build binaries for")
+  SET (CYCLES_ONEAPI_SYCL_TARGET GPUTarget CACHE STRING "oneAPI offload target to build binaries for")
   # List of available options can be found here:
   # https://www.intel.com/content/www/us/en/develop/documentation/oneapi-dpcpp-cpp-compiler-dev-guide-and-reference/top/compilation/ahead-of-time-compilation.html
   # Right now public Intel driver don't support this option, because corresponding HW haven't released yet
-  SET (CYCLES_ONEAPI_AOT_TARGETS "dg2" STRING "oneAPI GPU architectures to build binaries for")
+  SET (CYCLES_ONEAPI_AOT_TARGETS "dg2" CACHE STRING "oneAPI GPU architectures to build binaries for")
 
   mark_as_advanced(CYCLES_ONEAPI_SYCL_TARGET)
+  mark_as_advanced(WITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED)
+  mark_as_advanced(CYCLES_ONEAPI_SYCL_TARGET)
+  mark_as_advanced(CYCLES_ONEAPI_AOT_TARGETS)
 endif()
 
 # Draw Manager
