@@ -14,6 +14,7 @@ void main()
   GPU_INTEL_VERTEX_SHADER_WORKAROUND
 
 #ifdef HAIR_SHADER
+  hairBary = hair_get_barycentric();
   float time, thick_time, thickness;
   vec3 worldPosition, tan, binor;
   hair_get_pos_tan_binor_time((ProjectionMatrix[3][3] == 0.0),

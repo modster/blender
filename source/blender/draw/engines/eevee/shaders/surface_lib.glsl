@@ -48,6 +48,7 @@ IN_OUT ShaderHairInterface
   float hairThickness;
   float hairTime;
   flat int hairStrandID;
+  vec2 hairBary;
 };
 #endif
 
@@ -77,7 +78,7 @@ GlobalData init_globals(void)
   surf.hair_time = hairTime;
   surf.hair_thickness = hairThickness;
   surf.hair_strand_id = hairStrandID;
-  surf.barycentric_coords = vec2(0.0); /* TODO(fclem) */
+  surf.barycentric_coords = hair_resolve_barycentric(hairBary);
 #  else
   surf.is_strand = false;
   surf.hair_time = 0.0;
@@ -86,7 +87,7 @@ GlobalData init_globals(void)
   surf.barycentric_coords = vec2(0.0); /* TODO(fclem) */
 #  endif
   // surf.barycentric_dists = interp.barycentric_dists; /* TODO(fclem) */
-  surf.ray_type = RAY_TYPE_CAMERA;
+  surf.ray_type = rayType;
   surf.ray_depth = 0.0;
   surf.ray_length = distance(surf.P, cameraPos);
   surf.closure_rand = 0.5;

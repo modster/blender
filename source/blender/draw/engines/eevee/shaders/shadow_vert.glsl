@@ -13,8 +13,7 @@ void main()
 
 #ifdef HAIR_SHADER
   hairStrandID = hair_get_strand_id();
-  hairStrandID = hair_get_strand_id();
-  calc_barycentric_co(int vertid);
+  hairBary = hair_get_barycentric();
   vec3 pos, binor;
   hair_get_pos_tan_binor_time((ProjectionMatrix[3][3] == 0.0),
                               ModelMatrixInverse,

@@ -39,7 +39,7 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
 
   std::stringstream attr_load;
 
-  const bool do_fragment_attrib_load = is_background;
+  const bool do_fragment_attrib_load = is_background || is_volume;
 
   if (do_fragment_attrib_load && !info.vertex_out_interfaces_.is_empty()) {
     /* Codegen outputs only one interface. */
@@ -65,7 +65,7 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
 
   std::stringstream vert_gen, frag_gen, geom_gen;
 
-  if (is_background) {
+  if (do_fragment_attrib_load) {
     frag_gen << attr_load.str();
   }
   else {

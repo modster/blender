@@ -113,6 +113,7 @@ vec4 tangent_get(vec4 attr, mat3 normalmat)
 #define vec4_from_vec2(v) v.rrrg
 #define vec4_from_float(v) vec4(vec3(v), 1.0)
 
+/* TODO: Move to shader_shared. */
 #define RAY_TYPE_CAMERA 0
 #define RAY_TYPE_SHADOW 1
 #define RAY_TYPE_DIFFUSE 2

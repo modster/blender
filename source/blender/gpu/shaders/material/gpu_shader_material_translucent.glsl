@@ -24,6 +24,6 @@ void node_bsdf_translucent(vec4 color, vec3 N, float weight, out Closure result)
 #ifdef GPU_NODES_SAMPLE_BSDF
   closure_weight_add(g_diffuse_data, weight);
 #else
-  node_bsdf_translucent_eval(color, roughness, N, weight, result);
+  node_bsdf_translucent_eval(color, N, weight, result);
 #endif
 }

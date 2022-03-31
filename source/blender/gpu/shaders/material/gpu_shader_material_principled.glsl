@@ -70,8 +70,9 @@ void node_bsdf_principled_eval(vec4 base_color,
   ClosureReflection glass_reflect_data;
   ClosureReflection clearcoat_data;
   ClosureRefraction refraction_data;
-  ClosureEmission emission_data = ClosureEmission(emission.rgb * emission_strength * alpha);
-  ClosureTransparency transparency_data = ClosureTransparency(vec3(1.0 - alpha), 0.0);
+  ClosureEmission emission_data = ClosureEmission(emission.rgb * emission_strength * alpha *
+                                                  weight);
+  ClosureTransparency transparency_data = ClosureTransparency(vec3(1.0 - alpha) * weight, 0.0);
 #endif
 
   /* Diffuse. */
