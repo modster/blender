@@ -28,7 +28,7 @@ namespace blender::ed::outliner {
 
 class AbstractTreeElement;
 
-TreeDisplayOverrideLibraryHierarchy::TreeDisplayOverrideLibraryHierarchy(
+TreeDisplayOverrideLibraryHierarchies::TreeDisplayOverrideLibraryHierarchies(
     SpaceOutliner &space_outliner)
     : AbstractTreeDisplay(space_outliner)
 {
@@ -41,7 +41,7 @@ static void remove_expanded_children(TreeElement &te)
   outliner_free_tree(&te.subtree);
 }
 
-ListBase TreeDisplayOverrideLibraryHierarchy::buildTree(const TreeSourceData &source_data)
+ListBase TreeDisplayOverrideLibraryHierarchies::buildTree(const TreeSourceData &source_data)
 {
   ListBase tree = {nullptr};
 
@@ -83,7 +83,7 @@ ListBase TreeDisplayOverrideLibraryHierarchy::buildTree(const TreeSourceData &so
   return tree;
 }
 
-ListBase TreeDisplayOverrideLibraryHierarchy::build_hierarchy_for_lib_or_main(
+ListBase TreeDisplayOverrideLibraryHierarchies::build_hierarchy_for_lib_or_main(
     Main *bmain, TreeElement &parent_te, Library *lib)
 {
   ListBase tree = {nullptr};
@@ -210,7 +210,7 @@ static int build_hierarchy_foreach_ID_cb(LibraryIDLinkCallbackData *cb_data)
   return IDWALK_RET_NOP;
 }
 
-void TreeDisplayOverrideLibraryHierarchy::build_hierarchy_for_ID(Main *bmain,
+void TreeDisplayOverrideLibraryHierarchies::build_hierarchy_for_ID(Main *bmain,
                                                                  ID &override_root_id,
                                                                  TreeElementID &te_id) const
 {

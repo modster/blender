@@ -143,16 +143,18 @@ class TreeDisplayOverrideLibraryProperties final : public AbstractTreeDisplay {
 };
 
 /**
- * \brief Tree-Display for the Library Overrides display mode, Hierarchy view mode.
+ * \brief Tree-Display for the Library Overrides display mode, Hierarchies view mode.
  */
-class TreeDisplayOverrideLibraryHierarchy final : public AbstractTreeDisplay {
+class TreeDisplayOverrideLibraryHierarchies final : public AbstractTreeDisplay {
  public:
-  TreeDisplayOverrideLibraryHierarchy(SpaceOutliner &space_outliner);
+  TreeDisplayOverrideLibraryHierarchies(SpaceOutliner &space_outliner);
 
   ListBase buildTree(const TreeSourceData &source_data) override;
 
  private:
-  ListBase build_hierarchy_for_lib_or_main(Main *bmain, TreeElement &parent_te, Library *lib = nullptr);
+  ListBase build_hierarchy_for_lib_or_main(Main *bmain,
+                                           TreeElement &parent_te,
+                                           Library *lib = nullptr);
   void build_hierarchy_for_ID(Main *bmain, ID &override_root_id, TreeElementID &te_id) const;
 };
 

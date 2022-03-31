@@ -33,8 +33,8 @@ std::unique_ptr<AbstractTreeDisplay> AbstractTreeDisplay::createFromDisplayMode(
       switch ((eSpaceOutliner_LibOverrideViewMode)space_outliner.lib_override_view_mode) {
         case SO_LIB_OVERRIDE_VIEW_PROPERTIES:
           return std::make_unique<TreeDisplayOverrideLibraryProperties>(space_outliner);
-        case SO_LIB_OVERRIDE_VIEW_HIERARCHY:
-          return std::make_unique<TreeDisplayOverrideLibraryHierarchy>(space_outliner);
+        case SO_LIB_OVERRIDE_VIEW_HIERARCHIES:
+          return std::make_unique<TreeDisplayOverrideLibraryHierarchies>(space_outliner);
       }
       break;
     case SO_VIEW_LAYER:
