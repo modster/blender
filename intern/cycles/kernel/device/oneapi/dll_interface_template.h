@@ -15,10 +15,10 @@ DLL_INTERFACE_CALL(oneapi_usm_alloc_device, void *, SyclQueue *queue, size_t mem
 DLL_INTERFACE_CALL(oneapi_usm_free, void, SyclQueue *queue, void *usm_ptr)
 
 DLL_INTERFACE_CALL(
-    oneapi_usm_memcpy, void, SyclQueue *queue, void *dest, void *src, size_t num_bytes)
-DLL_INTERFACE_CALL(oneapi_queue_synchronize, void, SyclQueue *queue)
+    oneapi_usm_memcpy, bool, SyclQueue *queue, void *dest, void *src, size_t num_bytes)
+DLL_INTERFACE_CALL(oneapi_queue_synchronize, bool, SyclQueue *queue)
 DLL_INTERFACE_CALL(oneapi_usm_memset,
-                   void,
+                   bool,
                    SyclQueue *queue,
                    void *usm_ptr,
                    unsigned char value,

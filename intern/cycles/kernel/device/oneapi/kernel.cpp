@@ -116,34 +116,56 @@ void oneapi_usm_free(SyclQueue *queue_, void *usm_ptr)
   sycl::free(usm_ptr, *queue);
 }
 
-void oneapi_usm_memcpy(SyclQueue *queue_, void *dest, void *src, size_t num_bytes)
+bool oneapi_usm_memcpy(SyclQueue *queue_, void *dest, void *src, size_t num_bytes)
 {
   assert(queue_);
   sycl::queue *queue = reinterpret_cast<sycl::queue *>(queue_);
   check_usm(queue_, dest, true);
   check_usm(queue_, src, true);
-  queue->memcpy(dest, src, num_bytes);
-}
-
-void oneapi_usm_memset(SyclQueue *queue_, void *usm_ptr, unsigned char value, size_t num_bytes)
-{
-  assert(queue_);
-  sycl::queue *queue = reinterpret_cast<sycl::queue *>(queue_);
-  check_usm(queue_, usm_ptr, true);
-  queue->memset(usm_ptr, value, num_bytes);
-}
-
-void oneapi_queue_synchronize(SyclQueue *queue_)
-{
-  assert(queue_);
-  sycl::queue *queue = reinterpret_cast<sycl::queue *>(queue_);
   try {
-    queue->wait_and_throw();
+    sycl::event mem_event = queue->memcpy(dest, src, num_bytes);
+    mem_event.wait_and_throw();
+    return true;
   }
   catch (sycl::exception const &e) {
     if (s_error_cb) {
       s_error_cb(e.what(), s_error_user_ptr);
     }
+    return false;
+  }
+}
+
+bool oneapi_usm_memset(SyclQueue *queue_, void *usm_ptr, unsigned char value, size_t num_bytes)
+{
+  assert(queue_);
+  sycl::queue *queue = reinterpret_cast<sycl::queue *>(queue_);
+  check_usm(queue_, usm_ptr, true);
+  try {
+    sycl::event mem_event = queue->memset(usm_ptr, value, num_bytes);
+    mem_event.wait_and_throw();
+    return true;
+  }
+  catch (sycl::exception const &e) {
+    if (s_error_cb) {
+      s_error_cb(e.what(), s_error_user_ptr);
+    }
+    return false;
+  }
+}
+
+bool oneapi_queue_synchronize(SyclQueue *queue_)
+{
+  assert(queue_);
+  sycl::queue *queue = reinterpret_cast<sycl::queue *>(queue_);
+  try {
+    queue->wait_and_throw();
+    return true;
+  }
+  catch (sycl::exception const &e) {
+    if (s_error_cb) {
+      s_error_cb(e.what(), s_error_user_ptr);
+    }
+    return false;
   }
 }
 

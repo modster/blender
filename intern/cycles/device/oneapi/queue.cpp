@@ -146,13 +146,6 @@ int OneapiDeviceQueue::num_concurrent_busy_states() const
   }
 }
 
-static void queue_error_cb(const char *message, void *user_ptr)
-{
-  if (user_ptr) {
-    *((std::string *)user_ptr) = message;
-  }
-}
-
 void OneapiDeviceQueue::init_execution()
 {
   oneapi_device->load_texture_info();
@@ -162,7 +155,6 @@ void OneapiDeviceQueue::init_execution()
   assert(device_queue);
   assert(kg_dptr);
   kernel_context = new KernelContext{device_queue, kg_dptr, with_kernel_statistics};
-  (oneapi_dll.oneapi_set_error_cb)(queue_error_cb, &kernel_error_string);
 
   debug_init_execution();
 }
@@ -268,7 +260,7 @@ bool OneapiDeviceQueue::enqueue(DeviceKernel kernel,
 
   if (is_finished_ok == false) {
     oneapi_device->set_error("oneAPI kernel \"" + std::string(device_kernel_as_string(kernel)) +
-                             "\" execution error: got runtime exception \"" + kernel_error_string +
+                             "\" execution error: got runtime exception \"" + oneapi_device->oneapi_error_message() +
                              "\"");
   }
 
@@ -281,7 +273,9 @@ bool OneapiDeviceQueue::synchronize()
     return false;
   }
 
-  (oneapi_dll.oneapi_queue_synchronize)(oneapi_device->sycl_queue());
+  bool is_finished_ok = (oneapi_dll.oneapi_queue_synchronize)(oneapi_device->sycl_queue());
+  if (is_finished_ok == false)
+    oneapi_device->set_error("oneAPI unknown kernel execution error: got runtime exception \"" + oneapi_device->oneapi_error_message() + "\"");
 
   debug_synchronize();
 

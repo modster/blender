@@ -12,6 +12,13 @@
 
 CCL_NAMESPACE_BEGIN
 
+static void queue_error_cb(const char *message, void *user_ptr)
+{
+  if (user_ptr) {
+    *((std::string *)user_ptr) = message;
+  }
+}
+
 OneapiDevice::OneapiDevice(const DeviceInfo &info,
                            oneAPIDLLInterface &oneapi_dll_object,
                            Stats &stats,
@@ -26,12 +33,14 @@ OneapiDevice::OneapiDevice(const DeviceInfo &info,
 {
   need_texture_info = false;
 
+  (oneapi_dll.oneapi_set_error_cb)(queue_error_cb, &oneapi_error_string);
+
   // Oneapi calls should be initialised on this moment;
   assert(oneapi_dll.oneapi_create_queue != nullptr);
 
   bool is_finished_ok = (oneapi_dll.oneapi_create_queue)(device_queue, info.num);
   if (is_finished_ok == false) {
-    set_error("oneAPI queue initialization error: got runtime exception");
+    set_error("oneAPI queue initialization error: got runtime exception \"" + oneapi_error_string + "\"");
   }
   else {
     VLOG(1) << "oneAPI queue has been successfully created for the device \"" << info.description
@@ -42,7 +51,7 @@ OneapiDevice::OneapiDevice(const DeviceInfo &info,
   size_t globals_segment_size;
   is_finished_ok = (oneapi_dll.oneapi_kernel_globals_size)(device_queue, globals_segment_size);
   if (is_finished_ok == false) {
-    set_error("oneAPI constant memory initialization got runtime exception");
+    set_error("oneAPI constant memory initialization got runtime exception \"" + oneapi_error_string + "\"");
   }
   else {
     VLOG(1) << "Successfuly created global/constant memory segment (kernel globals object)";
@@ -94,7 +103,7 @@ bool OneapiDevice::load_kernels(const uint requested_features)
 
   bool is_finished_ok = (oneapi_dll.oneapi_trigger_runtime_compilation)(device_queue);
   if (is_finished_ok == false) {
-    set_error("oneAPI kernel load: got runtime exception");
+    set_error("oneAPI kernel load: got runtime exception \"" + oneapi_error_string + "\"");
   }
   else {
     VLOG(1) << "Runtime compilation done for \"" << info.description << "\"";
@@ -161,6 +170,11 @@ void OneapiDevice::generic_copy_to(device_memory &mem)
 SyclQueue *OneapiDevice::sycl_queue()
 {
   return device_queue;
+}
+
+string OneapiDevice::oneapi_error_message()
+{
+  return string(oneapi_error_string.c_str());
 }
 
 oneAPIDLLInterface OneapiDevice::oneapi_dll_object()
@@ -248,7 +262,10 @@ void OneapiDevice::mem_copy_from(device_memory &mem, size_t y, size_t w, size_t 
     assert(mem.device_pointer);
     char *shifted_host = (char *)mem.host_pointer + offset;
     char *shifted_device = (char *)mem.device_pointer + offset;
-    (oneapi_dll.oneapi_usm_memcpy)(device_queue, shifted_host, shifted_device, size);
+    bool is_finished_ok = (oneapi_dll.oneapi_usm_memcpy)(device_queue, shifted_host, shifted_device, size);
+    if (is_finished_ok == false) {
+      set_error("oneAPI memory operation error: got runtime exception \"" + oneapi_error_string + "\"");
+    }
   }
 }
 
@@ -268,7 +285,10 @@ void OneapiDevice::mem_zero(device_memory &mem)
   }
 
   assert(device_queue);
-  (oneapi_dll.oneapi_usm_memset)(device_queue, (void *)mem.device_pointer, 0, mem.memory_size());
+  bool is_finished_ok = (oneapi_dll.oneapi_usm_memset)(device_queue, (void *)mem.device_pointer, 0, mem.memory_size());
+  if (is_finished_ok == false) {
+    set_error("oneAPI memory operation error: got runtime exception \"" + oneapi_error_string + "\"");
+  }
 }
 
 void OneapiDevice::mem_free(device_memory &mem)

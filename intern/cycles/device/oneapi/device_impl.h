@@ -26,6 +26,7 @@ class OneapiDevice : public Device {
   void *kg_memory_device;
   size_t kg_memory_size = (size_t)0;
   oneAPIDLLInterface oneapi_dll;
+  std::string oneapi_error_string;
 
  public:
   virtual BVHLayoutMask get_bvh_layout_mask() const override;
@@ -55,6 +56,8 @@ class OneapiDevice : public Device {
   void generic_free(device_memory &mem);
 
   SyclQueue *sycl_queue();
+
+  string oneapi_error_message();
 
   oneAPIDLLInterface oneapi_dll_object();
 
