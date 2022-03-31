@@ -840,7 +840,6 @@ ConvertFloatToVectorProcessorOperation::ConvertFloatToVectorProcessorOperation(C
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Float;
-  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Vector, texture_pool()));
 }
@@ -866,7 +865,6 @@ ConvertFloatToColorProcessorOperation::ConvertFloatToColorProcessorOperation(Con
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Float;
-  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Color, texture_pool()));
 }
@@ -892,7 +890,6 @@ ConvertColorToFloatProcessorOperation::ConvertColorToFloatProcessorOperation(Con
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Color;
-  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Float, texture_pool()));
 }
@@ -917,7 +914,6 @@ ConvertVectorToFloatProcessorOperation::ConvertVectorToFloatProcessorOperation(C
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Vector;
-  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Float, texture_pool()));
 }
@@ -944,7 +940,6 @@ ConvertVectorToColorProcessorOperation::ConvertVectorToColorProcessorOperation(C
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Vector;
-  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(ResultType::Color, texture_pool()));
 }
@@ -970,7 +965,6 @@ RealizeOnDomainProcessorOperation::RealizeOnDomainProcessorOperation(Context &co
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = type;
-  input_descriptor.skip_realization = true;
   declare_input_descriptor(input_descriptor);
   populate_result(Result(type, texture_pool()));
 }
