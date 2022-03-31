@@ -19,26 +19,23 @@
 
 #include "gpu_shader_create_info.hh"
 
-GPU_SHADER_CREATE_INFO(compositor_realize_on_domain_color)
+GPU_SHADER_CREATE_INFO(compositor_realize_on_domain_shared)
     .local_group_size(16, 16)
     .push_constant(Type::MAT3, "inverse_transformation")
     .sampler(0, ImageType::FLOAT_2D, "input_sampler")
+    .compute_source("compositor_realize_on_domain.glsl");
+
+GPU_SHADER_CREATE_INFO(compositor_realize_on_domain_color)
+    .additional_info("compositor_realize_on_domain_shared")
     .image(0, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "domain")
-    .compute_source("compositor_realize_on_domain.glsl")
     .do_static_compilation(true);
 
 GPU_SHADER_CREATE_INFO(compositor_realize_on_domain_vector)
-    .local_group_size(16, 16)
-    .push_constant(Type::MAT3, "inverse_transformation")
-    .sampler(0, ImageType::FLOAT_2D, "input_sampler")
+    .additional_info("compositor_realize_on_domain_shared")
     .image(0, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "domain")
-    .compute_source("compositor_realize_on_domain.glsl")
     .do_static_compilation(true);
 
 GPU_SHADER_CREATE_INFO(compositor_realize_on_domain_float)
-    .local_group_size(16, 16)
-    .push_constant(Type::MAT3, "inverse_transformation")
-    .sampler(0, ImageType::FLOAT_2D, "input_sampler")
+    .additional_info("compositor_realize_on_domain_shared")
     .image(0, GPU_R16F, Qualifier::WRITE, ImageType::FLOAT_2D, "domain")
-    .compute_source("compositor_realize_on_domain.glsl")
     .do_static_compilation(true);
