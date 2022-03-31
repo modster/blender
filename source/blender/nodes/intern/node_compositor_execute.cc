@@ -1195,10 +1195,11 @@ InputIdentifierToOutputSocketMap &GPUMaterialOperation::get_input_identifier_to_
 
 void GPUMaterialOperation::bind_material_resources(GPUShader *shader)
 {
-  /* Bind the uniform buffer of the material. */
+  /* Bind the uniform buffer of the material if it exists. */
   GPUUniformBuf *ubo = GPU_material_uniform_buffer_get(material_);
-  int ubo_binding_location = GPU_shader_get_uniform_block_binding(shader, GPU_UBO_BLOCK_NAME);
-  GPU_uniformbuf_bind(ubo, ubo_binding_location);
+  if (ubo) {
+    GPU_uniformbuf_bind(ubo, GPU_shader_get_uniform_block_binding(shader, GPU_UBO_BLOCK_NAME));
+  }
 
   /* Bind color band textures needed by the material. */
   ListBase textures = GPU_material_textures(material_);
