@@ -310,6 +310,7 @@ set(GLSL_SRC
   shaders/compositor/material/gpu_shader_compositor_type_conversion.glsl
 
   shaders/compositor/compositor_convert.glsl
+  shaders/compositor/compositor_filter.glsl
   shaders/compositor/compositor_realize_on_domain.glsl
   shaders/compositor/compositor_split_viewer.glsl
 
@@ -495,6 +496,7 @@ set(SHADER_CREATE_INFOS
   shaders/infos/gpu_srgb_to_framebuffer_space_info.hh
 
   shaders/compositor/infos/compositor_convert_info.hh
+  shaders/compositor/infos/compositor_filter_info.hh
   shaders/compositor/infos/compositor_realize_on_domain_info.hh
   shaders/compositor/infos/compositor_split_viewer_info.hh
 )
