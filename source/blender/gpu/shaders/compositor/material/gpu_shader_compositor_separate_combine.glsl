@@ -1,3 +1,17 @@
+/* ** Combine/Separate XYZ ** */
+
+void node_composite_combine_xyz(float x, float y, float z, out vec3 vector)
+{
+  vector = vec3(x, y, z);
+}
+
+void node_composite_separate_xyz(vec3 vector, out float x, out float y, out float z)
+{
+  x = vector.x;
+  y = vector.y;
+  z = vector.z;
+}
+
 /* ** Combine/Separate RGBA ** */
 
 void node_composite_combine_rgba(float r, float g, float b, float a, out vec4 color)
