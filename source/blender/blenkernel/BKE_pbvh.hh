@@ -150,7 +150,6 @@ struct TileData {
 
   void mark_region(Image &image, const image::ImageTileWrapper &image_tile, ImBuf &image_buffer)
   {
-    print_rcti_id(&dirty_region);
     BKE_image_partial_update_mark_region(
         &image, image_tile.image_tile, &image_buffer, &dirty_region);
     BLI_rcti_init_minmax(&dirty_region);
