@@ -28,6 +28,8 @@ struct Closure {
 #ifndef GPU_METAL
 /* Prototype */
 Closure nodetree_exec();
+vec4 closure_to_rgba(Closure);
+
 /* Single BSDFs. */
 Closure closure_eval(ClosureDiffuse diffuse);
 Closure closure_eval(ClosureReflection reflection);
@@ -38,6 +40,14 @@ Closure closure_eval(ClosureVolumeScatter volume_scatter);
 Closure closure_eval(ClosureVolumeAbsorption volume_absorption);
 /* Glass BSDF. */
 Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction);
+/* Dielectric BSDF. */
+Closure closure_eval(ClosureDiffuse diffuse, ClosureReflection reflection);
+/* ClearCoat BSDF. */
+Closure closure_eval(ClosureReflection reflection, ClosureReflection clearcoat);
+/* Volume BSDF. */
+Closure closure_eval(ClosureVolumeScatter volume_scatter,
+                     ClosureVolumeAbsorption volume_absorption,
+                     ClosureEmission emission);
 /* Specular BSDF. */
 Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
@@ -47,12 +57,6 @@ Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
                      ClosureReflection clearcoat,
                      ClosureRefraction refraction);
-Closure closure_eval(ClosureDiffuse diffuse, ClosureReflection reflection);
-Closure closure_eval(ClosureReflection reflection, ClosureReflection clearcoat);
-Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction);
-Closure closure_eval(ClosureVolumeScatter volume_scatter,
-                     ClosureVolumeAbsorption volume_absorption,
-                     ClosureEmission emission);
 /* WORKAROUND: Included later with libs. This is because we are mixing include systems. */
 vec3 safe_normalize(vec3 N);
 float fast_sqrt(float a);

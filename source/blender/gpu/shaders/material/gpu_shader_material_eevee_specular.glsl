@@ -4,12 +4,13 @@ void node_eevee_specular(vec4 diffuse,
                          float roughness,
                          vec4 emissive,
                          float transp,
-                         vec3 normal,
+                         vec3 N,
                          float clearcoat,
                          float clearcoat_roughness,
-                         vec3 clearcoat_normal,
+                         vec3 CN,
                          float occlusion,
                          float weight,
+                         const float use_clearcoat,
                          out Closure result)
 {
   N = safe_normalize(N);
@@ -49,12 +50,17 @@ void node_eevee_specular(vec4 diffuse,
     vec2 split_sum = brdf_lut(NV, clearcoat_roughness);
     vec3 brdf = F_brdf_single_scatter(vec3(0.04), vec3(1.0), split_sum);
 
-    clearcoat_data.color = brdf * clearcoat_weight;
+    clearcoat_data.color = brdf;
     clearcoat_data.N = CN;
     clearcoat_data.roughness = clearcoat_roughness;
   }
 
-  result = closure_eval(diffuse_data, reflection_data, clearcoat_data);
+  if (use_clearcoat != 0.0f) {
+    result = closure_eval(diffuse_data, reflection_data, clearcoat_data);
+  }
+  else {
+    result = closure_eval(diffuse_data, reflection_data);
+  }
   result = closure_add(result, closure_eval(emission_data));
   result = closure_add(result, closure_eval(transparency_data));
 }
