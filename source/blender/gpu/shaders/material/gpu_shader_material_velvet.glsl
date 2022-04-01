@@ -1,12 +1,14 @@
-void node_bsdf_velvet(vec4 color, float sigma, vec3 N, float weight, out Closure result)
-{
-  closure_weight_add(g_diffuse_data, weight);
-}
 
-void node_bsdf_velvet_eval(vec4 color, float roughness, vec3 N, float weight, out Closure result)
+void node_bsdf_velvet(vec4 color, float roughness, vec3 N, float weight, out Closure result)
 {
-  if (closure_weight_threshold(g_diffuse_data, weight)) {
-    g_diffuse_data.color = color.rgb * weight;
-    g_diffuse_data.N = N;
-  }
+  N = safe_normalize(N);
+
+  /* Fallback to diffuse. */
+  ClosureDiffuse diffuse_data;
+  diffuse_data.weight = weight;
+  diffuse_data.color = color.rgb;
+  diffuse_data.N = N;
+  diffuse_data.sss_id = 0u;
+
+  result = closure_eval(diffuse_data);
 }

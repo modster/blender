@@ -151,16 +151,6 @@ bool GPU_stack_link(GPUMaterial *mat,
                     GPUNodeStack *in,
                     GPUNodeStack *out,
                     ...);
-/**
- * This is a special function to call the "*_eval" function of a BSDF node.
- * \note This must be call right after GPU_stack_link() so that out[0] contains a valid link.
- */
-bool GPU_stack_eval_link(GPUMaterial *material,
-                         struct bNode *bnode,
-                         const char *name,
-                         GPUNodeStack *in,
-                         GPUNodeStack *out,
-                         ...);
 GPUNodeLink *GPU_uniformbuf_link_out(struct GPUMaterial *mat,
                                      struct bNode *node,
                                      struct GPUNodeStack *stack,
@@ -177,10 +167,6 @@ bool GPU_material_sss_profile_create(GPUMaterial *material, float radii[3]);
 struct GPUUniformBuf *GPU_material_sss_profile_get(GPUMaterial *material,
                                                    int sample_len,
                                                    struct GPUTexture **tex_profile);
-
-void GPU_material_add_closure_eval(GPUMaterial *material,
-                                   const GPUNodeLink *weight_link,
-                                   const GPUNodeLink *eval_link);
 
 /**
  * High level functions to create and use GPU materials.
@@ -237,6 +223,7 @@ bool GPU_material_has_volume_output(GPUMaterial *mat);
 
 void GPU_material_flag_set(GPUMaterial *mat, eGPUMaterialFlag flag);
 bool GPU_material_flag_get(const GPUMaterial *mat, eGPUMaterialFlag flag);
+eGPUMaterialFlag GPU_material_flag(const GPUMaterial *mat);
 bool GPU_material_recalc_flag_get(GPUMaterial *mat);
 uint64_t GPU_material_uuid_get(GPUMaterial *mat);
 

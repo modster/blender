@@ -29,25 +29,31 @@ struct Closure {
 /* Prototype */
 Closure nodetree_exec();
 /* Single BSDFs. */
-Closure closure_inline_eval(ClosureDiffuse diffuse);
-Closure closure_inline_eval(ClosureReflection reflection);
-Closure closure_inline_eval(ClosureRefraction refraction);
-Closure closure_inline_eval(ClosureEmission emission);
-Closure closure_inline_eval(ClosureTransparency transparency);
+Closure closure_eval(ClosureDiffuse diffuse);
+Closure closure_eval(ClosureReflection reflection);
+Closure closure_eval(ClosureRefraction refraction);
+Closure closure_eval(ClosureEmission emission);
+Closure closure_eval(ClosureTransparency transparency);
+Closure closure_eval(ClosureVolumeScatter volume_scatter);
+Closure closure_eval(ClosureVolumeAbsorption volume_absorption);
 /* Glass BSDF. */
-Closure closure_inline_eval(ClosureReflection reflection, ClosureRefraction refraction);
+Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction);
 /* Specular BSDF. */
-Closure closure_inline_eval(ClosureDiffuse diffuse,
-                            ClosureReflection reflection,
-                            ClosureEmission emission,
-                            ClosureTransparency transparency);
+Closure closure_eval(ClosureDiffuse diffuse,
+                     ClosureReflection reflection,
+                     ClosureReflection clearcoat,
+                     ClosureEmission emission,
+                     ClosureTransparency transparency);
 /* Principled BSDF. */
-Closure closure_inline_eval(ClosureDiffuse diffuse,
-                            ClosureReflection reflection,
-                            ClosureReflection clearcoat,
-                            ClosureRefraction refraction,
-                            ClosureEmission emission,
-                            ClosureTransparency transparency);
+Closure closure_eval(ClosureDiffuse diffuse,
+                     ClosureReflection reflection,
+                     ClosureReflection clearcoat,
+                     ClosureRefraction refraction,
+                     ClosureEmission emission,
+                     ClosureTransparency transparency);
+Closure closure_eval(ClosureVolumeScatter volume_scatter,
+                     ClosureVolumeAbsorption volume_absorption,
+                     ClosureEmission emission);
 /* WORKAROUND: Included later with libs. This is because we are mixing include systems. */
 vec3 safe_normalize(vec3 N);
 float fast_sqrt(float a);
@@ -58,11 +64,6 @@ vec3 F_brdf_multi_scatter(vec3 a, vec3 b, vec2 c);
 vec3 F_brdf_single_scatter(vec3 a, vec3 b, vec2 c);
 float F_eta(float a, float b);
 #endif
-
-/* Not used */
-#define closure_weight_threshold(A, B) true
-#define ntree_eval_init()
-#define ntree_eval_weights()
 
 #ifdef VOLUMETRICS
 #  define CLOSURE_DEFAULT Closure(vec3(0), vec3(0), vec3(0), 0.0)

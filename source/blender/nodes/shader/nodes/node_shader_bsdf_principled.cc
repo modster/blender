@@ -177,34 +177,13 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
 
   GPU_material_flag_set(mat, flag);
 
-  GPUNodeLink *diffuse_weight, *specular_weight, *glass_reflection_weight,
-      *glass_transmission_weight, *clearcoat_weight;
-
-  GPU_stack_link(mat,
-                 node,
-                 "node_bsdf_principled",
-                 in,
-                 out,
-                 GPU_constant(&use_multi_scatter),
-                 GPU_uniform(&use_sss),
-                 &diffuse_weight,
-                 &specular_weight,
-                 &glass_reflection_weight,
-                 &glass_transmission_weight,
-                 &clearcoat_weight);
-
-  return GPU_stack_eval_link(mat,
-                             node,
-                             "node_bsdf_principled_eval",
-                             in,
-                             out,
-                             GPU_constant(&use_multi_scatter),
-                             GPU_uniform(&use_sss),
-                             diffuse_weight,
-                             specular_weight,
-                             glass_reflection_weight,
-                             glass_transmission_weight,
-                             clearcoat_weight);
+  return GPU_stack_link(mat,
+                        node,
+                        "node_bsdf_principled",
+                        in,
+                        out,
+                        GPU_constant(&use_multi_scatter),
+                        GPU_uniform(&use_sss));
 }
 
 static void node_shader_update_principled(bNodeTree *ntree, bNode *node)

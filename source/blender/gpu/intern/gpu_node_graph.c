@@ -723,30 +723,6 @@ bool GPU_stack_link(GPUMaterial *material,
   return valid;
 }
 
-bool GPU_stack_eval_link(GPUMaterial *material,
-                         bNode *bnode,
-                         const char *name,
-                         GPUNodeStack *in,
-                         GPUNodeStack *out,
-                         ...)
-{
-  /* Save the closure link to replace the one created by the eval function call. Avoiding
-   * dependency to the eval call before the end of the graph. */
-  GPUNodeLink *closure_out = out[0].link;
-
-  va_list params;
-  va_start(params, out);
-  bool valid = gpu_stack_link_v(material, bnode, name, in, out, params);
-  va_end(params);
-
-  /* Save both nodes for graph amendment. */
-  GPU_material_add_closure_eval(material, closure_out, out[0].link);
-  /* Restore original link. */
-  out[0].link = closure_out;
-
-  return valid;
-}
-
 GPUNodeLink *GPU_uniformbuf_link_out(GPUMaterial *mat,
                                      bNode *node,
                                      GPUNodeStack *stack,
@@ -808,7 +784,6 @@ void gpu_node_graph_free_nodes(GPUNodeGraph *graph)
     gpu_node_free(node);
   }
 
-  BLI_freelistN(&graph->eval_nodes);
   graph->outlink_surface = NULL;
   graph->outlink_volume = NULL;
   graph->outlink_displacement = NULL;
@@ -870,14 +845,6 @@ void gpu_node_graph_prune_unused(GPUNodeGraph *graph)
 
   LISTBASE_FOREACH (GPUNodeGraphOutputLink *, aovlink, &graph->outlink_aovs) {
     gpu_nodes_tag(aovlink->outlink, GPU_NODE_TAG_AOV);
-  }
-
-  LISTBASE_FOREACH (GPUNodeGraphEvalNode *, node, &graph->eval_nodes) {
-    /* Copy weight node tag to avoid pruning of eval node since they are node connected to
-     * output. */
-    if (node->weight_node->tag != GPU_NODE_TAG_NONE) {
-      node->eval_node->tag = GPU_NODE_TAG_EVAL | node->weight_node->tag;
-    }
   }
 
   for (GPUNode *node = graph->nodes.first, *next = NULL; node; node = next) {

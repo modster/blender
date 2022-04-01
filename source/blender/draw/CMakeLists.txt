@@ -268,9 +268,9 @@ set(GLSL_SRC
   engines/eevee/shaders/closure_eval_lib.glsl
   engines/eevee/shaders/closure_eval_diffuse_lib.glsl
   engines/eevee/shaders/closure_eval_glossy_lib.glsl
-  engines/eevee/shaders/closure_eval_impl_lib.glsl
+  engines/eevee/shaders/closure_eval_surface_lib.glsl
   engines/eevee/shaders/closure_eval_refraction_lib.glsl
-  engines/eevee/shaders/closure_eval_stubs_lib.glsl
+  engines/eevee/shaders/closure_eval_volume_lib.glsl
   engines/eevee/shaders/closure_eval_translucent_lib.glsl
   engines/eevee/shaders/closure_type_lib.glsl
   engines/eevee/shaders/eevee_empty.glsl

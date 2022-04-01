@@ -229,6 +229,7 @@ class GPUCodegen {
   GPUCodegen(GPUMaterial *mat_, GPUNodeGraph *graph_) : mat(*mat_), graph(*graph_)
   {
     BLI_hash_mm2a_init(&hm2a_, GPU_material_uuid_get(&mat));
+    BLI_hash_mm2a_add_int(&hm2a_, GPU_material_flag(&mat));
     create_info = new GPUCodegenCreateInfo("codegen");
     output.create_info = reinterpret_cast<GPUShaderCreateInfo *>(
         static_cast<ShaderCreateInfo *>(create_info));
@@ -503,21 +504,10 @@ char *GPUCodegen::graph_serialize(eGPUNodeTag tree_tag, GPUNodeLink *output_link
   }
 
   std::stringstream eval_ss;
-  /* Render engine implement this function if needed. */
-  eval_ss << "ntree_eval_init();\n\n";
   /* NOTE: The node order is already top to bottom (or left to right in node editor)
    * because of the evaluation order inside ntreeExecGPUNodes(). */
   LISTBASE_FOREACH (GPUNode *, node, &graph.nodes) {
-    if ((node->tag & tree_tag) == 0 || (node->tag & GPU_NODE_TAG_EVAL) != 0) {
-      continue;
-    }
-    node_serialize(eval_ss, node);
-  }
-  /* Render engine implement this function if needed. */
-  eval_ss << "ntree_eval_weights();\n\n";
-  /* Output eval function at the end. */
-  LISTBASE_FOREACH (GPUNode *, node, &graph.nodes) {
-    if ((node->tag & tree_tag) == 0 || (node->tag & GPU_NODE_TAG_EVAL) == 0) {
+    if ((node->tag & tree_tag) == 0) {
       continue;
     }
     node_serialize(eval_ss, node);
@@ -599,8 +589,6 @@ GPUPass *GPU_generate_pass(GPUMaterial *material,
   /* Cache lookup: Reuse shaders already compiled. */
   GPUPass *pass_hash = gpu_pass_cache_lookup(codegen.hash_get());
 
-  /* XXX: This is preventing any pre-compilation optimization from the engine based on the
-   * GPUMaterialFlags. But not doing this makes shader update slower. */
   /* FIXME(fclem): This is broken. Since we only check for the hash and not the full source
    * there is no way to have a collision currently. Some advocated to only use a bigger hash. */
   if (pass_hash && (pass_hash->next == nullptr || pass_hash->next->hash != codegen.hash_get())) {

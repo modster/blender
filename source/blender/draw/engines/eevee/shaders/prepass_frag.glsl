@@ -7,7 +7,7 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_uniforms_lib.glsl)
-#pragma BLENDER_REQUIRE(closure_eval_impl_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_eval_surface_lib.glsl)
 #pragma BLENDER_REQUIRE(surface_lib.glsl)
 
 #ifdef USE_ALPHA_HASH

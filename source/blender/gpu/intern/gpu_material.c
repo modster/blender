@@ -534,16 +534,6 @@ void GPU_material_add_output_link_aov(GPUMaterial *material, GPUNodeLink *link, 
   BLI_addtail(&material->graph.outlink_aovs, aov_link);
 }
 
-void GPU_material_add_closure_eval(GPUMaterial *material,
-                                   const GPUNodeLink *weight_link,
-                                   const GPUNodeLink *eval_link)
-{
-  GPUNodeGraphEvalNode *node = MEM_callocN(sizeof(GPUNodeGraphEvalNode), __func__);
-  node->weight_node = weight_link->output->node;
-  node->eval_node = eval_link->output->node;
-  BLI_addtail(&material->graph.eval_nodes, node);
-}
-
 GPUNodeGraph *gpu_material_node_graph(GPUMaterial *material)
 {
   return &material->graph;
@@ -584,6 +574,11 @@ void GPU_material_flag_set(GPUMaterial *mat, eGPUMaterialFlag flag)
 bool GPU_material_flag_get(const GPUMaterial *mat, eGPUMaterialFlag flag)
 {
   return (mat->flag & flag) != 0;
+}
+
+eGPUMaterialFlag GPU_material_flag(const GPUMaterial *mat)
+{
+  return mat->flag;
 }
 
 /* Note: Consumes the flags. */

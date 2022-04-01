@@ -41,9 +41,7 @@ static int node_shader_gpu_bsdf_glossy(GPUMaterial *mat,
 
   float use_multi_scatter = (node->custom1 == SHD_GLOSSY_MULTI_GGX) ? 1.0f : 0.0f;
 
-  GPU_stack_link(mat, node, "node_bsdf_glossy", in, out, GPU_constant(&use_multi_scatter));
-  return GPU_stack_eval_link(
-      mat, node, "node_bsdf_glossy_eval", in, out, GPU_constant(&use_multi_scatter));
+  return GPU_stack_link(mat, node, "node_bsdf_glossy", in, out, GPU_constant(&use_multi_scatter));
 }
 
 }  // namespace blender::nodes::node_shader_bsdf_glossy_cc

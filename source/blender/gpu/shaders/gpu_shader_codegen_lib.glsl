@@ -126,6 +126,7 @@ vec4 tangent_get(vec4 attr, mat3 normalmat)
 #endif
 
 struct ClosureDiffuse {
+  float weight;
   vec3 color;
   vec3 N;
   vec3 sss_radius;
@@ -133,23 +134,28 @@ struct ClosureDiffuse {
 };
 
 struct ClosureReflection {
+  float weight;
   vec3 color;
   vec3 N;
   float roughness;
 };
 
 struct ClosureRefraction {
+  float weight;
   vec3 color;
   vec3 N;
   float roughness;
   float ior;
 };
 
-struct ClosureVolume {
-  vec3 emission;
+struct ClosureVolumeScatter {
+  float weight;
   vec3 scattering;
-  vec3 transmittance;
   float anisotropy;
+};
+
+struct ClosureVolumeAbsorption {
+  vec3 absorption;
 };
 
 struct ClosureEmission {

@@ -40,8 +40,7 @@ static int node_shader_gpu_bsdf_refraction(GPUMaterial *mat,
 
   GPU_material_flag_set(mat, GPU_MATFLAG_REFRACT);
 
-  GPU_stack_link(mat, node, "node_bsdf_refraction", in, out);
-  return GPU_stack_eval_link(mat, node, "node_bsdf_refraction_eval", in, out);
+  return GPU_stack_link(mat, node, "node_bsdf_refraction", in, out);
 }
 
 }  // namespace blender::nodes::node_shader_bsdf_refraction_cc

@@ -5,7 +5,7 @@
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 
-#pragma BLENDER_REQUIRE(closure_eval_impl_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_eval_surface_lib.glsl)
 
 #pragma BLENDER_REQUIRE(surface_lib.glsl)
 #pragma BLENDER_REQUIRE(volumetric_lib.glsl)
