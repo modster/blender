@@ -2770,12 +2770,7 @@ static void sculpt_pbvh_update_pixels(SculptSession *ss, Object *ob)
                         ss->pmap,
                         mesh->mpoly,
                         mesh->mloop,
-                        mesh->mvert,
-                        mesh->totvert,
-                        &mesh->vdata,
                         &mesh->ldata,
-                        &mesh->pdata,
-                        NULL, /* looptri */
                         mesh->totpoly,
                         image,
                         image_user);

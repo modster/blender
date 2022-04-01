@@ -189,12 +189,7 @@ static void init(PBVH *pbvh,
                  const MeshElemMap *pmap,
                  const struct MPoly *mpoly,
                  const struct MLoop *mloop,
-                 struct MVert *verts,
-                 int totvert,
-                 struct CustomData *vdata,
                  struct CustomData *ldata,
-                 struct CustomData *pdata,
-                 const struct MLoopTri *looptri,
                  int tot_poly,
                  struct Image *image,
                  struct ImageUser *image_user)
@@ -342,29 +337,12 @@ void BKE_pbvh_build_pixels(PBVH *pbvh,
                            const struct MeshElemMap *pmap,
                            const struct MPoly *mpoly,
                            const struct MLoop *mloop,
-                           struct MVert *verts,
-                           int totvert,
-                           struct CustomData *vdata,
                            struct CustomData *ldata,
-                           struct CustomData *pdata,
-                           const struct MLoopTri *looptri,
                            int tot_poly,
                            struct Image *image,
                            struct ImageUser *image_user)
 {
-  init(pbvh,
-       pmap,
-       mpoly,
-       mloop,
-       verts,
-       totvert,
-       vdata,
-       ldata,
-       pdata,
-       looptri,
-       tot_poly,
-       image,
-       image_user);
+  init(pbvh, pmap, mpoly, mloop, ldata, tot_poly, image, image_user);
 }
 
 void pbvh_pixels_free(PBVHNode *node)
