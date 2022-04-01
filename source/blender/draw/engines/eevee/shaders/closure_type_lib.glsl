@@ -57,6 +57,10 @@ Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
                      ClosureReflection clearcoat,
                      ClosureRefraction refraction);
+
+Closure closure_add(Closure cl1, Closure cl2);
+Closure closure_mix(Closure cl1, Closure cl2, float fac);
+
 /* WORKAROUND: Included later with libs. This is because we are mixing include systems. */
 vec3 safe_normalize(vec3 N);
 float fast_sqrt(float a);
@@ -72,44 +76,4 @@ float F_eta(float a, float b);
 #  define CLOSURE_DEFAULT Closure(vec3(0), vec3(0), vec3(0), 0.0)
 #else
 #  define CLOSURE_DEFAULT Closure(vec3(0), vec3(0), 0.0)
-#endif
-
-#ifdef VOLUMETRICS
-Closure closure_mix(Closure cl1, Closure cl2, float fac)
-{
-  Closure cl;
-  cl.absorption = mix(cl1.absorption, cl2.absorption, fac);
-  cl.scatter = mix(cl1.scatter, cl2.scatter, fac);
-  cl.emission = mix(cl1.emission, cl2.emission, fac);
-  cl.anisotropy = mix(cl1.anisotropy, cl2.anisotropy, fac);
-  return cl;
-}
-
-Closure closure_add(Closure cl1, Closure cl2)
-{
-  Closure cl;
-  cl.absorption = cl1.absorption + cl2.absorption;
-  cl.scatter = cl1.scatter + cl2.scatter;
-  cl.emission = cl1.emission + cl2.emission;
-  cl.anisotropy = (cl1.anisotropy + cl2.anisotropy) / 2.0; /* Average phase (no multi lobe) */
-  return cl;
-}
-
-#else /* SURFACE */
-
-Closure closure_add(Closure cl1, Closure cl2)
-{
-  Closure cl;
-  cl.radiance = cl1.radiance + cl2.radiance;
-  cl.transmittance = cl1.transmittance + cl2.transmittance;
-  cl.holdout = cl1.holdout + cl2.holdout;
-  return cl;
-}
-
-Closure closure_mix(Closure cl1, Closure cl2, float fac)
-{
-  /* Weights have already been applied. */
-  return closure_add(cl1, cl2);
-}
-
 #endif

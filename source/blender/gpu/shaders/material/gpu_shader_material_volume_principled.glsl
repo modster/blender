@@ -66,10 +66,12 @@ void node_volume_principled(vec4 color,
   volume_scatter_data.anisotropy = anisotropy;
 
   ClosureVolumeAbsorption volume_absorption_data;
-  volume_absorption_data.absorption = absorption_coeff * density * weight;
+  volume_absorption_data.weight = weight;
+  volume_absorption_data.absorption = absorption_coeff * density;
 
   ClosureEmission emission_data;
-  emission_data.emission = emission_coeff * weight;
+  emission_data.weight = weight;
+  emission_data.emission = emission_coeff;
 
   result = closure_eval(volume_scatter_data, volume_absorption_data, emission_data);
 }

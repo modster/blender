@@ -18,10 +18,12 @@ void node_eevee_specular(vec4 diffuse,
   vec3 V = cameraVec(g_data.P);
 
   ClosureEmission emission_data;
-  emission_data.emission = emissive.rgb * weight;
+  emission_data.weight = weight;
+  emission_data.emission = emissive.rgb;
 
   ClosureTransparency transparency_data;
-  transparency_data.transmittance = vec3(transp) * weight;
+  transparency_data.weight = weight;
+  transparency_data.transmittance = vec3(transp);
   transparency_data.holdout = 0.0;
 
   float alpha = (1.0 - transp) * weight;

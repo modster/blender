@@ -4,8 +4,13 @@
 #pragma BLENDER_REQUIRE(closure_eval_refraction_lib.glsl)
 #pragma BLENDER_REQUIRE(closure_eval_translucent_lib.glsl)
 
+#ifdef USE_SHADER_TO_RGBA
+bool do_sss = false;
+bool do_ssr = false;
+#else
 bool do_sss = true;
 bool do_ssr = true;
+#endif
 
 vec3 out_sss_radiance;
 vec3 out_sss_color;
@@ -96,15 +101,15 @@ Closure closure_eval(ClosureRefraction refraction)
 Closure closure_eval(ClosureEmission emission)
 {
   Closure closure = CLOSURE_DEFAULT;
-  closure.radiance += emission.emission;
+  closure.radiance += emission.emission * emission.weight;
   return closure;
 }
 
 Closure closure_eval(ClosureTransparency transparency)
 {
   Closure closure = CLOSURE_DEFAULT;
-  closure.transmittance += transparency.transmittance;
-  closure.holdout += transparency.holdout;
+  closure.transmittance += transparency.transmittance * transparency.weight;
+  closure.holdout += transparency.holdout * transparency.weight;
   return closure;
 }
 
@@ -249,4 +254,24 @@ Closure closure_eval(ClosureVolumeScatter volume_scatter,
                      ClosureEmission emission)
 {
   return CLOSURE_DEFAULT;
+}
+
+vec4 closure_to_rgba(Closure closure)
+{
+  return vec4(closure.radiance, 1.0 - saturate(avg(closure.transmittance)));
+}
+
+Closure closure_add(Closure cl1, Closure cl2)
+{
+  Closure cl;
+  cl.radiance = cl1.radiance + cl2.radiance;
+  cl.transmittance = cl1.transmittance + cl2.transmittance;
+  cl.holdout = cl1.holdout + cl2.holdout;
+  return cl;
+}
+
+Closure closure_mix(Closure cl1, Closure cl2, float fac)
+{
+  /* Weights have already been applied. */
+  return closure_add(cl1, cl2);
 }

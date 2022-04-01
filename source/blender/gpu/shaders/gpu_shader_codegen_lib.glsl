@@ -155,14 +155,17 @@ struct ClosureVolumeScatter {
 };
 
 struct ClosureVolumeAbsorption {
+  float weight;
   vec3 absorption;
 };
 
 struct ClosureEmission {
+  float weight;
   vec3 emission;
 };
 
 struct ClosureTransparency {
+  float weight;
   vec3 transmittance;
   float holdout;
 };

@@ -69,13 +69,15 @@ void node_bsdf_principled(vec4 base_color,
   vec2 split_sum = brdf_lut(NV, roughness);
 
   ClosureTransparency transparency_data;
-  transparency_data.transmittance = vec3(1.0 - alpha) * weight;
+  transparency_data.weight = weight;
+  transparency_data.transmittance = vec3(1.0 - alpha);
   transparency_data.holdout = 0.0;
 
   weight *= alpha;
 
   ClosureEmission emission_data;
-  emission_data.emission = emission.rgb * emission_strength * weight;
+  emission_data.weight = weight;
+  emission_data.emission = emission.rgb * emission_strength;
 
   /* Diffuse. */
   ClosureDiffuse diffuse_data;
