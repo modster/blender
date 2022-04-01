@@ -1151,6 +1151,23 @@ static void move_segment(ViewContext *vc, MoveSegmentData *seg_data, const wmEve
   BezTriple *bezt1 = nu->bezt + seg_data->bezt_index;
   BezTriple *bezt2 = BKE_nurb_bezt_get_next(nu, bezt1);
 
+  int h1 = 2, h2 = 0;
+  if (bezt1->hide) {
+    if (bezt2->hide) {
+      return;
+    }
+    else {
+      /*
+       * Swap bezt1 and bezt2 in all calculations if only bezt2 is visible.
+       * (The first point needs to be visible for the calculations of the second point to be valid)
+       */
+      BezTriple *temp_bezt = bezt2;
+      bezt2 = bezt1;
+      bezt1 = temp_bezt;
+      h1 = 0, h2 = 2;
+    }
+  }
+
   const float t = max_ff(min_ff(seg_data->t, 0.9f), 0.1f);
   const float t_sq = t * t;
   const float t_cu = t_sq * t;
@@ -1180,42 +1197,42 @@ static void move_segment(ViewContext *vc, MoveSegmentData *seg_data, const wmEve
    */
 
   float k1[3];
-  const float denom = (3.0f * one_minus_t * t_sq);
+  const float denom = 3.0f * one_minus_t * t_sq;
   k1[0] = (mouse_3d[0] - one_minus_t_cu * bezt1->vec[1][0] - t_cu * bezt2->vec[1][0]) / denom;
   k1[1] = (mouse_3d[1] - one_minus_t_cu * bezt1->vec[1][1] - t_cu * bezt2->vec[1][1]) / denom;
   k1[2] = (mouse_3d[2] - one_minus_t_cu * bezt1->vec[1][2] - t_cu * bezt2->vec[1][2]) / denom;
 
   float k2[3];
-  sub_v3_v3v3(k2, bezt1->vec[2], bezt2->vec[0]);
+  sub_v3_v3v3(k2, bezt1->vec[h1], bezt2->vec[h2]);
 
   if (!bezt1->hide) {
     /* P1 = t(k1 + k2) */
-    add_v3_v3v3(bezt1->vec[2], k1, k2);
-    mul_v3_fl(bezt1->vec[2], t);
+    add_v3_v3v3(bezt1->vec[h1], k1, k2);
+    mul_v3_fl(bezt1->vec[h1], t);
 
     remove_handle_movement_constraints(bezt1, true, true);
 
     /* Move opposite handle as well if type is align. */
     if (bezt1->h1 == HD_ALIGN) {
       float handle_vec[3];
-      sub_v3_v3v3(handle_vec, bezt1->vec[1], bezt1->vec[2]);
-      normalize_v3_length(handle_vec, len_v3v3(bezt1->vec[1], bezt1->vec[0]));
-      add_v3_v3v3(bezt1->vec[0], bezt1->vec[1], handle_vec);
+      sub_v3_v3v3(handle_vec, bezt1->vec[1], bezt1->vec[h1]);
+      normalize_v3_length(handle_vec, len_v3v3(bezt1->vec[1], bezt1->vec[h2]));
+      add_v3_v3v3(bezt1->vec[h2], bezt1->vec[1], handle_vec);
     }
   }
 
   if (!bezt2->hide) {
     /* P2 = P1 - K2 */
-    sub_v3_v3v3(bezt2->vec[0], bezt1->vec[2], k2);
+    sub_v3_v3v3(bezt2->vec[h2], bezt1->vec[h1], k2);
 
     remove_handle_movement_constraints(bezt2, true, true);
 
     /* Move opposite handle as well if type is align. */
     if (bezt2->h2 == HD_ALIGN) {
       float handle_vec[3];
-      sub_v3_v3v3(handle_vec, bezt2->vec[1], bezt2->vec[0]);
-      normalize_v3_length(handle_vec, len_v3v3(bezt2->vec[1], bezt2->vec[2]));
-      add_v3_v3v3(bezt2->vec[2], bezt2->vec[1], handle_vec);
+      sub_v3_v3v3(handle_vec, bezt2->vec[1], bezt2->vec[h2]);
+      normalize_v3_length(handle_vec, len_v3v3(bezt2->vec[1], bezt2->vec[h1]));
+      add_v3_v3v3(bezt2->vec[h1], bezt2->vec[1], handle_vec);
     }
   }
 }
