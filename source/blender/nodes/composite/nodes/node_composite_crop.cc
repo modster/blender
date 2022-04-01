@@ -111,10 +111,10 @@ class CropOperation : public NodeOperation {
     GPUShader *shader = GPU_shader_create_from_info_name("compositor_alpha_crop");
     GPU_shader_bind(shader);
 
-    int2 lower_bound, higher_bound;
-    compute_cropping_bounds(lower_bound, higher_bound);
+    int2 lower_bound, upper_bound;
+    compute_cropping_bounds(lower_bound, upper_bound);
     GPU_shader_uniform_2iv(shader, "lower_bound", lower_bound);
-    GPU_shader_uniform_2iv(shader, "higher_bound", higher_bound);
+    GPU_shader_uniform_2iv(shader, "upper_bound", upper_bound);
 
     const Result &input_image = get_input("Image");
     input_image.bind_as_texture(shader, "input_image");
@@ -135,11 +135,11 @@ class CropOperation : public NodeOperation {
   /* Crop the image into a new size that matches the cropping bounds. */
   void execute_image_crop()
   {
-    int2 lower_bound, higher_bound;
-    compute_cropping_bounds(lower_bound, higher_bound);
+    int2 lower_bound, upper_bound;
+    compute_cropping_bounds(lower_bound, upper_bound);
 
     /* The image is cropped into nothing, so just return a single zero value. */
-    if (lower_bound.x == higher_bound.x || lower_bound.y == higher_bound.y) {
+    if (lower_bound.x == upper_bound.x || lower_bound.y == upper_bound.y) {
       Result &result = get_result("Image");
       result.allocate_single_value();
       result.set_color_value(float4(0.0f));
@@ -154,7 +154,7 @@ class CropOperation : public NodeOperation {
     const Result &input_image = get_input("Image");
     input_image.bind_as_texture(shader, "input_image");
 
-    const int2 size = higher_bound - lower_bound;
+    const int2 size = upper_bound - lower_bound;
 
     Result &output_image = get_result("Image");
     output_image.allocate_texture(Domain(size, compute_domain().transformation));
@@ -194,18 +194,18 @@ class CropOperation : public NodeOperation {
       return true;
     }
 
-    int2 lower_bound, higher_bound;
-    compute_cropping_bounds(lower_bound, higher_bound);
+    int2 lower_bound, upper_bound;
+    compute_cropping_bounds(lower_bound, upper_bound);
     const int2 input_size = input.domain().size;
     /* The cropping bounds cover the whole image, so no cropping happens. */
-    if (lower_bound == int2(0) && higher_bound == input_size) {
+    if (lower_bound == int2(0) && upper_bound == input_size) {
       return true;
     }
 
     return false;
   }
 
-  void compute_cropping_bounds(int2 &lower_bound, int2 &higher_bound)
+  void compute_cropping_bounds(int2 &lower_bound, int2 &upper_bound)
   {
     const NodeTwoXYs &node_two_xys = get_node_two_xys();
     const int2 input_size = get_input("Image").domain().size;
@@ -215,22 +215,22 @@ class CropOperation : public NodeOperation {
        * so it is guaranteed that they won't go over the input image size. */
       lower_bound.x = input_size.x * node_two_xys.fac_x1;
       lower_bound.y = input_size.y * node_two_xys.fac_y2;
-      higher_bound.x = input_size.x * node_two_xys.fac_x2;
-      higher_bound.y = input_size.y * node_two_xys.fac_y1;
+      upper_bound.x = input_size.x * node_two_xys.fac_x2;
+      upper_bound.y = input_size.y * node_two_xys.fac_y1;
     }
     else {
       /* Make sure the bounds don't go over the input image size. */
       lower_bound.x = min_ii(node_two_xys.x1, input_size.x);
       lower_bound.y = min_ii(node_two_xys.y2, input_size.y);
-      higher_bound.x = min_ii(node_two_xys.x2, input_size.x);
-      higher_bound.y = min_ii(node_two_xys.y1, input_size.y);
+      upper_bound.x = min_ii(node_two_xys.x2, input_size.x);
+      upper_bound.y = min_ii(node_two_xys.y1, input_size.y);
     }
 
-    /* Make sure higher bound is actually higher than the lower bound. */
-    lower_bound.x = min_ii(lower_bound.x, higher_bound.x);
-    lower_bound.y = min_ii(lower_bound.y, higher_bound.y);
-    higher_bound.x = max_ii(lower_bound.x, higher_bound.x);
-    higher_bound.y = max_ii(lower_bound.y, higher_bound.y);
+    /* Make sure upper bound is actually higher than the lower bound. */
+    lower_bound.x = min_ii(lower_bound.x, upper_bound.x);
+    lower_bound.y = min_ii(lower_bound.y, upper_bound.y);
+    upper_bound.x = max_ii(lower_bound.x, upper_bound.x);
+    upper_bound.y = max_ii(lower_bound.y, upper_bound.y);
   }
 };
 

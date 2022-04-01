@@ -3,8 +3,9 @@
 void main()
 {
   ivec2 xy = ivec2(gl_GlobalInvocationID.xy);
+  /* The lower bound is inclusive and upper bound is exclusive. */
+  bool is_inside = all(greaterThanEqual(xy, lower_bound)) && all(lessThan(xy, upper_bound));
   /* Write the pixel color if it is inside the cropping region, otherwise, write zero. */
-  bool is_inside = all(greaterThan(xy, lower_bound)) && all(lessThan(xy, higher_bound));
   vec4 color = is_inside ? texture_load(input_image, xy) : vec4(0.0);
   imageStore(output_image, xy, color);
 }
