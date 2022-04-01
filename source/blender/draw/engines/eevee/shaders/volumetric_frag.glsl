@@ -17,9 +17,7 @@ flat in int slice;
 vec3 worldPosition = vec3(0.0);
 vec3 viewPosition = vec3(0.0);
 vec3 viewNormal = vec3(0.0);
-#ifdef MESH_SHADER
-vec3 volumeObjectLocalCoord = vec3(0.0);
-#endif
+vec3 volumeOrco = vec3(0.0);
 
 layout(location = 0) out vec4 volumeScattering;
 layout(location = 1) out vec4 volumeExtinction;
@@ -27,6 +25,26 @@ layout(location = 2) out vec4 volumeEmissive;
 layout(location = 3) out vec4 volumePhase;
 
 /* Store volumetric properties into the froxel textures. */
+
+#ifdef MESH_SHADER
+GlobalData init_globals(void)
+{
+  GlobalData surf;
+  surf.P = worldPosition;
+  surf.N = vec3(0.0);
+  surf.Ng = vec3(0.0);
+  surf.is_strand = false;
+  surf.hair_time = 0.0;
+  surf.hair_thickness = 0.0;
+  surf.hair_strand_id = 0;
+  surf.barycentric_coords = vec2(0.0);
+  surf.barycentric_dists = vec3(0.0);
+  surf.ray_type = RAY_TYPE_CAMERA;
+  surf.ray_depth = 0.0;
+  surf.ray_length = distance(surf.P, cameraPos);
+  return surf;
+}
+#endif
 
 void main()
 {
@@ -36,15 +54,14 @@ void main()
   viewPosition = get_view_space_from_depth(ndc_cell.xy, ndc_cell.z);
   worldPosition = point_view_to_world(viewPosition);
 #ifdef MESH_SHADER
-  volumeObjectLocalCoord = point_world_to_object(worldPosition);
+  volumeOrco = point_world_to_object(worldPosition);
   /* TODO: redundant transform */
-  volumeObjectLocalCoord = (volumeObjectLocalCoord - volumeOrcoLoc + volumeOrcoSize) /
-                           (volumeOrcoSize * 2.0);
-  volumeObjectLocalCoord = (volumeObjectToTexture * vec4(volumeObjectLocalCoord, 1.0)).xyz;
+  volumeOrco = (volumeOrco - volumeOrcoLoc + volumeOrcoSize) / (volumeOrcoSize * 2.0);
+  volumeOrco = (volumeObjectToTexture * vec4(volumeOrco, 1.0)).xyz;
 
-  if (any(lessThan(volumeObjectLocalCoord, vec3(0.0))) ||
-      any(greaterThan(volumeObjectLocalCoord, vec3(1.0))))
+  if (any(lessThan(volumeOrco, vec3(0.0))) || any(greaterThan(volumeOrco, vec3(1.0)))) {
     discard;
+  }
 #endif
 
 #ifdef CLEAR
@@ -53,6 +70,9 @@ void main()
   volumeEmissive = vec4(0.0, 0.0, 0.0, 1.0);
   volumePhase = vec4(0.0, 0.0, 0.0, 0.0);
 #else
+#  ifdef MESH_SHADER
+  g_data = init_globals();
+#  endif
   Closure cl = nodetree_exec();
 #  ifdef MESH_SHADER
   cl.scatter *= volumeDensityScale;
@@ -75,8 +95,7 @@ void main()
 
 vec3 attr_load_orco(vec4 orco)
 {
-  /* TODO(fclem) */
-  return vec3(0);
+  return volumeOrco;
 }
 vec4 attr_load_tangent(vec4 tangent)
 {

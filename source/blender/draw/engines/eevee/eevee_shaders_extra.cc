@@ -32,6 +32,7 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
   ShaderCreateInfo &info = *reinterpret_cast<ShaderCreateInfo *>(codegen.create_info);
 
   info.legacy_resource_location(true);
+  info.auto_resource_location(true);
 
   if (GPU_material_flag_get(gpumat, GPU_MATFLAG_SUBSURFACE)) {
     info.define("USE_SSS");

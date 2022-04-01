@@ -14,7 +14,6 @@ void node_volume_principled(vec4 color,
                             float temperature_attribute,
                             sampler1DArray spectrummap,
                             float layer,
-                            float weight,
                             out Closure result)
 {
   vec3 absorption_coeff = vec3(0.0);
@@ -40,7 +39,7 @@ void node_volume_principled(vec4 color,
   emission_strength = max(emission_strength, 0.0);
 
   if (emission_strength > 1e-5) {
-    emission_data.emission += emission_strength * emission_color.rgb;
+    emission_coeff += emission_strength * emission_color.rgb;
   }
 
   if (blackbody_intensity > 1e-3) {
@@ -56,7 +55,7 @@ void node_volume_principled(vec4 color,
     if (intensity > 1e-5) {
       vec4 bb;
       node_blackbody(T, spectrummap, layer, bb);
-      emission_data.emission += bb.rgb * blackbody_tint.rgb * intensity;
+      emission_coeff += bb.rgb * blackbody_tint.rgb * intensity;
     }
   }
 

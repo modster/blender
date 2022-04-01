@@ -184,9 +184,6 @@ struct GlobalData {
   int ray_type;
   float ray_depth;
   float ray_length;
-  /** Random number to sample a closure. */
-  float closure_rand;
-  float transmit_rand;
   /** Hair time along hair length. 0 at base 1 at tip. */
   float hair_time;
   /** Hair time along width of the hair. */

@@ -584,16 +584,18 @@ GPUNodeLink *GPU_volume_grid(GPUMaterial *mat,
   transform_link->volume_grid = link->volume_grid;
   transform_link->volume_grid->users++;
 
+  GPUNodeLink *cos_link = GPU_attribute(mat, CD_ORCO, "");
+
   /* Two special cases, where we adjust the output values of smoke grids to
    * bring the into standard range without having to modify the grid values. */
   if (STREQ(name, "color")) {
-    GPU_link(mat, "node_attribute_volume_color", link, transform_link, &link);
+    GPU_link(mat, "node_attribute_volume_color", link, transform_link, cos_link, &link);
   }
   else if (STREQ(name, "temperature")) {
-    GPU_link(mat, "node_attribute_volume_temperature", link, transform_link, &link);
+    GPU_link(mat, "node_attribute_volume_temperature", link, transform_link, cos_link, &link);
   }
   else {
-    GPU_link(mat, "node_attribute_volume", link, transform_link, &link);
+    GPU_link(mat, "node_attribute_volume", link, transform_link, cos_link, &link);
   }
 
   return link;

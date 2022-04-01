@@ -57,20 +57,29 @@ Closure closure_eval(ClosureReflection reflection, ClosureReflection clearcoat)
   return CLOSURE_DEFAULT;
 }
 
-/* TODO(fclem) Implement. */
 Closure closure_eval(ClosureVolumeScatter volume_scatter)
 {
-  return CLOSURE_DEFAULT;
+  Closure closure = CLOSURE_DEFAULT;
+  closure.scatter = volume_scatter.scattering;
+  closure.anisotropy = volume_scatter.anisotropy;
+  return closure;
 }
 Closure closure_eval(ClosureVolumeAbsorption volume_absorption)
 {
-  return CLOSURE_DEFAULT;
+  Closure closure = CLOSURE_DEFAULT;
+  closure.absorption = volume_absorption.absorption;
+  return closure;
 }
 Closure closure_eval(ClosureVolumeScatter volume_scatter,
                      ClosureVolumeAbsorption volume_absorption,
                      ClosureEmission emission)
 {
-  return CLOSURE_DEFAULT;
+  Closure closure = CLOSURE_DEFAULT;
+  closure.absorption = volume_absorption.absorption;
+  closure.scatter = volume_scatter.scattering;
+  closure.anisotropy = volume_scatter.anisotropy;
+  closure.emission = emission.emission;
+  return closure;
 }
 
 vec4 closure_to_rgba(Closure closure)
