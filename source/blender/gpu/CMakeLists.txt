@@ -312,6 +312,7 @@ set(GLSL_SRC
   shaders/compositor/compositor_alpha_crop.glsl
   shaders/compositor/compositor_convert.glsl
   shaders/compositor/compositor_filter.glsl
+  shaders/compositor/compositor_flip.glsl
   shaders/compositor/compositor_image_crop.glsl
   shaders/compositor/compositor_realize_on_domain.glsl
   shaders/compositor/compositor_split_viewer.glsl
@@ -500,6 +501,7 @@ set(SHADER_CREATE_INFOS
   shaders/compositor/infos/compositor_alpha_crop_info.hh
   shaders/compositor/infos/compositor_convert_info.hh
   shaders/compositor/infos/compositor_filter_info.hh
+  shaders/compositor/infos/compositor_flip_info.hh
   shaders/compositor/infos/compositor_image_crop_info.hh
   shaders/compositor/infos/compositor_realize_on_domain_info.hh
   shaders/compositor/infos/compositor_split_viewer_info.hh
