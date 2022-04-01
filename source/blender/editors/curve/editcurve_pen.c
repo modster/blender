@@ -1188,28 +1188,35 @@ static void move_segment(ViewContext *vc, MoveSegmentData *seg_data, const wmEve
   float k2[3];
   sub_v3_v3v3(k2, bezt1->vec[2], bezt2->vec[0]);
 
-  /* P1 = t(k1 + k2) */
-  add_v3_v3v3(bezt1->vec[2], k1, k2);
-  mul_v3_fl(bezt1->vec[2], t);
+  if (!bezt1->hide) {
+    /* P1 = t(k1 + k2) */
+    add_v3_v3v3(bezt1->vec[2], k1, k2);
+    mul_v3_fl(bezt1->vec[2], t);
 
-  /* P2 = P1 - K2 */
-  sub_v3_v3v3(bezt2->vec[0], bezt1->vec[2], k2);
+    remove_handle_movement_constraints(bezt1, true, true);
 
-  remove_handle_movement_constraints(bezt1, true, true);
-  remove_handle_movement_constraints(bezt2, true, true);
-
-  /* Move opposite handle as well if type is align. */
-  if (bezt1->h1 == HD_ALIGN) {
-    float handle_vec[3];
-    sub_v3_v3v3(handle_vec, bezt1->vec[1], bezt1->vec[2]);
-    normalize_v3_length(handle_vec, len_v3v3(bezt1->vec[1], bezt1->vec[0]));
-    add_v3_v3v3(bezt1->vec[0], bezt1->vec[1], handle_vec);
+    /* Move opposite handle as well if type is align. */
+    if (bezt1->h1 == HD_ALIGN) {
+      float handle_vec[3];
+      sub_v3_v3v3(handle_vec, bezt1->vec[1], bezt1->vec[2]);
+      normalize_v3_length(handle_vec, len_v3v3(bezt1->vec[1], bezt1->vec[0]));
+      add_v3_v3v3(bezt1->vec[0], bezt1->vec[1], handle_vec);
+    }
   }
-  if (bezt2->h2 == HD_ALIGN) {
-    float handle_vec[3];
-    sub_v3_v3v3(handle_vec, bezt2->vec[1], bezt2->vec[0]);
-    normalize_v3_length(handle_vec, len_v3v3(bezt2->vec[1], bezt2->vec[2]));
-    add_v3_v3v3(bezt2->vec[2], bezt2->vec[1], handle_vec);
+
+  if (!bezt2->hide) {
+    /* P2 = P1 - K2 */
+    sub_v3_v3v3(bezt2->vec[0], bezt1->vec[2], k2);
+
+    remove_handle_movement_constraints(bezt2, true, true);
+
+    /* Move opposite handle as well if type is align. */
+    if (bezt2->h2 == HD_ALIGN) {
+      float handle_vec[3];
+      sub_v3_v3v3(handle_vec, bezt2->vec[1], bezt2->vec[0]);
+      normalize_v3_length(handle_vec, len_v3v3(bezt2->vec[1], bezt2->vec[2]));
+      add_v3_v3v3(bezt2->vec[2], bezt2->vec[1], handle_vec);
+    }
   }
 }
 
