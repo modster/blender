@@ -35,19 +35,18 @@ Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction)
 {
   return CLOSURE_DEFAULT;
 }
-Closure closure_eval(ClosureDiffuse diffuse,
-                     ClosureReflection reflection,
-                     ClosureEmission emission,
-                     ClosureTransparency transparency)
+Closure closure_eval(ClosureDiffuse diffuse, ClosureReflection reflection)
 {
   return CLOSURE_DEFAULT;
 }
 Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
                      ClosureReflection clearcoat,
-                     ClosureRefraction refraction,
-                     ClosureEmission emission,
-                     ClosureTransparency transparency)
+                     ClosureRefraction refraction)
+{
+  return CLOSURE_DEFAULT;
+}
+Closure closure_eval(ClosureReflection reflection, ClosureReflection clearcoat)
 {
   return CLOSURE_DEFAULT;
 }

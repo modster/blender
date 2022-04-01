@@ -41,16 +41,15 @@ Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction)
 /* Specular BSDF. */
 Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
-                     ClosureReflection clearcoat,
-                     ClosureEmission emission,
-                     ClosureTransparency transparency);
+                     ClosureReflection clearcoat);
 /* Principled BSDF. */
 Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
                      ClosureReflection clearcoat,
-                     ClosureRefraction refraction,
-                     ClosureEmission emission,
-                     ClosureTransparency transparency);
+                     ClosureRefraction refraction);
+Closure closure_eval(ClosureDiffuse diffuse, ClosureReflection reflection);
+Closure closure_eval(ClosureReflection reflection, ClosureReflection clearcoat);
+Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction);
 Closure closure_eval(ClosureVolumeScatter volume_scatter,
                      ClosureVolumeAbsorption volume_absorption,
                      ClosureEmission emission);

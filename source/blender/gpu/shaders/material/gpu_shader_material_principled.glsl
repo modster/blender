@@ -39,6 +39,9 @@ void node_bsdf_principled(vec4 base_color,
                           vec3 CN,
                           vec3 T,
                           float weight,
+                          const float do_diffuse,
+                          const float do_clearcoat,
+                          const float do_refraction,
                           const float do_multiscatter,
                           float do_sss,
                           out Closure result)
@@ -143,10 +146,26 @@ void node_bsdf_principled(vec4 base_color,
                                                        max(roughness, transmission_roughness);
   refraction_data.ior = ior;
 
-  result = closure_eval(diffuse_data,
-                        reflection_data,
-                        clearcoat_data,
-                        refraction_data,
-                        emission_data,
-                        transparency_data);
+  if (do_diffuse == 0.0 && do_refraction == 0.0 && do_clearcoat != 0.0) {
+    /* Metallic & Clearcoat case. */
+    result = closure_eval(reflection_data, clearcoat_data);
+  }
+  if (do_diffuse == 0.0 && do_refraction == 0.0 && do_clearcoat == 0.0) {
+    /* Metallic case. */
+    result = closure_eval(reflection_data);
+  }
+  else if (do_diffuse != 0.0 && do_refraction == 0.0 && do_clearcoat == 0.0) {
+    /* Dielectric case. */
+    result = closure_eval(diffuse_data, reflection_data);
+  }
+  else if (do_diffuse == 0.0 && do_refraction != 0.0 && do_clearcoat == 0.0) {
+    /* Glass case. */
+    result = closure_eval(reflection_data, refraction_data);
+  }
+  else {
+    /* Un-optimized case. */
+    result = closure_eval(diffuse_data, reflection_data, clearcoat_data, refraction_data);
+  }
+  result = closure_add(result, closure_eval(emission_data));
+  result = closure_add(result, closure_eval(transparency_data));
 }

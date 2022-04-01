@@ -152,7 +152,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
   bool use_subsurf = socket_not_zero(1) && use_diffuse;
   bool use_refract = socket_not_one(6) && socket_not_zero(17);
   bool use_transparency = socket_not_one(21);
-  // bool use_clear = socket_not_zero(14);
+  bool use_clear = socket_not_zero(14);
 
   eGPUMaterialFlag flag = GPU_MATFLAG_GLOSSY;
   if (use_diffuse) {
@@ -174,6 +174,9 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
 
   float use_multi_scatter = (node->custom1 == SHD_GLOSSY_MULTI_GGX) ? 1.0f : 0.0f;
   float use_sss = (use_subsurf) ? 1.0f : 0.0f;
+  float use_diffuse_f = (use_diffuse) ? 1.0f : 0.0f;
+  float use_clear_f = (use_clear) ? 1.0f : 0.0f;
+  float use_refract_f = (use_refract) ? 1.0f : 0.0f;
 
   GPU_material_flag_set(mat, flag);
 
@@ -182,6 +185,9 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
                         "node_bsdf_principled",
                         in,
                         out,
+                        GPU_constant(&use_diffuse_f),
+                        GPU_constant(&use_clear_f),
+                        GPU_constant(&use_refract_f),
                         GPU_constant(&use_multi_scatter),
                         GPU_uniform(&use_sss));
 }

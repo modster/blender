@@ -131,10 +131,7 @@ Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction)
 }
 
 CLOSURE_EVAL_FUNCTION_DECLARE_2(SpecularBSDF, Diffuse, Glossy);
-Closure closure_eval(ClosureDiffuse diffuse,
-                     ClosureReflection reflection,
-                     ClosureEmission emission,
-                     ClosureTransparency transparency)
+Closure closure_eval(ClosureDiffuse diffuse, ClosureReflection reflection)
 {
   /* Glue with the old sytem. */
   CLOSURE_VARS_DECLARE_2(Diffuse, Glossy);
@@ -151,9 +148,6 @@ Closure closure_eval(ClosureDiffuse diffuse,
   if (!output_ssr(reflection)) {
     closure.radiance += out_Glossy_1.radiance * reflection.color * reflection.weight;
   }
-  closure.radiance += emission.emission;
-  closure.transmittance = transparency.transmittance;
-  closure.holdout = transparency.holdout;
   return closure;
 }
 
@@ -161,9 +155,7 @@ CLOSURE_EVAL_FUNCTION_DECLARE_4(PrincipledBSDF, Diffuse, Glossy, Glossy, Refract
 Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
                      ClosureReflection clearcoat,
-                     ClosureRefraction refraction,
-                     ClosureEmission emission,
-                     ClosureTransparency transparency)
+                     ClosureRefraction refraction)
 {
   /* Glue with the old sytem. */
   CLOSURE_VARS_DECLARE_4(Diffuse, Glossy, Glossy, Refraction);
@@ -189,9 +181,27 @@ Closure closure_eval(ClosureDiffuse diffuse,
   if (!output_ssr(reflection)) {
     closure.radiance += out_Glossy_1.radiance * reflection.color * reflection.weight;
   }
-  closure.radiance += emission.emission;
-  closure.transmittance = transparency.transmittance;
-  closure.holdout = transparency.holdout;
+  return closure;
+}
+
+CLOSURE_EVAL_FUNCTION_DECLARE_2(PrincipledBSDFMetalClearCoat, Glossy, Glossy);
+Closure closure_eval(ClosureReflection reflection, ClosureReflection clearcoat)
+{
+  /* Glue with the old sytem. */
+  CLOSURE_VARS_DECLARE_2(Glossy, Glossy);
+
+  in_Glossy_0.N = reflection.N;
+  in_Glossy_0.roughness = reflection.roughness;
+  in_Glossy_1.N = clearcoat.N;
+  in_Glossy_1.roughness = clearcoat.roughness;
+
+  CLOSURE_EVAL_FUNCTION_2(PrincipledBSDFMetalClearCoat, Glossy, Glossy);
+
+  Closure closure = CLOSURE_DEFAULT;
+  closure.radiance += out_Glossy_1.radiance * clearcoat.color * clearcoat.weight;
+  if (!output_ssr(reflection)) {
+    closure.radiance += out_Glossy_0.radiance * reflection.color * reflection.weight;
+  }
   return closure;
 }
 
