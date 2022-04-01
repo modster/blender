@@ -113,6 +113,14 @@ class Context {
  * Domain.
  */
 
+/* Possible interpolations to use when realizing an input of some domain on another domain. See the
+ * Domain class for more information. */
+enum class Interpolation : uint8_t {
+  Nearest,
+  Bilinear,
+  Bicubic,
+};
+
 /* A domain is a rectangular area of a certain size in pixels that is transformed by a certain
  * transformation in pixel space relative to some reference space.
  *
@@ -130,9 +138,10 @@ class Context {
  * RealizeOnDomainProcessorOperation, except inputs whose descriptor sets skip_realization or
  * expects_single_value, see InputDescriptor for more information. The realization process simply
  * projects the input domain on the operation domain, copies the area of input that intersects the
- * operation domain, and fill the rest with zeros. This process is illustrated below. It follows
- * that operations should expect all their inputs to have the same domain and consequently size,
- * except for inputs that explicitly skip realization.
+ * operation domain, and fill the rest with zeros. The realization happens using the interpolation
+ * method defined set in the realization_interpolation member. This process is illustrated below.
+ * It follows that operations should expect all their inputs to have the same domain and
+ * consequently size, except for inputs that explicitly skip realization.
  *
  *                                   Realized Result
  *             +-------------+       +-------------+
@@ -152,7 +161,7 @@ class Context {
  * from it. The domain input is determined to be the non-single value input that have the highest
  * domain priority, a zero value being the highest priority. If all inputs are single values, then
  * the operation domain is irrelevant and an identity domain is set. See
- * NodeOperation::compute_domain.
+ * NodeOperation::compute_domain for more information.
  *
  * The aforementioned logic for operation domain computation is only a default that works for most
  * cases, but an operation can override the compute_domain method to implement a different logic.
@@ -178,6 +187,9 @@ class Domain {
   /* The 2D transformation of the domain defining its translation in pixels, rotation, and scale in
    * 2D space. */
   Transformation2D transformation;
+  /* The interpolation method that should be used when realizing the input whose domain is this
+   * one. */
+  Interpolation realization_interpolation = Interpolation::Nearest;
 
  public:
   /* A size only constructor that sets the transformation to identity. */
@@ -290,6 +302,9 @@ class Result {
    * transformation by the current transformation of the domain of the result. */
   void transform(const Transformation2D &transformation);
 
+  /* Set the interpolation method that will be used when realizing this result if needed. */
+  void set_realization_interpolation(Interpolation interpolation);
+
   /* If the result is a single value result of type float, return its float value. Otherwise, an
    * uninitialized value is returned. */
   float get_float_value() const;
@@ -350,7 +365,7 @@ class Result {
    * reference count of the master result is returned instead. */
   int reference_count() const;
 
-  /* Returns the domain of the result. See the Domain class. */
+  /* Returns a reference to the domain of the result. See the Domain class. */
   const Domain &domain() const;
 };
 

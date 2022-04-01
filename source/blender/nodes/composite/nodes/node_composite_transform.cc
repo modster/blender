@@ -21,6 +21,7 @@
  * \ingroup cmpnodes
  */
 
+#include "BLI_assert.h"
 #include "BLI_math_vector.h"
 
 #include "UI_interface.h"
@@ -87,6 +88,22 @@ class TransformOperation : public NodeOperation {
         translation, rotation, scale);
 
     result.transform(transformation);
+    result.set_realization_interpolation(get_interpolation());
+  }
+
+  Interpolation get_interpolation()
+  {
+    switch (node().custom1) {
+      case 0:
+        return Interpolation::Nearest;
+      case 1:
+        return Interpolation::Bilinear;
+      case 2:
+        return Interpolation::Bicubic;
+    }
+
+    BLI_assert_unreachable();
+    return Interpolation::Nearest;
   }
 };
 

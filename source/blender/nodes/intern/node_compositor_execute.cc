@@ -129,6 +129,8 @@ Domain Domain::identity()
   return Domain(int2(1), Transformation2D::identity());
 }
 
+/* Only compare the size and transformation members, as other members only describe the method of
+ * realization on another domain, which is not technically a proprty of the domain. */
 bool operator==(const Domain &a, const Domain &b)
 {
   return a.size == b.size && a.transformation == b.transformation;
@@ -221,6 +223,11 @@ void Result::pass_through(Result &target)
 void Result::transform(const Transformation2D &transformation)
 {
   domain_.transform(transformation);
+}
+
+void Result::set_realization_interpolation(Interpolation interpolation)
+{
+  domain_.realization_interpolation = interpolation;
 }
 
 float Result::get_float_value() const
@@ -983,6 +990,10 @@ void RealizeOnDomainProcessorOperation::execute()
 
   /* Make out-of-bound texture access return zero. */
   GPU_texture_wrap_mode(input.texture(), false, false);
+
+  /* Set the approperiate sampler interpolation. */
+  const bool use_bilinear = input.domain().realization_interpolation != Interpolation::Nearest;
+  GPU_texture_filter_mode(input.texture(), use_bilinear);
 
   input.bind_as_texture(shader, "input_sampler");
   result.bind_as_image(shader, "domain");
