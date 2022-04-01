@@ -72,7 +72,6 @@ typedef enum {
 
   PBVH_UpdateTopology = 1 << 13,
   PBVH_UpdateColor = 1 << 14,
-  PBVH_TexLeaf = 1 << 15,
 } PBVHNodeFlags;
 
 typedef struct PBVHFrustumPlanes {
