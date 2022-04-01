@@ -21,8 +21,13 @@
  * \ingroup cmpnodes
  */
 
+#include "BLI_assert.h"
+#include "BLI_transformation_2d.hh"
+
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "NOD_compositor_execute.hh"
 
 #include "node_composite_util.hh"
 
@@ -32,12 +37,15 @@ namespace blender::nodes::node_composite_rotate_cc {
 
 static void cmp_node_rotate_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_input<decl::Color>(N_("Image"))
+      .default_value({1.0f, 1.0f, 1.0f, 1.0f})
+      .compositor_domain_priority(0);
   b.add_input<decl::Float>(N_("Degr"))
       .default_value(0.0f)
       .min(-10000.0f)
       .max(10000.0f)
-      .subtype(PROP_ANGLE);
+      .subtype(PROP_ANGLE)
+      .compositor_expects_single_value();
   b.add_output<decl::Color>(N_("Image"));
 }
 
@@ -49,6 +57,47 @@ static void node_composit_init_rotate(bNodeTree *UNUSED(ntree), bNode *node)
 static void node_composit_buts_rotate(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "filter_type", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
+}
+
+using namespace blender::viewport_compositor;
+
+class RotateOperation : public NodeOperation {
+ public:
+  using NodeOperation::NodeOperation;
+
+  void execute() override
+  {
+    Result &input = get_input("Image");
+    Result &result = get_result("Image");
+    input.pass_through(result);
+
+    const float rotation = get_input("Degr").get_float_value_default(0.0f);
+
+    const Transformation2D transformation = Transformation2D::from_rotation(rotation);
+
+    result.transform(transformation);
+    result.set_realization_interpolation(get_interpolation());
+  }
+
+  Interpolation get_interpolation()
+  {
+    switch (node().custom1) {
+      case 0:
+        return Interpolation::Nearest;
+      case 1:
+        return Interpolation::Bilinear;
+      case 2:
+        return Interpolation::Bicubic;
+    }
+
+    BLI_assert_unreachable();
+    return Interpolation::Nearest;
+  }
+};
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new RotateOperation(context, node);
 }
 
 }  // namespace blender::nodes::node_composite_rotate_cc
@@ -63,6 +112,7 @@ void register_node_type_cmp_rotate()
   ntype.declare = file_ns::cmp_node_rotate_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_rotate;
   node_type_init(&ntype, file_ns::node_composit_init_rotate);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

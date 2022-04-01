@@ -23,6 +23,7 @@
 
 #include "BLI_assert.h"
 #include "BLI_math_vector.h"
+#include "BLI_transformation_2d.hh"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -37,7 +38,9 @@ namespace blender::nodes::node_composite_transform_cc {
 
 static void cmp_node_transform_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Color>(N_("Image")).default_value({0.8f, 0.8f, 0.8f, 1.0f});
+  b.add_input<decl::Color>(N_("Image"))
+      .default_value({0.8f, 0.8f, 0.8f, 1.0f})
+      .compositor_domain_priority(0);
   b.add_input<decl::Float>(N_("X"))
       .default_value(0.0f)
       .min(-10000.0f)
