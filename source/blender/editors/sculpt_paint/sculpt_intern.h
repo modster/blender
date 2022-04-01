@@ -11,22 +11,28 @@
 #include "DNA_key_types.h"
 #include "DNA_listBase.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_scene_types.h"
 #include "DNA_vec_types.h"
 
 #include "BKE_paint.h"
 #include "BKE_pbvh.h"
 #include "BLI_bitmap.h"
+#include "BLI_compiler_attrs.h"
 #include "BLI_compiler_compat.h"
 #include "BLI_gsqueue.h"
 #include "BLI_threads.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct AutomaskingCache;
+struct Image;
+struct ImageUser;
 struct KeyBlock;
 struct Object;
 struct SculptUndoNode;
 struct bContext;
-
-enum ePaintSymmetryFlags;
 
 /* Updates */
 
@@ -1607,7 +1613,24 @@ void SCULPT_multiplane_scrape_preview_draw(uint gpuattr,
 void SCULPT_do_draw_face_sets_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode);
 
 /* Paint Brush. */
-void SCULPT_do_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode);
+void SCULPT_do_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode) ATTR_NONNULL();
+
+/**
+ * @brief Get the image canvas for painting on the given object.
+ *
+ * @note this is a temporary function. Would actually need to be replaced by logic provided by
+ * {D14455}.
+ *
+ * @return #true if an image is found. The #r_image and #r_image_user fields are filled with the
+ * image and image user. Returns false when the image isn't found. In the later case the r_image
+ * and r_image_user would not be modified.
+ */
+bool SCULPT_paint_image_canvas_get(struct Object *ob,
+                                   struct Image **r_image,
+                                   struct ImageUser **r_image_user) ATTR_NONNULL();
+void SCULPT_do_paint_brush_image(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
+    ATTR_NONNULL();
+bool SCULPT_use_image_paint_brush(Sculpt *sd, Object *ob) ATTR_NONNULL();
 
 /* Smear Brush. */
 void SCULPT_do_smear_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode);
@@ -1719,3 +1742,7 @@ void SCULPT_bmesh_topology_rake(
 void SCULPT_OT_brush_stroke(struct wmOperatorType *ot);
 
 /* end sculpt_ops.c */
+
+#ifdef __cplusplus
+}
+#endif

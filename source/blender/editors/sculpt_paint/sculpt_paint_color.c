@@ -233,6 +233,12 @@ static void sample_wet_paint_reduce(const void *__restrict UNUSED(userdata),
 
 void SCULPT_do_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
 {
+  /* TODO: Should be determined by the painting canvas. */
+  if (SCULPT_use_image_paint_brush(sd, ob)) {
+    SCULPT_do_paint_brush_image(sd, ob, nodes, totnode);
+    return;
+  }
+
   Brush *brush = BKE_paint_brush(&sd->paint);
   SculptSession *ss = ob->sculpt;
 

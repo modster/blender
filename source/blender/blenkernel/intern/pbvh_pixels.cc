@@ -11,6 +11,8 @@
 #include "BLI_math.h"
 #include "BLI_task.h"
 
+#include "BKE_image_wrappers.hh"
+
 #include "bmesh.h"
 
 #include "pbvh_intern.h"
@@ -284,6 +286,53 @@ static void init(PBVH *pbvh,
 }
 
 }  // namespace blender::bke::pbvh::pixels::extractor
+
+namespace blender::bke::pbvh::pixels {
+
+Triangles &BKE_pbvh_pixels_triangles_get(PBVHNode &node)
+{
+  BLI_assert(node.pixels.node_data != nullptr);
+  NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);
+  return node_data->triangles;
+}
+
+TileData *BKE_pbvh_pixels_tile_data_get(PBVHNode &node, const image::ImageTileWrapper &image_tile)
+{
+  BLI_assert(node.pixels.node_data != nullptr);
+  NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);
+  return node_data->find_tile_data(image_tile);
+}
+
+void BKE_pbvh_pixels_mark_dirty(PBVHNode &node)
+{
+  BLI_assert(node.pixels.node_data != nullptr);
+  NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);
+  node_data->flags.dirty |= true;
+}
+
+void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &image_user)
+{
+  BLI_assert(node.pixels.node_data != nullptr);
+  NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);
+  if (node_data->flags.dirty) {
+    ImageUser local_image_user = image_user;
+    void *image_lock;
+    LISTBASE_FOREACH (ImageTile *, tile, &image.tiles) {
+      image::ImageTileWrapper image_tile(tile);
+      local_image_user.tile = image_tile.get_tile_number();
+      ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &local_image_user, &image_lock);
+      if (image_buffer == nullptr) {
+        continue;
+      }
+
+      node_data->mark_region(image, image_tile, *image_buffer);
+      BKE_image_release_ibuf(&image, image_buffer, image_lock);
+    }
+    node_data->flags.dirty = false;
+  }
+}
+
+}  // namespace blender::bke::pbvh::pixels
 
 extern "C" {
 using namespace blender::bke::pbvh::pixels::extractor;

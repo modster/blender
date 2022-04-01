@@ -25,7 +25,6 @@
 
 #include "DNA_brush_types.h"
 #include "DNA_customdata_types.h"
-#include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_node_types.h"
@@ -41,7 +40,6 @@
 #include "BKE_key.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
-#include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_mirror.h"
@@ -2745,10 +2743,13 @@ static void update_brush_local_mat(Sculpt *sd, Object *ob)
 /** \name Texture painting
  * \{ */
 
-static bool sculpt_needs_pbvh_pixels(const Brush *brush /*, const PaintModeSettings *settings*/)
+static bool sculpt_needs_pbvh_pixels(const Brush *brush,
+                                     Object *ob /*, const PaintModeSettings *settings*/)
 {
   if (brush->sculpt_tool == SCULPT_TOOL_PAINT /*&& U.experimental.use_sculpt_texture_paint*/) {
-    return true;
+    Image *image;
+    ImageUser *image_user;
+    return SCULPT_paint_image_canvas_get(ob, &image, &image_user);
   }
 
   return false;
@@ -2758,28 +2759,12 @@ static void sculpt_pbvh_update_pixels(SculptSession *ss, Object *ob)
 {
   BLI_assert(ob->type == OB_MESH);
   Mesh *mesh = (Mesh *)ob->data;
-  /* TODO: should be determined from PaintModeSettings */
-  Material *mat = BKE_object_material_get(ob, ob->actcol);
-  if (mat == NULL) {
-    return;
-  }
-  if (mat->use_nodes == false) {
-    return;
-  }
-  bNode *node = nodeGetActiveTexture(mat->nodetree);
-  if (node == NULL) {
-    return;
-  }
-  if (node->type != SH_NODE_TEX_IMAGE) {
-    return;
-  }
 
-  Image *image = (Image *)node->id;
-  if (image == NULL) {
+  Image *image;
+  ImageUser *image_user;
+  if (!SCULPT_paint_image_canvas_get(ob, &image, &image_user)) {
     return;
   }
-  NodeTexImage *storage = node->storage;
-  ImageUser *image_user = &storage->iuser;
 
   BKE_pbvh_build_pixels(ss->pbvh,
                         ss->pmap,
@@ -3256,7 +3241,7 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
     nodes = sculpt_pbvh_gather_generic(ob, sd, brush, use_original, radius_scale, &totnode);
   }
 
-  if (sculpt_needs_pbvh_pixels(brush)) {
+  if (sculpt_needs_pbvh_pixels(brush, ob)) {
     sculpt_pbvh_update_pixels(ss, ob);
   }
 
