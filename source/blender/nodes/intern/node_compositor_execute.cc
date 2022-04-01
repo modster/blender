@@ -1006,6 +1006,9 @@ GPUShader *RealizeOnDomainProcessorOperation::get_realization_shader()
     case ResultType::Float:
       return GPU_shader_create_from_info_name("compositor_realize_on_domain_float");
   }
+
+  BLI_assert_unreachable();
+  return nullptr;
 }
 
 Domain RealizeOnDomainProcessorOperation::compute_domain()
@@ -1378,6 +1381,9 @@ static const char *get_store_function_name(ResultType type)
     case ResultType::Color:
       return "store_output_color";
   }
+
+  BLI_assert_unreachable();
+  return nullptr;
 }
 
 static eGPUTextureFormat texture_format_from_result_type(ResultType type)
@@ -1390,6 +1396,9 @@ static eGPUTextureFormat texture_format_from_result_type(ResultType type)
     case ResultType::Color:
       return GPU_RGBA16F;
   }
+
+  BLI_assert_unreachable();
+  return GPU_RGBA16F;
 }
 
 void GPUMaterialOperation::populate_material_result(DOutputSocket output, GPUMaterial *material)
