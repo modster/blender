@@ -1744,6 +1744,21 @@ void BKE_pbvh_node_mark_update_color(PBVHNode *node)
   node->flag |= PBVH_UpdateColor | PBVH_UpdateDrawBuffers | PBVH_UpdateRedraw;
 }
 
+void BKE_pbvh_node_mark_update_pixels(PBVHNode *node)
+{
+  node->flag |= PBVH_UpdatePixels;
+}
+
+void BKE_pbvh_mark_update_pixels(PBVH *pbvh)
+{
+  for (int n = 0; n < pbvh->totnode; n++) {
+    PBVHNode *node = &pbvh->nodes[n];
+    if (node->flag & PBVH_Leaf) {
+      BKE_pbvh_node_mark_update_pixels(node);
+    }
+  }
+}
+
 void BKE_pbvh_node_mark_update_visibility(PBVHNode *node)
 {
   node->flag |= PBVH_UpdateVisibility | PBVH_RebuildDrawBuffers | PBVH_UpdateDrawBuffers |

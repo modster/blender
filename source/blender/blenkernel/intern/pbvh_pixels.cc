@@ -191,12 +191,16 @@ static void do_encode_pixels(void *__restrict userdata,
     node_data->tiles.append(tile_data);
   }
   node_data->triangles.cleanup_after_init();
+  node->flag = static_cast<PBVHNodeFlags>(node->flag & ~PBVH_UpdatePixels);
 }
 
 static bool should_pixels_be_updated(PBVHNode *node)
 {
   if ((node->flag & PBVH_Leaf) == 0) {
     return false;
+  }
+  if ((node->flag & PBVH_UpdatePixels) != 0) {
+    return true;
   }
   NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
   if (node_data != nullptr) {
@@ -255,8 +259,12 @@ static bool find_nodes_to_update(PBVH *pbvh,
       if (node->pixels.node_data == nullptr) {
         NodeData *node_data = MEM_new<NodeData>(__func__);
         node->pixels.node_data = node_data;
-        r_nodes_to_update.append(node);
       }
+      else {
+        NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
+        node_data->clear_data();
+      }
+      r_nodes_to_update.append(node);
     }
     else if (contains_triangles(node)) {
       /* Mark polygons that are owned by other leafs, so they don't be added twice. */

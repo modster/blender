@@ -2766,6 +2766,11 @@ static void sculpt_pbvh_update_pixels(SculptSession *ss, Object *ob)
     return;
   }
 
+  // If image is different than previous the PBVH should be tagged to fully rebuild the pixels.
+  // If any image tile image has a different resolution
+  // If uvmap changes.
+  // If other uvmap is selected.
+
   BKE_pbvh_build_pixels(ss->pbvh,
                         ss->pmap,
                         mesh->mpoly,

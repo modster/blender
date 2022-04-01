@@ -72,6 +72,8 @@ typedef enum {
 
   PBVH_UpdateTopology = 1 << 13,
   PBVH_UpdateColor = 1 << 14,
+  PBVH_UpdatePixels = 1 << 15,
+
 } PBVHNodeFlags;
 
 typedef struct PBVHFrustumPlanes {
@@ -290,6 +292,8 @@ bool BKE_pbvh_bmesh_update_topology(PBVH *pbvh,
 void BKE_pbvh_node_mark_update(PBVHNode *node);
 void BKE_pbvh_node_mark_update_mask(PBVHNode *node);
 void BKE_pbvh_node_mark_update_color(PBVHNode *node);
+void BKE_pbvh_node_mark_update_pixels(PBVHNode *node);
+void BKE_pbvh_mark_update_pixels(PBVH *pbvh);
 void BKE_pbvh_node_mark_update_visibility(PBVHNode *node);
 void BKE_pbvh_node_mark_rebuild_draw(PBVHNode *node);
 void BKE_pbvh_node_mark_redraw(PBVHNode *node);

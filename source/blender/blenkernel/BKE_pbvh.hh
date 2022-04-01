@@ -105,6 +105,13 @@ struct Triangles {
     loop_indices.clear();
   }
 
+  void clear()
+  {
+    paint_input.clear();
+    loop_indices.clear();
+    poly_indices.clear();
+  }
+
   uint64_t size() const
   {
     return paint_input.size();
@@ -190,6 +197,12 @@ struct NodeData {
     if (tile) {
       tile->mark_region(image, image_tile, image_buffer);
     }
+  }
+
+  void clear_data()
+  {
+    tiles.clear();
+    triangles.clear();
   }
 
   static void free_func(void *instance)
