@@ -78,6 +78,8 @@ static void extract_barycentric_pixels(TileData &tile_data,
     }
     package.num_pixels = x - package.start_image_coordinate.x;
     if (package.num_pixels > best_num_pixels) {
+      // TODO(jbakker): this could be done even when barycentric coordinates are outside the
+      // triangle, no need to find best location to perform the calculation.
       triangle.add_barycentric_coord_x = (barycentric - package.start_barycentric_coord.decode()) /
                                          package.num_pixels;
       best_num_pixels = package.num_pixels;
@@ -198,6 +200,9 @@ static void init(PBVH *pbvh,
   Vector<PBVHNode *> nodes_to_initialize;
   for (int n = 0; n < pbvh->totnode; n++) {
     PBVHNode *node = &pbvh->nodes[n];
+    if ((node->flag & PBVH_Leaf) == 0) {
+      continue;
+    }
     NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
     if (node_data != nullptr) {
       continue;
@@ -233,12 +238,17 @@ static void init(PBVH *pbvh,
   BKE_pbvh_parallel_range_settings(&settings, true, nodes_to_initialize.size());
   BLI_task_parallel_range(0, nodes_to_initialize.size(), &user_data, do_encode_pixels, &settings);
 
+//#define DO_PRINT_STATISTICS
+#ifdef DO_PRINT_STATISTICS
   /* Print some statistics about compression ratio. */
   {
     int64_t compressed_data_len = 0;
     int64_t num_pixels = 0;
     for (int n = 0; n < pbvh->totnode; n++) {
       PBVHNode *node = &pbvh->nodes[n];
+      if ((node->flag & PBVH_Leaf) == 0) {
+        continue;
+      }
       NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
       compressed_data_len += node_data->triangles.mem_size();
       for (const TileData &tile_data : node_data->tiles) {
@@ -253,6 +263,7 @@ static void init(PBVH *pbvh,
            compressed_data_len,
            float(compressed_data_len) / num_pixels);
   }
+#endif
 
 //#define DO_WATERTIGHT_CHECK
 #ifdef DO_WATERTIGHT_CHECK

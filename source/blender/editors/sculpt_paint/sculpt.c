@@ -25,6 +25,7 @@
 
 #include "DNA_brush_types.h"
 #include "DNA_customdata_types.h"
+#include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_node_types.h"
@@ -40,6 +41,7 @@
 #include "BKE_key.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
+#include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_mirror.h"
@@ -57,6 +59,7 @@
 #include "BKE_subdiv_ccg.h"
 #include "BKE_subsurf.h"
 
+#include "NOD_shader.h"
 #include "NOD_texture.h"
 
 #include "DEG_depsgraph.h"
@@ -2739,6 +2742,63 @@ static void update_brush_local_mat(Sculpt *sd, Object *ob)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Texture painting
+ * \{ */
+
+static bool sculpt_needs_pbvh_pixels(const Brush *brush /*, const PaintModeSettings *settings*/)
+{
+  if (brush->sculpt_tool == SCULPT_TOOL_PAINT /*&& U.experimental.use_sculpt_texture_paint*/) {
+    return true;
+  }
+
+  return false;
+}
+
+static void sculpt_pbvh_update_pixels(SculptSession *ss, Object *ob)
+{
+  BLI_assert(ob->type == OB_MESH);
+  Mesh *mesh = (Mesh *)ob->data;
+  /* TODO: should be determined from PaintModeSettings */
+  Material *mat = BKE_object_material_get(ob, ob->actcol);
+  if (mat == NULL) {
+    return;
+  }
+  if (mat->use_nodes == false) {
+    return;
+  }
+  bNode *node = nodeGetActiveTexture(mat->nodetree);
+  if (node == NULL) {
+    return;
+  }
+  if (node->type != SH_NODE_TEX_IMAGE) {
+    return;
+  }
+
+  Image *image = (Image *)node->id;
+  if (image == NULL) {
+    return;
+  }
+  NodeTexImage *storage = node->storage;
+  ImageUser *image_user = &storage->iuser;
+
+  BKE_pbvh_build_pixels(ss->pbvh,
+                        ss->pmap,
+                        mesh->mpoly,
+                        mesh->mloop,
+                        mesh->mvert,
+                        mesh->totvert,
+                        &mesh->vdata,
+                        &mesh->ldata,
+                        &mesh->pdata,
+                        NULL, /* looptri */
+                        mesh->totpoly,
+                        image,
+                        image_user);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Generic Brush Plane & Symmetry Utilities
  * \{ */
 
@@ -3194,6 +3254,10 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
       radius_scale = 2.0f;
     }
     nodes = sculpt_pbvh_gather_generic(ob, sd, brush, use_original, radius_scale, &totnode);
+  }
+
+  if (sculpt_needs_pbvh_pixels(brush)) {
+    sculpt_pbvh_update_pixels(ss, ob);
   }
 
   /* Draw Face Sets in draw mode makes a single undo push, in alt-smooth mode deforms the
@@ -4593,7 +4657,8 @@ static bool sculpt_needs_connectivity_info(const Sculpt *sd,
           (brush->sculpt_tool == SCULPT_TOOL_SLIDE_RELAX) ||
           (brush->sculpt_tool == SCULPT_TOOL_CLOTH) || (brush->sculpt_tool == SCULPT_TOOL_SMEAR) ||
           (brush->sculpt_tool == SCULPT_TOOL_DRAW_FACE_SETS) ||
-          (brush->sculpt_tool == SCULPT_TOOL_DISPLACEMENT_SMEAR));
+          (brush->sculpt_tool == SCULPT_TOOL_DISPLACEMENT_SMEAR) ||
+          (brush->sculpt_tool == SCULPT_TOOL_PAINT));
 }
 
 void SCULPT_stroke_modifiers_check(const bContext *C, Object *ob, const Brush *brush)
