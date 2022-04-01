@@ -373,6 +373,7 @@ if(WITH_IMAGE_WEBP)
   find_package_wrapper(WebP)
   if(NOT WEBP_FOUND)
     set(WITH_IMAGE_WEBP OFF)
+    message(WARNING "WebP not found, disabling WITH_IMAGE_WEBP")
   endif()
 endif()
 
