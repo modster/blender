@@ -42,9 +42,24 @@ static bool has_been_visited(std::vector<bool> &visited_polygons, const int poly
   return visited;
 }
 
+/**
+ * @brief Calculate the delta of two neighbour uv coordinates in the given image buffer.
+ */
+static float3 calc_barycentric_delta(const ImBuf *image_buffer,
+                                     const float2 uvs[3],
+                                     const int x,
+                                     const int y)
+{
+  const float2 start_uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
+  const float2 end_uv(float(x + 1) / image_buffer->x, float(y) / image_buffer->y);
+  const float3 start_barycentric = barycentric_weights(uvs[0], uvs[1], uvs[2], start_uv);
+  const float3 end_barycentric = barycentric_weights(uvs[0], uvs[1], uvs[2], end_uv);
+  const float3 delta_barycentric = end_barycentric - start_barycentric;
+  return delta_barycentric;
+}
+
 static void extract_barycentric_pixels(TileData &tile_data,
                                        const ImBuf *image_buffer,
-                                       TrianglePaintInput &triangle,
                                        const int triangle_index,
                                        const float2 uvs[3],
                                        const int minx,
@@ -52,7 +67,6 @@ static void extract_barycentric_pixels(TileData &tile_data,
                                        const int maxx,
                                        const int maxy)
 {
-  int best_num_pixels = 0;
   for (int y = miny; y < maxy; y++) {
     bool start_detected = false;
     float3 barycentric;
@@ -79,13 +93,6 @@ static void extract_barycentric_pixels(TileData &tile_data,
       continue;
     }
     package.num_pixels = x - package.start_image_coordinate.x;
-    if (package.num_pixels > best_num_pixels) {
-      // TODO(jbakker): this could be done even when barycentric coordinates are outside the
-      // triangle, no need to find best location to perform the calculation.
-      triangle.add_barycentric_coord_x = (barycentric - package.start_barycentric_coord.decode()) /
-                                         package.num_pixels;
-      best_num_pixels = package.num_pixels;
-    }
     tile_data.encoded_pixels.append(package);
   }
 }
@@ -169,8 +176,9 @@ static void do_encode_pixels(void *__restrict userdata,
       const int maxx = min_ii(ceil(maxu * image_buffer->x), image_buffer->x);
 
       TrianglePaintInput &triangle = triangles.get_paint_input(triangle_index);
+      triangle.add_barycentric_coord_x = calc_barycentric_delta(image_buffer, uvs, minx, miny);
       extract_barycentric_pixels(
-          tile_data, image_buffer, triangle, triangle_index, uvs, minx, miny, maxx, maxy);
+          tile_data, image_buffer, triangle_index, uvs, minx, miny, maxx, maxy);
     }
 
     BKE_image_release_ibuf(image, image_buffer, nullptr);
@@ -185,42 +193,105 @@ static void do_encode_pixels(void *__restrict userdata,
   node_data->triangles.cleanup_after_init();
 }
 
-static void init(PBVH *pbvh,
-                 const MeshElemMap *pmap,
-                 const struct MPoly *mpoly,
-                 const struct MLoop *mloop,
-                 struct CustomData *ldata,
-                 int tot_poly,
-                 struct Image *image,
-                 struct ImageUser *image_user)
+static bool should_pixels_be_updated(PBVHNode *node)
 {
-  Vector<PBVHNode *> nodes_to_initialize;
+  if ((node->flag & PBVH_Leaf) == 0) {
+    return false;
+  }
+  NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
+  if (node_data != nullptr) {
+    return false;
+  }
+  return true;
+}
+
+static bool contains_triangles(PBVHNode *node)
+{
+  if ((node->flag & PBVH_Leaf) == 0) {
+    return false;
+  }
+  NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
+  if (node_data == nullptr) {
+    return false;
+  }
+  return true;
+}
+
+static int64_t count_nodes_to_update(PBVH *pbvh)
+{
+  int64_t result = 0;
   for (int n = 0; n < pbvh->totnode; n++) {
     PBVHNode *node = &pbvh->nodes[n];
-    if ((node->flag & PBVH_Leaf) == 0) {
-      continue;
+    if (should_pixels_be_updated(node)) {
+      result++;
     }
-    NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
-    if (node_data != nullptr) {
-      continue;
-    }
-    node_data = MEM_new<NodeData>(__func__);
-    node->pixels.node_data = node_data;
-    nodes_to_initialize.append(node);
   }
-  if (nodes_to_initialize.size() == 0) {
+  return result;
+}
+
+/**
+ * Find the nodes that needs to be updated.
+ *
+ * The nodes that require updated are added to the r_nodes_to_update parameter.
+ * Will fill in r_visited_polygons with polygons that are owned by nodes that do not require
+ * updates.
+ *
+ * returns if there were any nodes found (true).
+ */
+static bool find_nodes_to_update(PBVH *pbvh,
+                                 Vector<PBVHNode *> &r_nodes_to_update,
+                                 std::vector<bool> &r_visited_polygons)
+{
+  int64_t nodes_to_update_len = count_nodes_to_update(pbvh);
+  if (nodes_to_update_len == 0) {
+    return false;
+  }
+
+  r_nodes_to_update.reserve(nodes_to_update_len);
+
+  for (int n = 0; n < pbvh->totnode; n++) {
+    PBVHNode *node = &pbvh->nodes[n];
+    if (should_pixels_be_updated(node)) {
+      if (node->pixels.node_data == nullptr) {
+        NodeData *node_data = MEM_new<NodeData>(__func__);
+        node->pixels.node_data = node_data;
+        r_nodes_to_update.append(node);
+      }
+    }
+    else if (contains_triangles(node)) {
+      /* Mark polygons that are owned by other leafs, so they don't be added twice. */
+      Triangles &triangles = BKE_pbvh_pixels_triangles_get(*node);
+      for (int &poly_index : triangles.poly_indices) {
+        r_visited_polygons[poly_index] = true;
+      }
+    }
+  }
+
+  return true;
+}
+
+static void update_pixels(PBVH *pbvh,
+                          const MeshElemMap *pmap,
+                          const struct MPoly *mpoly,
+                          const struct MLoop *mloop,
+                          struct CustomData *ldata,
+                          int tot_poly,
+                          struct Image *image,
+                          struct ImageUser *image_user)
+{
+  Vector<PBVHNode *> nodes_to_update;
+  std::vector<bool> visited_polygons(tot_poly);
+
+  if (!find_nodes_to_update(pbvh, nodes_to_update, visited_polygons)) {
     return;
   }
-  printf("%lld nodes to initialize\n", nodes_to_initialize.size());
 
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(ldata, CD_MLOOPUV));
   if (ldata_uv == nullptr) {
     return;
   }
-  std::vector<bool> visited_polygons(tot_poly);
 
-  for (int n = 0; n < nodes_to_initialize.size(); n++) {
-    PBVHNode *node = nodes_to_initialize[n];
+  for (PBVHNode *node : nodes_to_update) {
     NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
     init_triangles(pbvh, node, node_data, pmap, mpoly, mloop, visited_polygons);
   }
@@ -229,11 +300,11 @@ static void init(PBVH *pbvh,
   user_data.image = image;
   user_data.image_user = image_user;
   user_data.ldata_uv = ldata_uv;
-  user_data.nodes = &nodes_to_initialize;
+  user_data.nodes = &nodes_to_update;
 
   TaskParallelSettings settings;
-  BKE_pbvh_parallel_range_settings(&settings, true, nodes_to_initialize.size());
-  BLI_task_parallel_range(0, nodes_to_initialize.size(), &user_data, do_encode_pixels, &settings);
+  BKE_pbvh_parallel_range_settings(&settings, true, nodes_to_update.size());
+  BLI_task_parallel_range(0, nodes_to_update.size(), &user_data, do_encode_pixels, &settings);
 
 //#define DO_PRINT_STATISTICS
 #ifdef DO_PRINT_STATISTICS
@@ -342,7 +413,7 @@ void BKE_pbvh_build_pixels(PBVH *pbvh,
                            struct Image *image,
                            struct ImageUser *image_user)
 {
-  init(pbvh, pmap, mpoly, mloop, ldata, tot_poly, image, image_user);
+  update_pixels(pbvh, pmap, mpoly, mloop, ldata, tot_poly, image, image_user);
 }
 
 void pbvh_pixels_free(PBVHNode *node)
