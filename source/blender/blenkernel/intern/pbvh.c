@@ -679,6 +679,8 @@ void BKE_pbvh_free(PBVH *pbvh)
       if (node->bm_other_verts) {
         BLI_gset_free(node->bm_other_verts, NULL);
       }
+
+      pbvh_pixels_free(node);
     }
   }
 
