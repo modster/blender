@@ -236,27 +236,27 @@ constexpr FormattingSyntax syntax_elem_to_formatting(const eMTLSyntaxElement key
     case eMTLSyntaxElement::Ke: {
       return {"Ke {:.6f} {:.6f} {:.6f}\n", 3, is_type_float<T...>};
     }
-    /* Keep only one space between options since filepaths may have leading spaces too. */
+    /* Note: first texture map related argument, if present, will have its own leading space. */
     case eMTLSyntaxElement::map_Kd: {
-      return {"map_Kd {} {}\n", 2, is_type_string_related<T...>};
+      return {"map_Kd{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_Ks: {
-      return {"map_Ks {} {}\n", 2, is_type_string_related<T...>};
+      return {"map_Ks{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_Ns: {
-      return {"map_Ns {} {}\n", 2, is_type_string_related<T...>};
+      return {"map_Ns{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_d: {
-      return {"map_d {} {}\n", 2, is_type_string_related<T...>};
+      return {"map_d{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_refl: {
-      return {"map_refl {} {}\n", 2, is_type_string_related<T...>};
+      return {"map_refl{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_Ke: {
-      return {"map_Ke {} {}\n", 2, is_type_string_related<T...>};
+      return {"map_Ke{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_Bump: {
-      return {"map_Bump {} {}\n", 2, is_type_string_related<T...>};
+      return {"map_Bump{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::string: {
       return {"{}", 1, is_type_string_related<T...>};
@@ -316,7 +316,7 @@ class FormatHandler : NonCopyable, NonMovable {
    * `eFileType::MTL`.
    */
   template<typename FileTypeTraits<filetype>::SyntaxType key, typename... T>
-  constexpr void write(T &&...args)
+  constexpr void write(T &&... args)
   {
     /* Get format syntax, number of arguments expected and whether types of given arguments are
      * valid.
@@ -340,7 +340,7 @@ class FormatHandler : NonCopyable, NonMovable {
     }
   }
 
-  template<typename... T> void write_impl(const char *fmt, T &&...args)
+  template<typename... T> void write_impl(const char *fmt, T &&... args)
   {
     /* Format into a local buffer. */
     fmt::memory_buffer buf;
