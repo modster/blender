@@ -37,6 +37,9 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
   if (GPU_material_flag_get(gpumat, GPU_MATFLAG_SUBSURFACE)) {
     info.define("USE_SSS");
   }
+  if (GPU_material_flag_get(gpumat, GPU_MATFLAG_SHADER_TO_RGBA)) {
+    info.define("USE_SHADER_TO_RGBA");
+  }
 
   std::stringstream attr_load;
 
