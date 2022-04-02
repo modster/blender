@@ -1591,6 +1591,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     if (cpd->msd == NULL) {
       if (event->val == PEN_MODAL_FREE_ALIGN_TOGGLE) {
         toggle_sel_bezt_free_align_handles(nurbs);
+        cpd->link_handles = false;
       }
       else if (event->val == PEN_MODAL_LINK_HANDLES) {
         cpd->link_handles = !cpd->link_handles;
