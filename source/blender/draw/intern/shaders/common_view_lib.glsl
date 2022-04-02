@@ -129,7 +129,10 @@ uniform int drw_ResourceID;
 
 /* Use this to declare and pass the value if
  * the fragment shader uses the resource_id. */
-#    ifdef USE_GEOMETRY_SHADER
+#    if defined(EEVEE_GENERATED_INTERFACE)
+#      define RESOURCE_ID_VARYING
+#      define PASS_RESOURCE_ID resourceIDFrag = resource_id;
+#    elif defined(USE_GEOMETRY_SHADER)
 #      define RESOURCE_ID_VARYING flat out int resourceIDGeom;
 #      define PASS_RESOURCE_ID resourceIDGeom = resource_id;
 #    else
@@ -167,16 +170,23 @@ uniform int drw_ResourceID;
 /* If used in a fragment / geometry shader, we pass
  * resource_id as varying. */
 #  ifdef GPU_GEOMETRY_SHADER
-#    define RESOURCE_ID_VARYING \
-      flat out int resourceIDFrag; \
-      flat in int resourceIDGeom[];
+/* TODO(fclem): Remove. This is getting ridiculous. */
+#    if !defined(EEVEE_GENERATED_INTERFACE)
+#      define RESOURCE_ID_VARYING \
+        flat out int resourceIDFrag; \
+        flat in int resourceIDGeom[];
+#    else
+#      define RESOURCE_ID_VARYING
+#    endif
 
 #    define resource_id resourceIDGeom
 #    define PASS_RESOURCE_ID resourceIDFrag = resource_id[0];
 #  endif
 
-#  ifdef GPU_FRAGMENT_SHADER
+#  if defined(GPU_FRAGMENT_SHADER)
+#    if !defined(EEVEE_GENERATED_INTERFACE)
 flat in int resourceIDFrag;
+#    endif
 #    define resource_id resourceIDFrag
 #  endif
 #endif

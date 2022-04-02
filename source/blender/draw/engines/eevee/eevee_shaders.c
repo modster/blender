@@ -320,6 +320,7 @@ static void eevee_shader_library_ensure(void)
 
 void EEVEE_shaders_material_shaders_init(void)
 {
+  eevee_shader_extra_init();
   eevee_shader_library_ensure();
 }
 
@@ -1429,28 +1430,13 @@ static void eevee_material_post_eval(void *UNUSED(thunk),
                                      GPUCodegenOutput *codegen)
 {
   uint64_t options = GPU_material_uuid_get(mat);
-  const bool is_hair = (options & VAR_MAT_HAIR) != 0;
-  const bool is_mesh = (options & VAR_MAT_MESH) != 0;
 
   char *vert = eevee_get_vert(options);
   char *geom = eevee_get_geom(options);
   char *frag = eevee_get_frag(options);
   char *defines = eevee_get_defines(options);
 
-  /* Force geometry usage if GPU_BARYCENTRIC_DIST or GPU_BARYCENTRIC_TEXCO are used.
-   * NOTE: GPU_BARYCENTRIC_TEXCO only requires it if the shader is not drawing hairs. */
-  bool inject_geometry_shader = !is_hair && is_mesh &&
-                                GPU_material_flag_get(mat, GPU_MATFLAG_BARYCENTRIC) &&
-                                geom == NULL;
-  if (inject_geometry_shader) {
-    geom = e_data.surface_geom_barycentric;
-  }
-
   eevee_shader_material_create_info_amend(mat, codegen, frag, vert, geom, defines);
-
-  if (inject_geometry_shader) {
-    geom = NULL;
-  }
 
   MEM_SAFE_FREE(defines);
   MEM_SAFE_FREE(vert);
@@ -1522,6 +1508,7 @@ struct GPUMaterial *EEVEE_material_get(
 
 void EEVEE_shaders_free(void)
 {
+  eevee_shader_extra_exit();
   MEM_SAFE_FREE(e_data.surface_prepass_frag);
   MEM_SAFE_FREE(e_data.surface_lit_frag);
   MEM_SAFE_FREE(e_data.surface_geom_barycentric);

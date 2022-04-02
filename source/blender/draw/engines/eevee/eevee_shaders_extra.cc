@@ -15,6 +15,30 @@
 
 #include "eevee_private.h"
 
+using blender::gpu::shader::StageInterfaceInfo;
+
+static StageInterfaceInfo *stage_interface = nullptr;
+
+void eevee_shader_extra_init()
+{
+  if (stage_interface != nullptr) {
+    return;
+  }
+
+  using namespace blender::gpu::shader;
+  stage_interface = new StageInterfaceInfo("ShaderStageInterface", "");
+  stage_interface->smooth(Type::VEC3, "worldPosition");
+  stage_interface->smooth(Type::VEC3, "viewPosition");
+  stage_interface->smooth(Type::VEC3, "worldNormal");
+  stage_interface->smooth(Type::VEC3, "viewNormal");
+  stage_interface->flat(Type::INT, "resourceIDFrag");
+}
+
+void eevee_shader_extra_exit()
+{
+  delete stage_interface;
+}
+
 void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
                                              GPUCodegenOutput *codegen_,
                                              char *frag,
@@ -27,6 +51,8 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
   uint64_t options = GPU_material_uuid_get(gpumat);
   const bool is_background = (options & (VAR_WORLD_PROBE | VAR_WORLD_BACKGROUND)) != 0;
   const bool is_volume = (options & (VAR_MAT_VOLUME)) != 0;
+  const bool is_hair = (options & (VAR_MAT_HAIR)) != 0;
+  const bool is_point_cloud = (options & (VAR_MAT_POINTCLOUD)) != 0;
 
   GPUCodegenOutput &codegen = *codegen_;
   ShaderCreateInfo &info = *reinterpret_cast<ShaderCreateInfo *>(codegen.create_info);
@@ -39,6 +65,11 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
   }
   if (GPU_material_flag_get(gpumat, GPU_MATFLAG_SHADER_TO_RGBA)) {
     info.define("USE_SHADER_TO_RGBA");
+  }
+  if (GPU_material_flag_get(gpumat, GPU_MATFLAG_BARYCENTRIC) && !is_volume && !is_hair &&
+      !is_point_cloud) {
+    info.define("USE_BARYCENTRICS");
+    info.builtins(BuiltinBits::BARYCENTRIC_COORD);
   }
 
   std::stringstream attr_load;
@@ -60,6 +91,11 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
       attr_load << in.type << " " << in.name << ";\n";
     }
     info.vertex_out_interfaces_.clear();
+  }
+
+  if (!is_volume) {
+    info.define("EEVEE_GENERATED_INTERFACE");
+    info.vertex_out(*stage_interface);
   }
 
   attr_load << "void attrib_load()\n";

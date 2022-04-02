@@ -14,7 +14,8 @@
 #  endif
 #endif
 
-#if defined(STEP_RESOLVE) || defined(STEP_RAYTRACE)
+#ifndef EEVEE_GENERATED_INTERFACE
+#  if defined(STEP_RESOLVE) || defined(STEP_RAYTRACE)
 /* SSR will set these global variables itself.
  * Also make false positive compiler warnings disappear by setting values. */
 vec3 worldPosition = vec3(0);
@@ -22,22 +23,23 @@ vec3 viewPosition = vec3(0);
 vec3 worldNormal = vec3(0);
 vec3 viewNormal = vec3(0);
 
-#elif defined(GPU_GEOMETRY_SHADER)
+#  elif defined(GPU_GEOMETRY_SHADER)
 in ShaderStageInterface{SURFACE_INTERFACE} dataIn[];
 
 out ShaderStageInterface{SURFACE_INTERFACE} dataOut;
 
-#  define PASS_SURFACE_INTERFACE(vert) \
-    dataOut.worldPosition = dataIn[vert].worldPosition; \
-    dataOut.viewPosition = dataIn[vert].viewPosition; \
-    dataOut.worldNormal = dataIn[vert].worldNormal; \
-    dataOut.viewNormal = dataIn[vert].viewNormal;
+#    define PASS_SURFACE_INTERFACE(vert) \
+      dataOut.worldPosition = dataIn[vert].worldPosition; \
+      dataOut.viewPosition = dataIn[vert].viewPosition; \
+      dataOut.worldNormal = dataIn[vert].worldNormal; \
+      dataOut.viewNormal = dataIn[vert].viewNormal;
 
-#else /* GPU_VERTEX_SHADER || GPU_FRAGMENT_SHADER*/
+#  else /* GPU_VERTEX_SHADER || GPU_FRAGMENT_SHADER*/
 
 IN_OUT ShaderStageInterface{SURFACE_INTERFACE};
 
-#endif
+#  endif
+#endif /* EEVEE_GENERATED_INTERFACE */
 
 #ifdef HAIR_SHADER
 IN_OUT ShaderHairInterface
@@ -69,6 +71,7 @@ GlobalData init_globals(void)
   surf.P = worldPosition;
   surf.N = normalize(worldNormal);
   surf.Ng = safe_normalize(cross(dFdx(surf.P), dFdy(surf.P)));
+  surf.barycentric_coords = vec2(0.0);
 #  ifdef HAIR_SHADER
   /* Shade as a cylinder. */
   float cos_theta = hairThickTime / hairThickness;
@@ -78,13 +81,17 @@ GlobalData init_globals(void)
   surf.hair_time = hairTime;
   surf.hair_thickness = hairThickness;
   surf.hair_strand_id = hairStrandID;
+#    ifdef USE_BARYCENTRICS
   surf.barycentric_coords = hair_resolve_barycentric(hairBary);
+#    endif
 #  else
   surf.is_strand = false;
   surf.hair_time = 0.0;
   surf.hair_thickness = 0.0;
   surf.hair_strand_id = 0;
-  surf.barycentric_coords = vec2(0.0); /* TODO(fclem) */
+#    ifdef USE_BARYCENTRICS
+  surf.barycentric_coords = gpu_BaryCoord.xy;
+#    endif
 #  endif
   // surf.barycentric_dists = interp.barycentric_dists; /* TODO(fclem) */
   surf.ray_type = rayType;
