@@ -214,8 +214,8 @@ struct uiBut {
   BIFIconID icon;
   /** Copied from the #uiBlock.emboss */
   eUIEmbossType emboss;
-  /** direction in a pie menu, used for collision detection (RadialDirection) */
-  signed char pie_dir;
+  /** direction in a pie menu, used for collision detection. */
+  RadialDirection pie_dir;
   /** could be made into a single flag */
   bool changed;
   /** so buttons can support unit systems which are not RNA */
