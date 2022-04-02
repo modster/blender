@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2005 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup nodes
@@ -23,7 +7,9 @@
 
 #include "DNA_node_types.h"
 
-#include "node_shader_util.h"
+#include "node_shader_util.hh"
+
+#include "NOD_socket_search_link.hh"
 
 #include "node_exec.h"
 
@@ -47,24 +33,25 @@ static bool sh_fn_poll_default(bNodeType *UNUSED(ntype),
   return true;
 }
 
-void sh_node_type_base(
-    struct bNodeType *ntype, int type, const char *name, short nclass, short flag)
+void sh_node_type_base(struct bNodeType *ntype, int type, const char *name, short nclass)
 {
-  node_type_base(ntype, type, name, nclass, flag);
+  node_type_base(ntype, type, name, nclass);
 
   ntype->poll = sh_node_poll_default;
   ntype->insert_link = node_insert_link_default;
+  ntype->gather_link_search_ops = blender::nodes::search_link_ops_for_basic_node;
 }
 
-void sh_fn_node_type_base(bNodeType *ntype, int type, const char *name, short nclass, short flag)
+void sh_fn_node_type_base(bNodeType *ntype, int type, const char *name, short nclass)
 {
-  sh_node_type_base(ntype, type, name, nclass, flag);
+  sh_node_type_base(ntype, type, name, nclass);
   ntype->poll = sh_fn_poll_default;
+  ntype->gather_link_search_ops = blender::nodes::search_link_ops_for_basic_node;
 }
 
 /* ****** */
 
-void nodestack_get_vec(float *in, short type_in, bNodeStack *ns)
+static void nodestack_get_vec(float *in, short type_in, bNodeStack *ns)
 {
   const float *from = ns->vec;
 
@@ -277,11 +264,11 @@ void ntreeExecGPUNodes(bNodeTreeExec *exec, GPUMaterial *mat, bNode *output_node
 void node_shader_gpu_bump_tex_coord(GPUMaterial *mat, bNode *node, GPUNodeLink **link)
 {
   if (node->branch_tag == 1) {
-    /* Add one time the value fo derivative to the input vector. */
+    /* Add one time the value for derivative to the input vector. */
     GPU_link(mat, "dfdx_v3", *link, link);
   }
   else if (node->branch_tag == 2) {
-    /* Add one time the value fo derivative to the input vector. */
+    /* Add one time the value for derivative to the input vector. */
     GPU_link(mat, "dfdy_v3", *link, link);
   }
   else {

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2009 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2009 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup blf
@@ -66,7 +50,8 @@
 /* Font array. */
 static FontBLF *global_font[BLF_MAX_FONT] = {NULL};
 
-/* XXX, should these be made into global_font_'s too? */
+/* XXX: should these be made into global_font_'s too? */
+
 int blf_mono_font = -1;
 int blf_mono_font_render = -1;
 
@@ -144,7 +129,7 @@ bool BLF_has_glyph(int fontid, unsigned int unicode)
 {
   FontBLF *font = blf_get(fontid);
   if (font) {
-    return FT_Get_Char_Index(font->face, unicode) != 0;
+    return FT_Get_Char_Index(font->face, unicode) != FT_Err_Ok;
   }
   return false;
 }
@@ -173,14 +158,14 @@ int BLF_load_unique(const char *name)
     return -1;
   }
 
-  char *filename = blf_dir_search(name);
-  if (!filename) {
+  char *filepath = blf_dir_search(name);
+  if (!filepath) {
     printf("Can't find font: %s\n", name);
     return -1;
   }
 
-  FontBLF *font = blf_font_new(name, filename);
-  MEM_freeN(filename);
+  FontBLF *font = blf_font_new(name, filepath);
+  MEM_freeN(filepath);
 
   if (!font) {
     printf("Can't load font: %s\n", name);
@@ -568,14 +553,6 @@ int BLF_draw_mono(int fontid, const char *str, const size_t str_len, int cwidth)
   return columns;
 }
 
-/**
- * Run \a user_fn for each character, with the bound-box that would be used for drawing.
- *
- * \param user_fn: Callback that runs on each glyph, returning false early exits.
- * \param user_data: User argument passed to \a user_fn.
- *
- * \note The font position, clipping, matrix and rotation are not applied.
- */
 void BLF_boundbox_foreach_glyph_ex(int fontid,
                                    const char *str,
                                    size_t str_len,
@@ -892,9 +869,9 @@ void BLF_draw_buffer(int fontid, const char *str, const size_t str_len)
   BLF_draw_buffer_ex(fontid, str, str_len, NULL);
 }
 
-char *BLF_display_name_from_file(const char *filename)
+char *BLF_display_name_from_file(const char *filepath)
 {
-  FontBLF *font = blf_font_new("font_name", filename);
+  FontBLF *font = blf_font_new("font_name", filepath);
   if (!font) {
     return NULL;
   }

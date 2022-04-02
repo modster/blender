@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "node_geometry_util.hh"
 
@@ -54,44 +40,39 @@ static void select_mesh_by_material(const Mesh &mesh,
   });
 }
 
-class MaterialSelectionFieldInput final : public fn::FieldInput {
+class MaterialSelectionFieldInput final : public GeometryFieldInput {
   Material *material_;
 
  public:
   MaterialSelectionFieldInput(Material *material)
-      : fn::FieldInput(CPPType::get<bool>(), "Material Selection node"), material_(material)
+      : GeometryFieldInput(CPPType::get<bool>(), "Material Selection node"), material_(material)
   {
     category_ = Category::Generated;
   }
 
-  GVArray get_varray_for_context(const fn::FieldContext &context,
-                                 IndexMask mask,
-                                 ResourceScope &UNUSED(scope)) const final
+  GVArray get_varray_for_context(const GeometryComponent &component,
+                                 const AttributeDomain domain,
+                                 IndexMask mask) const final
   {
-    if (const GeometryComponentFieldContext *geometry_context =
-            dynamic_cast<const GeometryComponentFieldContext *>(&context)) {
-      const GeometryComponent &component = geometry_context->geometry_component();
-      const AttributeDomain domain = geometry_context->domain();
-      if (component.type() != GEO_COMPONENT_TYPE_MESH) {
-        return {};
-      }
-      const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
-      const Mesh *mesh = mesh_component.get_for_read();
-      if (mesh == nullptr) {
-        return {};
-      }
-
-      if (domain == ATTR_DOMAIN_FACE) {
-        Array<bool> selection(mask.min_array_size());
-        select_mesh_by_material(*mesh, material_, mask, selection);
-        return VArray<bool>::ForContainer(std::move(selection));
-      }
-
-      Array<bool> selection(mesh->totpoly);
-      select_mesh_by_material(*mesh, material_, IndexMask(mesh->totpoly), selection);
-      return mesh_component.attribute_try_adapt_domain<bool>(
-          VArray<bool>::ForContainer(std::move(selection)), ATTR_DOMAIN_FACE, domain);
+    if (component.type() != GEO_COMPONENT_TYPE_MESH) {
+      return {};
     }
+    const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
+    const Mesh *mesh = mesh_component.get_for_read();
+    if (mesh == nullptr) {
+      return {};
+    }
+
+    if (domain == ATTR_DOMAIN_FACE) {
+      Array<bool> selection(mask.min_array_size());
+      select_mesh_by_material(*mesh, material_, mask, selection);
+      return VArray<bool>::ForContainer(std::move(selection));
+    }
+
+    Array<bool> selection(mesh->totpoly);
+    select_mesh_by_material(*mesh, material_, IndexMask(mesh->totpoly), selection);
+    return mesh_component.attribute_try_adapt_domain<bool>(
+        VArray<bool>::ForContainer(std::move(selection)), ATTR_DOMAIN_FACE, domain);
 
     return nullptr;
   }
@@ -127,7 +108,7 @@ void register_node_type_geo_material_selection()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_MATERIAL_SELECTION, "Material Selection", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_MATERIAL_SELECTION, "Material Selection", NODE_CLASS_GEOMETRY);
   ntype.declare = file_ns::node_declare;
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   nodeRegisterType(&ntype);

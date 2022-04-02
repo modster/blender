@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "DNA_collection_types.h"
 
@@ -36,7 +22,8 @@ static void node_declare(NodeDeclarationBuilder &b)
       .description(N_("Geometry that is instanced on the points"));
   b.add_input<decl::Bool>(N_("Pick Instance"))
       .supports_field()
-      .description("Place different instances on different points");
+      .description(N_("Choose instances from the \"Instance\" input at each point instead of "
+                      "instancing the entire geometry"));
   b.add_input<decl::Int>(N_("Instance Index"))
       .implicit_field()
       .description(N_(
@@ -65,12 +52,24 @@ static void add_instances_from_component(
   const AttributeDomain domain = ATTR_DOMAIN_POINT;
   const int domain_size = src_component.attribute_domain_size(domain);
 
+  VArray<bool> pick_instance;
+  VArray<int> indices;
+  VArray<float3> rotations;
+  VArray<float3> scales;
+
   GeometryComponentFieldContext field_context{src_component, domain};
   const Field<bool> selection_field = params.get_input<Field<bool>>("Selection");
-  fn::FieldEvaluator selection_evaluator{field_context, domain_size};
-  selection_evaluator.add(selection_field);
-  selection_evaluator.evaluate();
-  const IndexMask selection = selection_evaluator.get_evaluated_as_mask(0);
+  fn::FieldEvaluator evaluator{field_context, domain_size};
+  evaluator.set_selection(selection_field);
+  /* The evaluator could use the component's stable IDs as a destination directly, but only the
+   * selected indices should be copied. */
+  evaluator.add(params.get_input<Field<bool>>("Pick Instance"), &pick_instance);
+  evaluator.add(params.get_input<Field<int>>("Instance Index"), &indices);
+  evaluator.add(params.get_input<Field<float3>>("Rotation"), &rotations);
+  evaluator.add(params.get_input<Field<float3>>("Scale"), &scales);
+  evaluator.evaluate();
+
+  const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
 
   /* The initial size of the component might be non-zero when this function is called for multiple
    * component types. */
@@ -82,19 +81,6 @@ static void add_instances_from_component(
                                                                                   select_len);
   MutableSpan<float4x4> dst_transforms = dst_component.instance_transforms().slice(start_len,
                                                                                    select_len);
-
-  FieldEvaluator field_evaluator{field_context, domain_size};
-  VArray<bool> pick_instance;
-  VArray<int> indices;
-  VArray<float3> rotations;
-  VArray<float3> scales;
-  /* The evaluator could use the component's stable IDs as a destination directly, but only the
-   * selected indices should be copied. */
-  field_evaluator.add(params.get_input<Field<bool>>("Pick Instance"), &pick_instance);
-  field_evaluator.add(params.get_input<Field<int>>("Instance Index"), &indices);
-  field_evaluator.add(params.get_input<Field<float3>>("Rotation"), &rotations);
-  field_evaluator.add(params.get_input<Field<float3>>("Scale"), &scales);
-  field_evaluator.evaluate();
 
   VArray<float3> positions = src_component.attribute_get_for_read<float3>(
       "position", domain, {0, 0, 0});
@@ -169,7 +155,7 @@ static void add_instances_from_component(
   }
 
   bke::CustomDataAttributes &instance_attributes = dst_component.attributes();
-  for (const auto &item : attributes_to_propagate.items()) {
+  for (const auto item : attributes_to_propagate.items()) {
     const AttributeIDRef &attribute_id = item.key;
     const AttributeKind attribute_kind = item.value;
 
@@ -209,35 +195,24 @@ static void node_geo_exec(GeoNodeExecParams params)
   geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
     InstancesComponent &instances = geometry_set.get_component_for_write<InstancesComponent>();
 
+    const Array<GeometryComponentType> types{
+        GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE};
+
     Map<AttributeIDRef, AttributeKind> attributes_to_propagate;
     geometry_set.gather_attributes_for_propagation(
-        {GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE},
-        GEO_COMPONENT_TYPE_INSTANCES,
-        false,
-        attributes_to_propagate);
+        types, GEO_COMPONENT_TYPE_INSTANCES, false, attributes_to_propagate);
     attributes_to_propagate.remove("position");
 
-    if (geometry_set.has<MeshComponent>()) {
-      add_instances_from_component(instances,
-                                   *geometry_set.get_component_for_read<MeshComponent>(),
-                                   instance,
-                                   params,
-                                   attributes_to_propagate);
+    for (const GeometryComponentType type : types) {
+      if (geometry_set.has(type)) {
+        add_instances_from_component(instances,
+                                     *geometry_set.get_component_for_read(type),
+                                     instance,
+                                     params,
+                                     attributes_to_propagate);
+      }
     }
-    if (geometry_set.has<PointCloudComponent>()) {
-      add_instances_from_component(instances,
-                                   *geometry_set.get_component_for_read<PointCloudComponent>(),
-                                   instance,
-                                   params,
-                                   attributes_to_propagate);
-    }
-    if (geometry_set.has<CurveComponent>()) {
-      add_instances_from_component(instances,
-                                   *geometry_set.get_component_for_read<CurveComponent>(),
-                                   instance,
-                                   params,
-                                   attributes_to_propagate);
-    }
+
     geometry_set.keep_only({GEO_COMPONENT_TYPE_INSTANCES});
   });
 
@@ -260,7 +235,7 @@ void register_node_type_geo_instance_on_points()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_INSTANCE_ON_POINTS, "Instance on Points", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_INSTANCE_ON_POINTS, "Instance on Points", NODE_CLASS_GEOMETRY);
   ntype.declare = file_ns::node_declare;
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   nodeRegisterType(&ntype);

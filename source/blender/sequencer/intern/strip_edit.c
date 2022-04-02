@@ -1,24 +1,7 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * - Blender Foundation, 2003-2009
- * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved.
+ *           2003-2009 Blender Foundation.
+ *           2005-2006 Peter Schlaile <peter [at] schlaile [dot] de> */
 
 /** \file
  * \ingroup bke
@@ -43,6 +26,7 @@
 #include "utils.h"
 
 #include "SEQ_add.h"
+#include "SEQ_animation.h"
 #include "SEQ_edit.h"
 #include "SEQ_effects.h"
 #include "SEQ_iterator.h"
@@ -175,7 +159,6 @@ static void sequencer_flag_users_for_removal(Scene *scene, ListBase *seqbase, Se
   }
 }
 
-/* Flag seq and its users (effects) for removal. */
 void SEQ_edit_flag_for_removal(Scene *scene, ListBase *seqbase, Sequence *seq)
 {
   if (seq == NULL || (seq->flag & SEQ_FLAG_DELETE) != 0) {
@@ -193,7 +176,6 @@ void SEQ_edit_flag_for_removal(Scene *scene, ListBase *seqbase, Sequence *seq)
   sequencer_flag_users_for_removal(scene, seqbase, seq);
 }
 
-/* Remove all flagged sequences, return true if sequence is removed. */
 void SEQ_edit_remove_flagged_sequences(Scene *scene, ListBase *seqbase)
 {
   LISTBASE_FOREACH_MUTABLE (Sequence *, seq, seqbase) {
@@ -201,8 +183,9 @@ void SEQ_edit_remove_flagged_sequences(Scene *scene, ListBase *seqbase)
       if (seq->type == SEQ_TYPE_META) {
         SEQ_edit_remove_flagged_sequences(scene, &seq->seqbase);
       }
+      SEQ_free_animdata(scene, seq);
       BLI_remlink(seqbase, seq);
-      SEQ_sequence_free(scene, seq, true);
+      SEQ_sequence_free(scene, seq);
       SEQ_sequence_lookup_tag(scene, SEQ_LOOKUP_TAG_INVALID);
     }
   }
@@ -221,14 +204,6 @@ static bool seq_exists_in_seqbase(Sequence *seq, ListBase *seqbase)
   return false;
 }
 
-/**
- * Move sequence to seqbase.
- *
- * \param scene: Scene containing the editing
- * \param dst_seqbase: seqbase where `seq` is located
- * \param seq: Sequence to move
- * \param dst_seqbase: Target seqbase
- */
 bool SEQ_edit_move_strip_to_seqbase(Scene *scene,
                                     ListBase *seqbase,
                                     Sequence *seq,
@@ -247,14 +222,6 @@ bool SEQ_edit_move_strip_to_seqbase(Scene *scene,
   return true;
 }
 
-/**
- * Move sequence to meta sequence.
- *
- * \param scene: Scene containing the editing
- * \param src_seq: Sequence to move
- * \param dst_seqm: Target Meta sequence
- * \param error_str: Error message
- */
 bool SEQ_edit_move_strip_to_meta(Scene *scene,
                                  Sequence *src_seq,
                                  Sequence *dst_seqm,
@@ -468,17 +435,6 @@ static bool seq_edit_split_operation_permitted_check(SeqCollection *strips,
   return true;
 }
 
-/**
- * Split Sequence at timeline_frame in two.
- *
- * \param bmain: Main in which Sequence is located
- * \param scene: Scene in which Sequence is located
- * \param seqbase: ListBase in which Sequence is located
- * \param seq: Sequence to be split
- * \param timeline_frame: frame at which seq is split.
- * \param method: affects type of offset to be applied to resize Sequence
- * \return The newly created sequence strip. This is always Sequence on right side.
- */
 Sequence *SEQ_edit_strip_split(Main *bmain,
                                Scene *scene,
                                ListBase *seqbase,
@@ -501,11 +457,18 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
     return NULL;
   }
 
-  /* Move strips in collection from seqbase to new ListBase. */
+  /* Store `F-curves`, so original ones aren't renamed. */
+  ListBase fcurves_original_backup = {NULL, NULL};
+  SEQ_animation_backup_original(scene, &fcurves_original_backup);
+
   ListBase left_strips = {NULL, NULL};
   SEQ_ITERATOR_FOREACH (seq, collection) {
+    /* Move strips in collection from seqbase to new ListBase. */
     BLI_remlink(seqbase, seq);
     BLI_addtail(&left_strips, seq);
+
+    /* Duplicate curves from backup, so they can be renamed along with split strips. */
+    SEQ_animation_duplicate(scene, seq, &fcurves_original_backup);
   }
 
   SEQ_collection_free(collection);
@@ -518,21 +481,27 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
   ListBase right_strips = {NULL, NULL};
   SEQ_sequence_base_dupli_recursive(scene, scene, &right_strips, &left_strips, SEQ_DUPE_ALL, 0);
 
-  /* Split strips. */
   Sequence *left_seq = left_strips.first;
   Sequence *right_seq = right_strips.first;
-  Sequence *return_seq = right_strips.first;
+  Sequence *return_seq = NULL;
 
-  /* Strips can't be tagged while in detached `seqbase`. Collect all strips which needs to be
-   * deleted and delay tagging until they are moved back to `seqbase` in `Editing`. */
-  SeqCollection *strips_to_delete = SEQ_collection_create(__func__);
+  /* Move strips from detached `ListBase`, otherwise they can't be flagged for removal,
+   * SEQ_time_update_sequence can fail to update meta strips and they can't be renamed.
+   * This is because these functions check all strips in `Editing` to manage relationships. */
+  BLI_movelisttolist(seqbase, &left_strips);
+  BLI_movelisttolist(seqbase, &right_strips);
 
+  /* Split strips. */
   while (left_seq && right_seq) {
     if (left_seq->startdisp >= timeline_frame) {
-      SEQ_collection_append_strip(left_seq, strips_to_delete);
+      SEQ_edit_flag_for_removal(scene, seqbase, left_seq);
     }
     if (right_seq->enddisp <= timeline_frame) {
-      SEQ_collection_append_strip(right_seq, strips_to_delete);
+      SEQ_edit_flag_for_removal(scene, seqbase, right_seq);
+    }
+    else if (return_seq == NULL) {
+      /* Store return value - pointer to strip that will not be removed. */
+      return_seq = right_seq;
     }
 
     seq_edit_split_handle_strip_offsets(
@@ -541,32 +510,19 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
     right_seq = right_seq->next;
   }
 
-  seq = right_strips.first;
-  BLI_movelisttolist(seqbase, &left_strips);
-  BLI_movelisttolist(seqbase, &right_strips);
-
-  for (; seq; seq = seq->next) {
-    SEQ_ensure_unique_name(seq, scene);
-  }
-
-  Sequence *seq_delete;
-  SEQ_ITERATOR_FOREACH (seq_delete, strips_to_delete) {
-    SEQ_edit_flag_for_removal(scene, seqbase, seq_delete);
-  }
   SEQ_edit_remove_flagged_sequences(scene, seqbase);
-  SEQ_collection_free(strips_to_delete);
+
+  /* Rename duplicated strips. */
+  Sequence *seq_rename = return_seq;
+  for (; seq_rename; seq_rename = seq_rename->next) {
+    SEQ_ensure_unique_name(seq_rename, scene);
+  }
+
+  SEQ_animation_restore_original(scene, &fcurves_original_backup);
+
   return return_seq;
 }
 
-/**
- * Find gap after initial_frame and move strips on right side to close the gap
- *
- * \param scene: Scene in which strips are located
- * \param seqbase: ListBase in which strips are located
- * \param initial_frame: frame on timeline from where gaps are searched for
- * \param remove_all_gaps: remove all gaps instead of one gap
- * \return true if gap is removed, otherwise false
- */
 bool SEQ_edit_remove_gaps(Scene *scene,
                           ListBase *seqbase,
                           const int initial_frame,

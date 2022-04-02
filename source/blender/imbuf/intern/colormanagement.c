@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2012 by Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2012 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup imbuf
@@ -53,6 +37,7 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_image.h"
+#include "BKE_image_format.h"
 #include "BKE_main.h"
 
 #include "RNA_define.h"
@@ -519,7 +504,18 @@ static void colormanage_load_config(OCIO_ConstConfigRcPtr *config)
     is_invertible = OCIO_colorSpaceIsInvertible(ocio_colorspace);
     is_data = OCIO_colorSpaceIsData(ocio_colorspace);
 
-    colormanage_colorspace_add(name, description, is_invertible, is_data);
+    ColorSpace *colorspace = colormanage_colorspace_add(name, description, is_invertible, is_data);
+
+    colorspace->num_aliases = OCIO_colorSpaceGetNumAliases(ocio_colorspace);
+    if (colorspace->num_aliases > 0) {
+      colorspace->aliases = MEM_callocN(sizeof(*colorspace->aliases) * colorspace->num_aliases,
+                                        "ColorSpace aliases");
+      for (int i = 0; i < colorspace->num_aliases; i++) {
+        BLI_strncpy(colorspace->aliases[i],
+                    OCIO_colorSpaceGetAlias(ocio_colorspace, i),
+                    MAX_COLORSPACE_NAME);
+      }
+    }
 
     OCIO_colorSpaceRelease(ocio_colorspace);
   }
@@ -602,6 +598,7 @@ static void colormanage_free_config(void)
     }
 
     /* free color space itself */
+    MEM_SAFE_FREE(colorspace->aliases);
     MEM_freeN(colorspace);
 
     colorspace = colorspace_next;
@@ -1409,6 +1406,12 @@ bool IMB_colormanagement_space_name_is_data(const char *name)
   return (colorspace && colorspace->is_data);
 }
 
+bool IMB_colormanagement_space_name_is_scene_linear(const char *name)
+{
+  ColorSpace *colorspace = colormanage_colorspace_get_named(name);
+  return (colorspace && IMB_colormanagement_space_is_scene_linear(colorspace));
+}
+
 const float *IMB_colormanagement_get_xyz_to_rgb()
 {
   return &imbuf_xyz_to_rgb[0][0];
@@ -1968,7 +1971,6 @@ static void colormanagement_transform_ex(unsigned char *byte_buffer,
   IMB_colormanagement_processor_free(cm_processor);
 }
 
-/* convert the whole buffer from specified by name color space to another */
 void IMB_colormanagement_transform(float *buffer,
                                    int width,
                                    int height,
@@ -1981,9 +1983,6 @@ void IMB_colormanagement_transform(float *buffer,
       NULL, buffer, width, height, channels, from_colorspace, to_colorspace, predivide, false);
 }
 
-/* convert the whole buffer from specified by name color space to another
- * will do threaded conversion
- */
 void IMB_colormanagement_transform_threaded(float *buffer,
                                             int width,
                                             int height,
@@ -1996,7 +1995,6 @@ void IMB_colormanagement_transform_threaded(float *buffer,
       NULL, buffer, width, height, channels, from_colorspace, to_colorspace, predivide, true);
 }
 
-/* Similar to functions above, but operates on byte buffer. */
 void IMB_colormanagement_transform_byte(unsigned char *buffer,
                                         int width,
                                         int height,
@@ -2018,7 +2016,6 @@ void IMB_colormanagement_transform_byte_threaded(unsigned char *buffer,
       buffer, NULL, width, height, channels, from_colorspace, to_colorspace, false, true);
 }
 
-/* Similar to above, but gets float buffer from display one. */
 void IMB_colormanagement_transform_from_byte(float *float_buffer,
                                              unsigned char *byte_buffer,
                                              int width,
@@ -2098,9 +2095,6 @@ void IMB_colormanagement_transform_v4(float pixel[4],
   IMB_colormanagement_processor_free(cm_processor);
 }
 
-/* convert pixel from specified by descriptor color space to scene linear
- * used by performance-critical areas such as renderer and baker
- */
 void IMB_colormanagement_colorspace_to_scene_linear_v3(float pixel[3], ColorSpace *colorspace)
 {
   OCIO_ConstCPUProcessorRcPtr *processor;
@@ -2118,7 +2112,6 @@ void IMB_colormanagement_colorspace_to_scene_linear_v3(float pixel[3], ColorSpac
   }
 }
 
-/* same as above, but converts colors in opposite direction */
 void IMB_colormanagement_scene_linear_to_colorspace_v3(float pixel[3], ColorSpace *colorspace)
 {
   OCIO_ConstCPUProcessorRcPtr *processor;
@@ -2315,14 +2308,6 @@ void IMB_colormanagement_imbuf_to_float_texture(float *out_buffer,
   }
 }
 
-/* Conversion between color picking role. Typically we would expect such a
- * requirements:
- * - It is approximately perceptually linear, so that the HSV numbers and
- *   the HSV cube/circle have an intuitive distribution.
- * - It has the same gamut as the scene linear color space.
- * - Color picking values 0..1 map to scene linear values in the 0..1 range,
- *   so that picked albedo values are energy conserving.
- */
 void IMB_colormanagement_scene_linear_to_color_picking_v3(float pixel[3])
 {
   if (!global_color_picking_state.cpu_processor_to && !global_color_picking_state.failed) {
@@ -2377,8 +2362,6 @@ void IMB_colormanagement_color_picking_to_scene_linear_v3(float pixel[3])
   }
 }
 
-/* Conversion between sRGB, for rare cases like hex color or copy/pasting
- * between UI theme and scene linear colors. */
 void IMB_colormanagement_scene_linear_to_srgb_v3(float pixel[3])
 {
   mul_m3_v3(imbuf_rgb_to_xyz, pixel);
@@ -2393,10 +2376,6 @@ void IMB_colormanagement_srgb_to_scene_linear_v3(float pixel[3])
   mul_m3_v3(imbuf_xyz_to_rgb, pixel);
 }
 
-/* convert pixel from scene linear to display space using default view
- * used by performance-critical areas such as color-related widgets where we want to reduce
- * amount of per-widget allocations
- */
 void IMB_colormanagement_scene_linear_to_display_v3(float pixel[3], ColorManagedDisplay *display)
 {
   OCIO_ConstCPUProcessorRcPtr *processor = display_from_scene_linear_processor(display);
@@ -2406,7 +2385,6 @@ void IMB_colormanagement_scene_linear_to_display_v3(float pixel[3], ColorManaged
   }
 }
 
-/* same as above, but converts color in opposite direction */
 void IMB_colormanagement_display_to_scene_linear_v3(float pixel[3], ColorManagedDisplay *display)
 {
   OCIO_ConstCPUProcessorRcPtr *processor = display_to_scene_linear_processor(display);
@@ -2468,29 +2446,15 @@ void IMB_colormanagement_imbuf_make_display_space(
   colormanagement_imbuf_make_display_space(ibuf, view_settings, display_settings, false);
 }
 
-/* prepare image buffer to be saved on disk, applying color management if needed
- * color management would be applied if image is saving as render result and if
- * file format is not expecting float buffer to be in linear space (currently
- * JPEG2000 and TIFF are such formats -- they're storing image as float but
- * file itself stores applied color space).
- *
- * Both byte and float buffers would contain applied color space, and result's
- * float_colorspace would be set to display color space. This should be checked
- * in image format write callback and if float_colorspace is not NULL, no color
- * space transformation should be applied on this buffer.
- */
 ImBuf *IMB_colormanagement_imbuf_for_write(ImBuf *ibuf,
                                            bool save_as_render,
                                            bool allocate_result,
-                                           const ColorManagedViewSettings *view_settings,
-                                           const ColorManagedDisplaySettings *display_settings,
-                                           ImageFormatData *image_format_data)
+                                           const ImageFormatData *image_format)
 {
   ImBuf *colormanaged_ibuf = ibuf;
-  bool do_colormanagement;
-  bool is_movie = BKE_imtype_is_movie(image_format_data->imtype);
-  bool requires_linear_float = BKE_imtype_requires_linear_float(image_format_data->imtype);
-  bool do_alpha_under = image_format_data->planes != R_IMF_PLANES_RGBA;
+  const bool is_movie = BKE_imtype_is_movie(image_format->imtype);
+  const bool requires_linear_float = BKE_imtype_requires_linear_float(image_format->imtype);
+  const bool do_alpha_under = image_format->planes != R_IMF_PLANES_RGBA;
 
   if (ibuf->rect_float && ibuf->rect &&
       (ibuf->userflags & (IB_DISPLAY_BUFFER_INVALID | IB_RECT_INVALID)) != 0) {
@@ -2498,9 +2462,13 @@ ImBuf *IMB_colormanagement_imbuf_for_write(ImBuf *ibuf,
     ibuf->userflags &= ~(IB_RECT_INVALID | IB_DISPLAY_BUFFER_INVALID);
   }
 
-  do_colormanagement = save_as_render && (is_movie || !requires_linear_float);
+  const bool do_colormanagement_display = save_as_render && (is_movie || !requires_linear_float);
+  const bool do_colormanagement_linear = save_as_render && requires_linear_float &&
+                                         image_format->linear_colorspace_settings.name[0] &&
+                                         !IMB_colormanagement_space_name_is_scene_linear(
+                                             image_format->linear_colorspace_settings.name);
 
-  if (do_colormanagement || do_alpha_under) {
+  if (do_colormanagement_display || do_colormanagement_linear || do_alpha_under) {
     if (allocate_result) {
       colormanaged_ibuf = IMB_dupImBuf(ibuf);
     }
@@ -2553,15 +2521,16 @@ ImBuf *IMB_colormanagement_imbuf_for_write(ImBuf *ibuf,
     }
   }
 
-  if (do_colormanagement) {
+  if (do_colormanagement_display) {
+    /* Color management with display and view transform. */
     bool make_byte = false;
 
     /* for proper check whether byte buffer is required by a format or not
      * should be pretty safe since this image buffer is supposed to be used for
      * saving only and ftype would be overwritten a bit later by BKE_imbuf_write
      */
-    colormanaged_ibuf->ftype = BKE_image_imtype_to_ftype(image_format_data->imtype,
-                                                         &colormanaged_ibuf->foptions);
+    colormanaged_ibuf->ftype = BKE_imtype_to_ftype(image_format->imtype,
+                                                   &colormanaged_ibuf->foptions);
 
     /* if file format isn't able to handle float buffer itself,
      * we need to allocate byte buffer and store color managed
@@ -2575,16 +2544,39 @@ ImBuf *IMB_colormanagement_imbuf_for_write(ImBuf *ibuf,
     }
 
     /* perform color space conversions */
-    colormanagement_imbuf_make_display_space(
-        colormanaged_ibuf, view_settings, display_settings, make_byte);
+    colormanagement_imbuf_make_display_space(colormanaged_ibuf,
+                                             &image_format->view_settings,
+                                             &image_format->display_settings,
+                                             make_byte);
 
     if (colormanaged_ibuf->rect_float) {
       /* float buffer isn't linear anymore,
        * image format write callback should check for this flag and assume
        * no space conversion should happen if ibuf->float_colorspace != NULL
        */
-      colormanaged_ibuf->float_colorspace = display_transform_get_colorspace(view_settings,
-                                                                             display_settings);
+      colormanaged_ibuf->float_colorspace = display_transform_get_colorspace(
+          &image_format->view_settings, &image_format->display_settings);
+    }
+  }
+  else if (do_colormanagement_linear) {
+    /* Color management transform to another linear color space. */
+    if (!colormanaged_ibuf->rect_float) {
+      IMB_float_from_rect(colormanaged_ibuf);
+      imb_freerectImBuf(colormanaged_ibuf);
+    }
+
+    if (colormanaged_ibuf->rect_float) {
+      const char *from_colorspace = (ibuf->float_colorspace) ? ibuf->float_colorspace->name :
+                                                               global_role_scene_linear;
+      const char *to_colorspace = image_format->linear_colorspace_settings.name;
+
+      IMB_colormanagement_transform(colormanaged_ibuf->rect_float,
+                                    colormanaged_ibuf->x,
+                                    colormanaged_ibuf->y,
+                                    colormanaged_ibuf->channels,
+                                    from_colorspace,
+                                    to_colorspace,
+                                    false);
     }
   }
 
@@ -2595,52 +2587,12 @@ ImBuf *IMB_colormanagement_imbuf_for_write(ImBuf *ibuf,
   return colormanaged_ibuf;
 }
 
-void IMB_colormanagement_buffer_make_display_space(
-    float *buffer,
-    unsigned char *display_buffer,
-    int width,
-    int height,
-    int channels,
-    float dither,
-    const ColorManagedViewSettings *view_settings,
-    const ColorManagedDisplaySettings *display_settings)
-{
-  ColormanageProcessor *cm_processor;
-  size_t float_buffer_size = ((size_t)width) * height * channels * sizeof(float);
-  float *display_buffer_float = MEM_mallocN(float_buffer_size, "byte_buffer_make_display_space");
-
-  /* TODO(sergey): Convert float directly to byte buffer. */
-
-  memcpy(display_buffer_float, buffer, float_buffer_size);
-
-  cm_processor = IMB_colormanagement_display_processor_new(view_settings, display_settings);
-
-  processor_transform_apply_threaded(
-      NULL, display_buffer_float, width, height, channels, cm_processor, true, false);
-
-  IMB_buffer_byte_from_float(display_buffer,
-                             display_buffer_float,
-                             channels,
-                             dither,
-                             IB_PROFILE_SRGB,
-                             IB_PROFILE_SRGB,
-                             true,
-                             width,
-                             height,
-                             width,
-                             width);
-
-  MEM_freeN(display_buffer_float);
-  IMB_colormanagement_processor_free(cm_processor);
-}
-
 /** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Public Display Buffers Interfaces
  * \{ */
 
-/* acquire display buffer for given image buffer using specified view and display settings */
 unsigned char *IMB_display_buffer_acquire(ImBuf *ibuf,
                                           const ColorManagedViewSettings *view_settings,
                                           const ColorManagedDisplaySettings *display_settings,
@@ -2738,7 +2690,6 @@ unsigned char *IMB_display_buffer_acquire(ImBuf *ibuf,
   return display_buffer;
 }
 
-/* same as IMB_display_buffer_acquire but gets view and display settings from context */
 unsigned char *IMB_display_buffer_acquire_ctx(const bContext *C, ImBuf *ibuf, void **cache_handle)
 {
   ColorManagedViewSettings *view_settings;
@@ -2899,7 +2850,6 @@ const char *IMB_colormanagement_display_get_default_name(void)
   return display->name;
 }
 
-/* used by performance-critical pixel processing areas, such as color widgets */
 ColorManagedDisplay *IMB_colormanagement_display_get_named(const char *name)
 {
   return colormanage_display_get_named(name);
@@ -3117,6 +3067,12 @@ ColorSpace *colormanage_colorspace_get_named(const char *name)
   for (colorspace = global_colorspaces.first; colorspace; colorspace = colorspace->next) {
     if (STREQ(colorspace->name, name)) {
       return colorspace;
+    }
+
+    for (int i = 0; i < colorspace->num_aliases; i++) {
+      if (STREQ(colorspace->aliases[i], name)) {
+        return colorspace;
+      }
     }
   }
 
@@ -4027,19 +3983,6 @@ bool IMB_colormanagement_support_glsl_draw(const ColorManagedViewSettings *UNUSE
   return OCIO_supportGPUShader();
 }
 
-/**
- * Configures GLSL shader for conversion from specified to
- * display color space
- *
- * Will create appropriate OCIO processor and setup GLSL shader,
- * so further 2D texture usage will use this conversion.
- *
- * When there's no need to apply transform on 2D textures, use
- * IMB_colormanagement_finish_glsl_draw().
- *
- * This is low-level function, use ED_draw_imbuf_ctx if you
- * only need to display given image buffer
- */
 bool IMB_colormanagement_setup_glsl_draw_from_space(
     const ColorManagedViewSettings *view_settings,
     const ColorManagedDisplaySettings *display_settings,
@@ -4097,7 +4040,6 @@ bool IMB_colormanagement_setup_glsl_draw_from_space(
   return global_gpu_state.gpu_shader_bound;
 }
 
-/* Configures GLSL shader for conversion from scene linear to display space */
 bool IMB_colormanagement_setup_glsl_draw(const ColorManagedViewSettings *view_settings,
                                          const ColorManagedDisplaySettings *display_settings,
                                          float dither,
@@ -4107,10 +4049,6 @@ bool IMB_colormanagement_setup_glsl_draw(const ColorManagedViewSettings *view_se
       view_settings, display_settings, NULL, dither, predivide, false);
 }
 
-/**
- * Same as setup_glsl_draw_from_space,
- * but color management settings are guessing from a given context.
- */
 bool IMB_colormanagement_setup_glsl_draw_from_space_ctx(const bContext *C,
                                                         struct ColorSpace *from_colorspace,
                                                         float dither,
@@ -4125,13 +4063,11 @@ bool IMB_colormanagement_setup_glsl_draw_from_space_ctx(const bContext *C,
       view_settings, display_settings, from_colorspace, dither, predivide, false);
 }
 
-/* Same as setup_glsl_draw, but color management settings are guessing from a given context */
 bool IMB_colormanagement_setup_glsl_draw_ctx(const bContext *C, float dither, bool predivide)
 {
   return IMB_colormanagement_setup_glsl_draw_from_space_ctx(C, NULL, dither, predivide);
 }
 
-/* Finish GLSL-based display space conversion */
 void IMB_colormanagement_finish_glsl_draw(void)
 {
   if (global_gpu_state.gpu_shader_bound) {

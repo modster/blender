@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_task.hh"
 
@@ -28,26 +14,24 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Vector>(N_("Pivot Point")).subtype(PROP_TRANSLATION).supports_field();
   b.add_input<decl::Bool>(N_("Local Space")).default_value(true).supports_field();
   b.add_output<decl::Geometry>(N_("Instances"));
-};
+}
 
 static void rotate_instances(GeoNodeExecParams &params, InstancesComponent &instances_component)
 {
   GeometryComponentFieldContext field_context{instances_component, ATTR_DOMAIN_INSTANCE};
   const int domain_size = instances_component.instances_amount();
 
-  fn::FieldEvaluator selection_evaluator{field_context, domain_size};
-  selection_evaluator.add(params.extract_input<Field<bool>>("Selection"));
-  selection_evaluator.evaluate();
-  const IndexMask selection = selection_evaluator.get_evaluated_as_mask(0);
+  fn::FieldEvaluator evaluator{field_context, domain_size};
+  evaluator.set_selection(params.extract_input<Field<bool>>("Selection"));
+  evaluator.add(params.extract_input<Field<float3>>("Rotation"));
+  evaluator.add(params.extract_input<Field<float3>>("Pivot Point"));
+  evaluator.add(params.extract_input<Field<bool>>("Local Space"));
+  evaluator.evaluate();
 
-  fn::FieldEvaluator transforms_evaluator{field_context, &selection};
-  transforms_evaluator.add(params.extract_input<Field<float3>>("Rotation"));
-  transforms_evaluator.add(params.extract_input<Field<float3>>("Pivot Point"));
-  transforms_evaluator.add(params.extract_input<Field<bool>>("Local Space"));
-  transforms_evaluator.evaluate();
-  const VArray<float3> &rotations = transforms_evaluator.get_evaluated<float3>(0);
-  const VArray<float3> &pivots = transforms_evaluator.get_evaluated<float3>(1);
-  const VArray<bool> &local_spaces = transforms_evaluator.get_evaluated<bool>(2);
+  const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
+  const VArray<float3> &rotations = evaluator.get_evaluated<float3>(0);
+  const VArray<float3> &pivots = evaluator.get_evaluated<float3>(1);
+  const VArray<bool> &local_spaces = evaluator.get_evaluated<bool>(2);
 
   MutableSpan<float4x4> instance_transforms = instances_component.instance_transforms();
 
@@ -114,8 +98,7 @@ void register_node_type_geo_rotate_instances()
 
   static bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_ROTATE_INSTANCES, "Rotate Instances", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_ROTATE_INSTANCES, "Rotate Instances", NODE_CLASS_GEOMETRY);
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.declare = file_ns::node_declare;
   nodeRegisterType(&ntype);

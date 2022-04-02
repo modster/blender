@@ -1,20 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_spline.hh"
+#include <atomic>
+
+#include "BKE_curves.hh"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -22,6 +10,8 @@
 #include "node_geometry_util.hh"
 
 namespace blender::nodes::node_geo_set_curve_handles_cc {
+
+NODE_STORAGE_FUNCS(NodeGeometrySetCurveHandlePositions)
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
@@ -39,15 +29,47 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometrySetCurveHandlePositions *data = (NodeGeometrySetCurveHandlePositions *)MEM_callocN(
-      sizeof(NodeGeometrySetCurveHandlePositions), __func__);
+  NodeGeometrySetCurveHandlePositions *data = MEM_cnew<NodeGeometrySetCurveHandlePositions>(
+      __func__);
 
   data->mode = GEO_NODE_CURVE_HANDLE_LEFT;
   node->storage = data;
 }
 
-static void set_position_in_component(const GeometryNodeCurveHandleMode mode,
-                                      GeometryComponent &component,
+static void update_handle_types_for_movement(int8_t &type, int8_t &other)
+{
+  switch (type) {
+    case BEZIER_HANDLE_FREE:
+      break;
+    case BEZIER_HANDLE_AUTO:
+      /* Converting auto handles to aligned handled instead of free handles is
+       * arbitrary, but expected and "standard" based on behavior in edit mode. */
+      if (other == BEZIER_HANDLE_AUTO) {
+        /* Convert pairs of auto handles to aligned handles when moving one side. */
+        type = BEZIER_HANDLE_ALIGN;
+        other = BEZIER_HANDLE_ALIGN;
+      }
+      else {
+        /* If the other handle isn't automatic, just make the handle free. */
+        type = BEZIER_HANDLE_FREE;
+      }
+      break;
+    case BEZIER_HANDLE_VECTOR:
+      type = BEZIER_HANDLE_FREE;
+      break;
+    case BEZIER_HANDLE_ALIGN:
+      /* The handle can stay aligned if the other handle is also aligned (in which case the other
+       * handle should be updated to be consistent). But otherwise the handle must be made free to
+       * avoid conflicting with its "aligned" type. */
+      if (other != BEZIER_HANDLE_ALIGN) {
+        type = BEZIER_HANDLE_FREE;
+      }
+      break;
+  }
+}
+
+static void set_position_in_component(CurveComponent &component,
+                                      const GeometryNodeCurveHandleMode mode,
                                       const Field<bool> &selection_field,
                                       const Field<float3> &position_field,
                                       const Field<float3> &offset_field)
@@ -58,105 +80,88 @@ static void set_position_in_component(const GeometryNodeCurveHandleMode mode,
     return;
   }
 
-  fn::FieldEvaluator selection_evaluator{field_context, domain_size};
-  selection_evaluator.add(selection_field);
-  selection_evaluator.evaluate();
-  const IndexMask selection = selection_evaluator.get_evaluated_as_mask(0);
+  fn::FieldEvaluator evaluator{field_context, domain_size};
+  evaluator.set_selection(selection_field);
+  evaluator.add(position_field);
+  evaluator.add(offset_field);
+  evaluator.evaluate();
+  const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
+  const VArray<float3> &new_positions = evaluator.get_evaluated<float3>(0);
+  const VArray<float3> &new_offsets = evaluator.get_evaluated<float3>(1);
 
-  CurveComponent *curve_component = static_cast<CurveComponent *>(&component);
-  CurveEval *curve = curve_component->get_for_write();
+  Curves &curves_id = *component.get_for_write();
+  bke::CurvesGeometry &curves = bke::CurvesGeometry::wrap(curves_id.geometry);
 
-  StringRef side = mode & GEO_NODE_CURVE_HANDLE_LEFT ? "handle_left" : "handle_right";
+  Span<float3> positions = curves.positions();
 
-  int current_point = 0;
-  int current_mask = 0;
+  const bool use_left = mode == GEO_NODE_CURVE_HANDLE_LEFT;
+  MutableSpan<int8_t> handle_types = use_left ? curves.handle_types_left() :
+                                                curves.handle_types_right();
+  MutableSpan<int8_t> handle_types_other = use_left ? curves.handle_types_right() :
+                                                      curves.handle_types_left();
+  MutableSpan<float3> handle_positions = use_left ? curves.handle_positions_left() :
+                                                    curves.handle_positions_right();
+  MutableSpan<float3> handle_positions_other = use_left ? curves.handle_positions_right() :
+                                                          curves.handle_positions_left();
 
-  for (const SplinePtr &spline : curve->splines()) {
-    if (spline->type() == Spline::Type::Bezier) {
-      BezierSpline &bezier = static_cast<BezierSpline &>(*spline);
-      for (int i : bezier.positions().index_range()) {
-        if (selection[current_mask] == current_point) {
-          if (mode & GEO_NODE_CURVE_HANDLE_LEFT) {
-            if (bezier.handle_types_left()[i] == BezierSpline::HandleType::Vector) {
-              bezier.ensure_auto_handles();
-              bezier.handle_types_left()[i] = BezierSpline::HandleType::Free;
-            }
-            else if (bezier.handle_types_left()[i] == BezierSpline::HandleType::Auto) {
-              bezier.ensure_auto_handles();
-              bezier.handle_types_left()[i] = BezierSpline::HandleType::Align;
-            }
-          }
-          else {
-            if (bezier.handle_types_right()[i] == BezierSpline::HandleType::Vector) {
-              bezier.ensure_auto_handles();
-              bezier.handle_types_right()[i] = BezierSpline::HandleType::Free;
-            }
-            else if (bezier.handle_types_right()[i] == BezierSpline::HandleType::Auto) {
-              bezier.ensure_auto_handles();
-              bezier.handle_types_right()[i] = BezierSpline::HandleType::Align;
-            }
-          }
-          current_mask++;
-        }
-        current_point++;
-      }
+  threading::parallel_for(selection.index_range(), 2048, [&](IndexRange range) {
+    for (const int i : selection.slice(range)) {
+      update_handle_types_for_movement(handle_types[i], handle_types_other[i]);
     }
-    else {
-      for (int UNUSED(i) : spline->positions().index_range()) {
-        if (selection[current_mask] == current_point) {
-          current_mask++;
-        }
-        current_point++;
-      }
+  });
+
+  threading::parallel_for(selection.index_range(), 2048, [&](IndexRange range) {
+    for (const int i : selection.slice(range)) {
+      bke::curves::bezier::set_handle_position(positions[i],
+                                               HandleType(handle_types[i]),
+                                               HandleType(handle_types_other[i]),
+                                               new_positions[i] + new_offsets[i],
+                                               handle_positions[i],
+                                               handle_positions_other[i]);
     }
-  }
+  });
 
-  fn::FieldEvaluator position_evaluator{field_context, &selection};
-  position_evaluator.add(position_field);
-  position_evaluator.add(offset_field);
-  position_evaluator.evaluate();
+  curves.calculate_bezier_auto_handles();
 
-  const VArray<float3> &positions_input = position_evaluator.get_evaluated<float3>(0);
-  const VArray<float3> &offsets_input = position_evaluator.get_evaluated<float3>(1);
-
-  OutputAttribute_Typed<float3> positions = component.attribute_try_get_for_output<float3>(
-      side, ATTR_DOMAIN_POINT, {0, 0, 0});
-  MutableSpan<float3> position_mutable = positions.as_span();
-
-  for (int i : selection) {
-    position_mutable[i] = positions_input[i] + offsets_input[i];
-  }
-
-  positions.save();
+  curves.tag_positions_changed();
 }
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  const NodeGeometrySetCurveHandlePositions *node_storage =
-      (NodeGeometrySetCurveHandlePositions *)params.node().storage;
-  const GeometryNodeCurveHandleMode mode = (GeometryNodeCurveHandleMode)node_storage->mode;
+  const NodeGeometrySetCurveHandlePositions &storage = node_storage(params.node());
+  const GeometryNodeCurveHandleMode mode = (GeometryNodeCurveHandleMode)storage.mode;
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
   Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
   Field<float3> position_field = params.extract_input<Field<float3>>("Position");
   Field<float3> offset_field = params.extract_input<Field<float3>>("Offset");
 
-  bool has_bezier = false;
+  std::atomic<bool> has_curves = false;
+  std::atomic<bool> has_bezier = false;
+
   geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
-    if (geometry_set.has_curve() &&
-        geometry_set.get_curve_for_read()->has_spline_with_type(Spline::Type::Bezier)) {
-      has_bezier = true;
-      set_position_in_component(mode,
-                                geometry_set.get_component_for_write<CurveComponent>(),
-                                selection_field,
-                                position_field,
-                                offset_field);
+    if (!geometry_set.has_curves()) {
+      return;
     }
+    has_curves = true;
+    const CurveComponent &component = *geometry_set.get_component_for_read<CurveComponent>();
+    if (!component.attribute_exists("handle_left") ||
+        !component.attribute_exists("handle_right")) {
+      return;
+    }
+    has_bezier = true;
+
+    set_position_in_component(geometry_set.get_component_for_write<CurveComponent>(),
+                              mode,
+                              selection_field,
+                              position_field,
+                              offset_field);
   });
-  if (!has_bezier) {
-    params.error_message_add(NodeWarningType::Info,
-                             TIP_("The input geometry does not contain a Bezier spline"));
+
+  if (has_curves && !has_bezier) {
+    params.error_message_add(NodeWarningType::Info, TIP_("Input curves do not have Bezier type"));
   }
+
   params.set_output("Curve", std::move(geometry_set));
 }
 
@@ -169,7 +174,7 @@ void register_node_type_geo_set_curve_handles()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_SET_CURVE_HANDLES, "Set Handle Positions", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_SET_CURVE_HANDLES, "Set Handle Positions", NODE_CLASS_GEOMETRY);
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.declare = file_ns::node_declare;
   ntype.minwidth = 100.0f;

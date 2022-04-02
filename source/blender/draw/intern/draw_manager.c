@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2016, Blender Foundation.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2016 Blender Foundation. */
 
 /** \file
  * \ingroup draw
@@ -35,11 +20,11 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
+#include "BKE_curves.h"
 #include "BKE_duplilist.h"
 #include "BKE_editmesh.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
-#include "BKE_hair.h"
 #include "BKE_lattice.h"
 #include "BKE_main.h"
 #include "BKE_mball.h"
@@ -52,6 +37,7 @@
 #include "BKE_pointcache.h"
 #include "BKE_pointcloud.h"
 #include "BKE_screen.h"
+#include "BKE_subdiv_modifier.h"
 #include "BKE_volume.h"
 
 #include "DNA_camera_types.h"
@@ -69,6 +55,8 @@
 #include "GPU_framebuffer.h"
 #include "GPU_immediate.h"
 #include "GPU_matrix.h"
+#include "GPU_platform.h"
+#include "GPU_shader_shared.h"
 #include "GPU_state.h"
 #include "GPU_uniform_buffer.h"
 #include "GPU_viewport.h"
@@ -90,6 +78,7 @@
 #include "draw_manager_testing.h"
 #include "draw_manager_text.h"
 #include "draw_shader.h"
+#include "draw_subdivision.h"
 #include "draw_texture_pool.h"
 
 /* only for callbacks */
@@ -97,6 +86,7 @@
 
 #include "engines/basic/basic_engine.h"
 #include "engines/eevee/eevee_engine.h"
+#include "engines/eevee_next/eevee_engine.h"
 #include "engines/external/external_engine.h"
 #include "engines/gpencil/gpencil_engine.h"
 #include "engines/image/image_engine.h"
@@ -204,31 +194,12 @@ bool DRW_object_is_renderable(const Object *ob)
   return true;
 }
 
-/* Does `ob` needs to be rendered in edit mode.
- *
- * When using duplicate linked meshes, objects that are not in edit-mode will be drawn as
- * it is in edit mode, when another object with the same mesh is in edit mode.
- * This will not be the case when one of the objects are influenced by modifiers. */
 bool DRW_object_is_in_edit_mode(const Object *ob)
 {
   if (BKE_object_is_in_editmode(ob)) {
     if (ob->type == OB_MESH) {
       if ((ob->mode & OB_MODE_EDIT) == 0) {
-        Mesh *me = (Mesh *)ob->data;
-        BMEditMesh *embm = me->edit_mesh;
-        /* Sanity check when rendering in multiple windows. */
-        if (embm && embm->mesh_eval_final == NULL) {
-          return false;
-        }
-        /* Do not draw ob with edit overlay when edit data is present and is modified. */
-        if (embm && embm->mesh_eval_cage && (embm->mesh_eval_cage != embm->mesh_eval_final)) {
-          return false;
-        }
-        /* Check if the object that we are drawing is modified. */
-        if (!DEG_is_original_id(&me->id)) {
-          return false;
-        }
-        return true;
+        return false;
       }
     }
     return true;
@@ -236,10 +207,6 @@ bool DRW_object_is_in_edit_mode(const Object *ob)
   return false;
 }
 
-/**
- * Return whether this object is visible depending if
- * we are rendering or drawing in the viewport.
- */
 int DRW_object_visibility_in_active_context(const Object *ob)
 {
   const eEvaluationMode mode = DRW_state_is_scene_render() ? DAG_EVAL_RENDER : DAG_EVAL_VIEWPORT;
@@ -322,7 +289,6 @@ struct DupliObject *DRW_object_get_dupli(const Object *UNUSED(ob))
 /** \name Viewport (DRW_viewport)
  * \{ */
 
-/* WARNING: only use for custom pipeline. 99% of the time, you don't want to use this. */
 void DRW_render_viewport_size_set(const int size[2])
 {
   DST.size[0] = size[0];
@@ -651,7 +617,7 @@ static void drw_manager_init(DRWManager *dst, GPUViewport *viewport, const int s
   }
 
   if (G_draw.view_ubo == NULL) {
-    G_draw.view_ubo = GPU_uniformbuf_create_ex(sizeof(DRWViewUboStorage), NULL, "G_draw.view_ubo");
+    G_draw.view_ubo = GPU_uniformbuf_create_ex(sizeof(ViewInfos), NULL, "G_draw.view_ubo");
   }
 
   if (dst->draw_list == NULL) {
@@ -765,8 +731,11 @@ static void duplidata_key_free(void *key)
   }
   else {
     Object temp_object = *dupli_key->ob;
+    /* Do not modify the original bound-box. */
+    temp_object.runtime.bb = NULL;
     BKE_object_replace_data_on_shallow_copy(&temp_object, dupli_key->ob_data);
     drw_batch_cache_generate_requested(&temp_object);
+    MEM_SAFE_FREE(temp_object.runtime.bb);
   }
   MEM_freeN(key);
 }
@@ -779,7 +748,6 @@ static void drw_duplidata_free(void)
   }
 }
 
-/* Return NULL if not a dupli or a pointer of pointer to the engine data */
 void **DRW_duplidata_get(void *vedata)
 {
   if (DST.dupli_source == NULL) {
@@ -875,9 +843,6 @@ static bool id_can_have_drawdata(const ID *id)
   return id_type_can_have_drawdata(GS(id->name));
 }
 
-/* Get DrawData from the given ID-block. In order for this to work, we assume that
- * the DrawData pointer is stored in the struct in the same fashion as in IdDdtTemplate.
- */
 DrawDataList *DRW_drawdatalist_from_id(ID *id)
 {
   /* only some ID-blocks have this info for now, so we cast the
@@ -1149,7 +1114,6 @@ static void drw_engines_draw_text(void)
   }
 }
 
-/* Draw render engine info. */
 void DRW_draw_region_engine_info(int xoffset, int *yoffset, int line_height)
 {
   DRW_ENABLED_ENGINE_ITER (DST.view_data_active, engine, data) {
@@ -1505,7 +1469,7 @@ void DRW_draw_callbacks_post_scene(void)
      * Don't trust them! */
     DRW_state_reset();
 
-    /* needed so gizmo isn't obscured */
+    /* Needed so gizmo isn't occluded. */
     if ((v3d->gizmo_flag & V3D_GIZMO_HIDE) == 0) {
       GPU_depth_test(GPU_DEPTH_NONE);
       DRW_draw_gizmo_3d();
@@ -1605,9 +1569,6 @@ struct DRWTextStore *DRW_text_cache_ensure(void)
 /** \name Main Draw Loops (DRW_draw)
  * \{ */
 
-/* Everything starts here.
- * This function takes care of calling all cache and rendering functions
- * for each relevant engine / mode engine. */
 void DRW_draw_view(const bContext *C)
 {
   View3D *v3d = CTX_wm_view3d(C);
@@ -1635,10 +1596,6 @@ void DRW_draw_view(const bContext *C)
   }
 }
 
-/**
- * Used for both regular and off-screen drawing.
- * Need to reset DST before calling this function
- */
 void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
                              RenderEngineType *engine_type,
                              ARegion *region,
@@ -1750,7 +1707,9 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
   drw_engines_draw_scene();
 
   /* Fix 3D view "lagging" on APPLE and WIN32+NVIDIA. (See T56996, T61474) */
-  GPU_flush();
+  if (GPU_type_matches_ex(GPU_DEVICE_ANY, GPU_OS_ANY, GPU_DRIVER_ANY, GPU_BACKEND_OPENGL)) {
+    GPU_flush();
+  }
 
   DRW_stats_reset();
 
@@ -1785,9 +1744,6 @@ void DRW_draw_render_loop(struct Depsgraph *depsgraph,
   DRW_draw_render_loop_ex(depsgraph, engine_type, region, v3d, viewport, NULL);
 }
 
-/**
- * \param viewport: can be NULL, in this case we create one.
- */
 void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
                                     RenderEngineType *engine_type,
                                     ARegion *region,
@@ -1798,6 +1754,8 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
                                     GPUOffScreen *ofs,
                                     GPUViewport *viewport)
 {
+  const bool is_xr_surface = ((v3d->flag & V3D_XR_SESSION_SURFACE) != 0);
+
   /* Create temporary viewport if needed or update the existing viewport. */
   GPUViewport *render_viewport = viewport;
   if (viewport == NULL) {
@@ -1807,7 +1765,7 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
     drw_notify_view_update_offscreen(depsgraph, engine_type, region, v3d, render_viewport);
   }
 
-  GPU_viewport_bind_from_offscreen(render_viewport, ofs);
+  GPU_viewport_bind_from_offscreen(render_viewport, ofs, is_xr_surface);
 
   /* Just here to avoid an assert but shouldn't be required in practice. */
   GPU_framebuffer_restore();
@@ -1819,12 +1777,12 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
   DRW_draw_render_loop_ex(depsgraph, engine_type, region, v3d, render_viewport, NULL);
 
   if (draw_background) {
-    /* HACK(fclem): In this case we need to make sure the final alpha is 1.
+    /* HACK(@fclem): In this case we need to make sure the final alpha is 1.
      * We use the blend mode to ensure that. A better way to fix that would
      * be to do that in the color-management shader. */
     GPU_offscreen_bind(ofs, false);
     GPU_clear_color(0.0f, 0.0f, 0.0f, 1.0f);
-    /* Premult Alpha over black background. */
+    /* Pre-multiply alpha over black background. */
     GPU_blend(GPU_BLEND_ALPHA_PREMULT);
   }
 
@@ -1849,7 +1807,6 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
   }
 }
 
-/* Helper to check if exit object type to render. */
 bool DRW_render_check_grease_pencil(Depsgraph *depsgraph)
 {
   if (!drw_gpencil_engine_needed(depsgraph, NULL)) {
@@ -1984,6 +1941,9 @@ void DRW_render_to_image(RenderEngine *engine, struct Depsgraph *depsgraph)
   };
   drw_context_state_init();
 
+  /* Begin GPU workload Boundary */
+  GPU_render_begin();
+
   const int size[2] = {engine->resolution_x, engine->resolution_y};
 
   drw_manager_init(&DST, NULL, size);
@@ -2039,6 +1999,9 @@ void DRW_render_to_image(RenderEngine *engine, struct Depsgraph *depsgraph)
 
   /* Reset state after drawing */
   DRW_state_reset();
+
+  /* End GPU workload Boundary */
+  GPU_render_end();
 }
 
 void DRW_render_object_iter(
@@ -2078,9 +2041,6 @@ void DRW_render_object_iter(
   drw_task_graph_deinit();
 }
 
-/* Assume a valid gl context is bound (and that the gl_context_mutex has been acquired).
- * This function only setup DST and execute the given function.
- * Warning: similar to DRW_render_to_image you cannot use default lists (dfbl & dtxl). */
 void DRW_custom_pipeline(DrawEngineType *draw_engine_type,
                          struct Depsgraph *depsgraph,
                          void (*callback)(void *vedata, void *user_data),
@@ -2121,13 +2081,14 @@ void DRW_custom_pipeline(DrawEngineType *draw_engine_type,
    * resources as the main thread (viewport) may lead to data
    * races and undefined behavior on certain drivers. Using
    * GPU_finish to sync seems to fix the issue. (see T62997) */
-  GPU_finish();
+  eGPUBackendType type = GPU_backend_get_type();
+  if (type == GPU_BACKEND_OPENGL) {
+    GPU_finish();
+  }
 
   drw_manager_exit(&DST);
 }
 
-/* Used when the render engine want to redo another cache populate inside the same render frame.
- */
 void DRW_cache_restart(void)
 {
   drw_manager_init(&DST, DST.viewport, (int[2]){UNPACK2(DST.size)});
@@ -2224,7 +2185,9 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
   drw_engines_draw_scene();
 
   /* Fix 3D view being "laggy" on macos and win+nvidia. (See T56996, T61474) */
-  GPU_flush();
+  if (GPU_type_matches_ex(GPU_DEVICE_ANY, GPU_OS_ANY, GPU_DRIVER_ANY, GPU_BACKEND_OPENGL)) {
+    GPU_flush();
+  }
 
   if (DST.draw_ctx.evil_C) {
     DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
@@ -2318,7 +2281,6 @@ static void draw_select_framebuffer_depth_only_setup(const int size[2])
   }
 }
 
-/* Must run after all instance datas have been added. */
 void DRW_render_instance_buffer_finish(void)
 {
   BLI_assert_msg(!DST.buffer_finish_called, "DRW_render_instance_buffer_finish called twice!");
@@ -2327,7 +2289,6 @@ void DRW_render_instance_buffer_finish(void)
   drw_resource_buffer_finish(DST.vmempool);
 }
 
-/* WARNING: Changing frame might free the ViewLayerEngineData */
 void DRW_render_set_time(RenderEngine *engine, Depsgraph *depsgraph, int frame, float subframe)
 {
   RE_engine_frame_set(engine, frame, subframe);
@@ -2335,9 +2296,6 @@ void DRW_render_set_time(RenderEngine *engine, Depsgraph *depsgraph, int frame, 
   DST.draw_ctx.view_layer = DEG_get_evaluated_view_layer(depsgraph);
 }
 
-/**
- * object mode select-loop, see: ED_view3d_draw_select_loop (legacy drawing).
- */
 void DRW_draw_select_loop(struct Depsgraph *depsgraph,
                           ARegion *region,
                           View3D *v3d,
@@ -2566,16 +2524,17 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
                                      ARegion *region,
                                      View3D *v3d,
                                      GPUViewport *viewport,
-                                     const bool use_opengl_context)
+                                     const bool use_gpencil,
+                                     const bool use_basic,
+                                     const bool use_overlay)
 {
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   RenderEngineType *engine_type = ED_view3d_engine_type(scene, v3d->shading.type);
   ViewLayer *view_layer = DEG_get_evaluated_view_layer(depsgraph);
   RegionView3D *rv3d = region->regiondata;
 
-  if (use_opengl_context) {
-    DRW_opengl_context_enable();
-  }
+  /* Reset before using it. */
+  drw_state_prepare_clean_for_draw(&DST);
 
   DST.options.is_depth = true;
 
@@ -2591,6 +2550,18 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
       .depsgraph = depsgraph,
   };
   drw_context_state_init();
+  drw_manager_init(&DST, viewport, NULL);
+
+  if (use_gpencil) {
+    use_drw_engine(&draw_engine_gpencil_type);
+  }
+  if (use_basic) {
+    drw_engines_enable_basic();
+  }
+  if (use_overlay) {
+    drw_engines_enable_overlays();
+  }
+
   drw_task_graph_init();
 
   /* Setup frame-buffer. */
@@ -2658,62 +2629,23 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
   drw_engines_disable();
 
   drw_manager_exit(&DST);
-
-  /* Changing context. */
-  if (use_opengl_context) {
-    DRW_opengl_context_disable();
-  }
 }
 
-/**
- * object mode select-loop, see: ED_view3d_draw_depth_loop (legacy drawing).
- */
 void DRW_draw_depth_loop(struct Depsgraph *depsgraph,
                          ARegion *region,
                          View3D *v3d,
                          GPUViewport *viewport)
 {
-  /* Reset before using it. */
-  drw_state_prepare_clean_for_draw(&DST);
-
-  /* Required by `drw_manager_init()` */
-  DST.draw_ctx.region = region;
-  DST.draw_ctx.rv3d = region->regiondata;
-  drw_manager_init(&DST, viewport, NULL);
-
-  /* Get list of enabled engines */
-  {
-    /* Required by `DRW_state_draw_support()` */
-    DST.draw_ctx.v3d = v3d;
-
-    drw_engines_enable_basic();
-    if (DRW_state_draw_support()) {
-      drw_engines_enable_overlays();
-    }
-  }
-
-  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, false);
+  drw_draw_depth_loop_impl(
+      depsgraph, region, v3d, viewport, false, true, DRW_state_draw_support());
 }
 
-/**
- * Converted from ED_view3d_draw_depth_gpencil (legacy drawing).
- */
 void DRW_draw_depth_loop_gpencil(struct Depsgraph *depsgraph,
                                  ARegion *region,
                                  View3D *v3d,
                                  GPUViewport *viewport)
 {
-  /* Reset before using it. */
-  drw_state_prepare_clean_for_draw(&DST);
-
-  /* Required by `drw_manager_init()` */
-  DST.draw_ctx.region = region;
-  DST.draw_ctx.rv3d = region->regiondata;
-  drw_manager_init(&DST, viewport, NULL);
-
-  use_drw_engine(&draw_engine_gpencil_type);
-
-  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, false);
+  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, true, false, false);
 }
 
 void DRW_draw_select_id(Depsgraph *depsgraph, ARegion *region, View3D *v3d, const rcti *rect)
@@ -2790,9 +2722,6 @@ void DRW_draw_select_id(Depsgraph *depsgraph, ARegion *region, View3D *v3d, cons
   drw_manager_exit(&DST);
 }
 
-/**
- * Clears the Depth Buffer and draws only the specified object.
- */
 void DRW_draw_depth_object(
     Scene *scene, ARegion *region, View3D *v3d, GPUViewport *viewport, Object *object)
 {
@@ -2816,11 +2745,15 @@ void DRW_draw_depth_object(
   GPU_framebuffer_clear_depth(depth_fb, 1.0f);
   GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
 
-  const float(*world_clip_planes)[4] = NULL;
-  if (RV3D_CLIPPING_ENABLED(v3d, rv3d)) {
+  struct GPUClipPlanes planes;
+  const bool use_clipping_planes = RV3D_CLIPPING_ENABLED(v3d, rv3d);
+  if (use_clipping_planes) {
     GPU_clip_distances(6);
     ED_view3d_clipping_local(rv3d, object->obmat);
-    world_clip_planes = rv3d->clip_local;
+    for (int i = 0; i < 6; i++) {
+      copy_v4_v4(planes.world[i], rv3d->clip_local[i]);
+    }
+    copy_m4_m4(planes.ModelMatrix, object->obmat);
   }
 
   drw_batch_cache_validate(object);
@@ -2842,16 +2775,21 @@ void DRW_draw_depth_object(
       BLI_task_graph_work_and_wait(task_graph);
       BLI_task_graph_free(task_graph);
 
-      const eGPUShaderConfig sh_cfg = world_clip_planes ? GPU_SHADER_CFG_CLIPPED :
-                                                          GPU_SHADER_CFG_DEFAULT;
+      const eGPUShaderConfig sh_cfg = use_clipping_planes ? GPU_SHADER_CFG_CLIPPED :
+                                                            GPU_SHADER_CFG_DEFAULT;
       GPU_batch_program_set_builtin_with_config(batch, GPU_SHADER_3D_DEPTH_ONLY, sh_cfg);
-      if (world_clip_planes != NULL) {
-        GPU_batch_uniform_4fv_array(batch, "WorldClipPlanes", 6, world_clip_planes);
+
+      GPUUniformBuf *ubo = NULL;
+      if (use_clipping_planes) {
+        ubo = GPU_uniformbuf_create_ex(sizeof(struct GPUClipPlanes), &planes, __func__);
+        GPU_batch_uniformbuf_bind(batch, "clipPlanes", ubo);
       }
 
       GPU_batch_draw(batch);
+      GPU_uniformbuf_free(ubo);
+
     } break;
-    case OB_CURVE:
+    case OB_CURVES_LEGACY:
     case OB_SURF:
       break;
   }
@@ -2873,19 +2811,12 @@ void DRW_draw_depth_object(
 /** \name Draw Manager State (DRW_state)
  * \{ */
 
-/**
- * When false, drawing doesn't output to a pixel buffer
- * eg: Occlusion queries, or when we have setup a context to draw in already.
- */
 bool DRW_state_is_fbo(void)
 {
   return ((DST.default_framebuffer != NULL) || DST.options.is_image_render) &&
          !DRW_state_is_depth() && !DRW_state_is_select();
 }
 
-/**
- * For when engines need to know if this is drawing for selection or not.
- */
 bool DRW_state_is_select(void)
 {
   return DST.options.is_select;
@@ -2901,27 +2832,17 @@ bool DRW_state_is_depth(void)
   return DST.options.is_depth;
 }
 
-/**
- * Whether we are rendering for an image
- */
 bool DRW_state_is_image_render(void)
 {
   return DST.options.is_image_render;
 }
 
-/**
- * Whether we are rendering only the render engine,
- * or if we should also render the mode engines.
- */
 bool DRW_state_is_scene_render(void)
 {
   BLI_assert(DST.options.is_scene_render ? DST.options.is_image_render : true);
   return DST.options.is_scene_render;
 }
 
-/**
- * Whether we are rendering simple opengl render
- */
 bool DRW_state_is_opengl_render(void)
 {
   return DST.options.is_image_render && !DST.options.is_scene_render;
@@ -2936,28 +2857,18 @@ bool DRW_state_is_playback(void)
   return false;
 }
 
-/**
- * Is the user navigating the region.
- */
 bool DRW_state_is_navigating(void)
 {
   const RegionView3D *rv3d = DST.draw_ctx.rv3d;
   return (rv3d) && (rv3d->rflag & (RV3D_NAVIGATING | RV3D_PAINTING));
 }
 
-/**
- * Should text draw in this mode?
- */
 bool DRW_state_show_text(void)
 {
   return (DST.options.is_select) == 0 && (DST.options.is_depth) == 0 &&
          (DST.options.is_scene_render) == 0 && (DST.options.draw_text) == 0;
 }
 
-/**
- * Should draw support elements
- * Objects center, selection outline, probe data, ...
- */
 bool DRW_state_draw_support(void)
 {
   View3D *v3d = DST.draw_ctx.v3d;
@@ -2965,9 +2876,6 @@ bool DRW_state_draw_support(void)
          ((v3d->flag2 & V3D_HIDE_OVERLAYS) == 0);
 }
 
-/**
- * Whether we should render the background
- */
 bool DRW_state_draw_background(void)
 {
   return DST.options.draw_background;
@@ -3003,6 +2911,13 @@ void DRW_engine_register(DrawEngineType *draw_engine_type)
 
   BLI_addtail(&g_registered_engines.engines, draw_engine);
   g_registered_engines.len = BLI_listbase_count(&g_registered_engines.engines);
+}
+
+void DRW_engines_register_experimental(void)
+{
+  if (U.experimental.enable_eevee_next) {
+    RE_engines_register(&DRW_engine_viewport_eevee_next_type);
+  }
 }
 
 void DRW_engines_register(void)
@@ -3042,14 +2957,16 @@ void DRW_engines_register(void)
     BKE_gpencil_batch_cache_dirty_tag_cb = DRW_gpencil_batch_cache_dirty_tag;
     BKE_gpencil_batch_cache_free_cb = DRW_gpencil_batch_cache_free;
 
-    BKE_hair_batch_cache_dirty_tag_cb = DRW_hair_batch_cache_dirty_tag;
-    BKE_hair_batch_cache_free_cb = DRW_hair_batch_cache_free;
+    BKE_curves_batch_cache_dirty_tag_cb = DRW_curves_batch_cache_dirty_tag;
+    BKE_curves_batch_cache_free_cb = DRW_curves_batch_cache_free;
 
     BKE_pointcloud_batch_cache_dirty_tag_cb = DRW_pointcloud_batch_cache_dirty_tag;
     BKE_pointcloud_batch_cache_free_cb = DRW_pointcloud_batch_cache_free;
 
     BKE_volume_batch_cache_dirty_tag_cb = DRW_volume_batch_cache_dirty_tag;
     BKE_volume_batch_cache_free_cb = DRW_volume_batch_cache_free;
+
+    BKE_subsurf_modifier_free_gpu_cache_cb = DRW_subdiv_cache_free;
   }
 }
 
@@ -3191,6 +3108,7 @@ void DRW_opengl_context_enable_ex(bool UNUSED(restore))
      * This shall remain in effect until immediate mode supports
      * multiple threads. */
     BLI_ticket_mutex_lock(DST.gl_context_mutex);
+    GPU_render_begin();
     WM_opengl_context_activate(DST.gl_context);
     GPU_context_active_set(DST.gpu_context);
   }
@@ -3202,7 +3120,9 @@ void DRW_opengl_context_disable_ex(bool restore)
 #ifdef __APPLE__
     /* Need to flush before disabling draw context, otherwise it does not
      * always finish drawing and viewport can be empty or partially drawn */
-    GPU_flush();
+    if (GPU_type_matches_ex(GPU_DEVICE_ANY, GPU_OS_MAC, GPU_DRIVER_ANY, GPU_BACKEND_OPENGL)) {
+      GPU_flush();
+    }
 #endif
 
     if (BLI_thread_is_main() && restore) {
@@ -3213,12 +3133,18 @@ void DRW_opengl_context_disable_ex(bool restore)
       GPU_context_active_set(NULL);
     }
 
+    /* Render boundaries are opened and closed here as this may be
+     * called outside of an existing render loop. */
+    GPU_render_end();
+
     BLI_ticket_mutex_unlock(DST.gl_context_mutex);
   }
 }
 
 void DRW_opengl_context_enable(void)
 {
+  /* TODO: should be replace by a more elegant alternative. */
+
   if (G.background && DST.gl_context == NULL) {
     WM_init_opengl();
   }
@@ -3247,7 +3173,6 @@ void DRW_opengl_render_context_disable(void *re_gl_context)
   BLI_ticket_mutex_unlock(DST.gl_context_mutex);
 }
 
-/* Needs to be called AFTER DRW_opengl_render_context_enable() */
 void DRW_gpu_render_context_enable(void *re_gpu_context)
 {
   /* If thread is main you should use DRW_opengl_context_enable(). */
@@ -3256,7 +3181,6 @@ void DRW_gpu_render_context_enable(void *re_gpu_context)
   GPU_context_active_set(re_gpu_context);
 }
 
-/* Needs to be called BEFORE DRW_opengl_render_context_disable() */
 void DRW_gpu_render_context_disable(void *UNUSED(re_gpu_context))
 {
   GPU_flush();
@@ -3300,6 +3224,8 @@ void DRW_xr_drawing_end(void)
 }
 
 #endif
+
+/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Internal testing API for gtests

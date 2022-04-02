@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup edasset
@@ -173,7 +159,7 @@ void ED_asset_catalogs_save_from_main_path(::AssetLibrary *library, const Main *
   /* Since writing to disk also means loading any on-disk changes, it may be a good idea to store
    * an undo step. */
   catalog_service->undo_push();
-  catalog_service->write_to_disk(bmain->name);
+  catalog_service->write_to_disk(bmain->filepath);
 }
 
 void ED_asset_catalogs_set_save_catalogs_when_file_is_saved(const bool should_save)

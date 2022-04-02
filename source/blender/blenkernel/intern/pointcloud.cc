@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -25,10 +11,14 @@
 #include "DNA_object_types.h"
 #include "DNA_pointcloud_types.h"
 
+#include "BLI_bounds.hh"
+#include "BLI_index_range.hh"
 #include "BLI_listbase.h"
-#include "BLI_math.h"
+#include "BLI_math_vec_types.hh"
 #include "BLI_rand.h"
+#include "BLI_span.hh"
 #include "BLI_string.h"
+#include "BLI_task.hh"
 #include "BLI_utildefines.h"
 
 #include "BKE_anim_data.h"
@@ -50,6 +40,10 @@
 #include "DEG_depsgraph_query.h"
 
 #include "BLO_read_write.h"
+
+using blender::float3;
+using blender::IndexRange;
+using blender::Span;
 
 /* PointCloud datablock */
 
@@ -261,18 +255,30 @@ PointCloud *BKE_pointcloud_new_nomain(const int totpoint)
   return pointcloud;
 }
 
-void BKE_pointcloud_minmax(const struct PointCloud *pointcloud, float r_min[3], float r_max[3])
+static std::optional<blender::bounds::MinMaxResult<float3>> point_cloud_bounds(
+    const PointCloud &pointcloud)
 {
-  float(*pointcloud_co)[3] = pointcloud->co;
-  float *pointcloud_radius = pointcloud->radius;
-  for (int a = 0; a < pointcloud->totpoint; a++) {
-    float *co = pointcloud_co[a];
-    float radius = (pointcloud_radius) ? pointcloud_radius[a] : 0.0f;
-    const float co_min[3] = {co[0] - radius, co[1] - radius, co[2] - radius};
-    const float co_max[3] = {co[0] + radius, co[1] + radius, co[2] + radius};
-    DO_MIN(co_min, r_min);
-    DO_MAX(co_max, r_max);
+  Span<float3> positions{reinterpret_cast<float3 *>(pointcloud.co), pointcloud.totpoint};
+  if (pointcloud.radius) {
+    Span<float> radii{pointcloud.radius, pointcloud.totpoint};
+    return blender::bounds::min_max_with_radii(positions, radii);
   }
+  return blender::bounds::min_max(positions);
+}
+
+bool BKE_pointcloud_minmax(const PointCloud *pointcloud, float r_min[3], float r_max[3])
+{
+  using namespace blender;
+
+  const std::optional<bounds::MinMaxResult<float3>> min_max = point_cloud_bounds(*pointcloud);
+  if (!min_max) {
+    return false;
+  }
+
+  copy_v3_v3(r_min, math::min(min_max->min, float3(r_min)));
+  copy_v3_v3(r_max, math::max(min_max->max, float3(r_max)));
+
+  return true;
 }
 
 BoundBox *BKE_pointcloud_boundbox_get(Object *ob)
@@ -287,7 +293,7 @@ BoundBox *BKE_pointcloud_boundbox_get(Object *ob)
     ob->runtime.bb = static_cast<BoundBox *>(MEM_callocN(sizeof(BoundBox), "pointcloud boundbox"));
   }
 
-  blender::float3 min, max;
+  float3 min, max;
   INIT_MINMAX(min, max);
   if (ob->runtime.geometry_set_eval != nullptr) {
     ob->runtime.geometry_set_eval->compute_boundbox_without_instances(&min, &max);
@@ -419,6 +425,7 @@ void BKE_pointcloud_data_update(struct Depsgraph *depsgraph, struct Scene *scene
 }
 
 /* Draw Cache */
+
 void (*BKE_pointcloud_batch_cache_dirty_tag_cb)(PointCloud *pointcloud, int mode) = nullptr;
 void (*BKE_pointcloud_batch_cache_free_cb)(PointCloud *pointcloud) = nullptr;
 

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup edscr
@@ -52,6 +36,7 @@
 #include "BKE_tracking.h"
 
 #include "RNA_access.h"
+#include "RNA_prototypes.h"
 
 #include "ED_anim_api.h"
 #include "ED_armature.h"
@@ -501,7 +486,7 @@ static eContextResult screen_ctx_active_pose_bone(const bContext *C, bContextDat
   Object *obact = view_layer->basact ? view_layer->basact->object : NULL;
   Object *obpose = BKE_object_pose_armature_get(obact);
 
-  bPoseChannel *pchan = BKE_pose_channel_active(obpose);
+  bPoseChannel *pchan = BKE_pose_channel_active_if_layer_visible(obpose);
   if (pchan) {
     CTX_data_pointer_set(result, &obpose->id, &RNA_PoseBone, pchan);
     return CTX_RESULT_OK;
@@ -1283,7 +1268,6 @@ static void ensure_ed_screen_context_functions(void)
   register_context_function("ui_list", screen_ctx_ui_list);
 }
 
-/* Entry point for the screen context. */
 int ed_screen_context(const bContext *C, const char *member, bContextDataResult *result)
 {
   if (CTX_data_dir(member)) {

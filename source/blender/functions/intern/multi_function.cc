@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "FN_multi_function.hh"
 
@@ -66,12 +52,6 @@ static int64_t compute_grain_size(const ExecutionHints &hints, const IndexMask m
   return grain_size;
 }
 
-/**
- * The result is the same as using #call directly but this method has some additional features.
- * - Automatic multi-threading when possible and appropriate.
- * - Automatic index mask offsetting to avoid large temporary intermediate arrays that are mostly
- *   unused.
- */
 void MultiFunction::call_auto(IndexMask mask, MFParams params, MFContext context) const
 {
   if (mask.is_empty()) {

@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2015, Blender Foundation.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2015 Blender Foundation. */
 
 /** \file
  * \ingroup bpygpu
@@ -64,6 +49,14 @@
 /* -------------------------------------------------------------------- */
 /** \name GPUOffScreen Common Utilities
  * \{ */
+
+static const struct PyC_StringEnumItems pygpu_framebuffer_color_texture_formats[] = {
+    {GPU_RGBA8, "RGBA8"},
+    {GPU_RGBA16, "RGBA16"},
+    {GPU_RGBA16F, "RGBA16F"},
+    {GPU_RGBA32F, "RGBA32F"},
+    {0, NULL},
+};
 
 static int pygpu_offscreen_valid_check(BPyGPUOffScreen *py_ofs)
 {
@@ -219,16 +212,18 @@ static PyObject *pygpu_offscreen__tp_new(PyTypeObject *UNUSED(self),
 
   GPUOffScreen *ofs = NULL;
   int width, height;
+  struct PyC_StringEnum pygpu_textureformat = {pygpu_framebuffer_color_texture_formats, GPU_RGBA8};
   char err_out[256];
 
-  static const char *_keywords[] = {"width", "height", NULL};
-  static _PyArg_Parser _parser = {"ii:GPUOffScreen.__new__", _keywords, 0};
-  if (!_PyArg_ParseTupleAndKeywordsFast(args, kwds, &_parser, &width, &height)) {
+  static const char *_keywords[] = {"width", "height", "format", NULL};
+  static _PyArg_Parser _parser = {"ii|$O&:GPUOffScreen.__new__", _keywords, 0};
+  if (!_PyArg_ParseTupleAndKeywordsFast(
+          args, kwds, &_parser, &width, &height, PyC_ParseStringEnum, &pygpu_textureformat)) {
     return NULL;
   }
 
   if (GPU_context_active_get()) {
-    ofs = GPU_offscreen_create(width, height, true, GPU_RGBA8, err_out);
+    ofs = GPU_offscreen_create(width, height, true, pygpu_textureformat.value_found, err_out);
   }
   else {
     STRNCPY(err_out, "No active GPU context found");
@@ -456,14 +451,21 @@ static struct PyMethodDef pygpu_offscreen__tp_methods[] = {
 };
 
 PyDoc_STRVAR(pygpu_offscreen__tp_doc,
-             ".. class:: GPUOffScreen(width, height)\n"
+             ".. class:: GPUOffScreen(width, height, *, format='RGBA8')\n"
              "\n"
              "   This object gives access to off screen buffers.\n"
              "\n"
              "   :arg width: Horizontal dimension of the buffer.\n"
              "   :type width: int\n"
              "   :arg height: Vertical dimension of the buffer.\n"
-             "   :type height: int\n");
+             "   :type height: int\n"
+             "   :arg format: Internal data format inside GPU memory for color attachment "
+             "texture. Possible values are:\n"
+             "      `RGBA8`,\n"
+             "      `RGBA16`,\n"
+             "      `RGBA16F`,\n"
+             "      `RGBA32F`,\n"
+             "   :type format: str\n");
 PyTypeObject BPyGPUOffScreen_Type = {
     PyVarObject_HEAD_INIT(NULL, 0).tp_name = "GPUOffScreen",
     .tp_basicsize = sizeof(BPyGPUOffScreen),

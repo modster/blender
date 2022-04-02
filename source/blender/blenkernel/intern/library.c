@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -127,7 +111,7 @@ void BKE_library_filepath_set(Main *bmain, Library *lib, const char *filepath)
      */
     /* Never make paths relative to parent lib - reading code (blenloader) always set *all*
      * `lib->filepath` relative to current main, not to their parent for indirectly linked ones. */
-    const char *basepath = BKE_main_blendfile_path(bmain);
-    BLI_path_abs(lib->filepath_abs, basepath);
+    const char *blendfile_path = BKE_main_blendfile_path(bmain);
+    BLI_path_abs(lib->filepath_abs, blendfile_path);
   }
 }

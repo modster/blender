@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #ifdef WITH_OPENVDB
 #  include <openvdb/openvdb.h>
@@ -30,12 +16,25 @@
 
 namespace blender::nodes::node_geo_points_to_volume_cc {
 
+NODE_STORAGE_FUNCS(NodeGeometryPointsToVolume)
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Points"));
   b.add_input<decl::Float>(N_("Density")).default_value(1.0f).min(0.0f);
-  b.add_input<decl::Float>(N_("Voxel Size")).default_value(0.3f).min(0.01f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>(N_("Voxel Amount")).default_value(64.0f).min(0.0f);
+  b.add_input<decl::Float>(N_("Voxel Size"))
+      .default_value(0.3f)
+      .min(0.01f)
+      .subtype(PROP_DISTANCE)
+      .make_available([](bNode &node) {
+        node_storage(node).resolution_mode = GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_SIZE;
+      });
+  b.add_input<decl::Float>(N_("Voxel Amount"))
+      .default_value(64.0f)
+      .min(0.0f)
+      .make_available([](bNode &node) {
+        node_storage(node).resolution_mode = GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_AMOUNT;
+      });
   b.add_input<decl::Float>(N_("Radius"))
       .default_value(0.5f)
       .min(0.0f)
@@ -53,24 +52,23 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometryPointsToVolume *data = (NodeGeometryPointsToVolume *)MEM_callocN(
-      sizeof(NodeGeometryPointsToVolume), __func__);
+  NodeGeometryPointsToVolume *data = MEM_cnew<NodeGeometryPointsToVolume>(__func__);
   data->resolution_mode = GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_AMOUNT;
   node->storage = data;
 }
 
 static void node_update(bNodeTree *ntree, bNode *node)
 {
-  NodeGeometryPointsToVolume *data = (NodeGeometryPointsToVolume *)node->storage;
+  const NodeGeometryPointsToVolume &storage = node_storage(*node);
   bNodeSocket *voxel_size_socket = nodeFindSocket(node, SOCK_IN, "Voxel Size");
   bNodeSocket *voxel_amount_socket = nodeFindSocket(node, SOCK_IN, "Voxel Amount");
   nodeSetSocketAvailability(ntree,
                             voxel_amount_socket,
-                            data->resolution_mode ==
+                            storage.resolution_mode ==
                                 GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_AMOUNT);
   nodeSetSocketAvailability(ntree,
                             voxel_size_socket,
-                            data->resolution_mode ==
+                            storage.resolution_mode ==
                                 GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_SIZE);
 }
 
@@ -134,8 +132,7 @@ static float compute_voxel_size(const GeoNodeExecParams &params,
                                 Span<float3> positions,
                                 const float radius)
 {
-  const NodeGeometryPointsToVolume &storage =
-      *(const NodeGeometryPointsToVolume *)params.node().storage;
+  const NodeGeometryPointsToVolume &storage = node_storage(params.node());
 
   if (storage.resolution_mode == GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_SIZE) {
     return params.get_input<float>("Voxel Size");
@@ -155,7 +152,7 @@ static float compute_voxel_size(const GeoNodeExecParams &params,
   }
 
   /* The voxel size adapts to the final size of the volume. */
-  const float diagonal = float3::distance(min, max);
+  const float diagonal = math::distance(min, max);
   const float extended_diagonal = diagonal + 2.0f * radius;
   const float voxel_size = extended_diagonal / voxel_amount;
   return voxel_size;
@@ -201,17 +198,12 @@ static void initialize_volume_component_from_points(GeoNodeExecParams &params,
   Vector<float3> positions;
   Vector<float> radii;
 
-  if (r_geometry_set.has<MeshComponent>()) {
-    gather_point_data_from_component(
-        params, *r_geometry_set.get_component_for_read<MeshComponent>(), positions, radii);
-  }
-  if (r_geometry_set.has<PointCloudComponent>()) {
-    gather_point_data_from_component(
-        params, *r_geometry_set.get_component_for_read<PointCloudComponent>(), positions, radii);
-  }
-  if (r_geometry_set.has<CurveComponent>()) {
-    gather_point_data_from_component(
-        params, *r_geometry_set.get_component_for_read<CurveComponent>(), positions, radii);
+  for (const GeometryComponentType type :
+       {GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE}) {
+    if (r_geometry_set.has(type)) {
+      gather_point_data_from_component(
+          params, *r_geometry_set.get_component_for_read(type), positions, radii);
+    }
   }
 
   const float max_radius = *std::max_element(radii.begin(), radii.end());
@@ -258,8 +250,7 @@ void register_node_type_geo_points_to_volume()
 
   static bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_POINTS_TO_VOLUME, "Points to Volume", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_POINTS_TO_VOLUME, "Points to Volume", NODE_CLASS_GEOMETRY);
   node_type_storage(&ntype,
                     "NodeGeometryPointsToVolume",
                     node_free_standard_storage,

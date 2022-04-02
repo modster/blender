@@ -1,16 +1,5 @@
-/*
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #pragma once
 
@@ -175,7 +164,7 @@ ccl_device float4 curve_attribute_float4(KernelGlobals kg,
     if (dx)
       *dx = sd->du.dx * (f1 - f0);
     if (dy)
-      *dy = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+      *dy = zero_float4();
 #  endif
 
     return (1.0f - sd->u) * f0 + sd->u * f1;
@@ -183,9 +172,9 @@ ccl_device float4 curve_attribute_float4(KernelGlobals kg,
   else {
 #  ifdef __RAY_DIFFERENTIALS__
     if (dx)
-      *dx = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+      *dx = zero_float4();
     if (dy)
-      *dy = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+      *dy = zero_float4();
 #  endif
 
     if (desc.element & (ATTR_ELEMENT_CURVE | ATTR_ELEMENT_OBJECT | ATTR_ELEMENT_MESH)) {
@@ -194,7 +183,7 @@ ccl_device float4 curve_attribute_float4(KernelGlobals kg,
       return kernel_tex_fetch(__attributes_float4, offset);
     }
     else {
-      return make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+      return zero_float4();
     }
   }
 }
@@ -205,14 +194,14 @@ ccl_device float curve_thickness(KernelGlobals kg, ccl_private const ShaderData 
 {
   float r = 0.0f;
 
-  if (sd->type & PRIMITIVE_ALL_CURVE) {
+  if (sd->type & PRIMITIVE_CURVE) {
     KernelCurve curve = kernel_tex_fetch(__curves, sd->prim);
     int k0 = curve.first_key + PRIMITIVE_UNPACK_SEGMENT(sd->type);
     int k1 = k0 + 1;
 
     float4 P_curve[2];
 
-    if (!(sd->type & PRIMITIVE_ALL_MOTION)) {
+    if (!(sd->type & PRIMITIVE_MOTION)) {
       P_curve[0] = kernel_tex_fetch(__curve_keys, k0);
       P_curve[1] = kernel_tex_fetch(__curve_keys, k1);
     }
@@ -224,6 +213,18 @@ ccl_device float curve_thickness(KernelGlobals kg, ccl_private const ShaderData 
   }
 
   return r * 2.0f;
+}
+
+/* Curve random */
+
+ccl_device float curve_random(KernelGlobals kg, ccl_private const ShaderData *sd)
+{
+  if (sd->type & PRIMITIVE_CURVE) {
+    const AttributeDescriptor desc = find_attribute(kg, sd, ATTR_STD_CURVE_RANDOM);
+    return (desc.offset != ATTR_STD_NOT_FOUND) ? curve_attribute_float(kg, sd, desc, NULL, NULL) :
+                                                 0.0f;
+  }
+  return 0.0f;
 }
 
 /* Curve location for motion pass, linear interpolation between keys and
@@ -249,7 +250,7 @@ ccl_device float3 curve_tangent_normal(KernelGlobals kg, ccl_private const Shade
 {
   float3 tgN = make_float3(0.0f, 0.0f, 0.0f);
 
-  if (sd->type & PRIMITIVE_ALL_CURVE) {
+  if (sd->type & PRIMITIVE_CURVE) {
 
     tgN = -(-sd->I - sd->dPdu * (dot(sd->dPdu, -sd->I) / len_squared(sd->dPdu)));
     tgN = normalize(tgN);

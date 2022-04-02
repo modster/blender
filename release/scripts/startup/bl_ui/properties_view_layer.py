@@ -1,20 +1,4 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # <pep8 compliant>
 from bpy.types import Panel, UIList
@@ -203,6 +187,33 @@ class VIEWLAYER_PT_layer_passes_cryptomatte(ViewLayerCryptomattePanel, Panel):
     COMPAT_ENGINES = {'BLENDER_EEVEE'}
 
 
+class ViewLayerLightgroupsPanel(ViewLayerButtonsPanel, Panel):
+    bl_label = "Light Groups"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        view_layer = context.view_layer
+
+        row = layout.row()
+        col = row.column()
+        col.template_list("UI_UL_list", "lightgroups", view_layer,
+                          "lightgroups", view_layer, "active_lightgroup_index", rows=2)
+
+        col = row.column()
+        sub = col.column(align=True)
+        sub.operator("scene.view_layer_add_lightgroup", icon='ADD', text="")
+        sub.operator("scene.view_layer_remove_lightgroup", icon='REMOVE', text="")
+
+
+class VIEWLAYER_PT_layer_passes_lightgroups(ViewLayerLightgroupsPanel):
+    bl_parent_id = "VIEWLAYER_PT_layer_passes"
+    COMPAT_ENGINES = {'CYCLES'}
+
+
 classes = (
     VIEWLAYER_PT_layer,
     VIEWLAYER_PT_layer_passes,
@@ -211,6 +222,7 @@ classes = (
     VIEWLAYER_PT_eevee_layer_passes_effects,
     VIEWLAYER_PT_layer_passes_cryptomatte,
     VIEWLAYER_PT_layer_passes_aov,
+    VIEWLAYER_PT_layer_passes_lightgroups,
     VIEWLAYER_UL_aov,
 )
 

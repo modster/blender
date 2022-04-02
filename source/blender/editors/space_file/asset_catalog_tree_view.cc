@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2007 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2007 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spfile
@@ -76,10 +60,10 @@ class AssetCatalogTreeView : public ui::AbstractTreeView {
   void activate_catalog_by_id(CatalogID catalog_id);
 
  private:
-  ui::BasicTreeViewItem &build_catalog_items_recursive(ui::TreeViewItemContainer &view_parent_item,
+  ui::BasicTreeViewItem &build_catalog_items_recursive(ui::TreeViewOrItem &view_parent_item,
                                                        AssetCatalogTreeItem &catalog);
 
-  void add_all_item();
+  AssetCatalogTreeViewAllItem &add_all_item();
   void add_unassigned_item();
   bool is_active_catalog(CatalogID catalog_id) const;
 };
@@ -98,7 +82,7 @@ class AssetCatalogTreeViewItem : public ui::BasicTreeViewItem {
   void build_row(uiLayout &row) override;
   void build_context_menu(bContext &C, uiLayout &column) const override;
 
-  bool can_rename() const override;
+  bool supports_renaming() const override;
   bool rename(StringRefNull new_name) override;
 
   /** Add drag support for catalog items. */
@@ -197,14 +181,13 @@ AssetCatalogTreeView::AssetCatalogTreeView(::AssetLibrary *library,
 
 void AssetCatalogTreeView::build_tree()
 {
-  add_all_item();
+  AssetCatalogTreeViewAllItem &all_item = add_all_item();
+  all_item.set_collapsed(false);
 
   if (catalog_tree_) {
-    catalog_tree_->foreach_root_item([this](AssetCatalogTreeItem &item) {
-      ui::BasicTreeViewItem &child_view_item = build_catalog_items_recursive(*this, item);
-
-      /* Open root-level items by default. */
-      child_view_item.set_collapsed(false);
+    /* Pass the "All" item on as parent of the actual catalog items. */
+    catalog_tree_->foreach_root_item([this, &all_item](AssetCatalogTreeItem &item) {
+      build_catalog_items_recursive(all_item, item);
     });
   }
 
@@ -212,7 +195,7 @@ void AssetCatalogTreeView::build_tree()
 }
 
 ui::BasicTreeViewItem &AssetCatalogTreeView::build_catalog_items_recursive(
-    ui::TreeViewItemContainer &view_parent_item, AssetCatalogTreeItem &catalog)
+    ui::TreeViewOrItem &view_parent_item, AssetCatalogTreeItem &catalog)
 {
   ui::BasicTreeViewItem &view_item = view_parent_item.add_tree_item<AssetCatalogTreeViewItem>(
       &catalog);
@@ -225,18 +208,18 @@ ui::BasicTreeViewItem &AssetCatalogTreeView::build_catalog_items_recursive(
   return view_item;
 }
 
-void AssetCatalogTreeView::add_all_item()
+AssetCatalogTreeViewAllItem &AssetCatalogTreeView::add_all_item()
 {
   FileAssetSelectParams *params = params_;
 
-  AssetCatalogTreeViewAllItem &item = add_tree_item<AssetCatalogTreeViewAllItem>(IFACE_("All"),
-                                                                                 ICON_HOME);
+  AssetCatalogTreeViewAllItem &item = add_tree_item<AssetCatalogTreeViewAllItem>(IFACE_("All"));
   item.set_on_activate_fn([params](ui::BasicTreeViewItem & /*item*/) {
     params->asset_catalog_visibility = FILE_SHOW_ASSETS_ALL_CATALOGS;
     WM_main_add_notifier(NC_SPACE | ND_SPACE_ASSET_PARAMS, nullptr);
   });
   item.set_is_active_fn(
       [params]() { return params->asset_catalog_visibility == FILE_SHOW_ASSETS_ALL_CATALOGS; });
+  return item;
 }
 
 void AssetCatalogTreeView::add_unassigned_item()
@@ -326,7 +309,7 @@ void AssetCatalogTreeViewItem::build_context_menu(bContext &C, uiLayout &column)
 
   /* Doesn't actually exist right now, but could be defined in Python. Reason that this isn't done
    * in Python yet is that catalogs are not exposed in BPY, and we'd somehow pass the clicked on
-   * catalog to the menu draw callback (via context probably).*/
+   * catalog to the menu draw callback (via context probably). */
   MenuType *mt = WM_menutype_find("ASSETBROWSER_MT_catalog_context_menu", true);
   if (!mt) {
     return;
@@ -334,7 +317,7 @@ void AssetCatalogTreeViewItem::build_context_menu(bContext &C, uiLayout &column)
   UI_menutype_draw(&C, mt, &column);
 }
 
-bool AssetCatalogTreeViewItem::can_rename() const
+bool AssetCatalogTreeViewItem::supports_renaming() const
 {
   return true;
 }
@@ -680,7 +663,7 @@ using namespace blender::ed::asset_browser;
 
 FileAssetCatalogFilterSettingsHandle *file_create_asset_catalog_filter_settings()
 {
-  AssetCatalogFilterSettings *filter_settings = OBJECT_GUARDED_NEW(AssetCatalogFilterSettings);
+  AssetCatalogFilterSettings *filter_settings = MEM_new<AssetCatalogFilterSettings>(__func__);
   return reinterpret_cast<FileAssetCatalogFilterSettingsHandle *>(filter_settings);
 }
 
@@ -689,13 +672,10 @@ void file_delete_asset_catalog_filter_settings(
 {
   AssetCatalogFilterSettings **filter_settings = reinterpret_cast<AssetCatalogFilterSettings **>(
       filter_settings_handle);
-  OBJECT_GUARDED_SAFE_DELETE(*filter_settings, AssetCatalogFilterSettings);
+  MEM_delete(*filter_settings);
+  *filter_settings = nullptr;
 }
 
-/**
- * \return True if the file list should update its filtered results (e.g. because filtering
- *         parameters changed).
- */
 bool file_set_asset_catalog_filter_settings(
     FileAssetCatalogFilterSettingsHandle *filter_settings_handle,
     eFileSel_Params_AssetCatalogVisibility catalog_visibility,

@@ -1,29 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_material.h"
-#include "BKE_mesh.h"
-#include "BKE_mesh_runtime.h"
-#include "BKE_pointcloud.h"
-#include "BKE_spline.hh"
-
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
-
-#include "NOD_type_conversions.hh"
+#include "GEO_realize_instances.hh"
 
 #include "node_geometry_util.hh"
 
@@ -179,8 +156,7 @@ static void join_component_type(Span<GeometrySet> src_geometry_sets, GeometrySet
   InstancesComponent &instances =
       instances_geometry_set.get_component_for_write<InstancesComponent>();
 
-  if constexpr (std::is_same_v<Component, InstancesComponent> ||
-                std::is_same_v<Component, VolumeComponent>) {
+  if constexpr (is_same_any_v<Component, InstancesComponent, VolumeComponent>) {
     join_components(components, result);
   }
   else {
@@ -191,7 +167,10 @@ static void join_component_type(Span<GeometrySet> src_geometry_sets, GeometrySet
       instances.add_instance(handle, float4x4::identity());
     }
 
-    GeometrySet joined_components = bke::geometry_set_realize_instances(instances_geometry_set);
+    geometry::RealizeInstancesOptions options;
+    options.keep_original_ids = true;
+    options.realize_instance_attributes = false;
+    GeometrySet joined_components = geometry::realize_instances(instances_geometry_set, options);
     result.add(joined_components.get_component_for_write<Component>());
   }
 }
@@ -217,7 +196,7 @@ void register_node_type_geo_join_geometry()
 
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_JOIN_GEOMETRY, "Join Geometry", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_JOIN_GEOMETRY, "Join Geometry", NODE_CLASS_GEOMETRY);
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.declare = file_ns::node_declare;
   nodeRegisterType(&ntype);

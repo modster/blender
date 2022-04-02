@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_math_matrix.h"
 
@@ -22,6 +8,8 @@
 #include "node_geometry_util.hh"
 
 namespace blender::nodes::node_geo_object_info_cc {
+
+NODE_STORAGE_FUNCS(NodeGeometryObjectInfo)
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
@@ -42,9 +30,8 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  const bNode &bnode = params.node();
-  NodeGeometryObjectInfo *node_storage = (NodeGeometryObjectInfo *)bnode.storage;
-  const bool transform_space_relative = (node_storage->transform_space ==
+  const NodeGeometryObjectInfo &storage = node_storage(params.node());
+  const bool transform_space_relative = (storage.transform_space ==
                                          GEO_NODE_TRANSFORM_SPACE_RELATIVE);
 
   Object *object = params.get_input<Object *>("Object");
@@ -101,8 +88,7 @@ static void node_geo_exec(GeoNodeExecParams params)
 
 static void node_node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryObjectInfo *data = (NodeGeometryObjectInfo *)MEM_callocN(
-      sizeof(NodeGeometryObjectInfo), __func__);
+  NodeGeometryObjectInfo *data = MEM_cnew<NodeGeometryObjectInfo>(__func__);
   data->transform_space = GEO_NODE_TRANSFORM_SPACE_ORIGINAL;
   node->storage = data;
 }
@@ -115,7 +101,7 @@ void register_node_type_geo_object_info()
 
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_OBJECT_INFO, "Object Info", NODE_CLASS_INPUT, 0);
+  geo_node_type_base(&ntype, GEO_NODE_OBJECT_INFO, "Object Info", NODE_CLASS_INPUT);
   node_type_init(&ntype, file_ns::node_node_init);
   node_type_storage(
       &ntype, "NodeGeometryObjectInfo", node_free_standard_storage, node_copy_standard_storage);

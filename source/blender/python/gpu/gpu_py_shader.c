@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bpygpu
@@ -395,11 +381,11 @@ static PyObject *pygpu_shader_uniform_float(BPyGPUShader *self, PyObject *args)
     if (BaseMath_ReadCallback(mat) == -1) {
       return NULL;
     }
-    if ((mat->num_row != mat->num_col) || !ELEM(mat->num_row, 3, 4)) {
+    if ((mat->row_num != mat->col_num) || !ELEM(mat->row_num, 3, 4)) {
       PyErr_SetString(PyExc_ValueError, "Expected 3x3 or 4x4 matrix");
       return NULL;
     }
-    length = mat->num_row * mat->num_col;
+    length = mat->row_num * mat->col_num;
     memcpy(values, mat->matrix, sizeof(float) * length);
   }
   else {

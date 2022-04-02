@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2007 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2007 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spfile
@@ -179,7 +163,6 @@ int folderlist_clear_next(struct SpaceFile *sfile)
   return 1;
 }
 
-/* not listbase itself */
 void folderlist_free(ListBase *folderlist)
 {
   if (folderlist) {
@@ -340,7 +323,10 @@ typedef struct FileListEntryCache {
   /* Previews handling. */
   TaskPool *previews_pool;
   ThreadQueue *previews_done;
-  size_t previews_todo_count;
+  /** Counter for previews that are not fully loaded and ready to display yet. So includes all
+   * previews either in `previews_pool` or `previews_done`. #filelist_cache_previews_update() makes
+   * previews in `preview_done` ready for display, so the counter is decremented there. */
+  int previews_todo_count;
 } FileListEntryCache;
 
 /* FileListCache.flags */
@@ -353,7 +339,7 @@ typedef struct FileListEntryPreview {
   char path[FILE_MAX];
   uint flags;
   int index;
-
+  int attributes; /* from FileDirEntry. */
   int icon_id;
 } FileListEntryPreview;
 
@@ -512,6 +498,53 @@ static int compare_apply_inverted(int val, const struct FileSortData *sort_data)
 }
 
 /**
+ * If all relevant characteristics match (e.g. the file type when sorting by file types), this
+ * should be used as tiebreaker. It makes sure there's a well defined sorting even in such cases.
+ *
+ * Multiple files with the same name can appear with recursive file loading and/or when displaying
+ * IDs of different types, so these cases need to be handled.
+ *
+ * 1) Sort files by name using natural sorting.
+ * 2) If not possible (file names match) and both represent local IDs, sort by ID-type.
+ * 3) If not possible and only one is a local ID, place files representing local IDs first.
+ *
+ * TODO: (not actually implemented, but should be):
+ * 4) If no file represents a local ID, sort by file path, so that files higher up the file system
+ *    hierarchy are placed first.
+ */
+static int compare_tiebreaker(const FileListInternEntry *entry1, const FileListInternEntry *entry2)
+{
+  /* Case 1. */
+  {
+    const int order = BLI_strcasecmp_natural(entry1->name, entry2->name);
+    if (order) {
+      return order;
+    }
+  }
+
+  /* Case 2. */
+  if (entry1->local_data.id && entry2->local_data.id) {
+    if (entry1->blentype < entry2->blentype) {
+      return -1;
+    }
+    if (entry1->blentype > entry2->blentype) {
+      return 1;
+    }
+  }
+  /* Case 3. */
+  {
+    if (entry1->local_data.id && !entry2->local_data.id) {
+      return -1;
+    }
+    if (!entry1->local_data.id && entry2->local_data.id) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+/**
  * Handles inverted sorting itself (currently there's nothing to invert), so if this returns non-0,
  * it should be used as-is and not inverted.
  */
@@ -571,17 +604,13 @@ static int compare_name(void *user_data, const void *a1, const void *a2)
   const FileListInternEntry *entry1 = a1;
   const FileListInternEntry *entry2 = a2;
   const struct FileSortData *sort_data = user_data;
-  char *name1, *name2;
-  int ret;
 
+  int ret;
   if ((ret = compare_direntry_generic(entry1, entry2))) {
     return ret;
   }
 
-  name1 = entry1->name;
-  name2 = entry2->name;
-
-  return compare_apply_inverted(BLI_strcasecmp_natural(name1, name2), sort_data);
+  return compare_apply_inverted(compare_tiebreaker(entry1, entry2), sort_data);
 }
 
 static int compare_date(void *user_data, const void *a1, const void *a2)
@@ -589,10 +618,9 @@ static int compare_date(void *user_data, const void *a1, const void *a2)
   const FileListInternEntry *entry1 = a1;
   const FileListInternEntry *entry2 = a2;
   const struct FileSortData *sort_data = user_data;
-  char *name1, *name2;
   int64_t time1, time2;
-  int ret;
 
+  int ret;
   if ((ret = compare_direntry_generic(entry1, entry2))) {
     return ret;
   }
@@ -606,10 +634,7 @@ static int compare_date(void *user_data, const void *a1, const void *a2)
     return compare_apply_inverted(-1, sort_data);
   }
 
-  name1 = entry1->name;
-  name2 = entry2->name;
-
-  return compare_apply_inverted(BLI_strcasecmp_natural(name1, name2), sort_data);
+  return compare_apply_inverted(compare_tiebreaker(entry1, entry2), sort_data);
 }
 
 static int compare_size(void *user_data, const void *a1, const void *a2)
@@ -617,7 +642,6 @@ static int compare_size(void *user_data, const void *a1, const void *a2)
   const FileListInternEntry *entry1 = a1;
   const FileListInternEntry *entry2 = a2;
   const struct FileSortData *sort_data = user_data;
-  char *name1, *name2;
   uint64_t size1, size2;
   int ret;
 
@@ -634,10 +658,7 @@ static int compare_size(void *user_data, const void *a1, const void *a2)
     return compare_apply_inverted(-1, sort_data);
   }
 
-  name1 = entry1->name;
-  name2 = entry2->name;
-
-  return compare_apply_inverted(BLI_strcasecmp_natural(name1, name2), sort_data);
+  return compare_apply_inverted(compare_tiebreaker(entry1, entry2), sort_data);
 }
 
 static int compare_extension(void *user_data, const void *a1, const void *a2)
@@ -645,7 +666,6 @@ static int compare_extension(void *user_data, const void *a1, const void *a2)
   const FileListInternEntry *entry1 = a1;
   const FileListInternEntry *entry2 = a2;
   const struct FileSortData *sort_data = user_data;
-  char *name1, *name2;
   int ret;
 
   if ((ret = compare_direntry_generic(entry1, entry2))) {
@@ -693,10 +713,7 @@ static int compare_extension(void *user_data, const void *a1, const void *a2)
     }
   }
 
-  name1 = entry1->name;
-  name2 = entry2->name;
-
-  return compare_apply_inverted(BLI_strcasecmp_natural(name1, name2), sort_data);
+  return compare_apply_inverted(compare_tiebreaker(entry1, entry2), sort_data);
 }
 
 void filelist_sort(struct FileList *filelist)
@@ -822,7 +839,8 @@ static bool is_filtered_hidden(const char *filename,
 
 /**
  * Apply the filter string as file path matching pattern.
- * \return true when the file should be in the result set, false if it should be filtered out. */
+ * \return true when the file should be in the result set, false if it should be filtered out.
+ */
 static bool is_filtered_file_relpath(const FileListInternEntry *file, const FileListFilter *filter)
 {
   if (filter->filter_search[0] == '\0') {
@@ -831,6 +849,20 @@ static bool is_filtered_file_relpath(const FileListInternEntry *file, const File
 
   /* If there's a filter string, apply it as filter even if FLF_DO_FILTER is not set. */
   return fnmatch(filter->filter_search, file->relpath, FNM_CASEFOLD) == 0;
+}
+
+/**
+ * Apply the filter string as matching pattern on file name.
+ * \return true when the file should be in the result set, false if it should be filtered out.
+ */
+static bool is_filtered_file_name(const FileListInternEntry *file, const FileListFilter *filter)
+{
+  if (filter->filter_search[0] == '\0') {
+    return true;
+  }
+
+  /* If there's a filter string, apply it as filter even if FLF_DO_FILTER is not set. */
+  return fnmatch(filter->filter_search, file->name, FNM_CASEFOLD) == 0;
 }
 
 /** \return true when the file should be in the result set, false if it should be filtered out. */
@@ -872,7 +904,8 @@ static bool is_filtered_file(FileListInternEntry *file,
                              const char *UNUSED(root),
                              FileListFilter *filter)
 {
-  return is_filtered_file_type(file, filter) && is_filtered_file_relpath(file, filter);
+  return is_filtered_file_type(file, filter) &&
+         (is_filtered_file_relpath(file, filter) || is_filtered_file_name(file, filter));
 }
 
 static bool is_filtered_id_file_type(const FileListInternEntry *file,
@@ -1023,10 +1056,10 @@ void filelist_tag_needs_filtering(FileList *filelist)
 void filelist_filter(FileList *filelist)
 {
   int num_filtered = 0;
-  const int num_files = filelist->filelist.nbr_entries;
+  const int num_files = filelist->filelist.entries_num;
   FileListInternEntry **filtered_tmp, *file;
 
-  if (ELEM(filelist->filelist.nbr_entries, FILEDIR_NBR_ENTRIES_UNSET, 0)) {
+  if (ELEM(filelist->filelist.entries_num, FILEDIR_NBR_ENTRIES_UNSET, 0)) {
     return;
   }
 
@@ -1066,8 +1099,8 @@ void filelist_filter(FileList *filelist)
   memcpy(filelist->filelist_intern.filtered,
          filtered_tmp,
          sizeof(*filelist->filelist_intern.filtered) * (size_t)num_filtered);
-  filelist->filelist.nbr_entries_filtered = num_filtered;
-  //  printf("Filetered: %d over %d entries\n", num_filtered, filelist->filelist.nbr_entries);
+  filelist->filelist.entries_filtered_num = num_filtered;
+  //  printf("Filetered: %d over %d entries\n", num_filtered, filelist->filelist.entries_num);
 
   filelist_cache_clear(&filelist->filelist_cache, filelist->filelist_cache.size);
   filelist->flags &= ~FL_NEED_FILTERING;
@@ -1131,11 +1164,6 @@ void filelist_setfilter_options(FileList *filelist,
   }
 }
 
-/**
- * Set the indexer to be used by the filelist.
- *
- * The given indexer allocation should be handled by the caller or defined statically.
- */
 void filelist_setindexer(FileList *filelist, const FileIndexerType *indexer)
 {
   BLI_assert(filelist);
@@ -1144,10 +1172,6 @@ void filelist_setindexer(FileList *filelist, const FileIndexerType *indexer)
   filelist->indexer = indexer;
 }
 
-/**
- * \param catalog_id: The catalog that should be filtered by if \a catalog_visibility is
- *                    #FILE_SHOW_ASSETS_FROM_CATALOG. May be NULL otherwise.
- */
 void filelist_set_asset_catalog_filter_options(
     FileList *filelist,
     eFileSel_Params_AssetCatalogVisibility catalog_visibility,
@@ -1187,9 +1211,6 @@ static bool filelist_compare_asset_libraries(const AssetLibraryReference *librar
   return true;
 }
 
-/**
- * \param asset_library_ref: May be NULL to unset the library.
- */
 void filelist_setlibrary(FileList *filelist, const AssetLibraryReference *asset_library_ref)
 {
   /* Unset if needed. */
@@ -1531,8 +1552,8 @@ static void filelist_direntryarr_free(FileDirEntryArr *array)
 #else
   BLI_assert(BLI_listbase_is_empty(&array->entries));
 #endif
-  array->nbr_entries = FILEDIR_NBR_ENTRIES_UNSET;
-  array->nbr_entries_filtered = FILEDIR_NBR_ENTRIES_UNSET;
+  array->entries_num = FILEDIR_NBR_ENTRIES_UNSET;
+  array->entries_filtered_num = FILEDIR_NBR_ENTRIES_UNSET;
 }
 
 static void filelist_intern_entry_free(FileListInternEntry *entry)
@@ -1617,15 +1638,19 @@ static void filelist_cache_preview_runf(TaskPool *__restrict pool, void *taskdat
 
   IMB_thumb_path_lock(preview->path);
   /* Always generate biggest preview size for now, it's simpler and avoids having to re-generate
-   * in case user switch to a bigger preview size. */
-  ImBuf *imbuf = IMB_thumb_manage(preview->path, THB_LARGE, source);
+   * in case user switch to a bigger preview size. Do not create preview when file is offline. */
+  ImBuf *imbuf = (preview->attributes & FILE_ATTR_OFFLINE) ?
+                     IMB_thumb_read(preview->path, THB_LARGE) :
+                     IMB_thumb_manage(preview->path, THB_LARGE, source);
   IMB_thumb_path_unlock(preview->path);
   if (imbuf) {
     preview->icon_id = BKE_icon_imbuf_create(imbuf);
   }
 
+  /* Move ownership to the done queue. */
+  preview_taskdata->preview = NULL;
+
   BLI_thread_queue_push(cache->previews_done, preview);
-  atomic_fetch_and_sub_z(&cache->previews_todo_count, 1);
 
   //  printf("%s: End (%d)...\n", __func__, threadid);
 }
@@ -1633,6 +1658,12 @@ static void filelist_cache_preview_runf(TaskPool *__restrict pool, void *taskdat
 static void filelist_cache_preview_freef(TaskPool *__restrict UNUSED(pool), void *taskdata)
 {
   FileListEntryPreviewTaskData *preview_taskdata = taskdata;
+
+  /* In case the preview wasn't moved to the "done" queue yet. */
+  if (preview_taskdata->preview) {
+    MEM_freeN(preview_taskdata->preview);
+  }
+
   MEM_freeN(preview_taskdata);
 }
 
@@ -1661,6 +1692,7 @@ static void filelist_cache_previews_clear(FileListEntryCache *cache)
       }
       MEM_freeN(preview);
     }
+    cache->previews_todo_count = 0;
   }
 }
 
@@ -1689,11 +1721,6 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
 
   BLI_assert(cache->flags & FLC_PREVIEWS_ACTIVE);
 
-  if (!entry->preview_icon_id && (entry->attributes & FILE_ATTR_OFFLINE)) {
-    entry->flags |= FILE_ENTRY_INVALID_PREVIEW;
-    return;
-  }
-
   if (entry->preview_icon_id) {
     return;
   }
@@ -1720,6 +1747,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
   FileListEntryPreview *preview = MEM_mallocN(sizeof(*preview), __func__);
   preview->index = index;
   preview->flags = entry->typeflag;
+  preview->attributes = entry->attributes;
   preview->icon_id = 0;
 
   if (preview_in_memory) {
@@ -1731,7 +1759,6 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
       preview->icon_id = BKE_icon_imbuf_create(imbuf);
     }
     BLI_thread_queue_push(cache->previews_done, preview);
-    atomic_fetch_and_sub_z(&cache->previews_todo_count, 1);
   }
   else {
     if (entry->redirection_path) {
@@ -1752,6 +1779,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
                        true,
                        filelist_cache_preview_freef);
   }
+  cache->previews_todo_count++;
 }
 
 static void filelist_cache_init(FileListEntryCache *cache, size_t cache_size)
@@ -1846,10 +1874,8 @@ FileList *filelist_new(short type)
   filelist_cache_init(&p->filelist_cache, FILELIST_ENTRYCACHESIZE_DEFAULT);
 
   p->selection_state = BLI_ghash_new(BLI_ghashutil_inthash_p, BLI_ghashutil_intcmp, __func__);
-  p->filelist.nbr_entries = FILEDIR_NBR_ENTRIES_UNSET;
+  p->filelist.entries_num = FILEDIR_NBR_ENTRIES_UNSET;
   filelist_settype(p, type);
-
-  p->indexer = &file_indexer_noop;
 
   return p;
 }
@@ -1862,6 +1888,7 @@ void filelist_settype(FileList *filelist, short type)
 
   filelist->type = type;
   filelist->tags = 0;
+  filelist->indexer = &file_indexer_noop;
   switch (filelist->type) {
     case FILE_MAIN:
       filelist->check_dir_fn = filelist_checkdir_main;
@@ -1952,9 +1979,9 @@ static void filelist_clear_main_files(FileList *filelist,
 
   const int removed_files = filelist_intern_free_main_files(&filelist->filelist_intern);
 
-  filelist->filelist.nbr_entries -= removed_files;
-  filelist->filelist.nbr_entries_filtered = FILEDIR_NBR_ENTRIES_UNSET;
-  BLI_assert(filelist->filelist.nbr_entries > FILEDIR_NBR_ENTRIES_UNSET);
+  filelist->filelist.entries_num -= removed_files;
+  filelist->filelist.entries_filtered_num = FILEDIR_NBR_ENTRIES_UNSET;
+  BLI_assert(filelist->filelist.entries_num > FILEDIR_NBR_ENTRIES_UNSET);
 
   if (do_selection && filelist->selection_state) {
     BLI_ghash_clear(filelist->selection_state, NULL, NULL);
@@ -1970,10 +1997,6 @@ void filelist_clear(FileList *filelist)
   filelist_clear_ex(filelist, true, true, true);
 }
 
-/**
- * A "smarter" version of #filelist_clear() that calls partial clearing based on the filelist
- * force-reset flags.
- */
 void filelist_clear_from_reset_tag(FileList *filelist)
 {
   /* Do a full clear if needed. */
@@ -2041,7 +2064,7 @@ static char *fileentry_uiname(const char *root,
     BLI_join_dirfile(abspath, sizeof(abspath), root, relpath);
     name = BLF_display_name_from_file(abspath);
     if (name) {
-      /* Allocated string, so no need to BLI_strdup.*/
+      /* Allocated string, so no need to #BLI_strdup. */
       return name;
     }
   }
@@ -2080,9 +2103,6 @@ bool filelist_is_dir(struct FileList *filelist, const char *path)
   return filelist->check_dir_fn(filelist, (char *)path, false);
 }
 
-/**
- * May modify in place given r_dir, which is expected to be FILE_MAX_LIBEXTRA length.
- */
 void filelist_setdir(struct FileList *filelist, char *r_dir)
 {
   const bool allow_invalid = filelist->asset_library_ref != NULL;
@@ -2140,12 +2160,6 @@ bool filelist_needs_reset_on_main_changes(const FileList *filelist)
   return (filelist->tags & FILELIST_TAGS_USES_MAIN_DATA) != 0;
 }
 
-/**
- * Limited version of full update done by space_file's file_refresh(),
- * to be used by operators and such.
- * Ensures given filelist is ready to be used (i.e. it is filtered and sorted),
- * unless it is tagged for a full refresh.
- */
 int filelist_files_ensure(FileList *filelist)
 {
   if (!filelist_needs_force_reset(filelist) || !filelist_needs_reading(filelist)) {
@@ -2153,7 +2167,7 @@ int filelist_files_ensure(FileList *filelist)
     filelist_filter(filelist);
   }
 
-  return filelist->filelist.nbr_entries_filtered;
+  return filelist->filelist.entries_filtered_num;
 }
 
 static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int index)
@@ -2212,7 +2226,7 @@ FileDirEntry *filelist_file_ex(struct FileList *filelist, const int index, const
   const size_t cache_size = cache->size;
   int old_index;
 
-  if ((index < 0) || (index >= filelist->filelist.nbr_entries_filtered)) {
+  if ((index < 0) || (index >= filelist->filelist.entries_filtered_num)) {
     return ret;
   }
 
@@ -2244,7 +2258,7 @@ FileDirEntry *filelist_file_ex(struct FileList *filelist, const int index, const
   cache->misc_entries_indices[cache->misc_cursor] = index;
   cache->misc_cursor = (cache->misc_cursor + 1) % cache_size;
 
-#if 0 /* Actually no, only block cached entries should have preview imho. */
+#if 0 /* Actually no, only block cached entries should have preview IMHO. */
   if (cache->previews_pool) {
     filelist_cache_previews_push(filelist, ret, index);
   }
@@ -2258,13 +2272,9 @@ FileDirEntry *filelist_file(struct FileList *filelist, int index)
   return filelist_file_ex(filelist, index, true);
 }
 
-/**
- * Find a file from a file name, or more precisely, its file-list relative path, inside the
- * filtered items. \return The index of the found file or -1.
- */
 int filelist_file_find_path(struct FileList *filelist, const char *filename)
 {
-  if (filelist->filelist.nbr_entries_filtered == FILEDIR_NBR_ENTRIES_UNSET) {
+  if (filelist->filelist.entries_filtered_num == FILEDIR_NBR_ENTRIES_UNSET) {
     return -1;
   }
 
@@ -2272,7 +2282,7 @@ int filelist_file_find_path(struct FileList *filelist, const char *filename)
    * This is only used to find again renamed entry,
    * annoying but looks hairy to get rid of it currently. */
 
-  for (int fidx = 0; fidx < filelist->filelist.nbr_entries_filtered; fidx++) {
+  for (int fidx = 0; fidx < filelist->filelist.entries_filtered_num; fidx++) {
     FileListInternEntry *entry = filelist->filelist_intern.filtered[fidx];
     if (STREQ(entry->relpath, filename)) {
       return fidx;
@@ -2282,17 +2292,13 @@ int filelist_file_find_path(struct FileList *filelist, const char *filename)
   return -1;
 }
 
-/**
- * Find a file representing \a id.
- * \return The index of the found file or -1.
- */
 int filelist_file_find_id(const FileList *filelist, const ID *id)
 {
-  if (filelist->filelist.nbr_entries_filtered == FILEDIR_NBR_ENTRIES_UNSET) {
+  if (filelist->filelist.entries_filtered_num == FILEDIR_NBR_ENTRIES_UNSET) {
     return -1;
   }
 
-  for (int fidx = 0; fidx < filelist->filelist.nbr_entries_filtered; fidx++) {
+  for (int fidx = 0; fidx < filelist->filelist.entries_filtered_num; fidx++) {
     FileListInternEntry *entry = filelist->filelist_intern.filtered[fidx];
     if (entry->local_data.id == id) {
       return fidx;
@@ -2302,9 +2308,6 @@ int filelist_file_find_id(const FileList *filelist, const ID *id)
   return -1;
 }
 
-/**
- * Get the ID a file represents (if any). For #FILE_MAIN, #FILE_MAIN_ASSET.
- */
 ID *filelist_file_get_id(const FileDirEntry *file)
 {
   return file->id;
@@ -2400,29 +2403,28 @@ static void filelist_file_cache_block_release(struct FileList *filelist,
   }
 }
 
-/* Load in cache all entries "around" given index (as much as block cache may hold). */
 bool filelist_file_cache_block(struct FileList *filelist, const int index)
 {
   FileListEntryCache *cache = &filelist->filelist_cache;
   const size_t cache_size = cache->size;
 
-  const int nbr_entries = filelist->filelist.nbr_entries_filtered;
+  const int entries_num = filelist->filelist.entries_filtered_num;
   int start_index = max_ii(0, index - (cache_size / 2));
-  int end_index = min_ii(nbr_entries, index + (cache_size / 2));
+  int end_index = min_ii(entries_num, index + (cache_size / 2));
   int i;
   const bool full_refresh = (filelist->flags & FL_IS_READY) == 0;
 
-  if ((index < 0) || (index >= nbr_entries)) {
-    //      printf("Wrong index %d ([%d:%d])", index, 0, nbr_entries);
+  if ((index < 0) || (index >= entries_num)) {
+    //      printf("Wrong index %d ([%d:%d])", index, 0, entries_num);
     return false;
   }
 
   /* Maximize cached range! */
   if ((end_index - start_index) < cache_size) {
     if (start_index == 0) {
-      end_index = min_ii(nbr_entries, start_index + cache_size);
+      end_index = min_ii(entries_num, start_index + cache_size);
     }
-    else if (end_index == nbr_entries) {
+    else if (end_index == entries_num) {
       start_index = max_ii(0, end_index - cache_size);
     }
   }
@@ -2691,6 +2693,7 @@ bool filelist_cache_previews_update(FileList *filelist)
     }
 
     MEM_freeN(preview);
+    cache->previews_todo_count--;
   }
 
   return changed;
@@ -2712,7 +2715,7 @@ bool filelist_cache_previews_done(FileList *filelist)
   }
 
   return (cache->previews_pool == NULL) || (cache->previews_done == NULL) ||
-         (cache->previews_todo_count == (size_t)BLI_thread_queue_len(cache->previews_done));
+         (cache->previews_todo_count == 0);
 }
 
 /* would recognize .blend as well */
@@ -2743,8 +2746,6 @@ static bool file_is_blend_backup(const char *str)
   return retval;
 }
 
-/* TODO: Maybe we should move this to BLI?
- * On the other hand, it's using defines from space-file area, so not sure... */
 int ED_path_extension_type(const char *path)
 {
   if (BLO_has_bfile_extension(path)) {
@@ -2779,7 +2780,8 @@ int ED_path_extension_type(const char *path)
                                  NULL)) {
     return FILE_TYPE_TEXT;
   }
-  if (BLI_path_extension_check_n(path, ".ttf", ".ttc", ".pfb", ".otf", ".otc", NULL)) {
+  if (BLI_path_extension_check_n(
+          path, ".ttf", ".ttc", ".pfb", ".otf", ".otc", ".woff", ".woff2", NULL)) {
     return FILE_TYPE_FTFONT;
   }
   if (BLI_path_extension_check(path, ".btx")) {
@@ -2859,7 +2861,7 @@ int ED_file_extension_icon(const char *path)
 
 int filelist_needs_reading(FileList *filelist)
 {
-  return (filelist->filelist.nbr_entries == FILEDIR_NBR_ENTRIES_UNSET) ||
+  return (filelist->filelist.entries_num == FILEDIR_NBR_ENTRIES_UNSET) ||
          filelist_needs_force_reset(filelist);
 }
 
@@ -2924,8 +2926,8 @@ void filelist_entries_select_index_range_set(
     FileList *filelist, FileSelection *sel, FileSelType select, uint flag, FileCheckType check)
 {
   /* select all valid files between first and last indicated */
-  if ((sel->first >= 0) && (sel->first < filelist->filelist.nbr_entries_filtered) &&
-      (sel->last >= 0) && (sel->last < filelist->filelist.nbr_entries_filtered)) {
+  if ((sel->first >= 0) && (sel->first < filelist->filelist.entries_filtered_num) &&
+      (sel->last >= 0) && (sel->last < filelist->filelist.entries_filtered_num)) {
     int current_file;
     for (current_file = sel->first; current_file <= sel->last; current_file++) {
       filelist_entry_select_index_set(filelist, current_file, select, flag, check);
@@ -2961,7 +2963,7 @@ uint filelist_entry_select_index_get(FileList *filelist, const int index, FileCh
 
 bool filelist_entry_is_selected(FileList *filelist, const int index)
 {
-  BLI_assert(index >= 0 && index < filelist->filelist.nbr_entries_filtered);
+  BLI_assert(index >= 0 && index < filelist->filelist.entries_filtered_num);
   FileListInternEntry *intern_entry = filelist->filelist_intern.filtered[index];
 
   /* BLI_ghash_lookup returns NULL if not found, which gets mapped to 0, which gets mapped to
@@ -2972,9 +2974,6 @@ bool filelist_entry_is_selected(FileList *filelist, const int index)
   return selection_state != 0;
 }
 
-/**
- * Set selection of the '..' parent entry, but only if it's actually visible.
- */
 void filelist_entry_parent_select_set(FileList *filelist,
                                       FileSelType select,
                                       uint flag,
@@ -2985,7 +2984,6 @@ void filelist_entry_parent_select_set(FileList *filelist,
   }
 }
 
-/* WARNING! dir must be FILE_MAX_LIBEXTRA long! */
 bool filelist_islibrary(struct FileList *filelist, char *dir, char **r_group)
 {
   return BLO_library_path_explode(filelist->filelist.root, dir, r_group, NULL);
@@ -3032,13 +3030,13 @@ static int filelist_readjob_list_dir(const char *root,
                                      const bool skip_currpar)
 {
   struct direntry *files;
-  int nbr_files, nbr_entries = 0;
+  int entries_num = 0;
   /* Full path of the item. */
   char full_path[FILE_MAX];
 
-  nbr_files = BLI_filelist_dir_contents(root, &files);
+  const int files_num = BLI_filelist_dir_contents(root, &files);
   if (files) {
-    int i = nbr_files;
+    int i = files_num;
     while (i--) {
       FileListInternEntry *entry;
 
@@ -3112,11 +3110,11 @@ static int filelist_readjob_list_dir(const char *root,
 #endif
 
       BLI_addtail(entries, entry);
-      nbr_entries++;
+      entries_num++;
     }
-    BLI_filelist_free(files, nbr_files);
+    BLI_filelist_free(files, files_num);
   }
-  return nbr_entries;
+  return entries_num;
 }
 
 typedef enum ListLibOptions {
@@ -3372,13 +3370,13 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
   if (filelist->dir[0] == 0) {
     /* make directories */
 #  ifdef WITH_FREESTYLE
-    filelist->filelist.nbr_entries = 27;
+    filelist->filelist.entries_num = 27;
 #  else
-    filelist->filelist.nbr_entries = 26;
+    filelist->filelist.entries_num = 26;
 #  endif
-    filelist_resize(filelist, filelist->filelist.nbr_entries);
+    filelist_resize(filelist, filelist->filelist.entries_num);
 
-    for (a = 0; a < filelist->filelist.nbr_entries; a++) {
+    for (a = 0; a < filelist->filelist.entries_num; a++) {
       filelist->filelist.entries[a].typeflag |= FILE_TYPE_DIR;
     }
 
@@ -3421,20 +3419,20 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
       return;
     }
 
-    filelist->filelist.nbr_entries = 0;
+    filelist->filelist.entries_num = 0;
     for (id = lb->first; id; id = id->next) {
       if (!(filelist->filter_data.flags & FLF_HIDE_DOT) || id->name[2] != '.') {
-        filelist->filelist.nbr_entries++;
+        filelist->filelist.entries_num++;
       }
     }
 
     /* XXX TODO: if data-browse or append/link #FLF_HIDE_PARENT has to be set. */
     if (!(filelist->filter_data.flags & FLF_HIDE_PARENT)) {
-      filelist->filelist.nbr_entries++;
+      filelist->filelist.entries_num++;
     }
 
-    if (filelist->filelist.nbr_entries > 0) {
-      filelist_resize(filelist, filelist->filelist.nbr_entries);
+    if (filelist->filelist.entries_num > 0) {
+      filelist_resize(filelist, filelist->filelist.entries_num);
     }
 
     files = filelist->filelist.entries;
@@ -3477,8 +3475,7 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
           //                  files->entry->nr = totbl + 1;
           files->entry->poin = id;
           fake = id->flag & LIB_FAKEUSER;
-          if (idcode == ID_MA || idcode == ID_TE || idcode == ID_LA || idcode == ID_WO ||
-              idcode == ID_IM) {
+          if (ELEM(idcode, ID_MA, ID_TE, ID_LA, ID_WO, ID_IM)) {
             files->typeflag |= FILE_TYPE_IMAGE;
           }
 #  if 0
@@ -3541,11 +3538,11 @@ typedef struct FileListReadJob {
 
 static void filelist_readjob_append_entries(FileListReadJob *job_params,
                                             ListBase *from_entries,
-                                            int nbr_from_entries,
+                                            int from_entries_num,
                                             short *do_update)
 {
-  BLI_assert(BLI_listbase_count(from_entries) == nbr_from_entries);
-  if (nbr_from_entries <= 0) {
+  BLI_assert(BLI_listbase_count(from_entries) == from_entries_num);
+  if (from_entries_num <= 0) {
     *do_update = false;
     return;
   }
@@ -3553,7 +3550,7 @@ static void filelist_readjob_append_entries(FileListReadJob *job_params,
   FileList *filelist = job_params->tmp_filelist; /* Use the thread-safe filelist queue. */
   BLI_mutex_lock(&job_params->lock);
   BLI_movelisttolist(&filelist->filelist.entries, from_entries);
-  filelist->filelist.nbr_entries += nbr_from_entries;
+  filelist->filelist.entries_num += from_entries_num;
   BLI_mutex_unlock(&job_params->lock);
 
   *do_update = true;
@@ -3609,7 +3606,7 @@ static void filelist_readjob_recursive_dir_add_items(const bool do_lib,
   char filter_glob[FILE_MAXFILE];
   const char *root = filelist->filelist.root;
   const int max_recursion = filelist->max_recursion;
-  int nbr_done_dirs = 0, nbr_todo_dirs = 1;
+  int dirs_done_count = 0, dirs_todo_count = 1;
 
   todo_dirs = BLI_stack_new(sizeof(*td_dir), __func__);
   td_dir = BLI_stack_push_r(todo_dirs);
@@ -3629,7 +3626,7 @@ static void filelist_readjob_recursive_dir_add_items(const bool do_lib,
 
   while (!BLI_stack_is_empty(todo_dirs) && !(*stop)) {
     FileListInternEntry *entry;
-    int nbr_entries = 0;
+    int entries_num = 0;
 
     char *subdir;
     char rel_subdir[FILE_MAX_LIBEXTRA];
@@ -3665,19 +3662,19 @@ static void filelist_readjob_recursive_dir_add_items(const bool do_lib,
         list_lib_options |= LIST_LIB_RECURSIVE;
       }
       /* Only load assets when browsing an asset library. For normal file browsing we return all
-       * entries. `FLF_ASSETS_ONLY` filter can be enabled/disabled by the user.*/
+       * entries. `FLF_ASSETS_ONLY` filter can be enabled/disabled by the user. */
       if (filelist->asset_library_ref) {
         list_lib_options |= LIST_LIB_ASSETS_ONLY;
       }
-      nbr_entries = filelist_readjob_list_lib(
+      entries_num = filelist_readjob_list_lib(
           subdir, &entries, list_lib_options, &indexer_runtime);
-      if (nbr_entries > 0) {
+      if (entries_num > 0) {
         is_lib = true;
       }
     }
 
     if (!is_lib) {
-      nbr_entries = filelist_readjob_list_dir(
+      entries_num = filelist_readjob_list_dir(
           subdir, &entries, filter_glob, do_lib, job_params->main_name, skip_currpar);
     }
 
@@ -3701,14 +3698,14 @@ static void filelist_readjob_recursive_dir_add_items(const bool do_lib,
         td_dir = BLI_stack_push_r(todo_dirs);
         td_dir->level = recursion_level + 1;
         td_dir->dir = BLI_strdup(dir);
-        nbr_todo_dirs++;
+        dirs_todo_count++;
       }
     }
 
-    filelist_readjob_append_entries(job_params, &entries, nbr_entries, do_update);
+    filelist_readjob_append_entries(job_params, &entries, entries_num, do_update);
 
-    nbr_done_dirs++;
-    *progress = (float)nbr_done_dirs / (float)nbr_todo_dirs;
+    dirs_done_count++;
+    *progress = (float)dirs_done_count / (float)dirs_todo_count;
     MEM_freeN(subdir);
   }
 
@@ -3741,10 +3738,10 @@ static void filelist_readjob_do(const bool do_lib,
 
   //  BLI_assert(filelist->filtered == NULL);
   BLI_assert(BLI_listbase_is_empty(&filelist->filelist.entries) &&
-             (filelist->filelist.nbr_entries == FILEDIR_NBR_ENTRIES_UNSET));
+             (filelist->filelist.entries_num == FILEDIR_NBR_ENTRIES_UNSET));
 
   /* A valid, but empty directory from now. */
-  filelist->filelist.nbr_entries = 0;
+  filelist->filelist.entries_num = 0;
 
   filelist_readjob_recursive_dir_add_items(do_lib, job_params, stop, do_update, progress);
 }
@@ -3815,7 +3812,7 @@ static void filelist_readjob_main_assets_add_items(FileListReadJob *job_params,
   FileListInternEntry *entry;
   ListBase tmp_entries = {0};
   ID *id_iter;
-  int nbr_entries = 0;
+  int entries_num = 0;
 
   /* Make sure no IDs are added/removed/reallocated in the main thread while this is running in
    * parallel. */
@@ -3838,19 +3835,19 @@ static void filelist_readjob_main_assets_add_items(FileListReadJob *job_params,
     entry->local_data.preview_image = BKE_asset_metadata_preview_get_from_id(id_iter->asset_data,
                                                                              id_iter);
     entry->local_data.id = id_iter;
-    nbr_entries++;
+    entries_num++;
     BLI_addtail(&tmp_entries, entry);
   }
   FOREACH_MAIN_ID_END;
 
   BKE_main_unlock(job_params->current_main);
 
-  if (nbr_entries) {
+  if (entries_num) {
     *do_update = true;
 
     BLI_movelisttolist(&filelist->filelist.entries, &tmp_entries);
-    filelist->filelist.nbr_entries += nbr_entries;
-    filelist->filelist.nbr_entries_filtered = -1;
+    filelist->filelist.entries_num += entries_num;
+    filelist->filelist.entries_filtered_num = -1;
   }
 }
 
@@ -3863,8 +3860,8 @@ static void filelist_readjob_main_assets_add_items(FileListReadJob *job_params,
  */
 static bool filelist_contains_main(const FileList *filelist, const Main *bmain)
 {
-  const char *main_path = BKE_main_blendfile_path(bmain);
-  return main_path[0] && BLI_path_contains(filelist->filelist.root, main_path);
+  const char *blendfile_path = BKE_main_blendfile_path(bmain);
+  return blendfile_path[0] && BLI_path_contains(filelist->filelist.root, blendfile_path);
 }
 
 static void filelist_readjob_asset_library(FileListReadJob *job_params,
@@ -3875,10 +3872,10 @@ static void filelist_readjob_asset_library(FileListReadJob *job_params,
   FileList *filelist = job_params->tmp_filelist; /* Use the thread-safe filelist queue. */
 
   BLI_assert(BLI_listbase_is_empty(&filelist->filelist.entries) &&
-             (filelist->filelist.nbr_entries == FILEDIR_NBR_ENTRIES_UNSET));
+             (filelist->filelist.entries_num == FILEDIR_NBR_ENTRIES_UNSET));
 
   /* A valid, but empty file-list from now. */
-  filelist->filelist.nbr_entries = 0;
+  filelist->filelist.entries_num = 0;
 
   /* NOP if already read. */
   filelist_readjob_load_asset_library_data(job_params, do_update);
@@ -3907,12 +3904,12 @@ static void filelist_readjob_main_assets(FileListReadJob *job_params,
 {
   FileList *filelist = job_params->tmp_filelist; /* Use the thread-safe filelist queue. */
   BLI_assert(BLI_listbase_is_empty(&filelist->filelist.entries) &&
-             (filelist->filelist.nbr_entries == FILEDIR_NBR_ENTRIES_UNSET));
+             (filelist->filelist.entries_num == FILEDIR_NBR_ENTRIES_UNSET));
 
   filelist_readjob_load_asset_library_data(job_params, do_update);
 
   /* A valid, but empty file-list from now. */
-  filelist->filelist.nbr_entries = 0;
+  filelist->filelist.entries_num = 0;
 
   filelist_readjob_main_assets_add_items(job_params, stop, do_update, progress);
 }
@@ -3935,7 +3932,7 @@ static void filelist_readjob_startjob(void *flrjv, short *stop, short *do_update
   FileListReadJob *flrj = flrjv;
 
   //  printf("START filelist reading (%d files, main thread: %d)\n",
-  //         flrj->filelist->filelist.nbr_entries, BLI_thread_is_main());
+  //         flrj->filelist->filelist.entries_num, BLI_thread_is_main());
 
   BLI_mutex_lock(&flrj->lock);
 
@@ -3944,7 +3941,7 @@ static void filelist_readjob_startjob(void *flrjv, short *stop, short *do_update
   flrj->tmp_filelist = MEM_dupallocN(flrj->filelist);
 
   BLI_listbase_clear(&flrj->tmp_filelist->filelist.entries);
-  flrj->tmp_filelist->filelist.nbr_entries = FILEDIR_NBR_ENTRIES_UNSET;
+  flrj->tmp_filelist->filelist.entries_num = FILEDIR_NBR_ENTRIES_UNSET;
 
   flrj->tmp_filelist->filelist_intern.filtered = NULL;
   BLI_listbase_clear(&flrj->tmp_filelist->filelist_intern.entries);
@@ -3976,18 +3973,18 @@ static void filelist_readjob_update(void *flrjv)
   FileListReadJob *flrj = flrjv;
   FileListIntern *fl_intern = &flrj->filelist->filelist_intern;
   ListBase new_entries = {NULL};
-  int nbr_entries, new_nbr_entries = 0;
+  int entries_num, new_entries_num = 0;
 
   BLI_movelisttolist(&new_entries, &fl_intern->entries);
-  nbr_entries = flrj->filelist->filelist.nbr_entries;
+  entries_num = flrj->filelist->filelist.entries_num;
 
   BLI_mutex_lock(&flrj->lock);
 
-  if (flrj->tmp_filelist->filelist.nbr_entries > 0) {
+  if (flrj->tmp_filelist->filelist.entries_num > 0) {
     /* We just move everything out of 'thread context' into final list. */
-    new_nbr_entries = flrj->tmp_filelist->filelist.nbr_entries;
+    new_entries_num = flrj->tmp_filelist->filelist.entries_num;
     BLI_movelisttolist(&new_entries, &flrj->tmp_filelist->filelist.entries);
-    flrj->tmp_filelist->filelist.nbr_entries = 0;
+    flrj->tmp_filelist->filelist.entries_num = 0;
   }
 
   if (flrj->tmp_filelist->asset_library) {
@@ -4001,7 +3998,7 @@ static void filelist_readjob_update(void *flrjv)
 
   BLI_mutex_unlock(&flrj->lock);
 
-  if (new_nbr_entries) {
+  if (new_entries_num) {
     /* Do not clear selection cache, we can assume already 'selected' UIDs are still valid! Keep
      * the asset library data we just read. */
     filelist_clear_ex(flrj->filelist, false, true, false);
@@ -4009,9 +4006,9 @@ static void filelist_readjob_update(void *flrjv)
     flrj->filelist->flags |= (FL_NEED_SORTING | FL_NEED_FILTERING);
   }
 
-  /* if no new_nbr_entries, this is NOP */
+  /* if no new_entries_num, this is NOP */
   BLI_movelisttolist(&fl_intern->entries, &new_entries);
-  flrj->filelist->filelist.nbr_entries = MAX2(nbr_entries, 0) + new_nbr_entries;
+  flrj->filelist->filelist.entries_num = MAX2(entries_num, 0) + new_entries_num;
 }
 
 static void filelist_readjob_endjob(void *flrjv)
@@ -4029,11 +4026,11 @@ static void filelist_readjob_free(void *flrjv)
 {
   FileListReadJob *flrj = flrjv;
 
-  //  printf("END filelist reading (%d files)\n", flrj->filelist->filelist.nbr_entries);
+  //  printf("END filelist reading (%d files)\n", flrj->filelist->filelist.entries_num);
 
   if (flrj->tmp_filelist) {
     /* tmp_filelist shall never ever be filtered! */
-    BLI_assert(flrj->tmp_filelist->filelist.nbr_entries == 0);
+    BLI_assert(flrj->tmp_filelist->filelist.entries_num == 0);
     BLI_assert(BLI_listbase_is_empty(&flrj->tmp_filelist->filelist.entries));
 
     filelist_freelib(flrj->tmp_filelist);
@@ -4071,7 +4068,13 @@ void filelist_readjob_start(FileList *filelist, const int space_notifier, const 
   /* Init even for single threaded execution. Called functions use it. */
   BLI_mutex_init(&flrj->lock);
 
-  if (filelist->tags & FILELIST_TAGS_NO_THREADS) {
+  /* The file list type may not support threading so execute immediately. Same when only rereading
+   * #Main data (which we do quite often on changes to #Main, since it's the easiest and safest way
+   * to ensure the displayed data is up to date), because some operations executing right after
+   * main data changed may need access to the ID files (see T93691). */
+  const bool no_threads = (filelist->tags & FILELIST_TAGS_NO_THREADS) || flrj->only_main_data;
+
+  if (no_threads) {
     short dummy_stop = false;
     short dummy_do_update = false;
     float dummy_progress = 0.0f;

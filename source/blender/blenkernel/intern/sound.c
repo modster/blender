@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -103,7 +87,7 @@ static void sound_free_data(ID *id)
 {
   bSound *sound = (bSound *)id;
 
-  /* No animdata here. */
+  /* No animation-data here. */
 
   if (sound->packedfile) {
     BKE_packedfile_free(sound->packedfile);
@@ -271,14 +255,11 @@ BLI_INLINE void sound_verify_evaluated_id(const ID *id)
 bSound *BKE_sound_new_file(Main *bmain, const char *filepath)
 {
   bSound *sound;
-  const char *path;
+  const char *blendfile_path = BKE_main_blendfile_path(bmain);
   char str[FILE_MAX];
 
   BLI_strncpy(str, filepath, sizeof(str));
-
-  path = BKE_main_blendfile_path(bmain);
-
-  BLI_path_abs(str, path);
+  BLI_path_abs(str, blendfile_path);
 
   sound = BKE_libblock_alloc(bmain, ID_SO, BLI_path_basename(filepath), 0);
   BLI_strncpy(sound->filepath, filepath, FILE_MAX);
@@ -746,16 +727,11 @@ void *BKE_sound_add_scene_sound(
   }
   sound_verify_evaluated_id(&sequence->sound->id);
   const double fps = FPS;
-  void *handle = AUD_Sequence_add(scene->sound_scene,
-                                  sequence->sound->playback_handle,
-                                  startframe / fps,
-                                  endframe / fps,
-                                  frameskip / fps + sequence->sound->offset_time);
-  AUD_SequenceEntry_setMuted(handle, (sequence->flag & SEQ_MUTE) != 0);
-  AUD_SequenceEntry_setAnimationData(handle, AUD_AP_VOLUME, CFRA, &sequence->volume, 0);
-  AUD_SequenceEntry_setAnimationData(handle, AUD_AP_PITCH, CFRA, &sequence->pitch, 0);
-  AUD_SequenceEntry_setAnimationData(handle, AUD_AP_PANNING, CFRA, &sequence->pan, 0);
-  return handle;
+  return AUD_Sequence_add(scene->sound_scene,
+                          sequence->sound->playback_handle,
+                          startframe / fps,
+                          endframe / fps,
+                          frameskip / fps + sequence->sound->offset_time);
 }
 
 void *BKE_sound_add_scene_sound_defaults(Scene *scene, Sequence *sequence)
@@ -1249,15 +1225,14 @@ bool BKE_sound_stream_info_get(struct Main *main,
                                int stream,
                                SoundStreamInfo *sound_info)
 {
-  const char *path;
+  const char *blendfile_path = BKE_main_blendfile_path(main);
   char str[FILE_MAX];
   AUD_Sound *sound;
   AUD_StreamInfo *stream_infos;
   int stream_count;
 
   BLI_strncpy(str, filepath, sizeof(str));
-  path = BKE_main_blendfile_path(main);
-  BLI_path_abs(str, path);
+  BLI_path_abs(str, blendfile_path);
 
   sound = AUD_Sound_file(str);
   if (!sound) {

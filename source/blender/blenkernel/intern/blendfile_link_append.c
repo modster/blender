@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -186,11 +172,6 @@ static void link_append_context_library_blohandle_release(
   }
 }
 
-/** Allocate and initialize a new context to link/append datablocks.
- *
- *  \param flag: A combination of #eFileSel_Params_Flag from DNA_space_types.h & #eBLOLibLinkFlags
- * from BLO_readfile.h
- */
 BlendfileLinkAppendContext *BKE_blendfile_link_append_context_new(LibraryLink_Params *params)
 {
   MemArena *ma = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
@@ -202,7 +183,6 @@ BlendfileLinkAppendContext *BKE_blendfile_link_append_context_new(LibraryLink_Pa
   return lapp_context;
 }
 
-/** Free a link/append context. */
 void BKE_blendfile_link_append_context_free(BlendfileLinkAppendContext *lapp_context)
 {
   if (lapp_context->new_id_to_item != NULL) {
@@ -220,10 +200,6 @@ void BKE_blendfile_link_append_context_free(BlendfileLinkAppendContext *lapp_con
   BLI_memarena_free(lapp_context->memarena);
 }
 
-/** Set or clear flags in given \a lapp_context.
- *
- * \param do_set: Set the given \a flag if true, clear it otherwise.
- */
 void BKE_blendfile_link_append_context_flag_set(BlendfileLinkAppendContext *lapp_context,
                                                 const int flag,
                                                 const bool do_set)
@@ -236,11 +212,6 @@ void BKE_blendfile_link_append_context_flag_set(BlendfileLinkAppendContext *lapp
   }
 }
 
-/** Store reference to a Blender's embedded memfile into the context.
- *
- * \note This is required since embedded startup blender file is handled in `ED` module, which
- * cannot be linked in BKE code.
- */
 void BKE_blendfile_link_append_context_embedded_blendfile_set(
     BlendfileLinkAppendContext *lapp_context, const void *blendfile_mem, int blendfile_memsize)
 {
@@ -251,7 +222,6 @@ void BKE_blendfile_link_append_context_embedded_blendfile_set(
   lapp_context->blendfile_memsize = (size_t)blendfile_memsize;
 }
 
-/** Clear reference to Blender's embedded startup file into the context. */
 void BKE_blendfile_link_append_context_embedded_blendfile_clear(
     BlendfileLinkAppendContext *lapp_context)
 {
@@ -259,15 +229,6 @@ void BKE_blendfile_link_append_context_embedded_blendfile_clear(
   lapp_context->blendfile_memsize = 0;
 }
 
-/** Add a new source library to search for items to be linked to the given link/append context.
- *
- * \param libname: the absolute path to the library blend file.
- * \param blo_handle: the blend file handle of the library, NULL is not available. Note that this
- *                    is only borrowed for linking purpose, no releasing or other management will
- *                    be performed by #BKE_blendfile_link_append code on it.
- *
- * \note *Never* call BKE_blendfile_link_append_context_library_add() after having added some
- * items. */
 void BKE_blendfile_link_append_context_library_add(BlendfileLinkAppendContext *lapp_context,
                                                    const char *libname,
                                                    BlendHandle *blo_handle)
@@ -289,13 +250,6 @@ void BKE_blendfile_link_append_context_library_add(BlendfileLinkAppendContext *l
   lapp_context->num_libraries++;
 }
 
-/** Add a new item (datablock name and idcode) to be searched and linked/appended from libraries
- * associated to the given context.
- *
- * \param userdata: an opaque user-data pointer stored in generated link/append item. */
-/* TODO: Add a more friendly version of this that combines it with the call to
- * #BKE_blendfile_link_append_context_item_library_index_enable to enable the added item for all
- * added library sources. */
 BlendfileLinkAppendContextItem *BKE_blendfile_link_append_context_item_add(
     BlendfileLinkAppendContext *lapp_context,
     const char *idname,
@@ -321,19 +275,6 @@ BlendfileLinkAppendContextItem *BKE_blendfile_link_append_context_item_add(
   return item;
 }
 
-/** Search for all ID matching given `id_types_filter` in given `library_index`, and add them to
- * the list of items to process.
- *
- * \note #BKE_blendfile_link_append_context_library_add should never be called on the same
- *`lapp_context` after this function.
- *
- * \param id_types_filter: A set of `FILTER_ID` bitflags, the types of IDs to add to the items
- *                         list.
- * \param library_index: The index of the library to look into, in given `lapp_context`.
- *
- * \return The number of items found and added to the list, or `BLENDFILE_LINK_APPEND_INVALID` if
- *         it could not open the .blend file.
- */
 int BKE_blendfile_link_append_context_item_idtypes_from_library_add(
     BlendfileLinkAppendContext *lapp_context,
     ReportList *reports,
@@ -385,8 +326,6 @@ int BKE_blendfile_link_append_context_item_idtypes_from_library_add(
   return id_num;
 }
 
-/** Enable search of the given \a item into the library stored at given index in the link/append
- * context. */
 void BKE_blendfile_link_append_context_item_library_index_enable(
     BlendfileLinkAppendContext *UNUSED(lapp_context),
     BlendfileLinkAppendContextItem *item,
@@ -395,7 +334,6 @@ void BKE_blendfile_link_append_context_item_library_index_enable(
   BLI_BITMAP_ENABLE(item->libraries, library_index);
 }
 
-/** Check if given link/append context is empty (has no items to process) or not. */
 bool BKE_blendfile_link_append_context_is_empty(struct BlendfileLinkAppendContext *lapp_context)
 {
   return lapp_context->num_items == 0;
@@ -420,13 +358,6 @@ short BKE_blendfile_link_append_context_item_idcode_get(
   return item->idcode;
 }
 
-/** Iterate over all (or a subset) of the items listed in given #BlendfileLinkAppendContext, and
- * call the `callback_function` on them.
- *
- * \param flag: Control which type of items to process (see
- * #eBlendfileLinkAppendForeachItemFlag enum flags).
- * \param userdata: An opaque void pointer passed to the `callback_function`.
- */
 void BKE_blendfile_link_append_context_item_foreach(
     struct BlendfileLinkAppendContext *lapp_context,
     BKE_BlendfileLinkAppendContexteItemFunction callback_function,
@@ -492,6 +423,16 @@ static bool object_in_any_collection(Main *bmain, Object *ob)
     }
   }
 
+  return false;
+}
+
+static bool collection_instantiated_by_any_object(Main *bmain, Collection *collection)
+{
+  LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+    if (ob->type == OB_EMPTY && ob->instance_collection == collection) {
+      return true;
+    }
+  }
   return false;
 }
 
@@ -668,7 +609,7 @@ static void loose_data_instantiate_collection_process(
 
   /* NOTE: For collections we only view_layer-instantiate duplicated collections that have
    * non-instantiated objects in them.
-   * NOTE: Also avoid viewlayer-instantiating of collections children of other instantiated
+   * NOTE: Also avoid view-layer-instantiating of collections children of other instantiated
    * collections. This is why we need two passes here. */
   LinkNode *itemlink;
   for (itemlink = lapp_context->items.list; itemlink; itemlink = itemlink->next) {
@@ -688,12 +629,19 @@ static void loose_data_instantiate_collection_process(
      * children.
      */
     Collection *collection = (Collection *)id;
+    /* The collection could be linked/appended together with an Empty object instantiating it,
+     * better not instantiate the collection in the view-layer in that case.
+     *
+     * Can easily happen when copy/pasting such instantiating empty, see T93839. */
+    const bool collection_is_instantiated = collection_instantiated_by_any_object(bmain,
+                                                                                  collection);
     /* Always consider adding collections directly selected by the user. */
-    bool do_add_collection = (item->tag & LINK_APPEND_TAG_INDIRECT) == 0;
+    bool do_add_collection = (item->tag & LINK_APPEND_TAG_INDIRECT) == 0 &&
+                             !collection_is_instantiated;
     /* In linking case, do not enforce instantiating non-directly linked collections/objects.
-     * This avoids cluttering the ViewLayers, user can instantiate themselves specific collections
+     * This avoids cluttering the view-layers, user can instantiate themselves specific collections
      * or objects easily from the Outliner if needed. */
-    if (!do_add_collection && do_append) {
+    if (!do_add_collection && do_append && !collection_is_instantiated) {
       LISTBASE_FOREACH (CollectionObject *, coll_ob, &collection->gobject) {
         Object *ob = coll_ob->ob;
         if (!object_in_any_scene(bmain, ob)) {
@@ -719,21 +667,25 @@ static void loose_data_instantiate_collection_process(
     Collection *collection = (Collection *)id;
     bool do_add_collection = (id->tag & LIB_TAG_DOIT) != 0;
 
-    /* When instantiated into viewlayer, do not add collections if one of their parents is also
-     * instantiated. In case of empty-instantiation though, instantiation of all user-selected
-     * collections is the desired behavior. */
-    if (!do_add_collection ||
-        (!do_instantiate_as_empty &&
-         loose_data_instantiate_collection_parents_check_recursive(collection))) {
+    if (!do_add_collection) {
+      continue;
+    }
+    /* When instantiated into view-layer, do not add collections if one of their parents is also
+     * instantiated. */
+    if (!do_instantiate_as_empty &&
+        loose_data_instantiate_collection_parents_check_recursive(collection)) {
+      continue;
+    }
+    /* When instantiated as empty, do not add indirectly linked (i.e. non-user-selected)
+     * collections. */
+    if (do_instantiate_as_empty && (item->tag & LINK_APPEND_TAG_INDIRECT) != 0) {
       continue;
     }
 
     loose_data_instantiate_ensure_active_collection(instantiate_context);
     Collection *active_collection = instantiate_context->active_collection;
 
-    /* In case user requested instantiation of collections as empties, do so for the one they
-     * explicitly selected (originally directly linked IDs) only. */
-    if (do_instantiate_as_empty && (item->tag & LINK_APPEND_TAG_INDIRECT) == 0) {
+    if (do_instantiate_as_empty) {
       /* BKE_object_add(...) messes with the selection. */
       Object *ob = BKE_object_add_only_object(bmain, OB_EMPTY, collection->id.name + 2);
       ob->type = OB_EMPTY;
@@ -781,6 +733,8 @@ static void loose_data_instantiate_object_process(LooseDataInstantiateContext *i
    * if you want it do it at the editor level. */
   const bool object_set_active = false;
 
+  const bool is_linking = (lapp_context->params->flag & FILE_LINK) != 0;
+
   /* NOTE: For objects we only view_layer-instantiate duplicated objects that are not yet used
    * anywhere. */
   LinkNode *itemlink;
@@ -788,6 +742,17 @@ static void loose_data_instantiate_object_process(LooseDataInstantiateContext *i
     BlendfileLinkAppendContextItem *item = itemlink->link;
     ID *id = loose_data_instantiate_process_check(instantiate_context, item);
     if (id == NULL || GS(id->name) != ID_OB) {
+      continue;
+    }
+
+    /* In linking case, never instantiate stray objects that are not directly linked.
+     *
+     * While this is not ideal (in theory no object should remain un-owned), in case of indirectly
+     * linked objects, the other solution would be to add them to a local collection, which would
+     * make them directly linked. Think for now keeping them indirectly linked is more important.
+     * Ref. T93757.
+     */
+    if (is_linking && (item->tag & LINK_APPEND_TAG_INDIRECT) != 0) {
       continue;
     }
 
@@ -961,9 +926,14 @@ static int foreach_libblock_link_append_callback(LibraryIDLinkCallbackData *cb_d
      * unfortunately they can use fully linkable valid IDs too, like actions. Those need to be
      * processed, so we need to recursively deal with them here. */
     /* NOTE: Since we are by-passing checks in `BKE_library_foreach_ID_link` by manually calling it
-     * recursively, we need to take care of potential recursion cases ourselves (e.g.animdata of
-     * shape-key referencing the shape-key itself). */
-    if (id != cb_data->id_self) {
+     * recursively, we need to take care of potential recursion cases ourselves (e.g.anim-data of
+     * shape-key referencing the shape-key itself).
+     * NOTE: in case both IDs (owner and 'used' ones) are non-linkable, we can assume we can break
+     * the dependency here. Indeed, either they are both linked in another way (through their own
+     * meshes for shape keys e.g.), or this is an unsupported case (two shape-keys depending on
+     * each-other need to be also 'linked' in by their respective meshes, independent shape-keys
+     * are not allowed). ref T96048. */
+    if (id != cb_data->id_self && BKE_idtype_idcode_is_linkable(GS(cb_data->id_self->name))) {
       BKE_library_foreach_ID_link(
           cb_data->bmain, id, foreach_libblock_link_append_callback, data, IDWALK_NOP);
     }
@@ -1014,11 +984,27 @@ static int foreach_libblock_link_append_callback(LibraryIDLinkCallbackData *cb_d
 /** \name Library link/append code.
  * \{ */
 
-/** Perform append operation, using modern ID usage looper to detect which ID should be kept
- * linked, made local, duplicated as local, re-used from local etc.
- *
- * The IDs processed by this functions are the one that have been linked by a previous call to
- * #BKE_blendfile_link on the same `lapp_context`. */
+static void blendfile_link_append_proxies_convert(Main *bmain, ReportList *reports)
+{
+  /* NOTE: Do not bother checking file versions here, if there are no proxies to convert this code
+   * is quite fast anyway. */
+
+  BlendFileReadReport bf_reports = {.reports = reports};
+  BKE_lib_override_library_main_proxy_convert(bmain, &bf_reports);
+
+  if (bf_reports.count.proxies_to_lib_overrides_success != 0 ||
+      bf_reports.count.proxies_to_lib_overrides_failures != 0) {
+    BKE_reportf(
+        bf_reports.reports,
+        RPT_WARNING,
+        "Proxies have been removed from Blender (%d proxies were automatically converted "
+        "to library overrides, %d proxies could not be converted and were cleared). "
+        "Please consider re-saving any library .blend file with the newest Blender version",
+        bf_reports.count.proxies_to_lib_overrides_success,
+        bf_reports.count.proxies_to_lib_overrides_failures);
+  }
+}
+
 void BKE_blendfile_append(BlendfileLinkAppendContext *lapp_context, ReportList *reports)
 {
   if (lapp_context->num_items == 0) {
@@ -1056,12 +1042,6 @@ void BKE_blendfile_append(BlendfileLinkAppendContext *lapp_context, ReportList *
     }
     BLI_assert(item->userdata == NULL);
 
-    /* Linked IDs should never be marked as needing post-processing (instantiation of loose
-     * objects etc.).
-     * NOTE: This is a developer test check, can be removed once we get rid of instantiation code
-     * in BLO completely.*/
-    BLI_assert((id->tag & LIB_TAG_DOIT) == 0);
-
     ID *existing_local_id = BKE_idtype_idcode_append_is_reusable(GS(id->name)) ?
                                 BKE_main_library_weak_reference_search_item(
                                     lapp_context->library_weak_reference_mapping,
@@ -1071,10 +1051,6 @@ void BKE_blendfile_append(BlendfileLinkAppendContext *lapp_context, ReportList *
 
     if (item->action != LINK_APPEND_ACT_UNSET) {
       /* Already set, pass. */
-    }
-    if (GS(id->name) == ID_OB && ((Object *)id)->proxy_from != NULL) {
-      CLOG_INFO(&LOG, 3, "Appended ID '%s' is proxified, keeping it linked...", id->name);
-      item->action = LINK_APPEND_ACT_KEEP_LINKED;
     }
     else if (do_reuse_local_id && existing_local_id != NULL) {
       CLOG_INFO(&LOG, 3, "Appended ID '%s' as a matching local one, re-using it...", id->name);
@@ -1130,10 +1106,7 @@ void BKE_blendfile_append(BlendfileLinkAppendContext *lapp_context, ReportList *
         local_appended_new_id = id->newid;
         break;
       case LINK_APPEND_ACT_MAKE_LOCAL:
-        BKE_lib_id_make_local(bmain,
-                              id,
-                              make_local_common_flags | LIB_ID_MAKELOCAL_FORCE_LOCAL |
-                                  LIB_ID_MAKELOCAL_OBJECT_NO_PROXY_CLEARING);
+        BKE_lib_id_make_local(bmain, id, make_local_common_flags | LIB_ID_MAKELOCAL_FORCE_LOCAL);
         BLI_assert(id->newid == NULL);
         local_appended_new_id = id;
         break;
@@ -1242,58 +1215,13 @@ void BKE_blendfile_append(BlendfileLinkAppendContext *lapp_context, ReportList *
       continue;
     }
     BLI_assert(ID_IS_LINKED(id));
-
-    /* Attempt to re-link copied proxy objects. This allows appending of an entire scene
-     * from another blend file into this one, even when that blend file contains proxified
-     * armatures that have local references. Since the proxified object needs to be linked
-     * (not local), this will only work when the "Localize all" checkbox is disabled.
-     * TL;DR: this is a dirty hack on top of an already weak feature (proxies). */
-    if (GS(id->name) == ID_OB && ((Object *)id)->proxy != NULL) {
-      Object *ob = (Object *)id;
-      Object *ob_new = (Object *)id->newid;
-      bool is_local = false, is_lib = false;
-
-      /* Proxies only work when the proxified object is linked-in from a library. */
-      if (!ID_IS_LINKED(ob->proxy)) {
-        CLOG_WARN(&LOG,
-                  "Proxy object %s will lose its link to %s, because the "
-                  "proxified object is local",
-                  id->newid->name,
-                  ob->proxy->id.name);
-        continue;
-      }
-
-      BKE_library_ID_test_usages(bmain, id, &is_local, &is_lib);
-
-      /* We can only switch the proxy'ing to a made-local proxy if it is no longer
-       * referred to from a library. Not checking for local use; if new local proxy
-       * was not used locally would be a nasty bug! */
-      if (is_local || is_lib) {
-        CLOG_WARN(&LOG,
-                  "Made-local proxy object %s will lose its link to %s, "
-                  "because the linked-in proxy is referenced (is_local=%i, is_lib=%i)",
-                  id->newid->name,
-                  ob->proxy->id.name,
-                  is_local,
-                  is_lib);
-      }
-      else {
-        /* we can switch the proxy'ing from the linked-in to the made-local proxy.
-         * BKE_object_make_proxy() shouldn't be used here, as it allocates memory that
-         * was already allocated by object_make_local() (which called BKE_object_copy). */
-        ob_new->proxy = ob->proxy;
-        ob_new->proxy_group = ob->proxy_group;
-        ob_new->proxy_from = ob->proxy_from;
-        ob_new->proxy->proxy_from = ob_new;
-        ob->proxy = ob->proxy_from = ob->proxy_group = NULL;
-      }
-    }
   }
 
   BKE_main_id_newptr_and_tag_clear(bmain);
+
+  blendfile_link_append_proxies_convert(bmain, reports);
 }
 
-/** Perform linking operation on all items added to given `lapp_context`. */
 void BKE_blendfile_link(BlendfileLinkAppendContext *lapp_context, ReportList *reports)
 {
   if (lapp_context->num_items == 0) {
@@ -1323,12 +1251,6 @@ void BKE_blendfile_link(BlendfileLinkAppendContext *lapp_context, ReportList *re
     }
 
     /* here appending/linking starts */
-
-    /* NOTE: This is temporary hot-fix until whole code using link/append features has been moved
-     * to use new BKE code. */
-    /* Do not handle instantiation in linking process anymore, we do it here in
-     * #loose_data_instantiate instead. */
-    lapp_context->params->flag &= ~BLO_LIBLINK_NEEDS_ID_TAG_DOIT;
 
     mainl = BLO_library_link_begin(&blo_handle, libname, lapp_context->params);
     lib = mainl->curlib;
@@ -1387,12 +1309,6 @@ void BKE_blendfile_link(BlendfileLinkAppendContext *lapp_context, ReportList *re
       }
       BLI_assert(item->userdata == NULL);
 
-      /* Linked IDs should never be marked as needing post-processing (instantiation of loose
-       * objects etc.).
-       * NOTE: This is developer test check, can be removed once we get rid of instantiation code
-       * in BLO completely.*/
-      BLI_assert((id->tag & LIB_TAG_DOIT) == 0);
-
       BlendfileLinkAppendContextCallBack cb_data = {
           .lapp_context = lapp_context, .item = item, .reports = reports};
       BKE_library_foreach_ID_link(lapp_context->params->bmain,
@@ -1405,6 +1321,10 @@ void BKE_blendfile_link(BlendfileLinkAppendContext *lapp_context, ReportList *re
     LooseDataInstantiateContext instantiate_context = {.lapp_context = lapp_context,
                                                        .active_collection = NULL};
     loose_data_instantiate(&instantiate_context);
+  }
+
+  if ((lapp_context->params->flag & FILE_LINK) != 0) {
+    blendfile_link_append_proxies_convert(lapp_context->params->bmain, reports);
   }
 }
 
@@ -1499,23 +1419,6 @@ static void blendfile_library_relocate_remap(Main *bmain,
   }
 }
 
-/** Try to relocate all linked IDs added to `lapp_context`, belonging to the given `library`.
- *
- * This function searches for matching IDs (type and name) in all libraries added to the given
- * `lapp_context`.
- *
- * Typical usages include:
- *  * Relocating a library:
- *    - Add the new target library path to `lapp_context`.
- *    - Add all IDs from the library to relocate to `lapp_context`
- *    - Mark the new target library to beconsidered for each ID.
- *    - Call this function.
- *
- *  * Searching for (e.g.missing) linked IDs in a set or sub-set of libraries:
- *    - Add all potential library sources paths to `lapp_context`.
- *    - Add all IDs to search for to `lapp_context`.
- *    - Mark which libraries should be considered for each ID.
- *    - Call this function. */
 void BKE_blendfile_library_relocate(BlendfileLinkAppendContext *lapp_context,
                                     ReportList *reports,
                                     Library *library,
@@ -1551,7 +1454,7 @@ void BKE_blendfile_library_relocate(BlendfileLinkAppendContext *lapp_context,
         BlendfileLinkAppendContextItem *item;
 
         /* We remove it from current Main, and add it to items to link... */
-        /* Note that non-linkable IDs (like e.g. shapekeys) are also explicitly linked here... */
+        /* Note that non-linkable IDs (like e.g. shape-keys) are also explicitly linked here... */
         BLI_remlink(lbarray[lba_idx], id);
         /* Usual special code for ShapeKeys snowflakes... */
         Key *old_key = BKE_key_from_id(id);
@@ -1603,7 +1506,6 @@ void BKE_blendfile_library_relocate(BlendfileLinkAppendContext *lapp_context,
 
   /* Note that in reload case, we also want to replace indirect usages. */
   const short remap_flags = ID_REMAP_SKIP_NEVER_NULL_USAGE |
-                            ID_REMAP_NO_INDIRECT_PROXY_DATA_USAGE |
                             (do_reload ? 0 : ID_REMAP_SKIP_INDIRECT_USAGE);
   for (item_idx = 0, itemlink = lapp_context->items.list; itemlink;
        item_idx++, itemlink = itemlink->next) {

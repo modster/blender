@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "NOD_geometry_nodes_eval_log.hh"
 
@@ -29,7 +15,6 @@
 
 namespace blender::nodes::geometry_nodes_eval_log {
 
-using fn::CPPType;
 using fn::FieldCPPType;
 using fn::FieldInput;
 using fn::GField;
@@ -191,12 +176,14 @@ const SocketLog *NodeLog::lookup_socket_log(const bNode &node, const bNodeSocket
 
 GFieldValueLog::GFieldValueLog(fn::GField field, bool log_full_field) : type_(field.cpp_type())
 {
-  Set<std::reference_wrapper<const FieldInput>> field_inputs_set;
-  field.node().foreach_field_input(
-      [&](const FieldInput &field_input) { field_inputs_set.add(field_input); });
+  const std::shared_ptr<const fn::FieldInputs> &field_input_nodes = field.node().field_inputs();
 
+  /* Put the deduplicated field inputs into a vector so that they can be sorted below. */
   Vector<std::reference_wrapper<const FieldInput>> field_inputs;
-  field_inputs.extend(field_inputs_set.begin(), field_inputs_set.end());
+  if (field_input_nodes) {
+    field_inputs.extend(field_input_nodes->deduplicated_nodes.begin(),
+                        field_input_nodes->deduplicated_nodes.end());
+  }
 
   std::sort(
       field_inputs.begin(), field_inputs.end(), [](const FieldInput &a, const FieldInput &b) {
@@ -350,6 +337,16 @@ const NodeLog *ModifierLog::find_node_by_node_editor_context(const SpaceNode &sn
   return tree_log->lookup_node_log(node);
 }
 
+const NodeLog *ModifierLog::find_node_by_node_editor_context(const SpaceNode &snode,
+                                                             const StringRef node_name)
+{
+  const TreeLog *tree_log = ModifierLog::find_tree_by_node_editor_context(snode);
+  if (tree_log == nullptr) {
+    return nullptr;
+  }
+  return tree_log->lookup_node_log(node_name);
+}
+
 const SocketLog *ModifierLog::find_socket_by_node_editor_context(const SpaceNode &snode,
                                                                  const bNode &node,
                                                                  const bNodeSocket &socket)
@@ -489,10 +486,6 @@ void LocalGeoLogger::log_execution_time(DNode node, std::chrono::microseconds ex
   node_exec_times_.append({node, exec_time});
 }
 
-/**
- * Log a message that will be displayed in the node editor next to the node. This should only be
- * used for debugging purposes and not to display information to users.
- */
 void LocalGeoLogger::log_debug_message(DNode node, std::string message)
 {
   node_debug_messages_.append({node, std::move(message)});

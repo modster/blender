@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #include <stdlib.h>
 
@@ -30,6 +17,7 @@
 #include "scene/object.h"
 #include "scene/osl.h"
 #include "scene/particles.h"
+#include "scene/pointcloud.h"
 #include "scene/procedural.h"
 #include "scene/scene.h"
 #include "scene/shader.h"
@@ -64,6 +52,8 @@ DeviceScene::DeviceScene(Device *device)
       curve_keys(device, "__curve_keys", MEM_GLOBAL),
       curve_segments(device, "__curve_segments", MEM_GLOBAL),
       patches(device, "__patches", MEM_GLOBAL),
+      points(device, "__points", MEM_GLOBAL),
+      points_shader(device, "__points_shader", MEM_GLOBAL),
       objects(device, "__objects", MEM_GLOBAL),
       object_motion_pass(device, "__object_motion_pass", MEM_GLOBAL),
       object_motion(device, "__object_motion", MEM_GLOBAL),
@@ -260,6 +250,11 @@ void Scene::device_update(Device *device_, Progress &progress)
    * - Light manager needs lookup tables and final mesh data to compute emission CDF.
    * - Lookup tables are done a second time to handle film tables
    */
+
+  if (film->update_lightgroups(this)) {
+    light_manager->tag_update(this, ccl::LightManager::LIGHT_MODIFIED);
+    object_manager->tag_update(this, ccl::ObjectManager::OBJECT_MODIFIED);
+  }
 
   progress.set_status("Updating Shaders");
   shader_manager->device_update(device, &dscene, this, progress);
@@ -499,7 +494,21 @@ void Scene::update_kernel_features()
   if (use_motion && camera->use_motion()) {
     kernel_features |= KERNEL_FEATURE_CAMERA_MOTION;
   }
+
+  /* Figure out whether the scene will use shader raytrace we need at least
+   * one caustic light, one caustic caster and one caustic receiver to use
+   * and enable the mnee code path. */
+  bool has_caustics_receiver = false;
+  bool has_caustics_caster = false;
+  bool has_caustics_light = false;
+
   foreach (Object *object, objects) {
+    if (object->get_is_caustics_caster()) {
+      has_caustics_caster = true;
+    }
+    else if (object->get_is_caustics_receiver()) {
+      has_caustics_receiver = true;
+    }
     Geometry *geom = object->get_geometry();
     if (use_motion) {
       if (object->use_motion() || geom->get_use_motion_blur()) {
@@ -523,6 +532,21 @@ void Scene::update_kernel_features()
     else if (geom->is_hair()) {
       kernel_features |= KERNEL_FEATURE_HAIR;
     }
+    else if (geom->is_pointcloud()) {
+      kernel_features |= KERNEL_FEATURE_POINTCLOUD;
+    }
+  }
+
+  foreach (Light *light, lights) {
+    if (light->get_use_caustics()) {
+      has_caustics_light = true;
+    }
+  }
+
+  dscene.data.integrator.use_caustics = false;
+  if (has_caustics_caster && has_caustics_receiver && has_caustics_light) {
+    dscene.data.integrator.use_caustics = true;
+    kernel_features |= KERNEL_FEATURE_NODE_RAYTRACE;
   }
 
   if (bake_manager->get_baking()) {
@@ -564,7 +588,6 @@ static void log_kernel_features(const uint features)
           << "\n";
   VLOG(2) << "Use Emission " << string_from_bool(features & KERNEL_FEATURE_NODE_EMISSION) << "\n";
   VLOG(2) << "Use Volume " << string_from_bool(features & KERNEL_FEATURE_NODE_VOLUME) << "\n";
-  VLOG(2) << "Use Hair " << string_from_bool(features & KERNEL_FEATURE_NODE_HAIR) << "\n";
   VLOG(2) << "Use Bump " << string_from_bool(features & KERNEL_FEATURE_NODE_BUMP) << "\n";
   VLOG(2) << "Use Voronoi " << string_from_bool(features & KERNEL_FEATURE_NODE_VORONOI_EXTRA)
           << "\n";
@@ -575,6 +598,7 @@ static void log_kernel_features(const uint features)
   VLOG(2) << "Use Path Tracing " << string_from_bool(features & KERNEL_FEATURE_PATH_TRACING)
           << "\n";
   VLOG(2) << "Use Hair " << string_from_bool(features & KERNEL_FEATURE_HAIR) << "\n";
+  VLOG(2) << "Use Pointclouds " << string_from_bool(features & KERNEL_FEATURE_POINTCLOUD) << "\n";
   VLOG(2) << "Use Object Motion " << string_from_bool(features & KERNEL_FEATURE_OBJECT_MOTION)
           << "\n";
   VLOG(2) << "Use Camera Motion " << string_from_bool(features & KERNEL_FEATURE_CAMERA_MOTION)
@@ -757,6 +781,15 @@ template<> Volume *Scene::create_node<Volume>()
   return node;
 }
 
+template<> PointCloud *Scene::create_node<PointCloud>()
+{
+  PointCloud *node = new PointCloud();
+  node->set_owner(this);
+  geometry.push_back(node);
+  geometry_manager->tag_update(this, GeometryManager::POINT_ADDED);
+  return node;
+}
+
 template<> Object *Scene::create_node<Object>()
 {
   Object *node = new Object();
@@ -842,6 +875,12 @@ template<> void Scene::delete_node_impl(Volume *node)
 {
   delete_node_from_array(geometry, static_cast<Geometry *>(node));
   geometry_manager->tag_update(this, GeometryManager::MESH_REMOVED);
+}
+
+template<> void Scene::delete_node_impl(PointCloud *node)
+{
+  delete_node_from_array(geometry, static_cast<Geometry *>(node));
+  geometry_manager->tag_update(this, GeometryManager::POINT_REMOVED);
 }
 
 template<> void Scene::delete_node_impl(Geometry *node)

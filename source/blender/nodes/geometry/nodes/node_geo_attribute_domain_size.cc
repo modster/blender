@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -24,12 +10,24 @@ namespace blender::nodes::node_geo_attribute_domain_size_cc {
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Geometry");
-  b.add_output<decl::Int>("Point Count");
-  b.add_output<decl::Int>("Edge Count");
-  b.add_output<decl::Int>("Face Count");
-  b.add_output<decl::Int>("Face Corner Count");
-  b.add_output<decl::Int>("Spline Count");
-  b.add_output<decl::Int>("Instance Count");
+  b.add_output<decl::Int>("Point Count").make_available([](bNode &node) {
+    node.custom1 = GEO_COMPONENT_TYPE_MESH;
+  });
+  b.add_output<decl::Int>("Edge Count").make_available([](bNode &node) {
+    node.custom1 = GEO_COMPONENT_TYPE_MESH;
+  });
+  b.add_output<decl::Int>("Face Count").make_available([](bNode &node) {
+    node.custom1 = GEO_COMPONENT_TYPE_MESH;
+  });
+  b.add_output<decl::Int>("Face Corner Count").make_available([](bNode &node) {
+    node.custom1 = GEO_COMPONENT_TYPE_MESH;
+  });
+  b.add_output<decl::Int>("Spline Count").make_available([](bNode &node) {
+    node.custom1 = GEO_COMPONENT_TYPE_CURVE;
+  });
+  b.add_output<decl::Int>("Instance Count").make_available([](bNode &node) {
+    node.custom1 = GEO_COMPONENT_TYPE_INSTANCES;
+  });
 }
 
 static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -86,7 +84,7 @@ static void node_geo_exec(GeoNodeExecParams params)
       break;
     }
     case GEO_COMPONENT_TYPE_CURVE: {
-      if (geometry_set.has_curve()) {
+      if (geometry_set.has_curves()) {
         const CurveComponent *component = geometry_set.get_component_for_read<CurveComponent>();
         params.set_output("Point Count", component->attribute_domain_size(ATTR_DOMAIN_POINT));
         params.set_output("Spline Count", component->attribute_domain_size(ATTR_DOMAIN_CURVE));
@@ -131,8 +129,7 @@ void register_node_type_geo_attribute_domain_size()
   namespace file_ns = blender::nodes::node_geo_attribute_domain_size_cc;
 
   static bNodeType ntype;
-  geo_node_type_base(
-      &ntype, GEO_NODE_ATTRIBUTE_DOMAIN_SIZE, "Domain Size", NODE_CLASS_ATTRIBUTE, 0);
+  geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_DOMAIN_SIZE, "Domain Size", NODE_CLASS_ATTRIBUTE);
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.declare = file_ns::node_declare;
   ntype.draw_buttons = file_ns::node_layout;

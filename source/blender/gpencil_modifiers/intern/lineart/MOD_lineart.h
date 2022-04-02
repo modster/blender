@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2008 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup editors
@@ -300,13 +284,17 @@ typedef struct LineartRenderBuffer {
   bool use_loose_edge_chain;
   bool use_geometry_space_chain;
   bool use_image_boundary_trimming;
+  bool use_back_face_culling;
 
   bool filter_face_mark;
   bool filter_face_mark_invert;
   bool filter_face_mark_boundaries;
+  bool filter_face_mark_keep_contour;
 
   bool force_crease;
   bool sharp_as_crease;
+
+  bool chain_preserve_details;
 
   /* Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;
@@ -355,6 +343,7 @@ typedef enum eLineartTriangleFlags {
   LRT_CULL_GENERATED = (1 << 2),
   LRT_TRIANGLE_INTERSECTION_ONLY = (1 << 3),
   LRT_TRIANGLE_NO_INTERSECTION = (1 << 4),
+  LRT_TRIANGLE_MAT_BACK_FACE_CULLING = (1 << 5),
 } eLineartTriangleFlags;
 
 /**
@@ -450,10 +439,10 @@ typedef struct LineartBoundingArea {
   ListBase up;
   ListBase bp;
 
-  int16_t triangle_count;
-  int16_t max_triangle_count;
-  int16_t line_count;
-  int16_t max_line_count;
+  uint16_t triangle_count;
+  uint16_t max_triangle_count;
+  uint16_t line_count;
+  uint16_t max_line_count;
 
   /* Use array for speeding up multiple accesses. */
   struct LineartTriangle **linked_triangles;
@@ -649,9 +638,18 @@ void MOD_lineart_destroy_render_data(struct LineartGpencilModifierData *lmd);
 
 void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb);
 void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb);
+/**
+ * This function only connects two different chains. It will not do any clean up or smart chaining.
+ * So no: removing overlapping chains, removal of short isolated segments, and no loop reduction is
+ * implemented yet.
+ */
 void MOD_lineart_chain_connect(LineartRenderBuffer *rb);
-void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
+void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, float threshold);
 void MOD_lineart_chain_clip_at_border(LineartRenderBuffer *rb);
+/**
+ * This should always be the last stage!, see the end of
+ * #MOD_lineart_chain_split_for_fixed_occlusion().
+ */
 void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
 void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance);
 void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb,
@@ -661,6 +659,11 @@ void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb,
 int MOD_lineart_chain_count(const LineartEdgeChain *ec);
 void MOD_lineart_chain_clear_picked_flag(LineartCache *lc);
 
+/**
+ * This is the entry point of all line art calculations.
+ *
+ * \return True when a change is made.
+ */
 bool MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
                                        struct LineartGpencilModifierData *lmd,
                                        struct LineartCache **cached_result,
@@ -668,15 +671,24 @@ bool MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
 
 struct Scene;
 
+/**
+ * This only gets initial "biggest" tile.
+ */
 LineartBoundingArea *MOD_lineart_get_parent_bounding_area(LineartRenderBuffer *rb,
                                                           double x,
                                                           double y);
 
+/**
+ * Wrapper for more convenience.
+ */
 LineartBoundingArea *MOD_lineart_get_bounding_area(LineartRenderBuffer *rb, double x, double y);
 
 struct bGPDframe;
 struct bGPDlayer;
 
+/**
+ * Wrapper for external calls.
+ */
 void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   struct Depsgraph *depsgraph,
                                   struct Object *ob,
@@ -697,6 +709,9 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   const char *vgname,
                                   int modifier_flags);
 
+/**
+ * Length is in image space.
+ */
 float MOD_lineart_chain_compute_length(LineartEdgeChain *ec);
 
 void ED_operatortypes_lineart(void);

@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -20,6 +6,7 @@
 #include "FN_multi_function_builder.hh"
 
 #include "BKE_attribute_access.hh"
+#include "BKE_geometry_fields.hh"
 #include "BKE_geometry_set.hh"
 #include "BKE_geometry_set_instances.hh"
 
@@ -27,6 +14,8 @@
 
 #include "NOD_derived_node_tree.hh"
 #include "NOD_geometry_nodes_eval_log.hh"
+
+#include "GEO_realize_instances.hh"
 
 struct Depsgraph;
 struct ModifierData;
@@ -36,29 +25,20 @@ namespace blender::nodes {
 using bke::AnonymousAttributeFieldInput;
 using bke::AttributeFieldInput;
 using bke::AttributeIDRef;
-using bke::geometry_set_realize_instances;
 using bke::GeometryComponentFieldContext;
+using bke::GeometryFieldInput;
 using bke::OutputAttribute;
 using bke::OutputAttribute_Typed;
 using bke::ReadAttributeLookup;
 using bke::StrongAnonymousAttributeID;
 using bke::WeakAnonymousAttributeID;
 using bke::WriteAttributeLookup;
-using fn::CPPType;
 using fn::Field;
 using fn::FieldContext;
 using fn::FieldEvaluator;
 using fn::FieldInput;
 using fn::FieldOperation;
 using fn::GField;
-using fn::GMutablePointer;
-using fn::GMutableSpan;
-using fn::GPointer;
-using fn::GSpan;
-using fn::GVArray;
-using fn::GVArray_GSpan;
-using fn::GVMutableArray;
-using fn::GVMutableArray_GSpan;
 using fn::ValueOrField;
 using geometry_nodes_eval_log::NodeWarningType;
 
@@ -132,12 +112,8 @@ class GeoNodeExecParams {
   }
 
   template<typename T>
-  static inline constexpr bool is_field_base_type_v = std::is_same_v<T, float> ||
-                                                      std::is_same_v<T, int> ||
-                                                      std::is_same_v<T, bool> ||
-                                                      std::is_same_v<T, ColorGeometry4f> ||
-                                                      std::is_same_v<T, float3> ||
-                                                      std::is_same_v<T, std::string>;
+  static inline constexpr bool is_field_base_type_v =
+      is_same_any_v<T, float, int, bool, ColorGeometry4f, float3, std::string>;
 
   /**
    * Get the input value for the input socket with the given identifier.
@@ -330,7 +306,7 @@ class GeoNodeExecParams {
    */
   GVArray get_input_attribute(const StringRef name,
                               const GeometryComponent &component,
-                              const AttributeDomain domain,
+                              AttributeDomain domain,
                               const CustomDataType type,
                               const void *default_value) const;
 
@@ -353,9 +329,14 @@ class GeoNodeExecParams {
                                                const GeometryComponent &component,
                                                const CustomDataType default_type) const;
 
+  /**
+   * If any of the corresponding input sockets are attributes instead of single values,
+   * use the highest priority attribute domain from among them.
+   * Otherwise return the default domain.
+   */
   AttributeDomain get_highest_priority_input_domain(Span<std::string> names,
                                                     const GeometryComponent &component,
-                                                    const AttributeDomain default_domain) const;
+                                                    AttributeDomain default_domain) const;
 
   std::string attribute_producer_name() const;
 

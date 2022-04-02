@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #ifndef KERNEL_TEX
 #  define KERNEL_TEX(type, name)
@@ -54,6 +41,10 @@ KERNEL_TEX(KernelCurveSegment, __curve_segments)
 
 /* patches */
 KERNEL_TEX(uint, __patches)
+
+/* pointclouds */
+KERNEL_TEX(float4, __points)
+KERNEL_TEX(uint, __points_shader)
 
 /* attributes */
 KERNEL_TEX(uint4, __attributes_map)

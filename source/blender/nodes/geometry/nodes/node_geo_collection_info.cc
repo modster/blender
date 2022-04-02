@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_math_matrix.h"
 
@@ -28,6 +14,8 @@
 #include <algorithm>
 
 namespace blender::nodes::node_geo_collection_info_cc {
+
+NODE_STORAGE_FUNCS(NodeGeometryCollectionInfo)
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
@@ -49,8 +37,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryCollectionInfo *data = (NodeGeometryCollectionInfo *)MEM_callocN(
-      sizeof(NodeGeometryCollectionInfo), __func__);
+  NodeGeometryCollectionInfo *data = MEM_cnew<NodeGeometryCollectionInfo>(__func__);
   data->transform_space = GEO_NODE_TRANSFORM_SPACE_ORIGINAL;
   node->storage = data;
 }
@@ -78,9 +65,8 @@ static void node_geo_exec(GeoNodeExecParams params)
     return;
   }
 
-  const bNode &bnode = params.node();
-  NodeGeometryCollectionInfo *node_storage = (NodeGeometryCollectionInfo *)bnode.storage;
-  const bool use_relative_transform = (node_storage->transform_space ==
+  const NodeGeometryCollectionInfo &storage = node_storage(params.node());
+  const bool use_relative_transform = (storage.transform_space ==
                                        GEO_NODE_TRANSFORM_SPACE_RELATIVE);
 
   GeometrySet geometry_set_out;
@@ -162,7 +148,7 @@ void register_node_type_geo_collection_info()
 
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_COLLECTION_INFO, "Collection Info", NODE_CLASS_INPUT, 0);
+  geo_node_type_base(&ntype, GEO_NODE_COLLECTION_INFO, "Collection Info", NODE_CLASS_INPUT);
   ntype.declare = file_ns::node_declare;
   node_type_init(&ntype, file_ns::node_node_init);
   node_type_storage(&ntype,

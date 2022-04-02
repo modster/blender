@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -44,11 +30,9 @@
 
 namespace blender {
 
-/* Forward declarations for generic virtual arrays. */
-namespace fn {
+/** Forward declarations for generic virtual arrays. */
 class GVArray;
 class GVMutableArray;
-};  // namespace fn
 
 /**
  * Implements the specifics of how the elements of a virtual array are accessed. It contains a
@@ -79,7 +63,7 @@ template<typename T> class VArrayImpl {
    * Get the element at #index. This does not return a reference, because the value may be computed
    * on the fly.
    */
-  virtual T get(const int64_t index) const = 0;
+  virtual T get(int64_t index) const = 0;
 
   /**
    * Return true when the virtual array is a plain array internally.
@@ -168,7 +152,7 @@ template<typename T> class VArrayImpl {
    * arrays in all cases.
    * Return true when the virtual array was assigned and false when nothing was done.
    */
-  virtual bool try_assign_GVArray(fn::GVArray &UNUSED(varray)) const
+  virtual bool try_assign_GVArray(GVArray &UNUSED(varray)) const
   {
     return false;
   }
@@ -194,7 +178,7 @@ template<typename T> class VArrayImpl {
   }
 };
 
-/* Similar to #VArrayImpl, but adds methods that allow modifying the referenced elements. */
+/** Similar to #VArrayImpl, but adds methods that allow modifying the referenced elements. */
 template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
  public:
   using VArrayImpl<T>::VArrayImpl;
@@ -202,7 +186,7 @@ template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
   /**
    * Assign the provided #value to the #index.
    */
-  virtual void set(const int64_t index, T value) = 0;
+  virtual void set(int64_t index, T value) = 0;
 
   /**
    * Copy all elements from the provided span into the virtual array.
@@ -225,7 +209,7 @@ template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
   /**
    * Similar to #VArrayImpl::try_assign_GVArray but for mutable virtual arrays.
    */
-  virtual bool try_assign_GVMutableArray(fn::GVMutableArray &UNUSED(varray)) const
+  virtual bool try_assign_GVMutableArray(GVMutableArray &UNUSED(varray)) const
   {
     return false;
   }
@@ -477,9 +461,9 @@ template<typename T> struct VArrayAnyExtraInfo {
   template<typename StorageT> static VArrayAnyExtraInfo get()
   {
     /* These are the only allowed types in the #Any. */
-    static_assert(std::is_base_of_v<VArrayImpl<T>, StorageT> ||
-                  std::is_same_v<StorageT, const VArrayImpl<T> *> ||
-                  std::is_same_v<StorageT, std::shared_ptr<const VArrayImpl<T>>>);
+    static_assert(
+        std::is_base_of_v<VArrayImpl<T>, StorageT> ||
+        is_same_any_v<StorageT, const VArrayImpl<T> *, std::shared_ptr<const VArrayImpl<T>>>);
 
     /* Depending on how the virtual array implementation is stored in the #Any, a different
      * #get_varray function is required. */
@@ -681,7 +665,7 @@ template<typename T> class VArrayCommon {
   }
 
   /**
-   * Returns the internally used span of the virtual array. This invokes undefined behavior is the
+   * Returns the internally used span of the virtual array. This invokes undefined behavior if the
    * virtual array is not stored as a span internally.
    */
   Span<T> get_internal_span() const
@@ -757,7 +741,7 @@ template<typename T> class VArrayCommon {
   }
 
   /** See #GVArrayImpl::try_assign_GVArray. */
-  bool try_assign_GVArray(fn::GVArray &varray) const
+  bool try_assign_GVArray(GVArray &varray) const
   {
     return impl_->try_assign_GVArray(varray);
   }
@@ -974,7 +958,7 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
   }
 
   /** See #GVMutableArrayImpl::try_assign_GVMutableArray. */
-  bool try_assign_GVMutableArray(fn::GVMutableArray &varray) const
+  bool try_assign_GVMutableArray(GVMutableArray &varray) const
   {
     return this->get_impl()->try_assign_GVMutableArray(varray);
   }

@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -26,6 +12,8 @@
 #include "node_geometry_util.hh"
 
 namespace blender::nodes::node_geo_mesh_primitive_circle_cc {
+
+NODE_STORAGE_FUNCS(NodeGeometryMeshCircle)
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
@@ -50,8 +38,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometryMeshCircle *node_storage = (NodeGeometryMeshCircle *)MEM_callocN(
-      sizeof(NodeGeometryMeshCircle), __func__);
+  NodeGeometryMeshCircle *node_storage = MEM_cnew<NodeGeometryMeshCircle>(__func__);
 
   node_storage->fill_type = GEO_NODE_MESH_CIRCLE_FILL_NONE;
 
@@ -137,12 +124,6 @@ static Mesh *create_circle_mesh(const float radius,
     copy_v3_v3(verts.last().co, float3(0));
   }
 
-  /* Point all vertex normals in the up direction. */
-  const short up_normal[3] = {0, 0, SHRT_MAX};
-  for (MVert &vert : verts) {
-    copy_v3_v3_short(vert.no, up_normal);
-  }
-
   /* Create outer edges. */
   const short edge_flag = (fill_type == GEO_NODE_MESH_CIRCLE_FILL_NONE) ?
                               ME_LOOSEEDGE :
@@ -199,11 +180,8 @@ static Mesh *create_circle_mesh(const float radius,
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  const bNode &node = params.node();
-  const NodeGeometryMeshCircle &storage = *(const NodeGeometryMeshCircle *)node.storage;
-
-  const GeometryNodeMeshCircleFillType fill_type = (const GeometryNodeMeshCircleFillType)
-                                                       storage.fill_type;
+  const NodeGeometryMeshCircle &storage = node_storage(params.node());
+  const GeometryNodeMeshCircleFillType fill = (GeometryNodeMeshCircleFillType)storage.fill_type;
 
   const float radius = params.extract_input<float>("Radius");
   const int verts_num = params.extract_input<int>("Vertices");
@@ -213,9 +191,7 @@ static void node_geo_exec(GeoNodeExecParams params)
     return;
   }
 
-  Mesh *mesh = create_circle_mesh(radius, verts_num, fill_type);
-
-  BLI_assert(BKE_mesh_is_valid(mesh));
+  Mesh *mesh = create_circle_mesh(radius, verts_num, fill);
 
   params.set_output("Mesh", GeometrySet::create_with_mesh(mesh));
 }
@@ -228,8 +204,7 @@ void register_node_type_geo_mesh_primitive_circle()
 
   static bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_MESH_PRIMITIVE_CIRCLE, "Mesh Circle", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_MESH_PRIMITIVE_CIRCLE, "Mesh Circle", NODE_CLASS_GEOMETRY);
   node_type_init(&ntype, file_ns::node_init);
   node_type_storage(
       &ntype, "NodeGeometryMeshCircle", node_free_standard_storage, node_copy_standard_storage);

@@ -1,27 +1,11 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2005 Blender Foundation. All rights reserved. */
 
 #include "node_geometry_util.hh"
 
 #include "BKE_image.h"
 
-#include "BLI_float4.hh"
+#include "BLI_math_vec_types.hh"
 #include "BLI_threads.h"
 #include "BLI_timeit.hh"
 
@@ -33,6 +17,8 @@
 #include "UI_resources.h"
 
 namespace blender::nodes::node_geo_image_texture_cc {
+
+NODE_STORAGE_FUNCS(NodeGeometryImageTexture)
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
@@ -53,8 +39,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometryImageTexture *tex = (NodeGeometryImageTexture *)MEM_callocN(
-      sizeof(NodeGeometryImageTexture), __func__);
+  NodeGeometryImageTexture *tex = MEM_cnew<NodeGeometryImageTexture>(__func__);
   node->storage = tex;
 }
 
@@ -272,8 +257,8 @@ class ImageFieldsFunction : public fn::MultiFunction {
     const int width = ibuf->x;
     const int height = ibuf->y;
     int ix, iy;
-    const float tx = frac(px * (float)width - 0.5f, &ix);
-    const float ty = frac(py * (float)height - 0.5f, &iy);
+    const float tx = frac(px * (float)width, &ix);
+    const float ty = frac(py * (float)height, &iy);
 
     switch (extension) {
       case SHD_IMAGE_EXTENSION_REPEAT: {
@@ -378,8 +363,7 @@ static void node_geo_exec(GeoNodeExecParams params)
     return;
   }
 
-  const bNode &node = params.node();
-  NodeGeometryImageTexture *data = (NodeGeometryImageTexture *)node.storage;
+  const NodeGeometryImageTexture &storage = node_storage(params.node());
 
   ImageUser image_user;
   BKE_imageuser_default(&image_user);
@@ -391,7 +375,7 @@ static void node_geo_exec(GeoNodeExecParams params)
   std::unique_ptr<ImageFieldsFunction> image_fn;
   try {
     image_fn = std::make_unique<ImageFieldsFunction>(
-        data->interpolation, data->extension, *image, image_user);
+        storage.interpolation, storage.extension, *image, image_user);
   }
   catch (const std::runtime_error &) {
     params.set_default_remaining_outputs();
@@ -409,13 +393,13 @@ static void node_geo_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes::node_geo_image_texture_cc
 
-void register_node_type_geo_image_texture(void)
+void register_node_type_geo_image_texture()
 {
   namespace file_ns = blender::nodes::node_geo_image_texture_cc;
 
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_IMAGE_TEXTURE, "Image Texture", NODE_CLASS_TEXTURE, 0);
+  geo_node_type_base(&ntype, GEO_NODE_IMAGE_TEXTURE, "Image Texture", NODE_CLASS_TEXTURE);
   ntype.declare = file_ns::node_declare;
   ntype.draw_buttons = file_ns::node_layout;
   node_type_init(&ntype, file_ns::node_init);

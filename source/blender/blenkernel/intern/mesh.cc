@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -38,11 +22,14 @@
 #include "BLI_endian_switch.h"
 #include "BLI_ghash.h"
 #include "BLI_hash.h"
+#include "BLI_index_range.hh"
 #include "BLI_linklist.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
+#include "BLI_math_vector.hh"
 #include "BLI_memarena.h"
 #include "BLI_string.h"
+#include "BLI_task.hh"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
@@ -72,6 +59,8 @@
 
 #include "BLO_read_write.h"
 
+using blender::float3;
+
 static void mesh_clear_geometry(Mesh *mesh);
 static void mesh_tessface_clear_intern(Mesh *mesh, int free_customdata);
 
@@ -90,6 +79,10 @@ static void mesh_init_data(ID *id)
   CustomData_reset(&mesh->ldata);
 
   BKE_mesh_runtime_init_data(mesh);
+
+  /* A newly created mesh does not have normals, so tag them dirty. This will be cleared
+   * by #BKE_mesh_vertex_normals_clear_dirty or #BKE_mesh_poly_normals_ensure. */
+  BKE_mesh_normals_tag_dirty(mesh);
 
   mesh->face_sets_color_seed = BLI_hash_int(PIL_check_seconds_timer_i() & UINT_MAX);
 }
@@ -143,9 +136,18 @@ static void mesh_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int 
 
   BKE_mesh_update_customdata_pointers(mesh_dst, do_tessface);
 
+  mesh_dst->cd_flag = mesh_src->cd_flag;
+
   mesh_dst->edit_mesh = nullptr;
 
   mesh_dst->mselect = (MSelect *)MEM_dupallocN(mesh_dst->mselect);
+
+  /* Set normal layers dirty. They should be dirty by default on new meshes anyway, but being
+   * explicit about it is safer. Alternatively normal layers could be copied if they aren't dirty,
+   * avoiding recomputation in some cases. However, a copied mesh is often changed anyway, so that
+   * idea is not clearly better. With proper reference counting, all custom data layers could be
+   * copied as the cost would be much lower. */
+  BKE_mesh_normals_tag_dirty(mesh_dst);
 
   /* TODO: Do we want to add flag to prevent this? */
   if (mesh_src->key && (flag & LIB_ID_COPY_SHAPEKEY)) {
@@ -153,6 +155,21 @@ static void mesh_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int 
     /* XXX This is not nice, we need to make BKE_id_copy_ex fully re-entrant... */
     mesh_dst->key->from = &mesh_dst->id;
   }
+
+  BKE_mesh_assert_normals_dirty_or_calculated(mesh_dst);
+}
+
+void BKE_mesh_free_editmesh(struct Mesh *mesh)
+{
+  if (mesh->edit_mesh == nullptr) {
+    return;
+  }
+
+  if (mesh->edit_mesh->is_shallow_copy == false) {
+    BKE_editmesh_free_data(mesh->edit_mesh);
+  }
+  MEM_freeN(mesh->edit_mesh);
+  mesh->edit_mesh = nullptr;
 }
 
 static void mesh_free_data(ID *id)
@@ -161,13 +178,7 @@ static void mesh_free_data(ID *id)
 
   BLI_freelistN(&mesh->vertex_group_names);
 
-  if (mesh->edit_mesh) {
-    if (mesh->edit_mesh->is_shallow_copy == false) {
-      BKE_editmesh_free_data(mesh->edit_mesh);
-    }
-    MEM_freeN(mesh->edit_mesh);
-    mesh->edit_mesh = nullptr;
-  }
+  BKE_mesh_free_editmesh(mesh);
 
   BKE_mesh_runtime_free_data(mesh);
   mesh_clear_geometry(mesh);
@@ -188,7 +199,7 @@ static void mesh_foreach_path(ID *id, BPathForeachPathData *bpath_data)
 {
   Mesh *me = (Mesh *)id;
   if (me->ldata.external) {
-    BKE_bpath_foreach_path_fixed_process(bpath_data, me->ldata.external->filename);
+    BKE_bpath_foreach_path_fixed_process(bpath_data, me->ldata.external->filepath);
   }
 }
 
@@ -332,6 +343,10 @@ static void mesh_blend_read_data(BlendDataReader *reader, ID *id)
       BLI_endian_switch_uint32_array(tf->col, 4);
     }
   }
+
+  /* We don't expect to load normals from files, since they are derived data. */
+  BKE_mesh_normals_tag_dirty(mesh);
+  BKE_mesh_assert_normals_dirty_or_calculated(mesh);
 }
 
 static void mesh_blend_read_lib(BlendLibReader *reader, ID *id)
@@ -453,14 +468,14 @@ static int customdata_compare(
 
   for (int i = 0; i < c1->totlayer; i++) {
     l1 = &c1->layers[i];
-    if (CD_TYPE_AS_MASK(l1->type) & cd_mask_all_attr && l1->anonymous_id != nullptr) {
+    if ((CD_TYPE_AS_MASK(l1->type) & cd_mask_all_attr) && l1->anonymous_id == nullptr) {
       layer_count1++;
     }
   }
 
   for (int i = 0; i < c2->totlayer; i++) {
     l2 = &c2->layers[i];
-    if (CD_TYPE_AS_MASK(l1->type) & cd_mask_all_attr && l2->anonymous_id != nullptr) {
+    if ((CD_TYPE_AS_MASK(l2->type) & cd_mask_all_attr) && l2->anonymous_id == nullptr) {
       layer_count2++;
     }
   }
@@ -495,7 +510,6 @@ static int customdata_compare(
                 return MESHCMP_VERTCOMISMATCH;
               }
             }
-            /* I don't care about normals, let's just do coordinates. */
           }
           break;
         }
@@ -656,6 +670,17 @@ static int customdata_compare(
           }
           break;
         }
+        case CD_PROP_INT8: {
+          const int8_t *l1_data = (int8_t *)l1->data;
+          const int8_t *l2_data = (int8_t *)l2->data;
+
+          for (int i = 0; i < total_length; i++) {
+            if (l1_data[i] != l2_data[i]) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+          }
+          break;
+        }
         case CD_PROP_BOOL: {
           const bool *l1_data = (bool *)l1->data;
           const bool *l2_data = (bool *)l2->data;
@@ -690,12 +715,6 @@ static int customdata_compare(
   return 0;
 }
 
-/**
- * Used for unit testing; compares two meshes, checking only
- * differences we care about.  should be usable with leaf's
- * testing framework I get RNA work done, will use hackish
- * testing code for now.
- */
 const char *BKE_mesh_cmp(Mesh *me1, Mesh *me2, float thresh)
 {
   int c;
@@ -896,10 +915,6 @@ bool BKE_mesh_has_custom_loop_normals(Mesh *me)
   return CustomData_has_layer(&me->ldata, CD_CUSTOMLOOPNORMAL);
 }
 
-/**
- * Free (or release) any data used by this mesh (does not free the mesh itself).
- * Only use for undo, in most cases `BKE_id_free(nullptr, me)` should be used.
- */
 void BKE_mesh_free_data_for_undo(Mesh *me)
 {
   mesh_free_data(&me->id);
@@ -1014,10 +1029,6 @@ Mesh *BKE_mesh_new_nomain(
   return mesh;
 }
 
-/**
- * Copy user editable settings that we want to preserve
- * when a new mesh is based on an existing mesh.
- */
 void BKE_mesh_copy_parameters(Mesh *me_dst, const Mesh *me_src)
 {
   /* Copy general settings. */
@@ -1040,18 +1051,14 @@ void BKE_mesh_copy_parameters(Mesh *me_dst, const Mesh *me_src)
   me_dst->vertex_group_active_index = me_src->vertex_group_active_index;
 }
 
-/**
- * A version of #BKE_mesh_copy_parameters that is intended for evaluated output
- * (the modifier stack for example).
- *
- * \warning User counts are not handled for ID's.
- */
 void BKE_mesh_copy_parameters_for_eval(Mesh *me_dst, const Mesh *me_src)
 {
   /* User counts aren't handled, don't copy into a mesh from #G_MAIN. */
   BLI_assert(me_dst->id.tag & (LIB_TAG_NO_MAIN | LIB_TAG_COPIED_ON_WRITE));
 
   BKE_mesh_copy_parameters(me_dst, me_src);
+
+  BKE_mesh_assert_normals_dirty_or_calculated(me_dst);
 
   /* Copy vertex group names. */
   BLI_assert(BLI_listbase_is_empty(&me_dst->vertex_group_names));
@@ -1159,6 +1166,7 @@ BMesh *BKE_mesh_to_bmesh(Mesh *me,
 {
   BMeshFromMeshParams bmesh_from_mesh_params{};
   bmesh_from_mesh_params.calc_face_normal = false;
+  bmesh_from_mesh_params.calc_vert_normal = false;
   bmesh_from_mesh_params.add_key_index = add_key_index;
   bmesh_from_mesh_params.use_shapekey = true;
   bmesh_from_mesh_params.active_shapekey = ob->shapenr;
@@ -1184,6 +1192,23 @@ Mesh *BKE_mesh_from_bmesh_for_eval_nomain(BMesh *bm,
   BM_mesh_bm_to_me_for_eval(bm, mesh, cd_mask_extra);
   BKE_mesh_copy_parameters_for_eval(mesh, me_settings);
   return mesh;
+}
+
+static void ensure_orig_index_layer(CustomData &data, const int size)
+{
+  if (CustomData_has_layer(&data, CD_ORIGINDEX)) {
+    return;
+  }
+  int *indices = (int *)CustomData_add_layer(&data, CD_ORIGINDEX, CD_DEFAULT, nullptr, size);
+  range_vn_i(indices, size, 0);
+}
+
+void BKE_mesh_ensure_default_orig_index_customdata(Mesh *mesh)
+{
+  BLI_assert(mesh->runtime.wrapper_type == ME_WRAPPER_TYPE_MDATA);
+  ensure_orig_index_layer(mesh->vdata, mesh->totvert);
+  ensure_orig_index_layer(mesh->edata, mesh->totedge);
+  ensure_orig_index_layer(mesh->pdata, mesh->totpoly);
 }
 
 BoundBox *BKE_mesh_boundbox_get(Object *ob)
@@ -1266,7 +1291,7 @@ void BKE_mesh_texspace_get(Mesh *me, float r_loc[3], float r_size[3])
   }
 }
 
-void BKE_mesh_texspace_get_reference(Mesh *me, short **r_texflag, float **r_loc, float **r_size)
+void BKE_mesh_texspace_get_reference(Mesh *me, char **r_texflag, float **r_loc, float **r_size)
 {
   BKE_mesh_texspace_ensure(me);
 
@@ -1284,7 +1309,7 @@ void BKE_mesh_texspace_get_reference(Mesh *me, short **r_texflag, float **r_loc,
 void BKE_mesh_texspace_copy_from_object(Mesh *me, Object *ob)
 {
   float *texloc, *texsize;
-  short *texflag;
+  char *texflag;
 
   if (BKE_object_obdata_texspace_get(ob, &texflag, &texloc, &texsize)) {
     me->texflag = *texflag;
@@ -1344,10 +1369,6 @@ void BKE_mesh_orco_ensure(Object *ob, Mesh *mesh)
   CustomData_add_layer(&mesh->vdata, CD_ORCO, CD_ASSIGN, orcodata, mesh->totvert);
 }
 
-/**
- * Rotates the vertices of a face in case v[2] or v[3] (vertex index) is = 0.
- * this is necessary to make the if #MFace.v4 check for quads work.
- */
 int BKE_mesh_mface_index_validate(MFace *mface, CustomData *fdata, int mfindex, int nr)
 {
   /* first test if the face is legal */
@@ -1551,10 +1572,6 @@ void BKE_mesh_smooth_flag_set(Mesh *me, const bool use_smooth)
   }
 }
 
-/**
- * Find the index of the loop in 'poly' which references vertex,
- * returns -1 if not found
- */
 int poly_find_loop_from_vert(const MPoly *poly, const MLoop *loopstart, uint vert)
 {
   for (int j = 0; j < poly->totloop; j++, loopstart++) {
@@ -1566,11 +1583,6 @@ int poly_find_loop_from_vert(const MPoly *poly, const MLoop *loopstart, uint ver
   return -1;
 }
 
-/**
- * Fill \a r_adj with the loop indices in \a poly adjacent to the
- * vertex. Returns the index of the loop matching vertex, or -1 if the
- * vertex is not in \a poly
- */
 int poly_get_adj_loops_from_vert(const MPoly *poly, const MLoop *mloop, uint vert, uint r_adj[2])
 {
   int corner = poly_find_loop_from_vert(poly, &mloop[poly->loopstart], vert);
@@ -1584,10 +1596,6 @@ int poly_get_adj_loops_from_vert(const MPoly *poly, const MLoop *mloop, uint ver
   return corner;
 }
 
-/**
- * Return the index of the edge vert that is not equal to \a v. If
- * neither edge vertex is equal to \a v, returns -1.
- */
 int BKE_mesh_edge_other_vert(const MEdge *e, int v)
 {
   if (e->v1 == v) {
@@ -1600,9 +1608,6 @@ int BKE_mesh_edge_other_vert(const MEdge *e, int v)
   return -1;
 }
 
-/**
- * Sets each output array element to the edge index if it is a real edge, or -1.
- */
 void BKE_mesh_looptri_get_real_edges(const Mesh *mesh, const MLoopTri *looptri, int r_edges[3])
 {
   for (int i = 2, i_next = 0; i_next < 3; i = i_next++) {
@@ -1615,16 +1620,37 @@ void BKE_mesh_looptri_get_real_edges(const Mesh *mesh, const MLoopTri *looptri, 
   }
 }
 
-/* basic vertex data functions */
 bool BKE_mesh_minmax(const Mesh *me, float r_min[3], float r_max[3])
 {
-  int i = me->totvert;
-  MVert *mvert;
-  for (mvert = me->mvert; i--; mvert++) {
-    minmax_v3v3_v3(r_min, r_max, mvert->co);
+  using namespace blender;
+  if (me->totvert == 0) {
+    return false;
   }
 
-  return (me->totvert != 0);
+  struct Result {
+    float3 min;
+    float3 max;
+  };
+
+  const Result minmax = threading::parallel_reduce(
+      IndexRange(me->totvert),
+      1024,
+      Result{float3(FLT_MAX), float3(-FLT_MAX)},
+      [&](IndexRange range, const Result &init) {
+        Result result = init;
+        for (const int i : range) {
+          math::min_max(float3(me->mvert[i].co), result.min, result.max);
+        }
+        return result;
+      },
+      [](const Result &a, const Result &b) {
+        return Result{math::min(a.min, b.min), math::max(a.max, b.max)};
+      });
+
+  copy_v3_v3(r_min, math::min(minmax.min, float3(r_min)));
+  copy_v3_v3(r_max, math::max(minmax.max, float3(r_max)));
+
+  return true;
 }
 
 void BKE_mesh_transform(Mesh *me, const float mat[4][4], bool do_keys)
@@ -1797,9 +1823,6 @@ void BKE_mesh_mselect_validate(Mesh *me)
   me->mselect = mselect_dst;
 }
 
-/**
- * Return the index within me->mselect, or -1
- */
 int BKE_mesh_mselect_find(Mesh *me, int index, int type)
 {
   BLI_assert(ELEM(type, ME_VSEL, ME_ESEL, ME_FSEL));
@@ -1813,9 +1836,6 @@ int BKE_mesh_mselect_find(Mesh *me, int index, int type)
   return -1;
 }
 
-/**
- * Return The index of the active element.
- */
 int BKE_mesh_mselect_active_get(Mesh *me, int type)
 {
   BLI_assert(ELEM(type, ME_VSEL, ME_ESEL, ME_FSEL));
@@ -1904,31 +1924,18 @@ void BKE_mesh_vert_coords_apply_with_mat4(Mesh *mesh,
   BKE_mesh_normals_tag_dirty(mesh);
 }
 
-void BKE_mesh_vert_normals_apply(Mesh *mesh, const short (*vert_normals)[3])
+void BKE_mesh_anonymous_attributes_remove(Mesh *mesh)
 {
-  /* This will just return the pointer if it wasn't a referenced layer. */
-  MVert *mv = (MVert *)CustomData_duplicate_referenced_layer(
-      &mesh->vdata, CD_MVERT, mesh->totvert);
-  mesh->mvert = mv;
-  for (int i = 0; i < mesh->totvert; i++, mv++) {
-    copy_v3_v3_short(mv->no, vert_normals[i]);
-  }
-  mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
+  CustomData_free_layers_anonymous(&mesh->vdata, mesh->totvert);
+  CustomData_free_layers_anonymous(&mesh->edata, mesh->totedge);
+  CustomData_free_layers_anonymous(&mesh->pdata, mesh->totpoly);
+  CustomData_free_layers_anonymous(&mesh->ldata, mesh->totloop);
 }
 
-/**
- * Compute 'split' (aka loop, or per face corner's) normals.
- *
- * \param r_lnors_spacearr: Allows to get computed loop normal space array.
- * That data, among other things, contains 'smooth fan' info, useful e.g.
- * to split geometry along sharp edges...
- */
 void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spacearr)
 {
   float(*r_loopnors)[3];
-  float(*polynors)[3];
   short(*clnors)[2] = nullptr;
-  bool free_polynors = false;
 
   /* Note that we enforce computing clnors when the clnor space array is requested by caller here.
    * However, we obviously only use the auto-smooth angle threshold
@@ -1950,26 +1957,8 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
   /* may be nullptr */
   clnors = (short(*)[2])CustomData_get_layer(&mesh->ldata, CD_CUSTOMLOOPNORMAL);
 
-  if (CustomData_has_layer(&mesh->pdata, CD_NORMAL)) {
-    /* This assume that layer is always up to date, not sure this is the case
-     * (esp. in Edit mode?)... */
-    polynors = (float(*)[3])CustomData_get_layer(&mesh->pdata, CD_NORMAL);
-    free_polynors = false;
-  }
-  else {
-    polynors = (float(*)[3])MEM_malloc_arrayN(mesh->totpoly, sizeof(float[3]), __func__);
-    BKE_mesh_calc_normals_poly_and_vertex(mesh->mvert,
-                                          mesh->totvert,
-                                          mesh->mloop,
-                                          mesh->totloop,
-                                          mesh->mpoly,
-                                          mesh->totpoly,
-                                          polynors,
-                                          nullptr);
-    free_polynors = true;
-  }
-
   BKE_mesh_normals_loop_split(mesh->mvert,
+                              BKE_mesh_vertex_normals_ensure(mesh),
                               mesh->totvert,
                               mesh->medge,
                               mesh->totedge,
@@ -1977,7 +1966,7 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
                               r_loopnors,
                               mesh->totloop,
                               mesh->mpoly,
-                              (const float(*)[3])polynors,
+                              BKE_mesh_poly_normals_ensure(mesh),
                               mesh->totpoly,
                               use_split_normals,
                               split_angle,
@@ -1985,13 +1974,7 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
                               clnors,
                               nullptr);
 
-  if (free_polynors) {
-    MEM_freeN(polynors);
-  }
-
-  mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
-  mesh->runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
-  mesh->runtime.cd_dirty_loop &= ~CD_MASK_NORMAL;
+  BKE_mesh_assert_normals_dirty_or_calculated(mesh);
 }
 
 void BKE_mesh_calc_normals_split(Mesh *mesh)
@@ -2018,7 +2001,7 @@ struct SplitFaceNewEdge {
 
 /* Detect needed new vertices, and update accordingly loops' vertex indices.
  * WARNING! Leaves mesh in invalid state. */
-static int split_faces_prepare_new_verts(const Mesh *mesh,
+static int split_faces_prepare_new_verts(Mesh *mesh,
                                          MLoopNorSpaceArray *lnors_spacearr,
                                          SplitFaceNewVert **new_verts,
                                          MemArena *memarena)
@@ -2030,8 +2013,9 @@ static int split_faces_prepare_new_verts(const Mesh *mesh,
 
   const int loops_len = mesh->totloop;
   int verts_len = mesh->totvert;
-  MVert *mvert = mesh->mvert;
   MLoop *mloop = mesh->mloop;
+  BKE_mesh_vertex_normals_ensure(mesh);
+  float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(mesh);
 
   BLI_bitmap *verts_used = BLI_BITMAP_NEW(verts_len, __func__);
   BLI_bitmap *done_loops = BLI_BITMAP_NEW(loops_len, __func__);
@@ -2075,7 +2059,7 @@ static int split_faces_prepare_new_verts(const Mesh *mesh,
          * vnor should always be defined to 'automatic normal' value computed from its polys,
          * not some custom normal.
          * Fortunately, that's the loop normal space's 'lnor' reference vector. ;) */
-        normal_float_to_short_v3(mvert[vert_idx].no, (*lnor_space)->vec_lnor);
+        copy_v3_v3(vert_normals[vert_idx], (*lnor_space)->vec_lnor);
       }
       else {
         /* Add new vert to list. */
@@ -2166,6 +2150,11 @@ static void split_faces_split_new_verts(Mesh *mesh,
 {
   const int verts_len = mesh->totvert - num_new_verts;
   MVert *mvert = mesh->mvert;
+  float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(mesh);
+
+  /* Normals were already calculated at the beginning of this operation, we rely on that to update
+   * them partially here. */
+  BLI_assert(!BKE_mesh_vertex_normals_are_dirty(mesh));
 
   /* Remember new_verts is a single linklist, so its items are in reversed order... */
   MVert *new_mv = &mvert[mesh->totvert - 1];
@@ -2174,7 +2163,7 @@ static void split_faces_split_new_verts(Mesh *mesh,
     BLI_assert(new_verts->new_index != new_verts->orig_index);
     CustomData_copy_data(&mesh->vdata, &mesh->vdata, new_verts->orig_index, i, 1);
     if (new_verts->vnor) {
-      normal_float_to_short_v3(new_mv->no, new_verts->vnor);
+      copy_v3_v3(vert_normals[i], new_verts->vnor);
     }
   }
 }
@@ -2198,12 +2187,6 @@ static void split_faces_split_new_edges(Mesh *mesh,
   }
 }
 
-/* Split faces based on the edge angle and loop normals.
- * Matches behavior of face splitting in render engines.
- *
- * NOTE: Will leave CD_NORMAL loop data layer which is
- * used by render engines to set shading up.
- */
 void BKE_mesh_split_faces(Mesh *mesh, bool free_loop_normals)
 {
   const int num_polys = mesh->totpoly;
@@ -2253,6 +2236,10 @@ void BKE_mesh_split_faces(Mesh *mesh, bool free_loop_normals)
     /* Update pointers to a newly allocated memory. */
     BKE_mesh_update_customdata_pointers(mesh, false);
 
+    /* Update normals manually to avoid recalculation after this operation. */
+    mesh->runtime.vert_normals = (float(*)[3])MEM_reallocN(mesh->runtime.vert_normals,
+                                                           sizeof(float[3]) * mesh->totvert);
+
     /* Perform actual split of vertices and edges. */
     split_faces_split_new_verts(mesh, new_verts, num_new_verts);
     if (do_edges) {
@@ -2270,6 +2257,7 @@ void BKE_mesh_split_faces(Mesh *mesh, bool free_loop_normals)
   /* Also frees new_verts/edges temp data, since we used its memarena to allocate them. */
   BKE_lnor_spacearr_free(&lnors_spacearr);
 
+  BKE_mesh_assert_normals_dirty_or_calculated(mesh);
 #ifdef VALIDATE_MESH
   BKE_mesh_validate(mesh, true, true);
 #endif
