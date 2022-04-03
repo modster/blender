@@ -1158,34 +1158,6 @@ endif()
 # install more files specified elsewhere
 delayed_do_install(${TARGETDIR_VER})
 
-if (WITH_CYCLES_DEVICE_ONEAPI)
-  # We need the installed lib, so use rel path to construct full path
-  if(IS_ABSOLUTE ${TARGETDIR_VER})
-    set(INSTALL_PATH_PREFIX_ABSOLUTE "${TARGETDIR_VER}")
-  else()
-    set(INSTALL_PATH_PREFIX_ABSOLUTE "${CMAKE_INSTALL_PREFIX}/${TARGETDIR_VER}")
-  endif()
-  if(UNIX AND NOT APPLE)
-    set(CYCLES_DEVICE_ONEAPI_SHARED_LIBRARY_CYCLES_PATH "${INSTALL_PATH_PREFIX_ABSOLUTE}/${CYCLES_DEVICE_ONEAPI_SHARED_LIBRARY_CYCLES_PATH}")
-    get_filename_component(CYCLES_DEVICE_ONEAPI_SHARED_LIBRARY_DIR ${CYCLES_DEVICE_ONEAPI_SHARED_LIBRARY_CYCLES_PATH} DIRECTORY)
-
-    set_target_properties(blender PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-    set_target_properties(blender PROPERTIES INSTALL_RPATH "${CYCLES_DEVICE_ONEAPI_SHARED_LIBRARY_DIR}")
-  elseif(GENERATOR_IS_MULTI_CONFIG AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    # A bit hacky, but without this the installation will fail due to empty value of ${BUILD_TYPE}
-    # GTestTesting.cmake does this replace too.
-    #string(REPLACE "\${BUILD_TYPE}" "$<CONFIG>" PROPER_FILEPATH "${CYCLES_DEVICE_ONEAPI_SHARED_LIBRARY_CYCLES_PATH}")
-    string(REPLACE "\${BUILD_TYPE}" "$<CONFIG>" PROPER_INSTALL_FILEPATH "${INSTALL_PATH_PREFIX_ABSOLUTE}")
-    add_custom_target(blender_cycles_dll_copy ALL
-      COMMAND "${CMAKE_COMMAND}" -E copy
-        "${CYCLES_DEVICE_ONEAPI_SHARED_LIBRARY_CYCLES_PATH}"
-        "${PROPER_INSTALL_FILEPATH}/.."
-      COMMAND ${CMAKE_COMMAND} -E echo "Copy oneAPI kernel dll to blender executable"
-    )
-    add_dependencies(blender_cycles_dll_copy blender)
-  endif()
-endif()
-
 unset(BLENDER_TEXT_FILES)
 unset(BLENDER_TEXT_FILES_DESTINATION)
 

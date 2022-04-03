@@ -8,9 +8,8 @@
 #ifdef WITH_ONEAPI
 #  include "device/device.h"
 #  include "device/oneapi/device_impl.h"
-#  include "device/oneapi/sycl.h"
-#  include "device/oneapi/util.h"
 
+#  include "util/path.h"
 #  include "util/string.h"
 
 #  ifdef __linux__
@@ -26,12 +25,12 @@ static oneAPIDLLInterface oneapi_dll;
 
 #ifdef _WIN32
 #  define LOAD_SYCL_SHARED_LIBRARY() (void *)(LoadLibrary(TEXT("sycl.dll")))
-#  define LOAD_ONEAPI_SHARED_LIBRARY() (void *)(LoadLibrary(TEXT("cycles_kernel_oneapi.dll")))
+#  define LOAD_ONEAPI_SHARED_LIBRARY(path) (void *)(LoadLibrary(path))
 #  define FREE_SHARED_LIBRARY(handle) FreeLibrary((HMODULE)handle)
 #  define GET_SHARED_LIBRARY_SYMBOL(handle, name) GetProcAddress((HMODULE)handle, name)
 #elif __linux__
 #  define LOAD_SYCL_SHARED_LIBRARY() dlopen("libsycl.so", RTLD_LAZY)
-#  define LOAD_ONEAPI_SHARED_LIBRARY() dlopen("libcycles_kernel_oneapi.so", RTLD_NOW)
+#  define LOAD_ONEAPI_SHARED_LIBRARY(path) dlopen(path, RTLD_NOW)
 #  define FREE_SHARED_LIBRARY(handle) dlclose(handle)
 #  define GET_SHARED_LIBRARY_SYMBOL(handle, name) dlsym(handle, name)
 #endif
@@ -51,7 +50,13 @@ bool device_oneapi_init()
 
   FREE_SHARED_LIBRARY(lib_handle);
 
-  lib_handle = LOAD_ONEAPI_SHARED_LIBRARY();
+  string lib_path = path_get("lib");
+#  ifdef _WIN32
+  lib_path = path_join(lib_path, "cycles_kernel_oneapi.dll");
+#  else
+  lib_path = path_join(lib_path, "cycles_kernel_oneapi.so");
+#  endif
+  lib_handle = LOAD_ONEAPI_SHARED_LIBRARY(lib_path.c_str());
 
   // This shouldn't happens, but still make sense to have a branch for this
   if (lib_handle == NULL) {

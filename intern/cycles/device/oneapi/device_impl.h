@@ -6,7 +6,6 @@
 #  include "device/device.h"
 #  include "device/oneapi/device.h"
 #  include "device/oneapi/queue.h"
-#  include "device/oneapi/util.h"
 
 #  include "util/map.h"
 

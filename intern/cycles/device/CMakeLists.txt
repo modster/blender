@@ -84,15 +84,12 @@ set(SRC_HIP
 )
 
 set(SRC_ONEAPI
-  oneapi/sycl.h
   oneapi/device_impl.cpp
   oneapi/device_impl.h
   oneapi/device.cpp
   oneapi/device.h
   oneapi/queue.cpp
   oneapi/queue.h
-  oneapi/util.cpp
-  oneapi/util.h
 )
 
 set(SRC_DUMMY
@@ -175,135 +172,6 @@ if(WITH_CYCLES_DEVICE_HIP AND WITH_HIP_DYNLOAD)
   )
 endif()
 
-# Build kernel here for linking with device below
-if (WITH_CYCLES_DEVICE_ONEAPI)
-  include(ExternalProject)
-
-  add_definitions(-DWITH_ONEAPI)
-  if (WITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED)
-    add_definitions(-DWITH_ONEAPI_SYCL_HOST_ENABLED)
-  endif()
-  set(oneapi_kernel_library_filename ${CMAKE_SHARED_LIBRARY_PREFIX}cycles_kernel_oneapi${CMAKE_SHARED_LIBRARY_SUFFIX})
-
-  # Pass a lot of include directories
-  get_property(CORRECT_CYCLES_INCLUDE_DIRS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-  string(REPLACE ";" "&" CORRECT_CYCLES_INCLUDE_DIRS_ESCAPED "${CORRECT_CYCLES_INCLUDE_DIRS}")
-
-  # Get sycl library directory
-  get_filename_component(SYCL_LIBRARY_DIR "${SYCL_LIBRARY}" DIRECTORY)
-
-  set (ONEAPI_KERNEL_BUILD_TYPE ${CMAKE_BUILD_TYPE})
-  if (WITH_CYCLES_ONEAPI_BINARIES AND NOT GENERATOR_IS_MULTI_CONFIG)
-    #NOTE(sirginko) Disable this, when GPU AOT will work with Debug information (for Debug and RelWithDebInfo builds)
-    message(STATUS "Change ONEAPI_KERNEL_BUILD_TYPE value from \"${ONEAPI_KERNEL_BUILD_TYPE}\" to \"Release\", because other builds don't work for GPU AOT yet")
-    set(ONEAPI_KERNEL_BUILD_TYPE "Release")
-  endif()
-
-  if (GENERATOR_IS_MULTI_CONFIG AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    set(ONEAPI_KERNEL_CMAKE_GENERATOR_TOOLSET "Intel(R) oneAPI DPC++ Compiler 2022")
-    ExternalProject_Add(
-      oneapi_kernel
-      DOWNLOAD_COMMAND ""
-      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/device/oneapi
-      CMAKE_ARGS
-      -DCMAKE_CXX_COMPILER:STRING=${SYCL_DPCPP_COMPILER}
-      -DCMAKE_GENERATOR_TOOLSET=${ONEAPI_KERNEL_CMAKE_GENERATOR_TOOLSET}
-      -DWITH_CYCLES_ONEAPI_BINARIES:BOOL=${WITH_CYCLES_ONEAPI_BINARIES}
-      -DCYCLES_ONEAPI_SYCL_TARGET:STRING=${CYCLES_ONEAPI_SYCL_TARGET}
-      -DCYCLES_ONEAPI_AOT_TARGETS:STRING=${CYCLES_ONEAPI_AOT_TARGETS}
-      -DCYCLES_ONEAPI_GPU_COMPILATION_OPTIONS:STRING=${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}
-      -DWITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED:BOOL=${WITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED}
-      -DWITH_NANOVDB:BOOL=${WITH_NANOVDB}
-      -DNANOVDB_INCLUDE_DIR=${NANOVDB_INCLUDE_DIR}
-      -DSYCL_INCLUDE_DIR=${SYCL_INCLUDE_DIR}
-      -DSYCL_LIBRARY_DIR=${SYCL_LIBRARY_DIR}
-      -DLEVEL_ZERO_LIBRARY=${LEVEL_ZERO_LIBRARY}
-      -DLEVEL_ZERO_INCLUDE_DIR=${LEVEL_ZERO_INCLUDE_DIR}
-      -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=TRUE
-      -DCYCLES_INCLUDE_DIRS_ESCAPED:STRING=${CORRECT_CYCLES_INCLUDE_DIRS_ESCAPED}&${CMAKE_CURRENT_SOURCE_DIR}/..
-      -DORIGINALCMAKE_CXX_COMPILER_ID=${CMAKE_CXX_COMPILER_ID}
-      INSTALL_COMMAND ""
-      BUILD_ALWAYS TRUE
-      STEP_TARGETS build
-      EXCLUDE_FROM_ALL TRUE
-    )
-  else()
-    ExternalProject_Add(
-      oneapi_kernel
-      DOWNLOAD_COMMAND ""
-      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/device/oneapi
-      CMAKE_ARGS
-      -DCMAKE_BUILD_TYPE:STRING=${ONEAPI_KERNEL_BUILD_TYPE}
-      -DWITH_CYCLES_ONEAPI_BINARIES:BOOL=${WITH_CYCLES_ONEAPI_BINARIES}
-      -DCYCLES_ONEAPI_SYCL_TARGET:STRING=${CYCLES_ONEAPI_SYCL_TARGET}
-      -DCYCLES_ONEAPI_AOT_TARGETS:STRING=${CYCLES_ONEAPI_AOT_TARGETS}
-      -DWITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED:BOOL=${WITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED}
-      -DWITH_NANOVDB:BOOL=${WITH_NANOVDB}
-      -DNANOVDB_INCLUDE_DIR=${NANOVDB_INCLUDE_DIR}
-      -DCMAKE_CXX_COMPILER:STRING=${SYCL_DPCPP_COMPILER}
-      -DSYCL_INCLUDE_DIR=${SYCL_INCLUDE_DIR}
-      -DSYCL_LIBRARY_DIR=${SYCL_LIBRARY_DIR}
-      -DLEVEL_ZERO_LIBRARY=${LEVEL_ZERO_LIBRARY}
-      -DLEVEL_ZERO_INCLUDE_DIR=${LEVEL_ZERO_INCLUDE_DIR}
-      -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=TRUE
-      -DCYCLES_INCLUDE_DIRS_ESCAPED:STRING=${CORRECT_CYCLES_INCLUDE_DIRS_ESCAPED}&${CMAKE_CURRENT_SOURCE_DIR}/..
-      -DORIGINALCMAKE_CXX_COMPILER_ID=${CMAKE_CXX_COMPILER_ID}
-      INSTALL_COMMAND ""
-      BUILD_ALWAYS TRUE
-      STEP_TARGETS build
-      EXCLUDE_FROM_ALL TRUE
-    )
-  endif()
-
-  ExternalProject_Get_Property(oneapi_kernel binary_dir)
-
-  if (GENERATOR_IS_MULTI_CONFIG AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    # make intermediate copy of the DLL since we can't use generator expression in delayed_install
-    add_custom_command(TARGET oneapi_kernel-build POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        "${binary_dir}/$<CONFIG>/${oneapi_kernel_library_filename}"
-        "${binary_dir}/${oneapi_kernel_library_filename}"
-    )
-  endif()
-
-  # The idea of using device as library, is that we compile device cpp files with oneAPI implementation code and then use
-  # the code via common C++ interface from .h files. So the rest of the project can be compiled with g++/clang/msbuild
-  add_library(cycles_kernel_oneapi SHARED IMPORTED)
-
-  if (GENERATOR_IS_MULTI_CONFIG AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    string(REPLACE ".dll" ".lib" oneapi_kernel_library_filename_lib ${oneapi_kernel_library_filename})
-    set_target_properties(cycles_kernel_oneapi PROPERTIES
-	    POSITION_INDEPENDENT_CODE ON
-    )
-    foreach(CONFIGURATION IN ITEMS ${CMAKE_CONFIGURATION_TYPES})
- 	    string(TOUPPER ${CONFIGURATION} CONFIG)
-      set_target_properties(cycles_kernel_oneapi PROPERTIES
- 	      IMPORTED_LOCATION_${CONFIG} "${binary_dir}/${CONFIGURATION}/${oneapi_kernel_library_filename}"
- 		    IMPORTED_IMPLIB_${CONFIG} "${binary_dir}/${CONFIGURATION}/${oneapi_kernel_library_filename_lib}"
- 	    )
-    endforeach()
-  else()
-    set_target_properties(cycles_kernel_oneapi PROPERTIES
-        IMPORTED_LOCATION ${binary_dir}/${oneapi_kernel_library_filename}
-        POSITION_INDEPENDENT_CODE ON
-    )
-  endif()
-
-  if (GENERATOR_IS_MULTI_CONFIG AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    if(WITH_BLENDER)
-      set(CYCLES_DEVICE_ONEAPI_SHARED_LIBRARY_CYCLES_PATH "${binary_dir}/$<CONFIG>/${oneapi_kernel_library_filename}" CACHE INTERNAL "")
-    endif()
-  else()
-    delayed_install(${binary_dir} "${oneapi_kernel_library_filename}" ${CYCLES_INSTALL_PATH}/source/kernel/kernels/oneapi)
-    if(WITH_BLENDER)
-      set(CYCLES_DEVICE_ONEAPI_SHARED_LIBRARY_CYCLES_PATH "${CYCLES_INSTALL_PATH}/source/kernel/kernels/oneapi/${oneapi_kernel_library_filename}" CACHE INTERNAL "")
-    endif()
-  endif()
-
-  add_dependencies(cycles_kernel_oneapi oneapi_kernel-build)
-endif()
-#]]
-
 add_definitions(${GL_DEFINITIONS})
 
 if(WITH_CYCLES_DEVICE_CUDA)
@@ -324,6 +192,9 @@ if(WITH_CYCLES_DEVICE_METAL)
     ${SRC_METAL}
   )
 endif()
+if (WITH_CYCLES_DEVICE_ONEAPI)
+  add_definitions(-DWITH_ONEAPI)
+endif()
 
 if(WITH_OPENIMAGEDENOISE)
   list(APPEND LIB
@@ -333,16 +204,6 @@ endif()
 
 include_directories(${INC})
 include_directories(SYSTEM ${INC_SYS})
-
-if (WITH_CYCLES_DEVICE_ONEAPI)
-  include_directories(SYSTEM ${SYCL_INCLUDE_DIR}/sycl ${SYCL_INCLUDE_DIR})
-  get_filename_component(SYCL_LIBRARY_DIR "${SYCL_LIBRARY}" DIRECTORY)
-  if (GENERATOR_IS_MULTI_CONFIG AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    link_libraries("${SYCL_LIBRARY_DIR}/sycl$<$<CONFIG:Debug>:d>${CMAKE_LINK_LIBRARY_SUFFIX}")
-  else()
-    link_libraries(${SYCL_LIBRARY})
-  endif()
-endif()
 
 cycles_add_library(cycles_device "${LIB}" ${SRC})
 

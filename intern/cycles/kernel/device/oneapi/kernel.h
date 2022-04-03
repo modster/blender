@@ -6,15 +6,19 @@
 
 #ifdef WITH_ONEAPI
 
-#  include "device/oneapi/sycl.h"
+#  include <stddef.h>
 
 // NOTE(sirgienko) Should match underlying type in the declaration inside "kernel/types.h"
 enum DeviceKernel : int;
 
-#  ifdef ONEAPI_EXPORT
-#    include <cycles_kernel_oneapi_export.h>
-#  else
-#    ifndef CYCLES_KERNEL_ONEAPI_EXPORT
+#  ifndef CYCLES_KERNEL_ONEAPI_EXPORT
+#    ifdef _WIN32
+#      if defined(ONEAPI_EXPORT)
+#        define CYCLES_KERNEL_ONEAPI_EXPORT extern __declspec(dllexport)
+#      else
+#        define CYCLES_KERNEL_ONEAPI_EXPORT extern __declspec(dllimport)
+#      endif
+#    else
 #      define CYCLES_KERNEL_ONEAPI_EXPORT
 #    endif
 #  endif
@@ -28,7 +32,7 @@ typedef void (*OneAPIDeviceIteratorCallback)(const char *id,
 
 typedef void (*OneAPIErrorCallback)(const char *error, void *user_ptr);
 
-struct CYCLES_KERNEL_ONEAPI_EXPORT KernelContext {
+struct KernelContext {
   // Queue, associated with selected device
   SyclQueue *queue;
   // Pointer to USM device memory with all global/constant allocation on this device

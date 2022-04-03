@@ -84,9 +84,13 @@ set(SRC_KERNEL_DEVICE_METAL_HEADERS
 
 set(SRC_KERNEL_DEVICE_ONEAPI_HEADERS
   device/oneapi/compat.h
+  device/oneapi/context_begin.h
+  device/oneapi/context_end.h
+  device/oneapi/device_id.h
   device/oneapi/globals.h
   device/oneapi/image.h
   device/oneapi/kernel.h
+  device/oneapi/kernel_templates.h
 )
 
 set(SRC_KERNEL_CLOSURE_HEADERS
@@ -694,6 +698,72 @@ if(WITH_CYCLES_DEVICE_OPTIX AND WITH_CYCLES_CUDA_BINARIES)
   cycles_set_solution_folder(cycles_kernel_optix)
 endif()
 
+if(WITH_CYCLES_DEVICE_ONEAPI)
+  if(WIN32)
+    set(cycles_kernel_oneapi_lib cycles_kernel_oneapi.dll)
+  else()
+    set(cycles_kernel_oneapi_lib cycles_kernel_oneapi.so)
+  endif()
+  set(dpcpp_flags
+      ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_KERNEL_DEVICE_ONEAPI}
+      -fsycl
+      -fsycl-unnamed-lambda
+      -fdelayed-template-parsing
+      -shared
+      -DWITH_ONEAPI
+      -ffast-math
+      -DNDEBUG
+      -O2
+      -o ${CMAKE_CURRENT_BINARY_DIR}/${cycles_kernel_oneapi_lib}
+      -I${CMAKE_CURRENT_SOURCE_DIR}/..
+      -I${LEVEL_ZERO_INCLUDE_DIR}
+      ${LEVEL_ZERO_LIBRARY}
+      ${ONEAPI_DPCPP_FLAGS}
+      )
+  if (WITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED)
+    list(APPEND dpcpp_flags -DWITH_ONEAPI_SYCL_HOST_ENABLED)
+  endif()
+  if (WITH_CYCLES_ONEAPI_BINARIES)
+    set (CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS "-internal_options '-ze-opt-large-register-file -ze-opt-regular-grf-kernel integrator_intersect'")
+    list(APPEND dpcpp_flags
+      -fsycl-targets=spir64_gen
+      -Xsycl-target-backend=spir64_gen "-device ${CYCLES_ONEAPI_AOT_TARGETS} ${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}")
+  endif()
+  if(WITH_NANOVDB)
+    list(APPEND dpcpp_flags
+      -DWITH_NANOVDB
+      -I"${NANOVDB_INCLUDE_DIR}")
+  endif()
+  if(WIN32)
+    list(APPEND dpcpp_flags
+    /EHsc
+    -fms-extensions
+    -fms-compatibility
+    -D_WINDLL
+    -D_MBCS
+    -DWIN32
+    -D_WINDOWS
+    -DONEAPI_EXPORT)
+
+  get_filename_component(dpcpp_root ${SYCL_DPCPP_COMPILER} DIRECTORY)
+
+    add_custom_command(
+      OUTPUT ${cycles_kernel_oneapi_lib}
+      COMMAND "${dpcpp_root}/../../env/vars.bat"
+      COMMAND ${SYCL_DPCPP_COMPILER} ${dpcpp_flags}
+      DEPENDS ${kernel_sources})
+  else()
+    list(APPEND dpcpp_flags -fPIC)
+    add_custom_command(
+      OUTPUT ${cycles_kernel_oneapi_lib}
+      COMMAND bash -c \"source ${dpcpp_root}/../../env/vars.sh&&${SYCL_DPCPP_COMPILER} ${dpcpp_flags}\"
+      DEPENDS ${kernel_sources})
+  endif()
+
+  delayed_install("${CMAKE_CURRENT_BINARY_DIR}" "${cycles_kernel_oneapi_lib}" ${CYCLES_INSTALL_PATH}/lib)
+  add_custom_target(cycles_kernel_oneapi ALL DEPENDS ${cycles_kernel_oneapi_lib})
+endif()
+
 # OSL module
 
 if(WITH_CYCLES_OSL)
@@ -782,6 +852,9 @@ if(WITH_CYCLES_DEVICE_OPTIX AND WITH_CYCLES_CUDA_BINARIES)
 endif()
 if(WITH_CYCLES_HIP)
   add_dependencies(cycles_kernel cycles_kernel_hip)
+endif()
+if(WITH_CYCLES_DEVICE_ONEAPI)
+  add_dependencies(cycles_kernel cycles_kernel_oneapi)
 endif()
 
 # Install kernel source for runtime compilation

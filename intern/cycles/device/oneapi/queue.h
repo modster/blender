@@ -11,7 +11,6 @@
 #  include <set>
 
 #  include "device/oneapi/device.h"
-#  include "device/oneapi/util.h"
 
 CCL_NAMESPACE_BEGIN
 

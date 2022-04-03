@@ -268,6 +268,13 @@ if(WITH_CYCLES AND WITH_CYCLES_OSL)
   endif()
 endif()
 
+if(WITH_CYCLES_DEVICE_ONEAPI)
+  set(CYCLES_LEVEL_ZERO ${LIBDIR}/level-zero CACHE PATH "Path to Level Zero installation")
+  if(EXISTS ${CYCLES_LEVEL_ZERO} AND NOT LEVEL_ZERO_ROOT_DIR)
+    set(LEVEL_ZERO_ROOT_DIR ${CYCLES_LEVEL_ZERO})
+  endif()
+endif()
+
 if(WITH_OPENVDB)
   find_package_wrapper(OpenVDB)
   find_package_wrapper(Blosc)

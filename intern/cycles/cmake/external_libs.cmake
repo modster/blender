@@ -72,7 +72,7 @@ if(CYCLES_STANDALONE_REPOSITORY)
     _set_default(TBB_ROOT_DIR "${_cycles_lib_dir}/tbb")
     _set_default(TIFF_ROOT "${_cycles_lib_dir}/tiff")
     _set_default(ZLIB_ROOT "${_cycles_lib_dir}/zlib")
-    _set_default(LEVEL_ZERO_ROOT_DIR "${_cycles_lib_dir}/level_zero")
+    _set_default(LEVEL_ZERO_ROOT_DIR "${_cycles_lib_dir}/level-zero")
 
     # Ignore system libraries
     set(CMAKE_IGNORE_PATH "${CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES};${CMAKE_SYSTEM_INCLUDE_PATH};${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES};${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
