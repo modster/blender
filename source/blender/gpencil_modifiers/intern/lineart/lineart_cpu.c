@@ -1605,19 +1605,14 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
   const MLoopTri *mlooptri = e_feat_data->mlooptri;
 
   if (rb->use_crease) {
-    if (e_f_pair->eflag & BM_ELEM_TAG) {
-      edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+    bool do_crease = true;
+    if (!rb->force_crease && !e_feat_data->use_auto_smooth &&
+        (me->mpoly[mlooptri[e_f_pair->f1].poly].flag & ME_SMOOTH) &&
+        (me->mpoly[mlooptri[e_f_pair->f2].poly].flag & ME_SMOOTH)) {
+      do_crease = false;
     }
-    else {
-      bool do_crease = true;
-      if (!rb->force_crease && !e_feat_data->use_auto_smooth &&
-          (me->mpoly[mlooptri[e_f_pair->f1].poly].flag & ME_SMOOTH) &&
-          (me->mpoly[mlooptri[e_f_pair->f2].poly].flag & ME_SMOOTH)) {
-        do_crease = false;
-      }
-      if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < e_feat_data->crease_threshold)) {
-        edge_flag_result |= LRT_EDGE_FLAG_CREASE;
-      }
+    if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < e_feat_data->crease_threshold)) {
+      edge_flag_result |= LRT_EDGE_FLAG_CREASE;
     }
   }
 
@@ -1652,7 +1647,7 @@ static uint16_t lineart_identify_medge_feature_edges(LineartRenderBuffer *rb,
   bool face_mark_filtered = false;
   uint16_t edge_flag_result = 0;
 
-  if (rb->use_crease && rb->sharp_as_crease && medge->flag & ME_SHARP) {
+  if (rb->use_crease && rb->sharp_as_crease && (medge->flag & ME_SHARP)) {
     edge_flag_result |= LRT_EDGE_FLAG_CREASE;
   }
 
@@ -2220,7 +2215,7 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
   if (orig_ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
     use_crease = cosf(M_PI - orig_ob->lineart.crease_threshold);
   }
-  if (ob_info->original_me->flag & ME_AUTOSMOOTH) {
+  else if (ob_info->original_me->flag & ME_AUTOSMOOTH) {
     use_crease = cosf(ob_info->original_me->smoothresh);
     use_auto_smooth = true;
   }
