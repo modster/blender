@@ -73,6 +73,7 @@ void EEVEE_material_bind_resources(DRWShadingGroup *shgrp,
   bool use_diffuse = GPU_material_flag_get(gpumat, GPU_MATFLAG_DIFFUSE);
   bool use_glossy = GPU_material_flag_get(gpumat, GPU_MATFLAG_GLOSSY);
   bool use_refract = GPU_material_flag_get(gpumat, GPU_MATFLAG_REFRACT);
+  bool use_ao = GPU_material_flag_get(gpumat, GPU_MATFLAG_AO);
 
   LightCache *lcache = vedata->stl->g_data->light_cache;
   EEVEE_EffectsInfo *effects = vedata->stl->effects;
@@ -91,6 +92,8 @@ void EEVEE_material_bind_resources(DRWShadingGroup *shgrp,
   if (use_diffuse || use_glossy || use_refract) {
     DRW_shgroup_uniform_texture_ref(shgrp, "shadowCubeTexture", &sldata->shadow_cube_pool);
     DRW_shgroup_uniform_texture_ref(shgrp, "shadowCascadeTexture", &sldata->shadow_cascade_pool);
+  }
+  if (use_diffuse || use_glossy || use_refract || use_ao) {
     DRW_shgroup_uniform_texture_ref(shgrp, "maxzBuffer", &vedata->txl->maxzbuffer);
   }
   if ((use_diffuse || use_glossy) && !use_ssrefraction) {

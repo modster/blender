@@ -423,3 +423,30 @@ OcclusionData occlusion_load(vec3 vP, float custom_occlusion)
 #ifndef GPU_FRAGMENT_SHADER
 #  undef gl_FragCoord
 #endif
+
+float ambient_occlusion_eval(vec3 normal,
+                             float max_distance,
+                             const float inverted,
+                             const float sample_count)
+{
+  /* Avoid multiline define causing compiler issues. */
+  /* clang-format off */
+#if defined(GPU_FRAGMENT_SHADER) && (defined(MESH_SHADER) || defined(HAIR_SHADER)) && !defined(DEPTH_SHADER)
+  /* clang-format on */
+  vec3 bent_normal;
+  vec4 rand = texelfetch_noise_tex(gl_FragCoord.xy);
+  OcclusionData data = occlusion_search(
+      viewPosition, maxzBuffer, max_distance, inverted, sample_count);
+
+  vec3 V = cameraVec(worldPosition);
+  vec3 N = normalize(normal);
+  vec3 Ng = safe_normalize(cross(dFdx(worldPosition), dFdy(worldPosition)));
+
+  float unused_error, visibility;
+  vec3 unused;
+  occlusion_eval(data, V, N, Ng, inverted, visibility, unused_error, unused);
+  return visibility;
+#else
+  return 1.0;
+#endif
+}
