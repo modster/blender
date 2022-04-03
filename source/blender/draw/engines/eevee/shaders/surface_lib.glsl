@@ -65,6 +65,31 @@ IN_OUT ShaderPointCloudInterface
 #endif
 
 #if defined(GPU_FRAGMENT_SHADER) && defined(CODEGEN_LIB)
+
+#  ifdef USE_BARYCENTRICS
+vec3 barycentric_distances_get()
+{
+  /* NOTE: No need to undo perspective divide since it is not applied yet. */
+  vec3 pos0 = (ProjectionMatrixInverse * gpu_position_at_vertex(0)).xyz;
+  vec3 pos1 = (ProjectionMatrixInverse * gpu_position_at_vertex(1)).xyz;
+  vec3 pos2 = (ProjectionMatrixInverse * gpu_position_at_vertex(2)).xyz;
+  vec3 edge21 = pos2 - pos1;
+  vec3 edge10 = pos1 - pos0;
+  vec3 edge02 = pos0 - pos2;
+  vec3 d21 = normalize(edge21);
+  vec3 d10 = normalize(edge10);
+  vec3 d02 = normalize(edge02);
+  vec3 dists;
+  float d = dot(d21, edge02);
+  dists.x = sqrt(dot(edge02, edge02) - d * d);
+  d = dot(d02, edge10);
+  dists.y = sqrt(dot(edge10, edge10) - d * d);
+  d = dot(d10, edge21);
+  dists.z = sqrt(dot(edge21, edge21) - d * d);
+  return dists.xyz;
+}
+#  endif
+
 GlobalData init_globals(void)
 {
   GlobalData surf;
@@ -72,6 +97,7 @@ GlobalData init_globals(void)
   surf.N = normalize(worldNormal);
   surf.Ng = safe_normalize(cross(dFdx(surf.P), dFdy(surf.P)));
   surf.barycentric_coords = vec2(0.0);
+  surf.barycentric_dists = vec3(0.0);
 #  ifdef HAIR_SHADER
   /* Shade as a cylinder. */
   float cos_theta = hairThickTime / hairThickness;
@@ -91,9 +117,9 @@ GlobalData init_globals(void)
   surf.hair_strand_id = 0;
 #    ifdef USE_BARYCENTRICS
   surf.barycentric_coords = gpu_BaryCoord.xy;
+  surf.barycentric_dists = barycentric_distances_get();
 #    endif
 #  endif
-  // surf.barycentric_dists = interp.barycentric_dists; /* TODO(fclem) */
   surf.ray_type = rayType;
   surf.ray_depth = 0.0;
   surf.ray_length = distance(surf.P, cameraPos);
