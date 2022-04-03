@@ -19,33 +19,40 @@
 
 struct LineartEdge;
 struct LineartRenderBuffer;
-typedef struct _LineartMemPool *LineartMemPool;
+struct LineartStaticMemPool;
 struct LineartStaticMemPoolNode;
 
-void *lineart_list_append_pointer_pool(ListBase *list, LineartMemPool *smp, void *data);
+void *lineart_list_append_pointer_pool(ListBase *list,
+                                       struct LineartStaticMemPool *smp,
+                                       void *data);
 void *lineart_list_append_pointer_pool_sized(ListBase *list,
-                                             LineartMemPool *smp,
+                                             struct LineartStaticMemPool *smp,
                                              void *data,
                                              int size);
-void *lineart_list_append_pointer_pool_thread(ListBase *list, LineartMemPool *smp, void *data);
+void *lineart_list_append_pointer_pool_thread(ListBase *list,
+                                              struct LineartStaticMemPool *smp,
+                                              void *data);
 void *lineart_list_append_pointer_pool_sized_thread(ListBase *list,
-                                                    LineartMemPool *smp,
+                                                    LineartStaticMemPool *smp,
                                                     void *data,
                                                     int size);
-void *list_push_pointer_static(ListBase *list, LineartMemPool *smp, void *p);
-void *list_push_pointer_static_sized(ListBase *list, LineartMemPool *smp, void *p, int size);
+void *list_push_pointer_static(ListBase *list, struct LineartStaticMemPool *smp, void *p);
+void *list_push_pointer_static_sized(ListBase *list,
+                                     struct LineartStaticMemPool *smp,
+                                     void *p,
+                                     int size);
 
 void *lineart_list_pop_pointer_no_free(ListBase *list);
 void lineart_list_remove_pointer_item_no_free(ListBase *list, LinkData *lip);
 
-struct LineartStaticMemPoolNode *lineart_mem_new_static_pool(struct _LineartMemPool *smp,
+struct LineartStaticMemPoolNode *lineart_mem_new_static_pool(struct LineartStaticMemPool *smp,
                                                              size_t size);
-void *lineart_mem_acquire(LineartMemPool *mp, size_t size);
-void *lineart_mem_acquire_thread(LineartMemPool *mp, size_t size);
-void lineart_mem_destroy(LineartMemPool *mp);
+void *lineart_mem_acquire(struct LineartStaticMemPool *smp, size_t size);
+void *lineart_mem_acquire_thread(struct LineartStaticMemPool *smp, size_t size);
+void lineart_mem_destroy(struct LineartStaticMemPool *smp);
 
 void lineart_prepend_edge_direct(void **list_head, void *node);
-void lineart_prepend_pool(LinkNode **first, LineartMemPool *smp, void *link);
+void lineart_prepend_pool(LinkNode **first, struct LineartStaticMemPool *smp, void *link);
 
 void lineart_matrix_ortho_44d(double (*mProjection)[4],
                               double xMin,

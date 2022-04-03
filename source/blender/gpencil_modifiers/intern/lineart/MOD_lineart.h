@@ -29,12 +29,10 @@ typedef struct LineartStaticMemPoolNode {
   /* User memory starts here */
 } LineartStaticMemPoolNode;
 
-typedef struct _LineartMemPool {
+typedef struct LineartStaticMemPool {
   ListBase pools;
   SpinLock lock_mem;
-} _LineartMemPool;
-
-typedef struct _LineartMemPool *LineartMemPool;
+} LineartStaticMemPool;
 
 typedef struct LineartTriangleAdjacent {
   struct LineartEdge *e[3];
@@ -246,13 +244,13 @@ typedef struct LineartRenderBuffer {
 
   ListBase intersecting_vertex_buffer;
   /** Use the one comes with Line Art. */
-  LineartMemPool render_data_pool;
+  LineartStaticMemPool render_data_pool;
   ListBase wasted_cuts;
   SpinLock lock_cuts;
 
   /* This is just a reference to LineartCache::chain_data_pool, which is not cleared after line art
    * completes which serves as a cache. */
-  LineartMemPool *chain_data_pool;
+  LineartStaticMemPool *chain_data_pool;
 
   /*  Render status */
   double view_vector[3];
@@ -342,7 +340,7 @@ typedef struct LineartRenderBuffer {
 typedef struct LineartCache {
   /** Separate memory pool for chain data, this goes to the cache, so when we free the main pool,
    * chains will still be available. */
-  LineartMemPool chain_data_pool;
+  LineartStaticMemPool chain_data_pool;
 
   /** A copy of rb->Chains after calculation is done, then we can destroy rb. */
   ListBase chains;
@@ -739,15 +737,3 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
 float MOD_lineart_chain_compute_length(LineartEdgeChain *ec);
 
 void ED_operatortypes_lineart(void);
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-LineartMemPool lineart_mem_init(void);
-LineartMemPool lineart_mem_local(LineartMemPool smp);
-void lineart_mem_destroy_internal(LineartMemPool *mp);
-
-#ifdef __cplusplus
-}
-#endif
