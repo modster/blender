@@ -204,7 +204,7 @@ bool ED_curve_pick_vert(struct ViewContext *vc,
  */
 bool ED_curve_pick_vert_ex(struct ViewContext *vc,
                            short sel,
-                           float sel_dist_mul,
+                           float dist_px,
                            struct Nurb **r_nurb,
                            struct BezTriple **r_bezt,
                            struct BPoint **r_bp,

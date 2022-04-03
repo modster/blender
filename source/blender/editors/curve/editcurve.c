@@ -4748,7 +4748,8 @@ bool ED_curve_editnurb_select_pick_ex(bContext *C,
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
   copy_v2_v2_int(vc.mval, mval);
 
-  bool found = ED_curve_pick_vert_ex(&vc, 1, sel_dist_mul, &nu, &bezt, &bp, &hand, &basact);
+  bool found = ED_curve_pick_vert_ex(
+      &vc, 1, sel_dist_mul * ED_view3d_select_dist_px(), &nu, &bezt, &bp, &hand, &basact);
 
   if (params->sel_op == SEL_OP_SET) {
     if ((found && params->select_passthrough) &&

@@ -90,7 +90,7 @@ static void ED_curve_pick_vert__do_closest(void *userData,
 
 bool ED_curve_pick_vert_ex(ViewContext *vc,
                            short sel,
-                           const float sel_dist_mul,
+                           float dist_px,
                            Nurb **r_nurb,
                            BezTriple **r_bezt,
                            BPoint **r_bp,
@@ -110,7 +110,7 @@ bool ED_curve_pick_vert_ex(ViewContext *vc,
     bool is_changed;
   } data = {NULL};
 
-  data.dist = ED_view3d_select_dist_px() * sel_dist_mul;
+  data.dist = dist_px;
   data.hpoint = 0;
   data.select = sel;
   data.mval_fl[0] = vc->mval[0];
@@ -152,7 +152,8 @@ bool ED_curve_pick_vert(ViewContext *vc,
                         short *r_handle,
                         Base **r_base)
 {
-  return ED_curve_pick_vert_ex(vc, sel, 1.0f, r_nurb, r_bezt, r_bp, r_handle, r_base);
+  return ED_curve_pick_vert_ex(
+      vc, sel, ED_view3d_select_dist_px(), r_nurb, r_bezt, r_bp, r_handle, r_base);
 }
 
 /** \} */

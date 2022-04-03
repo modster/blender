@@ -49,7 +49,8 @@
   } \
   ((void)0)
 
-#define SEL_DIST 0.2f
+/* Used to scale the default select distance. */
+#define SEL_DIST_FACTOR 0.2f
 
 /**
  * Data structure to keep track of details about the cut location
@@ -532,7 +533,7 @@ static bool get_closest_vertex_to_point_in_nurbs(const ViewContext *vc,
   }
 
   /* Assign closest data to the returned variables. */
-  const float threshold_dist = ED_view3d_select_dist_px() * SEL_DIST;
+  const float threshold_dist = ED_view3d_select_dist_px() * SEL_DIST_FACTOR;
   if (min_dist_bezt < threshold_dist || min_dist_bp < threshold_dist) {
     if (min_dist_bp < min_dist_bezt) {
       *r_bp = closest_bp;
@@ -844,7 +845,7 @@ static bool insert_point_to_segment(const ViewContext *vc, const wmEvent *event)
   CutData cd = init_cut_data(event);
   float mval[2] = {UNPACK2(event->mval)};
   const bool near_spline = update_cut_data_for_all_nurbs(
-      vc, BKE_curve_editNurbs_get(cu), mval, SEL_DIST * ED_view3d_select_dist_px(), &cd);
+      vc, BKE_curve_editNurbs_get(cu), mval, SEL_DIST_FACTOR * ED_view3d_select_dist_px(), &cd);
 
   if (near_spline && !cd.nurb->hide) {
     Nurb *nu = cd.nurb;
@@ -1649,7 +1650,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (ELEM(event->val, KM_RELEASE, KM_DBL_CLICK)) {
       if (delete_point && !cpd->new_point && !cpd->dragging) {
-        if (ED_curve_editnurb_select_pick_ex(C, event->mval, SEL_DIST, &params)) {
+        if (ED_curve_editnurb_select_pick_ex(C, event->mval, SEL_DIST_FACTOR, &params)) {
           cpd->acted = delete_point_under_mouse(&vc, event);
         }
       }
@@ -1708,7 +1709,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           }
         }
         else if (select_point) {
-          ED_curve_editnurb_select_pick_ex(C, event->mval, SEL_DIST, &params);
+          ED_curve_editnurb_select_pick_ex(C, event->mval, SEL_DIST_FACTOR, &params);
         }
       }
 
@@ -1798,7 +1799,7 @@ static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
       }
     }
     else if (!cpd->acted) {
-      if (is_spline_nearby(&vc, op, event, SEL_DIST * ED_view3d_select_dist_px())) {
+      if (is_spline_nearby(&vc, op, event, SEL_DIST_FACTOR * ED_view3d_select_dist_px())) {
         cpd->spline_nearby = true;
 
         /* If move segment is disabled, then insert point on key press and set
