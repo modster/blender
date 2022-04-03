@@ -1605,20 +1605,20 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
   const MLoopTri *mlooptri = e_feat_data->mlooptri;
 
   if (rb->use_crease) {
-    // if (rb->sharp_as_crease && !BM_elem_flag_test(e, BM_ELEM_SMOOTH)) {
-    //  edge_flag_result |= LRT_EDGE_FLAG_CREASE;
-    //}
-    // else {
-    bool do_crease = true;
-    if (!rb->force_crease && !e_feat_data->use_auto_smooth &&
-        (me->mpoly[mlooptri[e_f_pair->f1].poly].flag & ME_SMOOTH) &&
-        (me->mpoly[mlooptri[e_f_pair->f2].poly].flag & ME_SMOOTH)) {
-      do_crease = false;
-    }
-    if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < e_feat_data->crease_threshold)) {
+    if (e_f_pair->eflag & BM_ELEM_TAG) {
       edge_flag_result |= LRT_EDGE_FLAG_CREASE;
     }
-    //}
+    else {
+      bool do_crease = true;
+      if (!rb->force_crease && !e_feat_data->use_auto_smooth &&
+          (me->mpoly[mlooptri[e_f_pair->f1].poly].flag & ME_SMOOTH) &&
+          (me->mpoly[mlooptri[e_f_pair->f2].poly].flag & ME_SMOOTH)) {
+        do_crease = false;
+      }
+      if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < e_feat_data->crease_threshold)) {
+        edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+      }
+    }
   }
 
   int mat1 = me->mpoly[mlooptri[e_f_pair->f1].poly].mat_nr;
@@ -1651,6 +1651,10 @@ static uint16_t lineart_identify_medge_feature_edges(LineartRenderBuffer *rb,
   FreestyleEdge *fel, *fer;
   bool face_mark_filtered = false;
   uint16_t edge_flag_result = 0;
+
+  if (rb->use_crease && rb->sharp_as_crease && medge->flag & ME_SHARP) {
+    edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+  }
 
   // if (use_freestyle_face && rb->filter_face_mark) {
   //   fel = CustomData_bmesh_get(&bm_if_freestyle->pdata, ll->f->head.data, CD_FREESTYLE_FACE);
