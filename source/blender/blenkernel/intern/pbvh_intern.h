@@ -67,7 +67,7 @@ struct PBVHNode {
    * are loops unique to this node, see comment for
    * vert_indices for more details.*/
   int *loop_indices;
-  unsigned int indices_num;
+  unsigned int loop_indices_num;
 
   /* An array mapping face corners into the vert_indices
    * array. The array is sized to match 'totprim', and each of

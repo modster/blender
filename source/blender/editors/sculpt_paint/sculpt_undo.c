@@ -342,7 +342,7 @@ static bool sculpt_undo_restore_color(bContext *C, SculptUndoNode *unode)
 
   bool modified = false;
 
-  /* Note: even with loop colors we still store derived
+  /* NOTE: even with loop colors we still store derived
    * vertex colors for original data lookup.*/
   if (unode->col && !unode->loop_col) {
     BKE_pbvh_swap_colors(ss->pbvh, unode->index, unode->totvert, unode->col);
@@ -1113,11 +1113,11 @@ static SculptUndoNode *sculpt_undo_alloc_node(Object *ob, PBVHNode *node, Sculpt
 
       /* Allocate loop colors separately too. */
       if (ss->vcol_domain == ATTR_DOMAIN_CORNER) {
-        size_t alloc_size2 = sizeof(float) * 4 * (size_t)unode->totloop;
+        size_t alloc_size_loop = sizeof(float) * 4 * (size_t)unode->totloop;
 
         unode->loop_col = MEM_calloc_arrayN(
             unode->totloop, sizeof(float) * 4, "SculptUndoNode.loop_col");
-        usculpt->undo_size += alloc_size2;
+        usculpt->undo_size += alloc_size_loop;
       }
       break;
     }
@@ -1220,7 +1220,7 @@ static void sculpt_undo_store_color(Object *ob, SculptUndoNode *unode)
   int allvert;
   BKE_pbvh_node_num_verts(ss->pbvh, unode->node, NULL, &allvert);
 
-  /* Note: even with loop colors we still store (derived)
+  /* NOTE: even with loop colors we still store (derived)
    * vertex colors for original data lookup. */
   BKE_pbvh_store_colors_vertex(ss->pbvh, unode->index, allvert, unode->col);
 

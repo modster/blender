@@ -158,7 +158,7 @@ static void do_paint_brush_task_cb_ex(void *__restrict userdata,
     float noise = 1.0f;
     const float density = ss->cache->paint_brush.density;
     if (density < 1.0f) {
-      const float hash_noise = BLI_hash_int_01(ss->cache->density_seed * 1000 * vd.index);
+      const float hash_noise = (float) BLI_hash_int_01(ss->cache->density_seed * 1000 * vd.index);
       if (hash_noise > density) {
         noise = density * hash_noise;
         fade = fade * noise;
@@ -251,7 +251,7 @@ void SCULPT_do_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode
 
   if (SCULPT_stroke_is_first_brush_step_of_symmetry_pass(ss->cache)) {
     if (SCULPT_stroke_is_first_brush_step(ss->cache)) {
-      ss->cache->density_seed = BLI_hash_int_01(ss->cache->location[0] * 1000);
+      ss->cache->density_seed = (float) BLI_hash_int_01(ss->cache->location[0] * 1000);
     }
     return;
   }
@@ -417,8 +417,16 @@ static void do_smear_brush_task_cb_exec(void *__restrict userdata,
     float accum[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     float totw = 0.0f;
 
-    SculptVertexNeighborIter ni2;
+    /*
+     * NOTE: we have to do a nested iteration here to avoid
+     * blocky artifacts on quad topologies.  The runtime cost
+     * is not as bad as it seems due to neighbor iteration
+     * in the sculpt code being cache bound; once the data is in
+     * the cache iterating over it a few more times is not terribly
+     * costly.
+     */
 
+    SculptVertexNeighborIter ni2;
     SCULPT_VERTEX_NEIGHBORS_ITER_BEGIN (ss, vd.index, ni2) {
       const float *nco = SCULPT_vertex_co_get(ss, ni2.index);
 
@@ -499,10 +507,7 @@ static void do_smear_store_prev_colors_task_cb_exec(void *__restrict userdata,
 
   PBVHVertexIter vd;
   BKE_pbvh_vertex_iter_begin (ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE) {
-    float tmp[4] = {0};
-
-    SCULPT_vertex_color_get(ss, vd.index, tmp);
-    copy_v4_v4(ss->cache->prev_colors[vd.index], tmp);
+    SCULPT_vertex_color_get(ss, vd.index, ss->cache->prev_colors[vd.index]);
   }
   BKE_pbvh_vertex_iter_end;
 }
@@ -522,10 +527,7 @@ void SCULPT_do_smear_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode
     if (!ss->cache->prev_colors) {
       ss->cache->prev_colors = MEM_callocN(sizeof(float[4]) * totvert, "prev colors");
       for (int i = 0; i < totvert; i++) {
-        float tmp[4] = {0};
-
-        SCULPT_vertex_color_get(ss, i, tmp);
-        copy_v4_v4(ss->cache->prev_colors[i], tmp);
+        SCULPT_vertex_color_get(ss, i, ss->cache->prev_colors[i]);
       }
     }
   }

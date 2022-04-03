@@ -157,7 +157,7 @@ bool SCULPT_has_colors(const SculptSession *ss)
   return ss->vcol || ss->mcol;
 }
 
-void SCULPT_vertex_color_get(SculptSession *ss, int index, float r_color[4])
+void SCULPT_vertex_color_get(const SculptSession *ss, int index, float r_color[4])
 {
   BKE_pbvh_vertex_color_get(ss->pbvh, index, r_color);
 }

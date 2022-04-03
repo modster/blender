@@ -868,9 +868,13 @@ const float *SCULPT_vertex_co_get(struct SculptSession *ss, int index);
 void SCULPT_vertex_normal_get(SculptSession *ss, int index, float no[3]);
 
 float SCULPT_vertex_mask_get(struct SculptSession *ss, int index);
-void SCULPT_vertex_color_get(SculptSession *ss, int index, float r_color[4]);
+void SCULPT_vertex_color_get(const SculptSession *ss, int index, float r_color[4]);
 void SCULPT_vertex_color_set(SculptSession *ss, int index, const float color[4]);
+
+/** Returns true if a color attribute exists in the current sculpt session. */
 bool SCULPT_has_colors(const SculptSession *ss);
+
+/** Returns true if the active color attribute is on loop (ATTR_DOMAIN_CORNER) domain. */
 bool SCULPT_has_loop_colors(const struct Object *ob);
 
 const float *SCULPT_vertex_persistent_co_get(SculptSession *ss, int index);
