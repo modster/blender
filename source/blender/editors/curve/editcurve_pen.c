@@ -39,9 +39,10 @@
     if (nu->type == CU_BEZIER) { \
       for (int i = 0; i < nu->pntsu; i++) { \
         BezTriple *bezt = nu->bezt + i; \
-        if (BEZT_ISSEL_ANY(bezt) && !bezt->hide)
+        if (BEZT_ISSEL_ANY(bezt) && !bezt->hide) {
 
 #define FOREACH_SELECTED_BEZT_END \
+  } \
   } \
   } \
   BKE_nurb_handles_calc(nu); \
@@ -1106,8 +1107,7 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
     }
   }
 
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, &cu->editnurb->nurbs)
-  {
+  FOREACH_SELECTED_BEZT_BEGIN (bezt, &cu->editnurb->nurbs) {
     if (bezt) {
       bezt->h1 = extrude_handle;
       bezt->h2 = extrude_handle;
@@ -1255,8 +1255,7 @@ static void toggle_bezt_free_align_handles(BezTriple *bezt)
  */
 static void toggle_sel_bezt_free_align_handles(ListBase *nurbs)
 {
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
-  {
+  FOREACH_SELECTED_BEZT_BEGIN (bezt, nurbs) {
     toggle_bezt_free_align_handles(bezt);
   }
   FOREACH_SELECTED_BEZT_END;
@@ -1314,8 +1313,7 @@ static bool delete_point_under_mouse(ViewContext *vc, const wmEvent *event)
 
 static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase *nurbs)
 {
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
-  {
+  FOREACH_SELECTED_BEZT_BEGIN (bezt, nurbs) {
     BezTriple *adj_bezt;
     int bezt_idx;
     if (nu->pntsu == 1) {
@@ -1399,8 +1397,7 @@ static bool make_cyclic_if_endpoints(ViewContext *vc,
 
 static void init_selected_bezt_handles(ListBase *nurbs)
 {
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
-  {
+  FOREACH_SELECTED_BEZT_BEGIN (bezt, nurbs) {
     bezt->h1 = bezt->h2 = HD_ALIGN;
     copy_v3_v3(bezt->vec[0], bezt->vec[1]);
     copy_v3_v3(bezt->vec[2], bezt->vec[1]);
