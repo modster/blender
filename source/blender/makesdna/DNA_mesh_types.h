@@ -243,7 +243,6 @@ typedef struct Mesh {
    *
    * \note This is mainly stored for use in edit-mode.
    */
-
   int act_face;
 
   /**

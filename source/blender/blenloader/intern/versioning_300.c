@@ -45,6 +45,7 @@
 #include "BKE_attribute.h"
 #include "BKE_collection.h"
 #include "BKE_curve.h"
+#include "BKE_data_transfer.h"
 #include "BKE_deform.h"
 #include "BKE_fcurve.h"
 #include "BKE_fcurve_driver.h"
@@ -2489,13 +2490,11 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  
-  /* Rebuild active/render color attribute references. */
   if (!MAIN_VERSION_ATLEAST(bmain, 302, 8)) {
+    /* While vertex-colors were experimental the smear tool became corrupt due
+     * to bugs in the wm_toolsystem API (auto-creation of sculpt brushes
+     * was broken).  Go through and reset all smear brushes. */
     LISTBASE_FOREACH (Brush *, br, &bmain->brushes) {
-      /* While vertex-colors were experimental the smear tool became corrupt due
-       * to bugs in the wm_toolsystem API (auto-creation of sculpt brushes
-       * was broken) so its values must be reset. */
       if (br->sculpt_tool == SCULPT_TOOL_SMEAR) {
         br->alpha = 1.0f;
         br->spacing = 5;
@@ -2505,6 +2504,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
 
+    /* Rebuild active/render color attribute references. */
     LISTBASE_FOREACH (Mesh *, me, &bmain->meshes) {
       for (int step = 0; step < 2; step++) {
         CustomDataLayer *actlayer = NULL;
@@ -2533,6 +2533,25 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
           }
           else {
             BKE_id_attributes_active_color_set(&me->id, actlayer);
+          }
+        }
+      }
+    }
+
+    /* Update data transfer modifiers */
+    LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+      LISTBASE_FOREACH (ModifierData *, md, &ob->modifiers) {
+        if (md->type == eModifierType_DataTransfer) {
+          DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
+
+          for (int i = 0; i < DT_MULTILAYER_INDEX_MAX; i++) {
+            if (dtmd->layers_select_src[i] == 0) {
+              dtmd->layers_select_src[i] = DT_LAYERS_ALL_SRC;
+            }
+
+            if (dtmd->layers_select_dst[i] == 0) {
+              dtmd->layers_select_dst[i] = DT_LAYERS_NAME_DST;
+            }
           }
         }
       }

@@ -473,22 +473,6 @@ static void panelRegister(ARegionType *region_type)
 
 #undef DT_TYPES_AFFECT_MESH
 
-static void blendRead(struct BlendDataReader *UNUSED(reader), struct ModifierData *md)
-{
-  DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
-
-  /* Check for uninitialized data from old files. */
-  for (int i = 0; i < DT_MULTILAYER_INDEX_MAX; i++) {
-    if (dtmd->layers_select_src[i] == 0) {
-      dtmd->layers_select_src[i] = DT_LAYERS_ALL_SRC;
-    }
-
-    if (dtmd->layers_select_dst[i] == 0) {
-      dtmd->layers_select_dst[i] = DT_LAYERS_NAME_DST;
-    }
-  }
-}
-
 ModifierTypeInfo modifierType_DataTransfer = {
     /* name */ "DataTransfer",
     /* structName */ "DataTransferModifierData",
@@ -520,5 +504,5 @@ ModifierTypeInfo modifierType_DataTransfer = {
     /* freeRuntimeData */ NULL,
     /* panelRegister */ panelRegister,
     /* blendWrite */ NULL,
-    /* blendRead */ blendRead,
+    /* blendRead */ NULL,
 };
