@@ -67,9 +67,12 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
     info.define("USE_SHADER_TO_RGBA");
   }
   if (GPU_material_flag_get(gpumat, GPU_MATFLAG_BARYCENTRIC) && !is_volume && !is_hair &&
-      !is_point_cloud) {
+      !is_point_cloud && !is_background) {
     info.define("USE_BARYCENTRICS");
     info.builtins(BuiltinBits::BARYCENTRIC_COORD);
+  }
+  if (GPU_material_flag_get(gpumat, GPU_MATFLAG_BARYCENTRIC) && is_hair) {
+    info.define("USE_BARYCENTRICS");
   }
 
   std::stringstream attr_load;

@@ -53,32 +53,32 @@ vec3 attr_load_orco(samplerBuffer cd_buf)
 vec4 attr_load_tangent(samplerBuffer cd_buf)
 {
   /* Not supported. */
-  return vec4(0.0, 0.0, 0.0, 1.0);
+  return hairTran;
 }
 
 vec3 attr_load_uv(samplerBuffer cd_buf)
 {
-  return texelFetch(cd_buf, interp.hair_strand_id).rgb;
+  return texelFetch(cd_buf, hairStrandID).rgb;
 }
 
 vec4 attr_load_color(samplerBuffer cd_buf)
 {
-  return texelFetch(cd_buf, interp.hair_strand_id).rgba;
+  return texelFetch(cd_buf, hairStrandID).rgba;
 }
 
 vec4 attr_load_vec4(samplerBuffer cd_buf)
 {
-  return texelFetch(cd_buf, interp.hair_strand_id).rgba;
+  return texelFetch(cd_buf, hairStrandID).rgba;
 }
 
 vec3 attr_load_vec3(samplerBuffer cd_buf)
 {
-  return texelFetch(cd_buf, interp.hair_strand_id).rgb;
+  return texelFetch(cd_buf, hairStrandID).rgb;
 }
 
 vec2 attr_load_vec2(samplerBuffer cd_buf)
 {
-  return texelFetch(cd_buf, interp.hair_strand_id).rg;
+  return texelFetch(cd_buf, hairStrandID).rg;
 }
 
 #else

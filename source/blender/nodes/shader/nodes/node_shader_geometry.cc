@@ -24,7 +24,7 @@ static int node_shader_gpu_geometry(GPUMaterial *mat,
                                     GPUNodeStack *in,
                                     GPUNodeStack *out)
 {
-  /* HACK: Don't request GPU_BARYCENTRIC_TEXCO if not used because it will
+  /* HACK: Don't request GPU_MATFLAG_BARYCENTRIC if not used because it will
    * trigger the use of geometry shader (and the performance penalty it implies). */
   if (out[5].hasoutput) {
     GPU_material_flag_set(mat, GPU_MATFLAG_BARYCENTRIC);

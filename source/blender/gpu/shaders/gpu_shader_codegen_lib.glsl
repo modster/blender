@@ -177,6 +177,8 @@ struct GlobalData {
   vec3 N;
   /** Geometric Normal. */
   vec3 Ng;
+  /** Surface default Tangent. */
+  vec3 T;
   /** Barycentric coordinates. */
   vec2 barycentric_coords;
   vec3 barycentric_dists;
