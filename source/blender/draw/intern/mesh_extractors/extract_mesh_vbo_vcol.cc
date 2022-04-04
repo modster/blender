@@ -145,10 +145,8 @@ static void extract_vcol_init(const MeshRenderData *mr,
 
   Mesh me_query = {0};
 
-  /* Copy name so ID type switch statement in BKE_id_attribute_copy_domains_temp works. */
-  BLI_strncpy(me_query.id.name, mr->me->id.name, sizeof(mr->me->id.name));
-
-  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, nullptr, cd_ldata, nullptr, nullptr);
+  BKE_id_attribute_copy_domains_temp(
+      ID_ME, cd_vdata, nullptr, cd_ldata, nullptr, nullptr, &me_query.id);
 
   CustomDataLayer *active_color = BKE_id_attributes_active_color_get(&me_query.id);
   CustomDataLayer *render_color = BKE_id_attributes_render_color_get(&me_query.id);
@@ -259,7 +257,8 @@ static void extract_vcol_init_subdiv(const DRWSubdivCache *subdiv_cache,
                                                &coarse_mesh->ldata;
 
   Mesh me_query = *coarse_mesh;
-  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, nullptr, cd_ldata, nullptr, nullptr);
+  BKE_id_attribute_copy_domains_temp(
+      ID_ME, cd_vdata, nullptr, cd_ldata, nullptr, nullptr, &me_query.id);
 
   CustomDataLayer *active_color = BKE_id_attributes_active_color_get(&me_query.id);
   CustomDataLayer *render_color = BKE_id_attributes_render_color_get(&me_query.id);

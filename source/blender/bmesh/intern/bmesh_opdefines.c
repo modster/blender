@@ -1493,7 +1493,7 @@ static BMOpDefine bmo_rotate_colors_def = {
   /* slots_in */
   {{"faces", BMO_OP_SLOT_ELEMENT_BUF, {BM_FACE}},    /* input faces */
    {"use_ccw", BMO_OP_SLOT_BOOL},         /* rotate counter-clockwise if true, otherwise clockwise */
-   {"object", BMO_OP_SLOT_PTR, {(int)BMO_OP_SLOT_SUBTYPE_PTR_MESH}},
+   {"color_index", BMO_OP_SLOT_INT}, /* index into color attribute list */
    {{'\0'}},
   },
   {{{'\0'}}},  /* no output */
@@ -1510,7 +1510,7 @@ static BMOpDefine bmo_reverse_colors_def = {
   "reverse_colors",
   /* slots_in */
   {{"faces", BMO_OP_SLOT_ELEMENT_BUF, {BM_FACE}},    /* input faces */
-   {"object", BMO_OP_SLOT_PTR, {(int)BMO_OP_SLOT_SUBTYPE_PTR_MESH}},
+   {"color_index", BMO_OP_SLOT_INT}, /* index into color attribute list */
    {{'\0'}},
   },
   {{{'\0'}}},  /* no output */

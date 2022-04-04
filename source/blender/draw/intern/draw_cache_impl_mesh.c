@@ -461,13 +461,10 @@ static void mesh_cd_calc_active_mloopcol_layer(const Object *object,
   const Mesh *me_final = editmesh_final_or_this(object, me);
   Mesh me_query = {0};
 
-  /* Copy name so ID type switch statement in BKE_id_attribute_copy_domains_temp works. */
-  BLI_strncpy(me_query.id.name, me_final->id.name, sizeof(me_final->id.name));
-
   const CustomData *cd_vdata = mesh_cd_vdata_get_from_mesh(me_final);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
 
-  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, NULL, cd_ldata, NULL, NULL);
+  BKE_id_attribute_copy_domains_temp(ID_ME, cd_vdata, NULL, cd_ldata, NULL, NULL, &me_query.id);
 
   CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me_query.id);
   int layer_i = BKE_id_attribute_to_index(
@@ -566,13 +563,11 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
   const CustomData *cd_edata = mesh_cd_edata_get_from_mesh(me_final);
 
   /* Create a mesh with final customdata domains
-   * we can query. */
+   * we can query with attribute API. */
   Mesh me_query = {0};
 
-  /* Copy name so ID type switch statement in BKE_id_attribute_copy_domains_temp works. */
-  BLI_strncpy(me_query.id.name, me_final->id.name, sizeof(me_final->id.name));
-
-  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, cd_edata, cd_ldata, cd_pdata, NULL);
+  BKE_id_attribute_copy_domains_temp(
+      ID_ME, cd_vdata, cd_edata, cd_ldata, cd_pdata, NULL, &me_query.id);
 
   /* See: DM_vertex_attributes_from_gpu for similar logic */
   DRW_MeshCDMask cd_used;
@@ -1218,11 +1213,7 @@ static void sculpt_request_active_vcol(MeshBatchCache *cache, Object *object, Me
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
 
   Mesh me_query = {0};
-
-  /* Copy name so ID type switch statement in BKE_id_attribute_copy_domains_temp works. */
-  BLI_strncpy(me_query.id.name, me_final->id.name, sizeof(me_final->id.name));
-
-  BKE_id_attribute_copy_domains_temp(&me_query.id, cd_vdata, NULL, cd_ldata, NULL, NULL);
+  BKE_id_attribute_copy_domains_temp(ID_ME, cd_vdata, NULL, cd_ldata, NULL, NULL, &me_query.id);
 
   CustomDataLayer *active = BKE_id_attributes_active_color_get(&me_query.id);
   CustomDataLayer *render = BKE_id_attributes_render_color_get(&me_query.id);

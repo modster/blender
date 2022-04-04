@@ -3097,13 +3097,15 @@ static int edbm_rotate_colors_exec(bContext *C, wmOperator *op)
       continue;
     }
 
+    int color_index = BKE_id_attribute_to_index(
+        &me->id, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
     EDBM_op_init(em,
                  &bmop,
                  op,
-                 "rotate_colors faces=%hf use_ccw=%b object=%p",
+                 "rotate_colors faces=%hf use_ccw=%b color_index=%i",
                  BM_ELEM_SELECT,
                  use_ccw,
-                 ob);
+                 color_index);
 
     BMO_op_exec(em->bm, &bmop);
 
@@ -3149,7 +3151,8 @@ static int edbm_reverse_colors_exec(bContext *C, wmOperator *op)
 
     BMOperator bmop;
 
-    EDBM_op_init(em, &bmop, op, "reverse_colors faces=%hf object=%p", BM_ELEM_SELECT, obedit);
+    int color_index = BKE_id_attribute_to_index(&me->id, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
+    EDBM_op_init(em, &bmop, op, "reverse_colors faces=%hf color_index=%i", BM_ELEM_SELECT, color_index);
 
     BMO_op_exec(em->bm, &bmop);
 

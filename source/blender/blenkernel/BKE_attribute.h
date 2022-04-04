@@ -103,16 +103,17 @@ void BKE_id_attribute_subset_active_set(struct ID *id,
                                         CustomDataMask mask);
 
 /**
- * Copies CustomData instances into a (usually stack-allocated) ID.  This is a shallow copy, the
- * purpose is to create a bridge for using the C attribute API on arbitrary sets of CustomData
- * domains.
+ * Sets up a temporary ID with arbitrary CustomData domains.  ID will
+ * be zero'd, any non-nullptr CustomData parameter will then be
+ * copied into the appropriate field.
  */
-void BKE_id_attribute_copy_domains_temp(struct ID *temp_id,
+void BKE_id_attribute_copy_domains_temp(short id_type,
                                         const struct CustomData *vdata,
                                         const struct CustomData *edata,
                                         const struct CustomData *ldata,
                                         const struct CustomData *pdata,
-                                        const struct CustomData *cdata);
+                                        const struct CustomData *cdata,
+                                        struct ID *r_id);
 
 struct CustomDataLayer *BKE_id_attributes_active_color_get(const struct ID *id);
 void BKE_id_attributes_active_color_set(struct ID *id, struct CustomDataLayer *active_layer);
