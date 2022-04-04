@@ -148,7 +148,9 @@ typedef struct Brush {
   struct BrushClone clone;
   /** Falloff curve. */
   struct CurveMapping *curve;
+  /* Texture for coloring. */
   struct MTex mtex;
+  /* Texture for masking. */
   struct MTex mask_mtex;
 
   struct Brush *toggle_brush;

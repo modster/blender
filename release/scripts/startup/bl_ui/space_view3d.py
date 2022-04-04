@@ -60,9 +60,9 @@ class VIEW3D_HT_tool_header(Header):
 
         def draw_3d_brush_settings(layout, tool_mode):
             layout.popover("VIEW3D_PT_tools_brush_settings_advanced", text="Brush")
-            if tool_mode != 'PAINT_WEIGHT':
+            if tool_mode in ('PAINT_TEXTURE'):
                 layout.popover("VIEW3D_PT_tools_brush_texture")
-            if tool_mode == 'PAINT_TEXTURE':
+            if tool_mode in ('PAINT_TEXTURE', 'SCULPT', 'PAINT_VERTEX'):
                 layout.popover("VIEW3D_PT_tools_mask_texture")
             layout.popover("VIEW3D_PT_tools_brush_stroke")
             layout.popover("VIEW3D_PT_tools_brush_falloff")

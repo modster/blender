@@ -34,6 +34,7 @@
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 #include "DNA_text_types.h"
+#include "DNA_texture_defaults.h"
 #include "DNA_workspace_types.h"
 
 #include "BKE_action.h"
@@ -2545,6 +2546,19 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         previous_channels = &ms->parseq->channels;
         /* If `MetaStack` exists, active channels must point to last link. */
         ed->displayed_channels = &ms->parseq->channels;
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 302, 10)) {
+    /* Sculpting brushes used mtex for masking, image brushes used mtex for coloring and mask_mtex
+     * for masking. Converting sculpting brushes to use mask_tex for masking to make tools more
+     * compatible with each other. */
+    MTex default_texture = _DNA_DEFAULT_MTex;
+    LISTBASE_FOREACH (Brush *, brush, &bmain->brushes) {
+      if (brush->sculpt_tool != 0) {
+        memcpy(&brush->mask_mtex, &brush->mtex, sizeof(MTex));
+        memcpy(&brush->mtex, &default_texture, sizeof(MTex));
       }
     }
   }

@@ -613,7 +613,7 @@ class VIEW3D_PT_tools_brush_texture(Panel, View3DPaintPanel):
                 (brush := settings.brush)
         ):
             if context.sculpt_object or context.vertex_paint_object:
-                return True
+                return False
             elif context.image_paint_object:
                 return (brush.image_tool == 'DRAW')
         return False
@@ -642,12 +642,14 @@ class VIEW3D_PT_tools_mask_texture(Panel, View3DPaintPanel, TextureMaskPanel):
     @classmethod
     def poll(cls, context):
         settings = cls.paint_settings(context)
-        return (settings and settings.brush and context.image_paint_object)
+        return settings and settings.brush and (
+            context.image_paint_object or context.sculpt_object or context.vertex_paint_object)
 
     def draw(self, context):
         layout = self.layout
 
-        brush = context.tool_settings.image_paint.brush
+        settings = self.paint_settings(context)
+        brush = settings.brush
 
         col = layout.column()
         mask_tex_slot = brush.mask_texture_slot

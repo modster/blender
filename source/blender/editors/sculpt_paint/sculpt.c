@@ -1231,7 +1231,7 @@ static int sculpt_brush_needs_normal(const SculptSession *ss, const Brush *brush
                SCULPT_TOOL_ELASTIC_DEFORM,
                SCULPT_TOOL_THUMB) ||
 
-          (brush->mtex.brush_map_mode == MTEX_MAP_MODE_AREA)) ||
+          (brush->mask_mtex.brush_map_mode == MTEX_MAP_MODE_AREA)) ||
          sculpt_brush_use_topology_rake(ss, brush);
 }
 
@@ -2336,7 +2336,7 @@ float SCULPT_brush_strength_factor(SculptSession *ss,
 {
   StrokeCache *cache = ss->cache;
   const Scene *scene = cache->vc->scene;
-  const MTex *mtex = &br->mtex;
+  const MTex *mtex = &br->mask_mtex;
   float avg = 1.0f;
   float rgba[4];
   float point[3];
@@ -2383,7 +2383,7 @@ float SCULPT_brush_strength_factor(SculptSession *ss,
       x += br->mtex.ofs[0];
       y += br->mtex.ofs[1];
 
-      avg = paint_get_tex_pixel(&br->mtex, x, y, ss->tex_pool, thread_id);
+      avg = paint_get_tex_pixel(&br->mask_mtex, x, y, ss->tex_pool, thread_id);
 
       avg += br->texture_sample_bias;
     }
@@ -3260,7 +3260,7 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
     update_sculpt_normal(sd, ob, nodes, totnode);
   }
 
-  if (brush->mtex.brush_map_mode == MTEX_MAP_MODE_AREA) {
+  if (brush->mask_mtex.brush_map_mode == MTEX_MAP_MODE_AREA) {
     update_brush_local_mat(sd, ob);
   }
 
@@ -3780,7 +3780,7 @@ static void sculpt_fix_noise_tear(Sculpt *sd, Object *ob)
 {
   SculptSession *ss = ob->sculpt;
   Brush *brush = BKE_paint_brush(&sd->paint);
-  MTex *mtex = &brush->mtex;
+  MTex *mtex = &brush->mask_mtex;
 
   if (ss->multires.active && mtex->tex && mtex->tex->type == TEX_NOISE) {
     multires_stitch_grids(ob);
@@ -4929,7 +4929,7 @@ bool SCULPT_stroke_get_location(bContext *C, float out[3], const float mouse[2])
 static void sculpt_brush_init_tex(const Scene *scene, Sculpt *sd, SculptSession *ss)
 {
   Brush *brush = BKE_paint_brush(&sd->paint);
-  MTex *mtex = &brush->mtex;
+  MTex *mtex = &brush->mask_mtex;
 
   /* Init mtex nodes. */
   if (mtex->tex && mtex->tex->nodetree) {
@@ -5262,7 +5262,7 @@ static void sculpt_stroke_update_step(bContext *C,
 static void sculpt_brush_exit_tex(Sculpt *sd)
 {
   Brush *brush = BKE_paint_brush(&sd->paint);
-  MTex *mtex = &brush->mtex;
+  MTex *mtex = &brush->mask_mtex;
 
   if (mtex->tex && mtex->tex->nodetree) {
     ntreeTexEndExecTree(mtex->tex->nodetree->execdata);

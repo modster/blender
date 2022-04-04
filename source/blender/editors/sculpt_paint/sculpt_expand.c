@@ -173,7 +173,7 @@ static float sculpt_expand_falloff_value_vertex_get(SculptSession *ss,
     return expand_cache->vert_falloff[v];
   }
 
-  if (!expand_cache->brush->mtex.tex) {
+  if (!expand_cache->brush->mask_mtex.tex) {
     return expand_cache->vert_falloff[v];
   }
 
@@ -197,7 +197,7 @@ static float sculpt_expand_max_vertex_falloff_get(ExpandCache *expand_cache)
     return expand_cache->max_vert_falloff;
   }
 
-  if (!expand_cache->brush->mtex.tex) {
+  if (!expand_cache->brush->mask_mtex.tex) {
     return expand_cache->max_vert_falloff;
   }
 
@@ -1833,13 +1833,13 @@ static int sculpt_expand_modal(bContext *C, wmOperator *op, const wmEvent *event
       }
       case SCULPT_EXPAND_MODAL_TEXTURE_DISTORTION_INCREASE: {
         if (expand_cache->texture_distortion_strength == 0.0f) {
-          if (expand_cache->brush->mtex.tex == NULL) {
+          if (expand_cache->brush->mask_mtex.tex == NULL) {
             BKE_report(op->reports,
                        RPT_WARNING,
                        "Active brush does not contain any texture to distort the expand boundary");
             break;
           }
-          if (expand_cache->brush->mtex.brush_map_mode != MTEX_MAP_MODE_3D) {
+          if (expand_cache->brush->mask_mtex.brush_map_mode != MTEX_MAP_MODE_3D) {
             BKE_report(op->reports,
                        RPT_WARNING,
                        "Texture mapping not set to 3D, results may be unpredictable");
@@ -2003,7 +2003,7 @@ static void sculpt_expand_cache_initial_config_set(bContext *C,
   IMB_colormanagement_srgb_to_scene_linear_v3(expand_cache->fill_color);
 
   expand_cache->scene = CTX_data_scene(C);
-  expand_cache->mtex = &expand_cache->brush->mtex;
+  expand_cache->mtex = &expand_cache->brush->mask_mtex;
   expand_cache->texture_distortion_strength = 0.0f;
   expand_cache->blend_mode = expand_cache->brush->blend;
 }
