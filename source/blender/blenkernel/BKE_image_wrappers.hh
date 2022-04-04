@@ -5,7 +5,6 @@
  * \ingroup imbuf
  */
 
-/* TODO: should be reused by image engine. */
 #pragma once
 
 #include "DNA_image_types.h"
