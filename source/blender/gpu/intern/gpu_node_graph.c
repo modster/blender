@@ -128,6 +128,11 @@ static void gpu_node_input_link(GPUNode *node, GPUNodeLink *link, const eGPUType
     case GPU_NODE_LINK_UNIFORM:
       input->source = GPU_SOURCE_UNIFORM;
       break;
+    case GPU_NODE_LINK_DIFFERENTIATE_FLOAT_FN:
+      input->source = GPU_SOURCE_FUNCTION_CALL;
+      /* NOTE(@fclem): End of function call is the return variable set during codegen. */
+      SNPRINTF(input->function_call, "dF_branch(%s(), ", link->function_name);
+      break;
     default:
       break;
   }
@@ -519,6 +524,14 @@ GPUNodeLink *GPU_uniform(const float *num)
   return link;
 }
 
+GPUNodeLink *GPU_differentiate_float_function(const char *function_name)
+{
+  GPUNodeLink *link = gpu_node_link_create();
+  link->link_type = GPU_NODE_LINK_DIFFERENTIATE_FLOAT_FN;
+  link->function_name = function_name;
+  return link;
+}
+
 GPUNodeLink *GPU_image(GPUMaterial *mat,
                        Image *ima,
                        ImageUser *iuser,
@@ -795,6 +808,7 @@ void gpu_node_graph_free_nodes(GPUNodeGraph *graph)
 void gpu_node_graph_free(GPUNodeGraph *graph)
 {
   BLI_freelistN(&graph->outlink_aovs);
+  BLI_freelistN(&graph->material_functions);
   gpu_node_graph_free_nodes(graph);
 
   LISTBASE_FOREACH (GPUMaterialVolumeGrid *, grid, &graph->volume_grids) {
@@ -847,6 +861,9 @@ void gpu_node_graph_prune_unused(GPUNodeGraph *graph)
 
   LISTBASE_FOREACH (GPUNodeGraphOutputLink *, aovlink, &graph->outlink_aovs) {
     gpu_nodes_tag(aovlink->outlink, GPU_NODE_TAG_AOV);
+  }
+  LISTBASE_FOREACH (GPUNodeGraphFunctionLink *, funclink, &graph->material_functions) {
+    gpu_nodes_tag(funclink->outlink, GPU_NODE_TAG_FUNCTION);
   }
 
   for (GPUNode *node = graph->nodes.first, *next = NULL; node; node = next) {

@@ -120,6 +120,7 @@ typedef struct GPUCodegenOutput {
   char *surface;
   char *volume;
   char *thickness;
+  char *material_functions;
 
   GPUShaderCreateInfo *create_info;
 } GPUCodegenOutput;
@@ -143,6 +144,12 @@ GPUNodeLink *GPU_color_band(GPUMaterial *mat, int size, float *pixels, float *ro
 GPUNodeLink *GPU_volume_grid(GPUMaterial *mat,
                              const char *name,
                              eGPUVolumeDefaultValue default_value);
+/**
+ * Create an implementation defined differential calculation of a float function.
+ * The given function should return a float.
+ * The result will be a vec2 containing dFdx and dFdy result of that function.
+ */
+GPUNodeLink *GPU_differentiate_float_function(const char *function_name);
 
 bool GPU_link(GPUMaterial *mat, const char *name, ...);
 bool GPU_stack_link(GPUMaterial *mat,
@@ -162,6 +169,18 @@ void GPU_material_output_displacement(GPUMaterial *material, GPUNodeLink *link);
 void GPU_material_output_thickness(GPUMaterial *material, GPUNodeLink *link);
 
 void GPU_material_add_output_link_aov(GPUMaterial *material, GPUNodeLink *link, int hash);
+
+/**
+ * Wrap a part of the material graph into a function. You need then need to call the function by
+ * using something like #GPU_differentiate_float_function.
+ * \note This replace the link by a constant to break the link with the main graph.
+ * \param return_type: sub function return type. Output is cast to this type.
+ * \param link: link to use as the sub function output.
+ * \return the name of the generated function.
+ */
+char *GPU_material_split_sub_function(GPUMaterial *material,
+                                      eGPUType return_type,
+                                      GPUNodeLink **link);
 
 bool GPU_material_sss_profile_create(GPUMaterial *material, float radii[3]);
 struct GPUUniformBuf *GPU_material_sss_profile_get(GPUMaterial *material,

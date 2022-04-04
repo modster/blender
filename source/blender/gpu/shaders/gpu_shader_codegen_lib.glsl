@@ -200,5 +200,57 @@ struct GlobalData {
 
 GlobalData g_data;
 
+#ifndef GPU_FRAGMENT_SHADER
+/* Stubs. */
+vec3 dF_impl(vec3 v)
+{
+  return vec3(0.0);
+}
+
+void dF_branch(float fn, out vec2 result)
+{
+  result = vec2(0.0);
+}
+
+#elif 0 /* TODO(@fclem): User Option? */
+/* Fast derivatives */
+vec3 dF_impl(vec3 v)
+{
+  return vec3(0.0);
+}
+
+void dF_branch(float fn, out vec2 result)
+{
+  result.x = DFDX_SIGN * dFdx(fn);
+  result.y = DFDY_SIGN * dFdy(fn);
+}
+
+#else
+/* Precise derivatives */
+int g_derivative_flag = 0;
+
+vec3 dF_impl(vec3 v)
+{
+  if (g_derivative_flag > 0) {
+    return DFDX_SIGN * dFdx(v);
+  }
+  else if (g_derivative_flag < 0) {
+    return DFDY_SIGN * dFdy(v);
+  }
+  return vec3(0.0);
+}
+
+#  define dF_branch(fn, result) \
+    if (true) { \
+      g_derivative_flag = 1; \
+      result.x = (fn); \
+      g_derivative_flag = -1; \
+      result.y = (fn); \
+      g_derivative_flag = 0; \
+      result -= vec2((fn)); \
+    }
+
+#endif
+
 /* TODO(fclem): Remove. */
 #define CODEGEN_LIB

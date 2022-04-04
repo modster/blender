@@ -1,29 +1,12 @@
-void dfdx_v3(vec3 v, out vec3 dy)
+
+void differentiate_texco(vec3 v, out vec3 df)
 {
-#ifdef GPU_FRAGMENT_SHADER
-  dy = v + DFDX_SIGN * dFdx(v);
-#else
-  dy = v;
-#endif
+  /* Implementation defined. */
+  df = v + dF_impl(v);
 }
 
-void dfdy_v3(vec3 v, out vec3 dy)
-{
-#ifdef GPU_FRAGMENT_SHADER
-  dy = v + DFDY_SIGN * dFdy(v);
-#else
-  dy = v;
-#endif
-}
-
-void node_bump(float strength,
-               float dist,
-               float height,
-               float height_dx,
-               float height_dy,
-               vec3 N,
-               float invert,
-               out vec3 result)
+void node_bump(
+    float strength, float dist, float height, vec3 N, vec2 dHd, float invert, out vec3 result)
 {
   N = normalize(N);
   dist *= FrontFacing ? invert : -invert;
@@ -39,9 +22,7 @@ void node_bump(float strength,
   /* Compute surface gradient and determinant. */
   float det = dot(dPdx, Rx);
 
-  float dHdx = height_dx - height;
-  float dHdy = height_dy - height;
-  vec3 surfgrad = dHdx * Rx + dHdy * Ry;
+  vec3 surfgrad = dHd.x * Rx + dHd.y * Ry;
 
   strength = max(strength, 0.0);
 

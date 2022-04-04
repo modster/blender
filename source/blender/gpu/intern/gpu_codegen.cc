@@ -154,6 +154,7 @@ static bool gpu_pass_is_valid(GPUPass *pass)
 static std::ostream &operator<<(std::ostream &stream, const GPUInput *input)
 {
   switch (input->source) {
+    case GPU_SOURCE_FUNCTION_CALL:
     case GPU_SOURCE_OUTPUT:
       return stream << "tmp" << input->id;
     case GPU_SOURCE_CONSTANT:
@@ -242,6 +243,7 @@ class GPUCodegen {
     MEM_SAFE_FREE(output.volume);
     MEM_SAFE_FREE(output.thickness);
     MEM_SAFE_FREE(output.displacement);
+    MEM_SAFE_FREE(output.material_functions);
     delete create_info;
     BLI_freelistN(&ubo_inputs_);
   };
@@ -438,6 +440,9 @@ void GPUCodegen::node_serialize(std::stringstream &eval_ss, const GPUNode *node)
   /* Declare constants. */
   LISTBASE_FOREACH (GPUInput *, input, &node->inputs) {
     switch (input->source) {
+      case GPU_SOURCE_FUNCTION_CALL:
+        eval_ss << input->type << " " << input << "; " << input->function_call << input << ");\n";
+        break;
       case GPU_SOURCE_STRUCT:
         eval_ss << input->type << " " << input << " = CLOSURE_DEFAULT;\n";
         break;
@@ -558,6 +563,17 @@ void GPUCodegen::generate_graphs()
   output.volume = graph_serialize(GPU_NODE_TAG_VOLUME, graph.outlink_volume);
   output.displacement = graph_serialize(GPU_NODE_TAG_DISPLACEMENT, graph.outlink_displacement);
   output.thickness = graph_serialize(GPU_NODE_TAG_THICKNESS, graph.outlink_thickness);
+
+  if (!BLI_listbase_is_empty(&graph.material_functions)) {
+    std::stringstream eval_ss;
+    eval_ss << "\n/* Generated Functions */\n\n";
+    LISTBASE_FOREACH (GPUNodeGraphFunctionLink *, func_link, &graph.material_functions) {
+      char *fn = graph_serialize(GPU_NODE_TAG_FUNCTION, func_link->outlink);
+      eval_ss << "float " << func_link->name << "() {\n" << fn << "}\n\n";
+      MEM_SAFE_FREE(fn);
+    }
+    output.material_functions = extract_c_str(eval_ss);
+  }
 
   LISTBASE_FOREACH (GPUMaterialAttribute *, attr, &graph.attributes) {
     BLI_hash_mm2a_add(&hm2a_, (uchar *)attr->name, strlen(attr->name));

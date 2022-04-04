@@ -59,7 +59,7 @@ static int node_shader_gpu_tex_coord(GPUMaterial *mat,
      * This is the case for interpolated, non linear functions.
      * The resulting vector can still be a bit wrong but not as much.
      * (see T70644) */
-    if (node->branch_tag != 0 && ELEM(i, 1, 6)) {
+    if (ELEM(i, 1, 6)) {
       GPU_link(mat,
                "vector_math_normalize",
                out[i].link,

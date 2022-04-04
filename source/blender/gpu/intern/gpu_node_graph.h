@@ -36,6 +36,7 @@ typedef enum eGPUDataSource {
   GPU_SOURCE_TEX_TILED_MAPPING,
   GPU_SOURCE_VOLUME_GRID,
   GPU_SOURCE_VOLUME_GRID_TRANSFORM,
+  GPU_SOURCE_FUNCTION_CALL,
 } eGPUDataSource;
 
 typedef enum {
@@ -51,6 +52,7 @@ typedef enum {
   GPU_NODE_LINK_VOLUME_GRID_TRANSFORM,
   GPU_NODE_LINK_OUTPUT,
   GPU_NODE_LINK_UNIFORM,
+  GPU_NODE_LINK_DIFFERENTIATE_FLOAT_FN,
 } GPUNodeLinkType;
 
 typedef enum {
@@ -60,6 +62,7 @@ typedef enum {
   GPU_NODE_TAG_DISPLACEMENT = (1 << 2),
   GPU_NODE_TAG_THICKNESS = (1 << 3),
   GPU_NODE_TAG_AOV = (1 << 4),
+  GPU_NODE_TAG_FUNCTION = (1 << 5),
 } eGPUNodeTag;
 
 struct GPUNode {
@@ -95,6 +98,8 @@ struct GPUNodeLink {
     struct GPUUniformAttr *uniform_attr;
     /* GPU_NODE_LINK_IMAGE_BLENDER */
     struct GPUMaterialTexture *texture;
+    /* GPU_NODE_LINK_DIFFERENTIATE_FLOAT_FN */
+    const char *function_name;
   };
 };
 
@@ -129,6 +134,8 @@ typedef struct GPUInput {
     struct GPUUniformAttr *uniform_attr;
     /* GPU_SOURCE_VOLUME_GRID | GPU_SOURCE_VOLUME_GRID_TRANSFORM */
     struct GPUMaterialVolumeGrid *volume_grid;
+    /* GPU_SOURCE_FUNCTION_CALL */
+    char function_call[64];
   };
 } GPUInput;
 
@@ -137,6 +144,12 @@ typedef struct GPUNodeGraphOutputLink {
   int hash;
   GPUNodeLink *outlink;
 } GPUNodeGraphOutputLink;
+
+typedef struct GPUNodeGraphFunctionLink {
+  struct GPUNodeGraphFunctionLink *next, *prev;
+  char name[16];
+  GPUNodeLink *outlink;
+} GPUNodeGraphFunctionLink;
 
 typedef struct GPUNodeGraph {
   /* Nodes */
@@ -149,6 +162,8 @@ typedef struct GPUNodeGraph {
   GPUNodeLink *outlink_thickness;
   /* List of GPUNodeGraphOutputLink */
   ListBase outlink_aovs;
+  /* List of GPUNodeGraphFunctionLink */
+  ListBase material_functions;
 
   /* Requested attributes and textures. */
   ListBase attributes;
