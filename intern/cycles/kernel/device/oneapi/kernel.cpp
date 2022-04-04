@@ -20,8 +20,6 @@
 #  include "kernel/device/gpu/kernel.h"
 // clang-format on
 
-#  define VLOG(x) std::cout
-
 static OneAPIErrorCallback s_error_cb = nullptr;
 static void *s_error_user_ptr = nullptr;
 
@@ -681,8 +679,8 @@ static int parse_driver_build_version(const sycl::device &device, int &os_type)
     os_type = 2;
   }
   else {
-    VLOG(1) << "Unable to parse incorrect/unknown Intel GPU driver version \"" << driver_version
-            << "\" - device \"" << device_name << "\" will be skipped";
+    std::cerr << "Unable to parse incorrect/unknown Intel GPU driver version \"" << driver_version
+              << "\" - device \"" << device_name << "\" will be skipped" << std::endl;
     os_type = 0;
     return 0;
   }
@@ -705,25 +703,25 @@ static int parse_driver_build_version(const sycl::device &device, int &os_type)
         driver_build_version = std::stoi(third_number_substr) * 10000 +
                                std::stoi(forth_number_substr);
       else
-        VLOG(1) << "Unable to parse incorrect Intel GPU driver version \"" << driver_version
-                << "\" - " << third_number_substr << "." << forth_number_substr
-                << " does not match template xxx.xxxx, so device \"" << device_name
-                << "\" be skipped";
+        std::cerr << "Unable to parse incorrect Intel GPU driver version \"" << driver_version
+                  << "\" - " << third_number_substr << "." << forth_number_substr
+                  << " does not match template xxx.xxxx, so device \"" << device_name
+                  << "\" be skipped" << std::endl;
     }
     // Linux
     else if (os_type == 2) {
       if (third_number_substr.length() == 5 || third_number_substr.length() == 6)
         driver_build_version = std::stoi(third_number_substr);
       else
-        VLOG(1) << "Unable to parse unknown Intel GPU driver version \"" << driver_version
-                << "\" - the version does not match template xx.xx.xxxxx, so device \""
-                << device_name << "\" will be skipped";
+        std::cerr << "Unable to parse unknown Intel GPU driver version \"" << driver_version
+                  << "\" - the version does not match template xx.xx.xxxxx, so device \""
+                  << device_name << "\" will be skipped" << std::endl;
     }
   }
   catch (std::invalid_argument &e) {
-    VLOG(1) << "Unable to parse unknown Intel GPU driver version \"" << driver_version
-            << "\" - throws number parse exception \"" << e.what() << "\" so device \""
-            << device_name << "\" will be skipped";
+    std::cerr << "Unable to parse unknown Intel GPU driver version \"" << driver_version
+              << "\" - throws number parse exception \"" << e.what() << "\" so device \""
+              << device_name << "\" will be skipped" << std::endl;
   }
 
   return driver_build_version;
