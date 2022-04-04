@@ -791,6 +791,9 @@ static void node_composit_set_butfunc(bNodeType *ntype)
       ntype->draw_buttons = node_composit_buts_image;
       ntype->draw_buttons_ex = node_composit_buts_image_ex;
       break;
+    case CMP_NODE_NORMAL:
+      ntype->draw_buttons = node_buts_normal;
+      break;
     case CMP_NODE_CURVE_RGB:
       ntype->draw_buttons = node_buts_curvecol;
       break;
@@ -1299,8 +1302,7 @@ static void std_node_socket_draw(
       uiItemL(row, text, 0);
 
       if (socket_needs_attribute_search(*node, *sock)) {
-        const bNodeTree *node_tree = (const bNodeTree *)node_ptr->owner_id;
-        node_geometry_add_attribute_search_button(*C, *node_tree, *node, *ptr, *row);
+        node_geometry_add_attribute_search_button(*C, *node, *ptr, *row);
       }
       else {
         uiItemR(row, ptr, "default_value", DEFAULT_FLAGS, "", 0);
