@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2022 Blender Foundation. All rights reserved. */
+
 #include "BKE_customdata.h"
 #include "BKE_mesh_mapping.h"
 #include "BKE_pbvh.h"
@@ -19,7 +22,6 @@
 
 namespace blender::bke::pbvh::pixels::extractor {
 
-/* Express co as term of movement along 2 edges of a triangle. */
 static float3 barycentric_weights(const float2 v1,
                                   const float2 v2,
                                   const float2 v3,
@@ -35,12 +37,29 @@ static bool is_inside_triangle(const float3 barycentric_weights)
   return barycentric_inside_triangle_v2(barycentric_weights);
 }
 
-static bool has_been_visited(std::vector<bool> &visited_polygons, const int poly_index)
-{
-  bool visited = visited_polygons[poly_index];
-  visited_polygons[poly_index] = true;
-  return visited;
-}
+/**
+ * Keep track of visited polygons.
+ *
+ * Uses a std::vector<bool> to reduce memory requirements.
+ * TODO(jbakker): Should be replaced by BLI bool vector when available.
+ */
+class VisitedPolygons : std::vector<bool> {
+ public:
+  VisitedPolygons(int64_t polygon_len) : std::vector<bool>(polygon_len)
+  {
+  }
+
+  /**
+   * Check of the given poly_index has already been visited.
+   * Marks the given polygon as visited and return the previous visited state.
+   */
+  bool tag_visited(const int poly_index)
+  {
+    bool visited = (*this)[poly_index];
+    this[poly_index] = true;
+    return visited;
+  }
+};
 
 /**
  * @brief Calculate the delta of two neighbour uv coordinates in the given image buffer.
@@ -103,7 +122,7 @@ static void init_triangles(PBVH *pbvh,
                            const MeshElemMap *pmap,
                            const MPoly *mpoly,
                            const MLoop *mloop,
-                           std::vector<bool> &visited_polygons)
+                           VisitedPolygons &visited_polygons)
 {
   PBVHVertexIter vd;
 
@@ -111,7 +130,7 @@ static void init_triangles(PBVH *pbvh,
     const MeshElemMap *vert_map = &pmap[vd.index];
     for (int j = 0; j < pmap[vd.index].count; j++) {
       const int poly_index = vert_map->indices[j];
-      if (has_been_visited(visited_polygons, poly_index)) {
+      if (visited_polygons.tag_visited(poly_index)) {
         continue;
       }
 
@@ -244,7 +263,7 @@ static int64_t count_nodes_to_update(PBVH *pbvh)
  */
 static bool find_nodes_to_update(PBVH *pbvh,
                                  Vector<PBVHNode *> &r_nodes_to_update,
-                                 std::vector<bool> &r_visited_polygons)
+                                 VisitedPolygons &r_visited_polygons)
 {
   int64_t nodes_to_update_len = count_nodes_to_update(pbvh);
   if (nodes_to_update_len == 0) {
@@ -256,6 +275,8 @@ static bool find_nodes_to_update(PBVH *pbvh,
   for (int n = 0; n < pbvh->totnode; n++) {
     PBVHNode *node = &pbvh->nodes[n];
     if (should_pixels_be_updated(node)) {
+      r_nodes_to_update.append(node);
+
       if (node->pixels.node_data == nullptr) {
         NodeData *node_data = MEM_new<NodeData>(__func__);
         node->pixels.node_data = node_data;
@@ -264,13 +285,12 @@ static bool find_nodes_to_update(PBVH *pbvh,
         NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
         node_data->clear_data();
       }
-      r_nodes_to_update.append(node);
     }
     else if (contains_triangles(node)) {
       /* Mark polygons that are owned by other leafs, so they don't be added twice. */
       Triangles &triangles = BKE_pbvh_pixels_triangles_get(*node);
       for (int &poly_index : triangles.poly_indices) {
-        r_visited_polygons[poly_index] = true;
+        r_visited_polygons.tag_visited(poly_index);
       }
     }
   }
@@ -288,7 +308,7 @@ static void update_pixels(PBVH *pbvh,
                           struct ImageUser *image_user)
 {
   Vector<PBVHNode *> nodes_to_update;
-  std::vector<bool> visited_polygons(tot_poly);
+  VisitedPolygons visited_polygons(tot_poly);
 
   if (!find_nodes_to_update(pbvh, nodes_to_update, visited_polygons)) {
     return;
