@@ -701,10 +701,19 @@ endif()
 
 if(WITH_CYCLES_DEVICE_ONEAPI)
   if(WIN32)
-    set(cycles_kernel_oneapi_lib cycles_kernel_oneapi.dll)
+    set(cycles_kernel_oneapi_lib ${CMAKE_CURRENT_BINARY_DIR}/cycles_kernel_oneapi.dll)
   else()
-    set(cycles_kernel_oneapi_lib cycles_kernel_oneapi.so)
+    set(cycles_kernel_oneapi_lib ${CMAKE_CURRENT_BINARY_DIR}/cycles_kernel_oneapi.so)
   endif()
+
+  set(cycles_oneapi_kernel_sources
+    ${SRC_KERNEL_DEVICE_ONEAPI}
+    ${SRC_KERNEL_HEADERS}
+    ${SRC_KERNEL_DEVICE_GPU_HEADERS}
+    ${SRC_KERNEL_DEVICE_ONEAPI_HEADERS}
+    ${SRC_UTIL_HEADERS}
+  )
+
   set(dpcpp_flags
       ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_KERNEL_DEVICE_ONEAPI}
       -fsycl
@@ -715,7 +724,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       -ffast-math
       -DNDEBUG
       -O2
-      -o ${CMAKE_CURRENT_BINARY_DIR}/${cycles_kernel_oneapi_lib}
+      -o ${cycles_kernel_oneapi_lib}
       -I${CMAKE_CURRENT_SOURCE_DIR}/..
       -I${LEVEL_ZERO_INCLUDE_DIR}
       ${LEVEL_ZERO_LIBRARY}
@@ -753,13 +762,13 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       OUTPUT ${cycles_kernel_oneapi_lib}
       COMMAND "${dpcpp_root}/../../env/vars.bat"
       COMMAND ${SYCL_DPCPP_COMPILER} ${dpcpp_flags}
-      DEPENDS ${kernel_sources})
+      DEPENDS ${cycles_oneapi_kernel_sources})
   else()
     list(APPEND dpcpp_flags -fPIC)
     add_custom_command(
       OUTPUT ${cycles_kernel_oneapi_lib}
       COMMAND bash -c \"source ${dpcpp_root}/../../env/vars.sh&&${SYCL_DPCPP_COMPILER} ${dpcpp_flags}\"
-      DEPENDS ${kernel_sources})
+      DEPENDS ${cycles_oneapi_kernel_sources})
   endif()
 
   delayed_install("${CMAKE_CURRENT_BINARY_DIR}" "${cycles_kernel_oneapi_lib}" ${CYCLES_INSTALL_PATH}/lib)
