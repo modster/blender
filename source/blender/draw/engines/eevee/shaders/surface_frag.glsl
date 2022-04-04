@@ -25,6 +25,37 @@ layout(location = 5) out vec3 sssAlbedo;
 
 #endif
 
+#ifdef EEVEE_DISPLACEMENT_BUMP
+
+#  ifndef GPU_METAL
+/* Prototype. */
+vec3 displacement_exec();
+#  endif
+
+/* Return new shading normal. */
+vec3 displacement_bump()
+{
+  vec2 dHd;
+  dF_branch(dot(displacement_exec(), g_data.N + dF_impl(g_data.N)), dHd);
+
+  vec3 dPdx = dFdx(g_data.P);
+  vec3 dPdy = dFdy(g_data.P);
+
+  /* Get surface tangents from normal. */
+  vec3 Rx = cross(dPdy, g_data.N);
+  vec3 Ry = cross(g_data.N, dPdx);
+
+  /* Compute surface gradient and determinant. */
+  float det = dot(dPdx, Rx);
+
+  vec3 surfgrad = dHd.x * Rx + dHd.y * Ry;
+
+  float facing = FrontFacing ? 1.0 : -1.0;
+  return normalize(abs(det) * g_data.N - facing * sign(det) * surfgrad);
+}
+
+#endif
+
 void main()
 {
 #if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
@@ -33,6 +64,10 @@ void main()
 #endif
 
   g_data = init_globals();
+
+#ifdef EEVEE_DISPLACEMENT_BUMP
+  g_data.N = displacement_bump();
+#endif
 
   Closure cl = nodetree_exec();
 

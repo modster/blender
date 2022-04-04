@@ -52,6 +52,7 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
   const bool is_background = (options & (VAR_WORLD_PROBE | VAR_WORLD_BACKGROUND)) != 0;
   const bool is_volume = (options & (VAR_MAT_VOLUME)) != 0;
   const bool is_hair = (options & (VAR_MAT_HAIR)) != 0;
+  const bool is_mesh = (options & (VAR_MAT_MESH)) != 0;
   const bool is_point_cloud = (options & (VAR_MAT_POINTCLOUD)) != 0;
 
   GPUCodegenOutput &codegen = *codegen_;
@@ -136,6 +137,15 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
       frag_gen << ((codegen.surface) ? codegen.surface : "return CLOSURE_DEFAULT;\n");
     }
     frag_gen << "}\n\n";
+
+    if (codegen.displacement && (is_hair || is_mesh)) {
+      info.define("EEVEE_DISPLACEMENT_BUMP");
+
+      frag_gen << "vec3 displacement_exec()\n";
+      frag_gen << "{\n";
+      frag_gen << codegen.displacement;
+      frag_gen << "}\n\n";
+    }
 
     info.fragment_source_generated = frag_gen.str();
     /* Everything is in generated source. */
