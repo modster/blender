@@ -17,9 +17,9 @@
 namespace blender::bke::pbvh::pixels {
 
 /* TODO(jbakker): move encoders to blenlib. */
-class EncodedBarycentricCoord;
+class EncodedBarycentricWeights;
 
-/* Stores a barycentric coordinate in a float2. */
+/** Barycentric weights. */
 class BarycentricWeights {
  private:
   float3 weights;
@@ -54,15 +54,24 @@ class BarycentricWeights {
     return weights;
   }
 
-  friend class EncodedBarycentricCoord;
+  friend class EncodedBarycentricWeights;
 };
 
-class EncodedBarycentricCoord {
+/**
+ * Barycentric weights encoded into 2 floats.
+ *
+ * The third coordinate can be extracted as all 3 coordinates should sum up to 1.
+ * 
+ * \code{.cc}
+ * co[2] = 1.0 - co[0] - co[1]
+ * \endcode
+ */
+class EncodedBarycentricWeights {
  private:
   float2 encoded;
 
  public:
-  EncodedBarycentricCoord &operator=(const BarycentricWeights decoded)
+  EncodedBarycentricWeights &operator=(const BarycentricWeights decoded)
   {
     encoded = float2(decoded.weights.x, decoded.weights.y);
     return *this;
@@ -170,7 +179,7 @@ struct Triangles {
  */
 struct PixelsPackage {
   /** Barycentric coordinate of the first encoded pixel. */
-  EncodedBarycentricCoord start_barycentric_coord;
+  EncodedBarycentricWeights start_barycentric_coord;
   /** Image coordinate starting of the first encoded pixel. */
   ushort2 start_image_coordinate;
   /** Number of sequetial pixels encoded in this package. */
