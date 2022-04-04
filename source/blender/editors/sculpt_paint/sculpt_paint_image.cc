@@ -407,6 +407,9 @@ bool SCULPT_paint_image_canvas_get(Object *ob, Image **r_image, ImageUser **r_im
 
 bool SCULPT_use_image_paint_brush(Sculpt *UNUSED(sd), Object *ob)
 {
+  if (!U.experimental.use_sculpt_texture_paint) {
+    return false;
+  }
   if (ob->type != OB_MESH) {
     return false;
   }
