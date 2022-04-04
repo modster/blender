@@ -133,6 +133,7 @@ class Params:
                 self.tool_maybe_tweak_value = 'PRESS'
             else:
                 self.tool_maybe_tweak_value = 'CLICK_DRAG'
+
             self.use_tweak_tool_lmb_interaction = use_tweak_tool_lmb_interaction
 
             self.context_menu_event = {"type": 'W', "value": 'PRESS'}
@@ -574,18 +575,18 @@ def km_window(params):
              {"type": k, "value": 'PRESS', "shift": True},
              {"properties": [("space_type", t)]})
             for k, t in (
-                ('F1', 'FILE_BROWSER'),
-                ('F2', 'CLIP_EDITOR'),
-                ('F3', 'NODE_EDITOR'),
-                ('F4', 'CONSOLE'),
-                ('F5', 'VIEW_3D'),
-                ('F6', 'GRAPH_EDITOR'),
-                ('F7', 'PROPERTIES'),
-                ('F8', 'SEQUENCE_EDITOR'),
-                ('F9', 'OUTLINER'),
-                ('F10', 'IMAGE_EDITOR'),
-                ('F11', 'TEXT_EDITOR'),
-                ('F12', 'DOPESHEET_EDITOR'),
+                    ('F1', 'FILE_BROWSER'),
+                    ('F2', 'CLIP_EDITOR'),
+                    ('F3', 'NODE_EDITOR'),
+                    ('F4', 'CONSOLE'),
+                    ('F5', 'VIEW_3D'),
+                    ('F6', 'GRAPH_EDITOR'),
+                    ('F7', 'PROPERTIES'),
+                    ('F8', 'SEQUENCE_EDITOR'),
+                    ('F9', 'OUTLINER'),
+                    ('F10', 'IMAGE_EDITOR'),
+                    ('F11', 'TEXT_EDITOR'),
+                    ('F12', 'DOPESHEET_EDITOR'),
             )
         ),
 
@@ -2136,7 +2137,7 @@ def km_node_editor(params):
         ("wm.context_menu_enum", {"type": 'TAB', "value": 'PRESS', "shift": True, "ctrl": True},
          {"properties": [("data_path", 'tool_settings.snap_node_element')]}),
         ("wm.context_toggle", {"type": 'Z', "value": 'PRESS', "alt": True, "shift": True},
-            {"properties": [("data_path", "space_data.overlay.show_overlays")]}),
+         {"properties": [("data_path", "space_data.overlay.show_overlays")]}),
         *_template_items_context_menu("NODE_MT_context_menu", params.context_menu_event),
     ])
 
@@ -2892,10 +2893,12 @@ def km_sequencer(params):
         ("sequencer.slip", {"type": 'S', "value": 'PRESS'}, None),
         ("wm.context_set_int", {"type": 'O', "value": 'PRESS'},
          {"properties": [("data_path", 'scene.sequence_editor.overlay_frame'), ("value", 0)]}),
-        ("transform.seq_slide", {"type": 'G', "value": 'PRESS'}, None),
-        ("transform.seq_slide", {"type": params.select_mouse, "value": 'CLICK_DRAG'}, None),
+        ("transform.seq_slide", {"type": 'G', "value": 'PRESS'},
+         {"properties": [("view2d_edge_pan", True)]}),
+        ("transform.seq_slide", {"type": params.select_mouse, "value": 'CLICK_DRAG'},
+         {"properties": [("view2d_edge_pan", True)]}),
         ("transform.transform", {"type": 'E', "value": 'PRESS'},
-         {"properties": [("mode", 'TIME_EXTEND')]}),
+         {"properties": [("mode", 'TIME_EXTEND'), ("view2d_edge_pan", True)]}),
         ("marker.add", {"type": 'M', "value": 'PRESS'}, None),
         ("marker.rename", {"type": 'M', "value": 'PRESS', "ctrl": True}, None),
         ("sequencer.select_side_of_frame", {"type": 'LEFT_BRACKET', "value": 'PRESS'},
@@ -2994,6 +2997,22 @@ def km_sequencerpreview(params):
             ("sequencer.cursor_set", params.cursor_set_event, None),
         ])
 
+    return keymap
+
+
+def km_sequencer_channels(params):
+    items = []
+    keymap = (
+        "Sequencer Channels",
+        {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
+        {"items": items},
+    )
+
+    items.extend([
+        # Rename.
+        ("sequencer.rename_channel", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+        ("sequencer.rename_channel", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK'}, None),
+        ])
     return keymap
 
 
@@ -4444,10 +4463,6 @@ def km_pose(params):
         ("anim.keyframe_insert_menu", {"type": 'I', "value": 'PRESS'}, None),
         ("anim.keyframe_delete_v3d", {"type": 'I', "value": 'PRESS', "alt": True}, None),
         ("anim.keying_set_active_set", {"type": 'I', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
-        ("poselib.browse_interactive", {"type": 'L', "value": 'PRESS', "alt": True}, None),
-        ("poselib.pose_add", {"type": 'L', "value": 'PRESS', "shift": True}, None),
-        ("poselib.pose_remove", {"type": 'L', "value": 'PRESS', "shift": True, "alt": True}, None),
-        ("poselib.pose_rename", {"type": 'L', "value": 'PRESS', "shift": True, "ctrl": True}, None),
         ("pose.push", {"type": 'E', "value": 'PRESS', "ctrl": True}, None),
         ("pose.relax", {"type": 'E', "value": 'PRESS', "alt": True}, None),
         ("pose.breakdown", {"type": 'E', "value": 'PRESS', "shift": True}, None),
@@ -7109,7 +7124,7 @@ def km_3d_view_tool_edit_curve_pen(params):
                  ("select_point", True),
                  ("move_point", True),
                  ("close_spline_method", "ON_CLICK"),
-                ]}),
+             ]}),
             ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
              {"properties": [("insert_point", True), ("delete_point", True)]}),
             ("curve.pen", {"type": params.tool_mouse, "value": 'DOUBLE_CLICK'},
@@ -7842,6 +7857,7 @@ def generate_keymaps(params=None):
         km_sequencercommon(params),
         km_sequencer(params),
         km_sequencerpreview(params),
+        km_sequencer_channels(params),
         km_console(params),
         km_clip(params),
         km_clip_editor(params),

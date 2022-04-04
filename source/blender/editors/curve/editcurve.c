@@ -4725,15 +4725,8 @@ void CURVE_OT_make_segment(wmOperatorType *ot)
 
 bool ED_curve_editnurb_select_pick(bContext *C,
                                    const int mval[2],
+                                   const int dist_px,
                                    const struct SelectPick_Params *params)
-{
-  return ED_curve_editnurb_select_pick_ex(C, mval, 1.0f, params);
-}
-
-bool ED_curve_editnurb_select_pick_ex(bContext *C,
-                                      const int mval[2],
-                                      const float sel_dist_mul,
-                                      const struct SelectPick_Params *params)
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewContext vc;
@@ -4748,8 +4741,7 @@ bool ED_curve_editnurb_select_pick_ex(bContext *C,
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
   copy_v2_v2_int(vc.mval, mval);
 
-  bool found = ED_curve_pick_vert_ex(
-      &vc, 1, sel_dist_mul * ED_view3d_select_dist_px(), &nu, &bezt, &bp, &hand, &basact);
+  bool found = ED_curve_pick_vert_ex(&vc, 1, dist_px, &nu, &bezt, &bp, &hand, &basact);
 
   if (params->sel_op == SEL_OP_SET) {
     if ((found && params->select_passthrough) &&
@@ -6512,8 +6504,8 @@ void ed_dissolve_bez_segment(BezTriple *bezt_prev,
                              BezTriple *bezt_next,
                              const Nurb *nu,
                              const Curve *cu,
-                             const int span_len,
-                             const int span_step[2])
+                             const uint span_len,
+                             const uint span_step[2])
 {
   int i_span_edge_len = span_len + 1;
   const int dims = 3;
@@ -6593,8 +6585,8 @@ static int curve_dissolve_exec(bContext *C, wmOperator *UNUSED(op))
 
     LISTBASE_FOREACH (Nurb *, nu, editnurb) {
       if ((nu->type == CU_BEZIER) && (nu->pntsu > 2)) {
-        int span_step[2] = {nu->pntsu, nu->pntsu};
-        int span_len;
+        uint span_step[2] = {nu->pntsu, nu->pntsu};
+        uint span_len;
 
         while (BLI_array_iter_span(nu->bezt,
                                    nu->pntsu,

@@ -2260,6 +2260,7 @@ class USERPREF_PT_experimental_new_features(ExperimentalPanel, Panel):
         self._draw_items(
             context, (
                 ({"property": "use_sculpt_tools_tilt"}, "T82877"),
+                ({"property": "use_sculpt_texture_paint"}, "T96225"),
                 ({"property": "use_select_nearest_on_first_click"}, "T96752"),
                 ({"property": "use_extended_asset_browser"}, ("project/view/130/", "Project Page")),
                 ({"property": "use_override_templates"}, ("T73318", "Milestone 4")),
