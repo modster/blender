@@ -895,7 +895,7 @@ static void rna_HookModifier_object_set(PointerRNA *ptr,
   BKE_object_modifier_hook_reset(owner, hmd);
 }
 
-static bool rna_HookModifier_object_override_apply(Main *UNUSED(bmain),
+static bool rna_HookModifier_object_override_apply(Main *bmain,
                                                    PointerRNA *ptr_dst,
                                                    PointerRNA *ptr_src,
                                                    PointerRNA *ptr_storage,
@@ -933,6 +933,7 @@ static bool rna_HookModifier_object_override_apply(Main *UNUSED(bmain),
     /* The only case where we do want default behavior (with matrix reset). */
     BKE_object_modifier_hook_reset(owner, hmd);
   }
+  RNA_property_update_main(bmain, NULL, ptr_dst, prop_dst);
   return true;
 }
 
@@ -4082,6 +4083,7 @@ static void rna_def_modifier_bevel(BlenderRNA *brna)
   prop = RNA_def_property(srna, "segments", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "res");
   RNA_def_property_range(prop, 1, 1000);
+  RNA_def_property_ui_range(prop, 1, 100, 1, -1);
   RNA_def_property_ui_text(prop, "Segments", "Number of segments for round edges/verts");
   RNA_def_property_update(prop, 0, "rna_BevelModifier_update_segments");
 
