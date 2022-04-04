@@ -212,7 +212,12 @@ static bool should_pixels_be_updated(PBVHNode *node)
   return true;
 }
 
-static bool contains_triangles(PBVHNode *node)
+/**
+ * Does this the given node contains a list with owning polygons.
+ *
+ * The owning polygons are stored per triangle inside the node.
+ */
+static bool contains_polygons(PBVHNode *node)
 {
   if ((node->flag & PBVH_Leaf) == 0) {
     return false;
@@ -270,8 +275,9 @@ static bool find_nodes_to_update(PBVH *pbvh,
         node_data->clear_data();
       }
     }
-    else if (contains_triangles(node)) {
-      /* Mark polygons that are owned by other leafs, so they don't be added twice. */
+    else if (contains_polygons(node)) {
+      /* Mark polygons that are owned by other leafs, so they don't be added to new other PBVH_Leaf
+       * nodes. */
       Triangles &triangles = BKE_pbvh_pixels_triangles_get(*node);
       for (int &poly_index : triangles.poly_indices) {
         r_visited_polygons.tag_visited(poly_index);

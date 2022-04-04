@@ -61,7 +61,7 @@ class BarycentricWeights {
  * Barycentric weights encoded into 2 floats.
  *
  * The third coordinate can be extracted as all 3 coordinates should sum up to 1.
- * 
+ *
  * \code{.cc}
  * co[2] = 1.0 - co[0] - co[1]
  * \endcode
@@ -118,10 +118,23 @@ struct TrianglePaintInput {
   }
 };
 
+/**
+ * Pixels of the same triangle share some data.
+ *
+ * Data is stored as a list of structs, grouped by usage to improve performance as it improves CPU
+ * cache prefetching.
+ *
+ */
 struct Triangles {
+  /** Paint input per triangle. */
   Vector<TrianglePaintInput> paint_input;
-  Vector<EncodedLoopIndices> loop_indices;
+  /** Polygon index per triangle. */
   Vector<int> poly_indices;
+  /**
+   * Loop indices per triangle.
+   * NOTE: is only available during building the triangles.
+   */
+  Vector<EncodedLoopIndices> loop_indices;
 
  public:
   void append(const Triangle &triangle)
@@ -135,6 +148,7 @@ struct Triangles {
   {
     return loop_indices[index].decode();
   }
+
   int get_poly_index(const int index)
   {
     return poly_indices[index];
