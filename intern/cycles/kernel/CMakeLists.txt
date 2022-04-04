@@ -734,6 +734,9 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       -DWITH_NANOVDB
       -I"${NANOVDB_INCLUDE_DIR}")
   endif()
+
+  get_filename_component(dpcpp_root ${SYCL_DPCPP_COMPILER} DIRECTORY)
+
   if(WIN32)
     list(APPEND dpcpp_flags
     /EHsc
@@ -744,8 +747,6 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     -DWIN32
     -D_WINDOWS
     -DONEAPI_EXPORT)
-
-  get_filename_component(dpcpp_root ${SYCL_DPCPP_COMPILER} DIRECTORY)
 
     add_custom_command(
       OUTPUT ${cycles_kernel_oneapi_lib}
