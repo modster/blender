@@ -40,7 +40,8 @@ OneapiDevice::OneapiDevice(const DeviceInfo &info,
 
   bool is_finished_ok = (oneapi_dll.oneapi_create_queue)(device_queue, info.num);
   if (is_finished_ok == false) {
-    set_error("oneAPI queue initialization error: got runtime exception \"" + oneapi_error_string + "\"");
+    set_error("oneAPI queue initialization error: got runtime exception \"" + oneapi_error_string +
+              "\"");
   }
   else {
     VLOG(1) << "oneAPI queue has been successfully created for the device \"" << info.description
@@ -51,7 +52,8 @@ OneapiDevice::OneapiDevice(const DeviceInfo &info,
   size_t globals_segment_size;
   is_finished_ok = (oneapi_dll.oneapi_kernel_globals_size)(device_queue, globals_segment_size);
   if (is_finished_ok == false) {
-    set_error("oneAPI constant memory initialization got runtime exception \"" + oneapi_error_string + "\"");
+    set_error("oneAPI constant memory initialization got runtime exception \"" +
+              oneapi_error_string + "\"");
   }
   else {
     VLOG(1) << "Successfuly created global/constant memory segment (kernel globals object)";
@@ -262,9 +264,11 @@ void OneapiDevice::mem_copy_from(device_memory &mem, size_t y, size_t w, size_t 
     assert(mem.device_pointer);
     char *shifted_host = (char *)mem.host_pointer + offset;
     char *shifted_device = (char *)mem.device_pointer + offset;
-    bool is_finished_ok = (oneapi_dll.oneapi_usm_memcpy)(device_queue, shifted_host, shifted_device, size);
+    bool is_finished_ok =
+        (oneapi_dll.oneapi_usm_memcpy)(device_queue, shifted_host, shifted_device, size);
     if (is_finished_ok == false) {
-      set_error("oneAPI memory operation error: got runtime exception \"" + oneapi_error_string + "\"");
+      set_error("oneAPI memory operation error: got runtime exception \"" + oneapi_error_string +
+                "\"");
     }
   }
 }
@@ -285,9 +289,13 @@ void OneapiDevice::mem_zero(device_memory &mem)
   }
 
   assert(device_queue);
-  bool is_finished_ok = (oneapi_dll.oneapi_usm_memset)(device_queue, (void *)mem.device_pointer, 0, mem.memory_size());
+  bool is_finished_ok = (oneapi_dll.oneapi_usm_memset)(device_queue,
+                                                       (void *)mem.device_pointer,
+                                                       0,
+                                                       mem.memory_size());
   if (is_finished_ok == false) {
-    set_error("oneAPI memory operation error: got runtime exception \"" + oneapi_error_string + "\"");
+    set_error("oneAPI memory operation error: got runtime exception \"" + oneapi_error_string +
+              "\"");
   }
 }
 

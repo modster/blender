@@ -260,8 +260,8 @@ bool OneapiDeviceQueue::enqueue(DeviceKernel kernel,
 
   if (is_finished_ok == false) {
     oneapi_device->set_error("oneAPI kernel \"" + std::string(device_kernel_as_string(kernel)) +
-                             "\" execution error: got runtime exception \"" + oneapi_device->oneapi_error_message() +
-                             "\"");
+                             "\" execution error: got runtime exception \"" +
+                             oneapi_device->oneapi_error_message() + "\"");
   }
 
   return is_finished_ok;
@@ -275,7 +275,8 @@ bool OneapiDeviceQueue::synchronize()
 
   bool is_finished_ok = (oneapi_dll.oneapi_queue_synchronize)(oneapi_device->sycl_queue());
   if (is_finished_ok == false)
-    oneapi_device->set_error("oneAPI unknown kernel execution error: got runtime exception \"" + oneapi_device->oneapi_error_message() + "\"");
+    oneapi_device->set_error("oneAPI unknown kernel execution error: got runtime exception \"" +
+                             oneapi_device->oneapi_error_message() + "\"");
 
   debug_synchronize();
 
