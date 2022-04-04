@@ -264,8 +264,9 @@ static eV3DShadingColorType workbench_color_type_get(WORKBENCH_PrivateData *wpd,
   const bool is_vertpaint_mode = is_active && (wpd->ctx_mode == CTX_MODE_PAINT_VERTEX);
 
   /* Needed for mesh cache validation, to prevent two copies of
-     of vertex color arrays from being sent to the GPU (e.g.
-     when switching from eevee to workbench). */
+   * of vertex color arrays from being sent to the GPU (e.g.
+   * when switching from eevee to workbench).
+   */
   if (ob->sculpt && ob->sculpt->pbvh) {
     BKE_pbvh_is_drawing_set(ob->sculpt->pbvh, is_sculpt_pbvh);
   }
