@@ -17,6 +17,9 @@ struct UndoType;
 struct ViewContext;
 struct bContext;
 struct rcti;
+struct wmMsgSubscribeKey;
+struct wmMsgSubscribeValue;
+struct wmRegionMessageSubscribeParams;
 
 /* sculpt.c */
 
@@ -54,6 +57,11 @@ int ED_sculpt_face_sets_active_update_and_get(struct bContext *C,
  * if there is no multi-res sculpt active regular undo is used. */
 void ED_sculpt_undo_push_multires_mesh_begin(struct bContext *C, const char *str);
 void ED_sculpt_undo_push_multires_mesh_end(struct bContext *C, const char *str);
+
+/**
+ * Subscribe to messages that will trigger a PBVH update.
+ */
+void ED_sculpt_pbvh_message_subscribe(const struct wmRegionMessageSubscribeParams *params);
 
 #ifdef __cplusplus
 }

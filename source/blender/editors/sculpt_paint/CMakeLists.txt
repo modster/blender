@@ -65,6 +65,7 @@ set(SRC
   sculpt_filter_mask.c
   sculpt_filter_mesh.c
   sculpt_geodesic.c
+  sculpt_image.cc
   sculpt_mask_expand.c
   sculpt_mask_init.c
   sculpt_multiplane_scrape.c
