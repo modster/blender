@@ -260,7 +260,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     return result - start_pixel;
   }
 
-  Pixel init_pixel(const TrianglePaintInput &triangle, const float3 weights) const
+  Pixel init_pixel(const TrianglePaintInput &triangle, const BarycentricWeights &weights) const
   {
     const int3 &vert_indices = triangle.vert_indices;
     Pixel result;

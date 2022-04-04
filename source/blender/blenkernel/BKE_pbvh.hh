@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "BLI_math.h"
 #include "BLI_math_vec_types.hh"
 #include "BLI_rect.h"
 #include "BLI_vector.hh"
@@ -16,20 +17,60 @@
 namespace blender::bke::pbvh::pixels {
 
 /* TODO(jbakker): move encoders to blenlib. */
+class EncodedBarycentricCoord;
 
 /* Stores a barycentric coordinate in a float2. */
-struct EncodedBarycentricCoord {
+class BarycentricWeights {
+ private:
+  float3 weights;
+
+ public:
+  explicit BarycentricWeights(const float2 v1, const float2 v2, const float2 v3, const float2 co)
+  {
+    barycentric_weights_v2(v1, v2, v3, co, weights);
+  }
+
+  explicit BarycentricWeights(const float3 weights) : weights(weights)
+  {
+  }
+
+  const bool is_inside_triangle() const
+  {
+    return barycentric_inside_triangle_v2(weights);
+  }
+
+  float3 operator-(const BarycentricWeights &rhs) const
+  {
+    return weights - rhs.weights;
+  }
+
+  BarycentricWeights operator+(const float3 &rhs) const
+  {
+    return BarycentricWeights(weights + rhs);
+  }
+
+  operator const float *() const
+  {
+    return weights;
+  }
+
+  friend class EncodedBarycentricCoord;
+};
+
+class EncodedBarycentricCoord {
+ private:
   float2 encoded;
 
-  EncodedBarycentricCoord &operator=(const float3 decoded)
+ public:
+  EncodedBarycentricCoord &operator=(const BarycentricWeights decoded)
   {
-    encoded = float2(decoded.x, decoded.y);
+    encoded = float2(decoded.weights.x, decoded.weights.y);
     return *this;
   }
 
-  float3 decode() const
+  const BarycentricWeights decode() const
   {
-    return float3(encoded.x, encoded.y, 1.0 - encoded.x - encoded.y);
+    return BarycentricWeights(float3(encoded.x, encoded.y, 1.0 - encoded.x - encoded.y));
   }
 };
 

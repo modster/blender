@@ -22,21 +22,6 @@
 
 namespace blender::bke::pbvh::pixels::extractor {
 
-static float3 barycentric_weights(const float2 v1,
-                                  const float2 v2,
-                                  const float2 v3,
-                                  const float2 co)
-{
-  float3 weights;
-  barycentric_weights_v2(v1, v2, v3, co, weights);
-  return weights;
-}
-
-static bool is_inside_triangle(const float3 barycentric_weights)
-{
-  return barycentric_inside_triangle_v2(barycentric_weights);
-}
-
 /**
  * Keep track of visited polygons.
  *
@@ -56,7 +41,7 @@ class VisitedPolygons : std::vector<bool> {
   bool tag_visited(const int poly_index)
   {
     bool visited = (*this)[poly_index];
-    this[poly_index] = true;
+    (*this)[poly_index] = true;
     return visited;
   }
 };
@@ -71,8 +56,8 @@ static float3 calc_barycentric_delta(const ImBuf *image_buffer,
 {
   const float2 start_uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
   const float2 end_uv(float(x + 1) / image_buffer->x, float(y) / image_buffer->y);
-  const float3 start_barycentric = barycentric_weights(uvs[0], uvs[1], uvs[2], start_uv);
-  const float3 end_barycentric = barycentric_weights(uvs[0], uvs[1], uvs[2], end_uv);
+  const BarycentricWeights start_barycentric(uvs[0], uvs[1], uvs[2], start_uv);
+  const BarycentricWeights end_barycentric(uvs[0], uvs[1], uvs[2], end_uv);
   const float3 delta_barycentric = end_barycentric - start_barycentric;
   return delta_barycentric;
 }
@@ -88,7 +73,6 @@ static void extract_barycentric_pixels(TileData &tile_data,
 {
   for (int y = miny; y < maxy; y++) {
     bool start_detected = false;
-    float3 barycentric;
     PixelsPackage package;
     package.triangle_index = triangle_index;
     package.num_pixels = 0;
@@ -96,8 +80,8 @@ static void extract_barycentric_pixels(TileData &tile_data,
 
     for (x = minx; x < maxx; x++) {
       float2 uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
-      barycentric = barycentric_weights(uvs[0], uvs[1], uvs[2], uv);
-      const bool is_inside = is_inside_triangle(barycentric);
+      const BarycentricWeights barycentric(uvs[0], uvs[1], uvs[2], uv);
+      const bool is_inside = barycentric.is_inside_triangle();
       if (!start_detected && is_inside) {
         start_detected = true;
         package.start_image_coordinate = ushort2(x, y);
