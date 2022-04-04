@@ -46,10 +46,6 @@ static int node_shader_gpu_tex_coord(GPUMaterial *mat,
   GPUNodeLink *orco = (!out[0].hasoutput) ? GPU_constant(zero) : GPU_attribute(mat, CD_ORCO, "");
   GPUNodeLink *mtface = GPU_attribute(mat, CD_MTFACE, "");
 
-  if (out[0].hasoutput) {
-    GPU_link(mat, "generated_from_orco", orco, &orco);
-  }
-
   GPU_stack_link(mat, node, "node_tex_coord", in, out, inv_obmat, orco, mtface);
 
   int i;

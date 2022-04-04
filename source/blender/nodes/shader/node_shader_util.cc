@@ -270,7 +270,6 @@ void node_shader_gpu_default_tex_coord(GPUMaterial *mat, bNode *node, GPUNodeLin
 {
   if (!*link) {
     *link = GPU_attribute(mat, CD_ORCO, "");
-    GPU_link(mat, "generated_texco", *link, link);
     node_shader_gpu_bump_tex_coord(mat, node, link);
   }
 }

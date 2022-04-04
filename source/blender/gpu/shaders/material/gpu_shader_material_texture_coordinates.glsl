@@ -1,22 +1,4 @@
 
-void generated_from_orco(vec3 orco, out vec3 generated)
-{
-#ifdef VOLUMETRICS
-#  ifdef MESH_SHADER
-  generated = volumeObjectLocalCoord;
-#  else
-  generated = g_data.P;
-#  endif
-#else
-  generated = orco;
-#endif
-}
-
-void generated_texco(vec3 attr_orco, out vec3 generated)
-{
-  generated_from_orco(attr_orco, generated);
-}
-
 void node_tex_coord(mat4 obmatinv,
                     vec3 attr_orco,
                     vec3 attr_uv,
