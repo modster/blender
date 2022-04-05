@@ -1384,6 +1384,7 @@ static void view3d_main_region_message_subscribe(const wmRegionMessageSubscribeP
 
       case OB_MODE_SCULPT:
         WM_msg_subscribe_rna_anon_prop(mbus, WorkSpace, tools, &msg_sub_value_pbvh_refresh);
+        WM_msg_subscribe_rna_anon_prop(mbus, WorkSpace, tools, &msg_sub_value_region_tag_redraw);
         break;
       default:
         break;
