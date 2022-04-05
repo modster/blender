@@ -99,7 +99,7 @@ void node_bsdf_principled(vec4 base_color,
 
   /* Reflection. */
   ClosureReflection reflection_data;
-  reflection_data.weight = (specular_weight + glass_reflection_weight) * weight;
+  reflection_data.weight = reflection_weight * weight;
   reflection_data.N = N;
   reflection_data.roughness = roughness;
   if (true) {
@@ -140,9 +140,10 @@ void node_bsdf_principled(vec4 base_color,
 
   /* Refraction. */
   ClosureRefraction refraction_data;
+  refraction_data.weight = glass_transmission_weight;
   float btdf = (do_multiscatter != 0.0) ? 1.0 : btdf_lut(NV, roughness, ior).x;
 
-  refraction_data.color = base_color.rgb * (btdf * glass_transmission_weight);
+  refraction_data.color = base_color.rgb * btdf;
   refraction_data.N = N;
   refraction_data.roughness = do_multiscatter != 0.0 ? roughness :
                                                        max(roughness, transmission_roughness);
@@ -152,7 +153,7 @@ void node_bsdf_principled(vec4 base_color,
     /* Metallic & Clearcoat case. */
     result = closure_eval(reflection_data, clearcoat_data);
   }
-  if (do_diffuse == 0.0 && do_refraction == 0.0 && do_clearcoat == 0.0) {
+  else if (do_diffuse == 0.0 && do_refraction == 0.0 && do_clearcoat == 0.0) {
     /* Metallic case. */
     result = closure_eval(reflection_data);
   }
