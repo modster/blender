@@ -431,7 +431,7 @@ float ambient_occlusion_eval(vec3 normal,
 {
   /* Avoid multiline define causing compiler issues. */
   /* clang-format off */
-#if defined(GPU_FRAGMENT_SHADER) && (defined(MESH_SHADER) || defined(HAIR_SHADER)) && !defined(DEPTH_SHADER)
+#if defined(GPU_FRAGMENT_SHADER) && (defined(MESH_SHADER) || defined(HAIR_SHADER)) && !defined(DEPTH_SHADER) && !defined(VOLUMETRICS)
   /* clang-format on */
   vec3 bent_normal;
   vec4 rand = texelfetch_noise_tex(gl_FragCoord.xy);
