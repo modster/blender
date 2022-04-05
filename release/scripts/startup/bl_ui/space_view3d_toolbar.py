@@ -613,22 +613,27 @@ class VIEW3D_PT_tools_brush_texture(Panel, View3DPaintPanel):
                 (brush := settings.brush)
         ):
             if context.sculpt_object or context.vertex_paint_object:
-                return False
+                return True
             elif context.image_paint_object:
                 return (brush.image_tool == 'DRAW')
         return False
+
+    def get_texture_slot(self, context, brush):
+        if context.sculpt_object or contex.vertex_paint_object:
+            return brush.mask_texture_slot
+        return brush.texture_slot
 
     def draw(self, context):
         layout = self.layout
 
         settings = self.paint_settings(context)
         brush = settings.brush
-        tex_slot = brush.texture_slot
+        tex_slot = self.get_texture_slot(context, brush)
 
         col = layout.column()
         col.template_ID_preview(tex_slot, "texture", new="texture.new", rows=3, cols=8)
 
-        brush_texture_settings(col, brush, context.sculpt_object)
+        brush_texture_settings(col, brush, context.sculpt_object, tex_slot=tex_slot)
 
 
 # TODO, move to space_view3d.py
@@ -642,14 +647,12 @@ class VIEW3D_PT_tools_mask_texture(Panel, View3DPaintPanel, TextureMaskPanel):
     @classmethod
     def poll(cls, context):
         settings = cls.paint_settings(context)
-        return settings and settings.brush and (
-            context.image_paint_object or context.sculpt_object or context.vertex_paint_object)
+        return (settings and settings.brush and context.image_paint_object)
 
     def draw(self, context):
         layout = self.layout
 
-        settings = self.paint_settings(context)
-        brush = settings.brush
+        brush = context.tool_settings.image_paint.brush
 
         col = layout.column()
         mask_tex_slot = brush.mask_texture_slot

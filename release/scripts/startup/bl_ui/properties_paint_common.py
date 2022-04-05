@@ -1012,8 +1012,9 @@ def draw_color_settings(context, layout, brush, color_type=False):
 
 
 # Used in both the View3D toolbar and texture properties
-def brush_texture_settings(layout, brush, sculpt):
-    tex_slot = brush.texture_slot
+def brush_texture_settings(layout, brush, sculpt, tex_slot=None):
+    if tex_slot is None:
+        tex_slot = brush.texture_slot
 
     layout.use_property_split = True
     layout.use_property_decorate = False
