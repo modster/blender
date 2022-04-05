@@ -586,7 +586,7 @@ static const EnumPropertyItem *rna_PaintModeSettings_canvas_source_itemf(bContex
   }
 
   RNA_enum_item_end(&items, &totitem);
-  *r_free = false;
+  *r_free = true;
   return items;
 }
 
