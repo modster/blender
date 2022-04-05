@@ -2,16 +2,24 @@
 void node_bsdf_anisotropic(vec4 color,
                            float roughness,
                            float anisotropy,
+                           float rotation,
                            vec3 N,
                            vec3 T,
                            float weight,
-                           float use_multiscatter,
+                           const float do_multiscatter,
                            out Closure result)
 {
+  N = safe_normalize(N);
+  vec3 V = cameraVec(g_data.P);
+  float NV = dot(N, V);
+
+  vec2 split_sum = brdf_lut(NV, roughness);
+
   ClosureReflection reflection_data;
   reflection_data.weight = weight;
-  /* TODO(fclem): Multiscatter. */
-  reflection_data.color = color.rgb;
+  reflection_data.color = (do_multiscatter != 0.0) ?
+                              F_brdf_multi_scatter(color.rgb, color.rgb, split_sum) :
+                              color.rgb;
   reflection_data.N = N;
   reflection_data.roughness = roughness;
 
