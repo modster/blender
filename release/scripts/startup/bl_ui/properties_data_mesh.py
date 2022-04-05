@@ -643,8 +643,6 @@ class DATA_PT_vertex_colors(DATA_PT_mesh_attributes, Panel):
         col = row.column(align=True)
         col.operator("geometry.color_attribute_add", icon='ADD', text="")
         col.operator("geometry.color_attribute_remove", icon='REMOVE', text="")
-
-        active = mesh.attributes.active
         
         self.draw_attribute_warnings(context, layout)
 

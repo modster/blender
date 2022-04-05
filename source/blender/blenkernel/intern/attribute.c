@@ -92,7 +92,8 @@ static CustomData *attribute_customdata_find(ID *id, CustomDataLayer *layer)
 
   for (AttributeDomain domain = 0; domain < ATTR_DOMAIN_NUM; domain++) {
     CustomData *customdata = info[domain].customdata;
-    if (customdata && ARRAY_HAS_ITEM(layer, customdata->layers, customdata->totlayer)) {
+    if (customdata &&
+        ARRAY_HAS_ITEM(layer, (CustomDataLayer const *)customdata->layers, customdata->totlayer)) {
       return customdata;
     }
   }

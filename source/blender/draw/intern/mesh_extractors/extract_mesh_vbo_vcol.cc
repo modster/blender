@@ -21,9 +21,9 @@ struct VColRef {
 
 /** Get all vcol layers as AttributeRefs.
  *
- * \param vcol_layers bitmask to fitler vcol layers by, each bit
- *                    corrusponds to the integer position of the attribute
- *                    within the global color attribute list.
+ * \param vcol_layers: bitmask to filter vcol layers by, each bit
+ *                     corresponds to the integer position of the attribute
+ *                     within the global color attribute list.
  */
 static blender::Vector<VColRef> get_vcol_refs(const CustomData *cd_vdata,
                                               const CustomData *cd_ldata,
