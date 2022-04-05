@@ -80,7 +80,14 @@ void eevee_shader_material_create_info_amend(GPUMaterial *gpumat,
 
   const bool do_fragment_attrib_load = is_background || is_volume;
 
-  if (do_fragment_attrib_load && !info.vertex_out_interfaces_.is_empty()) {
+  if (is_hair && !info.vertex_out_interfaces_.is_empty()) {
+    /** Hair attributes comme from sampler buffer. Transfer attributes to sampler. */
+    for (auto &input : info.vertex_inputs_) {
+      info.sampler(0, ImageType::FLOAT_BUFFER, input.name, Frequency::BATCH);
+    }
+    info.vertex_inputs_.clear();
+  }
+  else if (do_fragment_attrib_load && !info.vertex_out_interfaces_.is_empty()) {
     /* Codegen outputs only one interface. */
     const StageInterfaceInfo &iface = *info.vertex_out_interfaces_.first();
     /* Globals the attrib_load() can write to when it is in the fragment shader. */

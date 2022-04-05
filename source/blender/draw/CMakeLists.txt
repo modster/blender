@@ -307,7 +307,6 @@ set(GLSL_SRC
   engines/eevee/shaders/object_motion_frag.glsl
   engines/eevee/shaders/object_motion_vert.glsl
   engines/eevee/shaders/prepass_frag.glsl
-  engines/eevee/shaders/prepass_vert.glsl
   engines/eevee/shaders/shadow_accum_frag.glsl
   engines/eevee/shaders/shadow_frag.glsl
   engines/eevee/shaders/shadow_vert.glsl

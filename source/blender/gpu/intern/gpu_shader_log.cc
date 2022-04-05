@@ -33,7 +33,7 @@ namespace blender::gpu {
  * Print dependencies sources list before the shader report.
  * Useful to debug include order or missing dependencies.
  */
-#define DEBUG_DEPENDENCIES 1
+#define DEBUG_DEPENDENCIES 0
 
 void Shader::print_log(Span<const char *> sources,
                        char *log,

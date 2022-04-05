@@ -60,7 +60,6 @@ void main()
 {
 #if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
   attrib_load();
-  vec3 v = attr_load_uv(vec3(1));
 #endif
 
   g_data = init_globals();

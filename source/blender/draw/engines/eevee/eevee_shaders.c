@@ -242,7 +242,6 @@ extern char datatoc_object_motion_frag_glsl[];
 extern char datatoc_object_motion_vert_glsl[];
 extern char datatoc_octahedron_lib_glsl[];
 extern char datatoc_prepass_frag_glsl[];
-extern char datatoc_prepass_vert_glsl[];
 extern char datatoc_random_lib_glsl[];
 extern char datatoc_raytrace_lib_glsl[];
 extern char datatoc_renderpass_lib_glsl[];
