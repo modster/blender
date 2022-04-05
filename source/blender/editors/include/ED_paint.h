@@ -133,6 +133,9 @@ void ED_paint_do_msg_notify_active_tool_changed(struct bContext *C,
                                                 struct wmMsgSubscribeKey *msg_key,
                                                 struct wmMsgSubscribeValue *msg_val);
 
+/* Store the last used tool in the sculpt session. */
+void ED_paint_tool_update_sticky_shading_color(struct bContext *C, struct Object *ob);
+
 #ifdef __cplusplus
 }
 #endif

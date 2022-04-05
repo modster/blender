@@ -10,6 +10,7 @@
 #include "BKE_context.h"
 #include "BKE_customdata.h"
 #include "BKE_material.h"
+#include "BKE_paint.h"
 
 #include "DEG_depsgraph.h"
 
@@ -42,12 +43,86 @@ extern "C" {
 using namespace blender;
 using namespace blender::ed::sculpt_paint::canvas;
 
+/* Does the paint tool with the given idname uses a canvas. */
+static bool paint_tool_uses_canvas(StringRef idname)
+{
+  /* TODO(jbakker): complete this list. */
+  return ELEM(idname, "builtin_brush.Paint", "builtin.color_filter");
+}
+
+static bool paint_tool_shading_color_follows_last_used(StringRef idname)
+{
+  /* TODO(jbakker): complete this list. */
+  return ELEM(idname, "builtin_brush.Mask");
+}
+
+void ED_paint_tool_update_sticky_shading_color(struct bContext *C, struct Object *ob)
+{
+  if (ob == nullptr || ob->sculpt == nullptr) {
+    return;
+  }
+
+  bToolRef *tref = WM_toolsystem_ref_from_context(C);
+  if (tref == nullptr) {
+    return;
+  }
+  /* Do not modify when tool follows lat used tool. */
+  if (paint_tool_shading_color_follows_last_used(tref->idname)) {
+    return;
+  }
+
+  ob->sculpt->sticky_shading_color = paint_tool_uses_canvas(tref->idname);
+}
+
+static bool paint_tool_shading_color_follows_last_used_tool(struct bContext *C, struct Object *ob)
+{
+  if (ob == nullptr || ob->sculpt == nullptr) {
+    return false;
+  }
+
+  bToolRef *tref = WM_toolsystem_ref_from_context(C);
+  if (tref == nullptr) {
+    return false;
+  }
+
+  return paint_tool_shading_color_follows_last_used(tref->idname);
+}
+
+bool ED_paint_tool_use_canvas(struct bContext *C, struct Object *ob)
+{
+  /* Quick exit, only sculpt tools can use canvas. */
+  if (ob == nullptr || ob->sculpt == nullptr) {
+    return false;
+  }
+
+  bToolRef *tref = WM_toolsystem_ref_from_context(C);
+  if (tref != nullptr) {
+    return paint_tool_uses_canvas(tref->idname);
+  }
+
+  return false;
+}
+
+static bool paint_tool_last_used_tool_used_canvas(struct Object *ob)
+{
+  if (ob == nullptr || ob->sculpt == nullptr) {
+    return false;
+  }
+  return ob->sculpt->sticky_shading_color;
+}
+
 eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
                                                      const PaintModeSettings *settings,
                                                      Object *ob,
                                                      eV3DShadingColorType orig_color_type)
 {
-  if (!ED_paint_tool_use_canvas(C, ob)) {
+  /* NOTE: This early exit is temporarily, until a paint mode has been added.
+   * For better integration with the vertex paint in sculpt mode we sticky
+   * with the last stoke when using tools like masking.
+   */
+  if (!ED_paint_tool_use_canvas(C, ob) &&
+      !(paint_tool_shading_color_follows_last_used_tool(C, ob) &&
+        ob->sculpt->sticky_shading_color)) {
     return orig_color_type;
   }
 
@@ -140,26 +215,6 @@ int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settin
     }
   }
   return -1;
-}
-
-bool ED_paint_tool_use_canvas(struct bContext *C, struct Object *ob)
-{
-  /* Quick exit, only sculpt tools can use canvas. */
-  if (ob == nullptr || ob->sculpt == nullptr) {
-    return false;
-  }
-
-  bToolRef *tref = WM_toolsystem_ref_from_context(C);
-  if (tref != nullptr) {
-    if (STREQ(tref->idname, "builtin_brush.Paint")) {
-      return true;
-    }
-    if (STREQ(tref->idname, "builtin.color_filter")) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 void ED_paint_do_msg_notify_active_tool_changed(struct bContext *C,

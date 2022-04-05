@@ -69,6 +69,7 @@
 #include "WM_types.h"
 
 #include "ED_object.h"
+#include "ED_paint.h"
 #include "ED_screen.h"
 #include "ED_sculpt.h"
 #include "ED_view3d.h"
@@ -4976,6 +4977,8 @@ static void sculpt_brush_stroke_init(bContext *C, wmOperator *op)
    * earlier steps modifying the data. */
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   BKE_sculpt_update_object_for_edit(depsgraph, ob, is_smooth, need_mask, needs_colors);
+
+  ED_paint_tool_update_sticky_shading_color(C, ob);
 }
 
 static void sculpt_restore_mesh(Sculpt *sd, Object *ob)
