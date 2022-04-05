@@ -98,6 +98,9 @@ GlobalData init_globals(void)
   surf.Ng = safe_normalize(cross(dFdx(surf.P), dFdy(surf.P)));
   surf.barycentric_coords = vec2(0.0);
   surf.barycentric_dists = vec3(0.0);
+  if (!FrontFacing) {
+    surf.N = -surf.N;
+  }
 #  ifdef HAIR_SHADER
   /* Shade as a cylinder. */
   float cos_theta = hairThickTime / hairThickness;
