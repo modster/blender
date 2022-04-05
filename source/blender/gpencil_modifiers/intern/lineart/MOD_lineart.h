@@ -210,6 +210,12 @@ enum eLineArtTileRecursiveLimit {
 #define LRT_TILE_SPLITTING_TRIANGLE_LIMIT 100
 #define LRT_TILE_EDGE_COUNT_INITIAL 32
 
+typedef struct LineartPendingEdges {
+  LineartEdge **array;
+  int max;
+  int next;
+} LineartPendingEdges;
+
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
 
@@ -267,6 +273,10 @@ typedef struct LineartRenderBuffer {
   ListBase edge_mark;
   ListBase floating;
   ListBase light_contour;
+
+  /* Note: Data here are allocated with MEM_xxx call instead of in pool. */
+  struct LineartPendingEdges pending_edges;
+  int scheduled_count;
 
   ListBase chains;
 
@@ -386,6 +396,10 @@ typedef struct LineartRenderTaskInfo {
   ListBase floating;
   ListBase light_contour;
 
+  /* Here it doesn't really hold memory, it just stores a refernce to a portion in
+   * rb->pending_edges. */
+  struct LineartPendingEdges pending_edges;
+
 } LineartRenderTaskInfo;
 
 typedef struct LineartObjectInfo {
@@ -411,6 +425,9 @@ typedef struct LineartObjectInfo {
   ListBase edge_mark;
   ListBase floating;
   ListBase light_contour;
+
+  /* Note: Data here are allocated with MEM_xxx call instead of in pool. */
+  struct LineartPendingEdges pending_edges;
 
 } LineartObjectInfo;
 
