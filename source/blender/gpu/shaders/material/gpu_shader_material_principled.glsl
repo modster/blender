@@ -128,7 +128,7 @@ void node_bsdf_principled(vec4 base_color,
   }
 
   ClosureReflection clearcoat_data;
-  clearcoat_data.weight = clearcoat_weight;
+  clearcoat_data.weight = clearcoat_weight * weight;
   clearcoat_data.N = CN;
   clearcoat_data.roughness = clearcoat_roughness;
   if (true) {
@@ -140,7 +140,7 @@ void node_bsdf_principled(vec4 base_color,
 
   /* Refraction. */
   ClosureRefraction refraction_data;
-  refraction_data.weight = glass_transmission_weight;
+  refraction_data.weight = glass_transmission_weight * weight;
   float btdf = (do_multiscatter != 0.0) ? 1.0 : btdf_lut(NV, roughness, ior).x;
 
   refraction_data.color = base_color.rgb * btdf;
