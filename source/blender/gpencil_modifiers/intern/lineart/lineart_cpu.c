@@ -934,7 +934,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges.array, e);
+          lineart_add_edge_to_list(&rb->pending_edges, e);
         }
         /* NOTE: inverting `e->v1/v2` (left/right point) doesn't matter as long as
          * `tri->edge` and `tri->v` has the same sequence. and the winding direction
@@ -983,7 +983,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges.array, e);
+          lineart_add_edge_to_list(&rb->pending_edges, e);
         }
         e->v1 = &vt[0];
         e->v2 = &vt[1];
@@ -1024,7 +1024,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges.array, e);
+          lineart_add_edge_to_list(&rb->pending_edges, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1099,7 +1099,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges.array, e);
+          lineart_add_edge_to_list(&rb->pending_edges, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1151,7 +1151,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges.array, e);
+          lineart_add_edge_to_list(&rb->pending_edges, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1199,7 +1199,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges.array, e);
+          lineart_add_edge_to_list(&rb->pending_edges, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1886,6 +1886,9 @@ static void lineart_finalize_object_edge_list_reserve(LineartPendingEdges *pe, i
 
 static void lineart_finalize_object_edge_list(LineartPendingEdges *pe, LineartObjectInfo *obi)
 {
+  if (!obi->pending_edges.array) {
+    return;
+  }
   memcpy(&pe->array[pe->next],
          obi->pending_edges.array,
          sizeof(LineartEdge *) * obi->pending_edges.next);
@@ -2690,8 +2693,8 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
   //- Assign the number of objects instead of number of threads
   printf("thread start: %d\n", olti->thread_id);
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
-    lineart_geometry_object_load_no_bmesh(obi, olti->rb);
-    // lineart_geometry_object_load(obi, olti->rb);
+    // lineart_geometry_object_load_no_bmesh(obi, olti->rb);
+    lineart_geometry_object_load(obi, olti->rb);
     printf("thread id: %d processed: %d\n", olti->thread_id, obi->original_me->totpoly);
   }
   printf("thread end: %d\n", olti->thread_id);
@@ -4738,7 +4741,7 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
       e->intersection_mask = (is->tri1->intersection_mask | is->tri2->intersection_mask);
       BLI_addtail(&e->segments, es);
 
-      lineart_add_edge_to_list(&rb->pending_edges.array, e);
+      lineart_add_edge_to_list(&rb->pending_edges, e);
 
       v += 2;
       e++;

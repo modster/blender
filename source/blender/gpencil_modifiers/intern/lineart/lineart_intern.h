@@ -69,14 +69,16 @@ int lineart_count_intersection_segment_count(struct LineartRenderBuffer *rb);
 void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb);
 
 #define LRT_ITER_ALL_LINES_BEGIN \
-  LineartEdge *e; \
-  for (int i = 0; i < rb->pending_edges.next; i++) { \
-    e = rb->pending_edges.array[i];
+  { \
+    LineartEdge *e; \
+    for (int __i = 0; __i < rb->pending_edges.next; __i++) { \
+      e = rb->pending_edges.array[__i];
 
 #define LRT_ITER_ALL_LINES_NEXT ; /* Doesn't do anything now with new array setup. */
 
 #define LRT_ITER_ALL_LINES_END \
   LRT_ITER_ALL_LINES_NEXT \
+  } \
   }
 
 #define LRT_BOUND_AREA_CROSSES(b1, b2) \
