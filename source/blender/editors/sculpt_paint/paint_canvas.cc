@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-
-#include "ED_paint.h"
+#include "BLI_compiler_compat.h"
 
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_node_types.h"
+#include "DNA_screen_types.h"
 #include "DNA_workspace_types.h"
 
 #include "BKE_context.h"
@@ -104,20 +104,11 @@ bool ED_paint_tool_use_canvas(struct bContext *C, struct Object *ob)
   return false;
 }
 
-static bool paint_tool_last_used_tool_used_canvas(struct Object *ob)
-{
-  if (ob == nullptr || ob->sculpt == nullptr) {
-    return false;
-  }
-  return ob->sculpt->sticky_shading_color;
-}
-
 eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
                                                      const PaintModeSettings *settings,
                                                      Object *ob,
                                                      eV3DShadingColorType orig_color_type)
 {
-  printf("%s %d\n", __func__, orig_color_type);
   /* NOTE: This early exit is temporarily, until a paint mode has been added.
    * For better integration with the vertex paint in sculpt mode we sticky
    * with the last stoke when using tools like masking.
@@ -160,7 +151,6 @@ eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
   if (!U.experimental.use_sculpt_texture_paint && color_type == V3D_SHADING_TEXTURE_COLOR) {
     return orig_color_type;
   }
-  printf("%s %d->%d\n", __func__, orig_color_type, color_type);
 
   return color_type;
 }
@@ -218,21 +208,5 @@ int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settin
     }
   }
   return -1;
-}
-
-void ED_paint_do_msg_notify_active_tool_changed(struct bContext *C,
-                                                struct wmMsgSubscribeKey *msg_key,
-                                                struct wmMsgSubscribeValue *msg_val)
-{
-  Object *ob = CTX_data_active_object(C);
-  if (ob == nullptr) {
-    return;
-  }
-  if (ob->sculpt == nullptr) {
-    return;
-  }
-  PBVH *pbvh = ob->sculpt->pbvh;
-  BKE_pbvh_mark_update_color(pbvh);
-  printf("%s\n", __func__);
 }
 }
