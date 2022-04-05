@@ -48,7 +48,7 @@ bool output_ssr(ClosureReflection reflection)
 CLOSURE_EVAL_FUNCTION_DECLARE_1(DiffuseBSDF, Diffuse);
 Closure closure_eval(ClosureDiffuse diffuse)
 {
-  /* Glue with the old sytem. */
+  /* Glue with the old system. */
   CLOSURE_VARS_DECLARE_1(Diffuse);
 
   in_Diffuse_0.N = diffuse.N;
@@ -66,7 +66,7 @@ Closure closure_eval(ClosureDiffuse diffuse)
 CLOSURE_EVAL_FUNCTION_DECLARE_1(GlossyBSDF, Glossy);
 Closure closure_eval(ClosureReflection reflection)
 {
-  /* Glue with the old sytem. */
+  /* Glue with the old system. */
   CLOSURE_VARS_DECLARE_1(Glossy);
 
   in_Glossy_0.N = reflection.N;
@@ -84,7 +84,7 @@ Closure closure_eval(ClosureReflection reflection)
 CLOSURE_EVAL_FUNCTION_DECLARE_1(RefractionBSDF, Refraction);
 Closure closure_eval(ClosureRefraction refraction)
 {
-  /* Glue with the old sytem. */
+  /* Glue with the old system. */
   CLOSURE_VARS_DECLARE_1(Refraction);
 
   in_Refraction_0.N = refraction.N;
@@ -117,7 +117,7 @@ Closure closure_eval(ClosureTransparency transparency)
 CLOSURE_EVAL_FUNCTION_DECLARE_2(GlassBSDF, Glossy, Refraction);
 Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction)
 {
-  /* Glue with the old sytem. */
+  /* Glue with the old system. */
   CLOSURE_VARS_DECLARE_2(Glossy, Refraction);
 
   in_Glossy_0.N = reflection.N;
@@ -140,7 +140,7 @@ Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction)
 CLOSURE_EVAL_FUNCTION_DECLARE_2(DielectricBSDF, Diffuse, Glossy);
 Closure closure_eval(ClosureDiffuse diffuse, ClosureReflection reflection)
 {
-  /* Glue with the old sytem. */
+  /* Glue with the old system. */
   CLOSURE_VARS_DECLARE_2(Diffuse, Glossy);
 
   in_Diffuse_0.N = diffuse.N;
@@ -151,7 +151,9 @@ Closure closure_eval(ClosureDiffuse diffuse, ClosureReflection reflection)
   CLOSURE_EVAL_FUNCTION_2(DielectricBSDF, Diffuse, Glossy);
 
   Closure closure = CLOSURE_DEFAULT;
-  closure.radiance += out_Diffuse_0.radiance * diffuse.color * diffuse.weight;
+  if (!output_sss(diffuse, out_Diffuse_0)) {
+    closure.radiance += out_Diffuse_0.radiance * diffuse.color * diffuse.weight;
+  }
   if (!output_ssr(reflection)) {
     closure.radiance += out_Glossy_1.radiance * reflection.color * reflection.weight;
   }
@@ -164,7 +166,7 @@ Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
                      ClosureReflection clearcoat)
 {
-  /* Glue with the old sytem. */
+  /* Glue with the old system. */
   CLOSURE_VARS_DECLARE_3(Diffuse, Glossy, Glossy);
 
   in_Diffuse_0.N = diffuse.N;
@@ -177,7 +179,9 @@ Closure closure_eval(ClosureDiffuse diffuse,
   CLOSURE_EVAL_FUNCTION_3(SpecularBSDF, Diffuse, Glossy, Glossy);
 
   Closure closure = CLOSURE_DEFAULT;
-  closure.radiance += out_Diffuse_0.radiance * diffuse.color * diffuse.weight;
+  if (!output_sss(diffuse, out_Diffuse_0)) {
+    closure.radiance += out_Diffuse_0.radiance * diffuse.color * diffuse.weight;
+  }
   closure.radiance += out_Glossy_2.radiance * clearcoat.color * clearcoat.weight;
   if (!output_ssr(reflection)) {
     closure.radiance += out_Glossy_1.radiance * reflection.color * reflection.weight;
@@ -192,7 +196,7 @@ Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection clearcoat,
                      ClosureRefraction refraction)
 {
-  /* Glue with the old sytem. */
+  /* Glue with the old system. */
   CLOSURE_VARS_DECLARE_4(Diffuse, Glossy, Glossy, Refraction);
 
   in_Diffuse_0.N = diffuse.N;
@@ -222,7 +226,7 @@ Closure closure_eval(ClosureDiffuse diffuse,
 CLOSURE_EVAL_FUNCTION_DECLARE_2(PrincipledBSDFMetalClearCoat, Glossy, Glossy);
 Closure closure_eval(ClosureReflection reflection, ClosureReflection clearcoat)
 {
-  /* Glue with the old sytem. */
+  /* Glue with the old system. */
   CLOSURE_VARS_DECLARE_2(Glossy, Glossy);
 
   in_Glossy_0.N = reflection.N;

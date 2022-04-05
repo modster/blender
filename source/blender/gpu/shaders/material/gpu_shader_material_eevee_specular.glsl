@@ -32,6 +32,7 @@ void node_eevee_specular(vec4 diffuse,
   diffuse_data.weight = alpha;
   diffuse_data.color = diffuse.rgb;
   diffuse_data.N = N;
+  diffuse_data.sss_id = 0u;
 
   ClosureReflection reflection_data;
   reflection_data.weight = alpha;
