@@ -5030,8 +5030,6 @@ static void rna_def_space_view3d(BlenderRNA *brna)
     RNA_def_property_ui_text(prop, "Visibility Icon", "");
   }
 
-  RNA_api_space_view3d(srna);
-
   /* Nested Structs */
   prop = RNA_def_property(srna, "shading", PROP_POINTER, PROP_NONE);
   RNA_def_property_flag(prop, PROP_NEVER_NULL);

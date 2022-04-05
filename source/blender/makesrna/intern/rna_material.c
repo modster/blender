@@ -1030,7 +1030,6 @@ static void rna_def_tex_slot(BlenderRNA *brna)
       srna, "Texture Paint Slot", "Slot that contains information about texture painting");
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_maxlength(prop, 64); /* else it uses the pointer size! */
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_string_funcs(
       prop, "rna_TexPaintSlot_name_get", "rna_TexPaintSlot_name_length", NULL);

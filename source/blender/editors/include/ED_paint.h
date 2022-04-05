@@ -126,8 +126,12 @@ eV3DShadingColorType ED_paint_shading_color_override(struct bContext *C,
                                                      struct Object *ob,
                                                      eV3DShadingColorType orig_color_type);
 
-/** Does the active tool uses a paint canvas for the given object. */
-bool ED_paint_tool_use_canvas(struct bContext *C, struct Object *ob);
+/**
+ * Does the given tool use a paint canvas.
+ * 
+ * When #tref isn't given the active tool from the context is used.
+ */
+bool ED_paint_tool_use_canvas(struct bContext *C, struct bToolRef *tref);
 
 /* Store the last used tool in the sculpt session. */
 void ED_paint_tool_update_sticky_shading_color(struct bContext *C, struct Object *ob);

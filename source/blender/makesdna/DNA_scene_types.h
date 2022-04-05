@@ -938,7 +938,7 @@ typedef struct PaintModeSettings {
   char _pad[7];
 
   /** Selected image when canvas_source=PAINT_CANVAS_SOURCE_IMAGE. */
-  Image *image;
+  Image *canvas_image;
 
 } PaintModeSettings;
 

@@ -458,6 +458,10 @@ class VIEW3D_MT_tools_projectpaint_uvlayer(Menu):
 
 class SelectPaintSlotHelper:
     bl_category = "Tool"
+
+    canvas_source_attr_name = "canvas_source"
+    canvas_image_attr_name = "canvas_image"
+
     def draw(self, context):
         layout = self.layout
         layout.use_property_split = True
@@ -468,12 +472,12 @@ class SelectPaintSlotHelper:
 
         ob = context.active_object
 
-        layout.prop(mode_settings, "mode", text="Mode")
+        layout.prop(mode_settings, self.canvas_source_attr_name, text="Mode")
         layout.separator()
 
         have_image = False
 
-        match mode_settings.mode:
+        match getattr(mode_settings, self.canvas_source_attr_name):
             case 'MATERIAL':
                 if len(ob.material_slots) > 1:
                     layout.template_list("MATERIAL_UL_matslots", "layers",
@@ -504,12 +508,12 @@ class SelectPaintSlotHelper:
             case 'IMAGE':
                 mesh = ob.data
                 uv_text = mesh.uv_layers.active.name if mesh.uv_layers.active else ""
-                layout.template_ID(mode_settings, "canvas", new="image.new", open="image.open")
+                layout.template_ID(mode_settings, self.canvas_image_attr_name, new="image.new", open="image.open")
                 if settings.missing_uvs:
                     layout.operator("paint.add_simple_uvs", icon='ADD', text="Add UVs")
                 else:
                     layout.menu("VIEW3D_MT_tools_projectpaint_uvlayer", text=uv_text, translate=False)
-                have_image = settings.canvas is not None
+                have_image = getattr(settings, self.canvas_image_attr_name) is not None
                 
                 self.draw_image_interpolation(layout=layout, mode_settings=mode_settings)
 
@@ -533,6 +537,9 @@ class VIEW3D_PT_slots_projectpaint(SelectPaintSlotHelper, View3DPanel, Panel):
     bl_context = ".imagepaint"  # dot on purpose (access from topbar)
     bl_label = "Texture Slots"
 
+    canvas_source_attr_name = "mode"
+    canvas_image_attr_name = "canvas"
+
     @classmethod
     def poll(cls, context):
         brush = context.tool_settings.image_paint.brush
@@ -555,9 +562,11 @@ class VIEW3D_PT_slots_paint_canvas(SelectPaintSlotHelper, View3DPanel, Panel):
     def poll(cls, context):
         if not context.preferences.experimental.use_sculpt_vertex_colors:
             return False
-        if context.space_data is None:
+        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        tool = ToolSelectPanelHelper.tool_active_from_context(context)
+        if tool is None:
             return False
-        return context.space_data.uses_paint_canvas()
+        return tool.use_paint_canvas
 
     def get_mode_settings(self, context):
         return context.tool_settings.paint_mode

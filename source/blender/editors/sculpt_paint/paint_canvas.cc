@@ -89,19 +89,16 @@ static bool paint_tool_shading_color_follows_last_used_tool(struct bContext *C, 
   return paint_tool_shading_color_follows_last_used(tref->idname);
 }
 
-bool ED_paint_tool_use_canvas(struct bContext *C, struct Object *ob)
+bool ED_paint_tool_use_canvas(struct bContext *C, bToolRef *tref)
 {
-  /* Quick exit, only sculpt tools can use canvas. */
-  if (ob == nullptr || ob->sculpt == nullptr) {
+  if (tref == nullptr) {
+    tref = WM_toolsystem_ref_from_context(C);
+  }
+  if (tref == nullptr) {
     return false;
   }
 
-  bToolRef *tref = WM_toolsystem_ref_from_context(C);
-  if (tref != nullptr) {
-    return paint_tool_uses_canvas(tref->idname);
-  }
-
-  return false;
+  return paint_tool_uses_canvas(tref->idname);
 }
 
 eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
@@ -113,7 +110,7 @@ eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
    * For better integration with the vertex paint in sculpt mode we sticky
    * with the last stoke when using tools like masking.
    */
-  if (!ED_paint_tool_use_canvas(C, ob) &&
+  if (!ED_paint_tool_use_canvas(C, nullptr) &&
       !(paint_tool_shading_color_follows_last_used_tool(C, ob) &&
         ob->sculpt->sticky_shading_color)) {
     return orig_color_type;
@@ -161,7 +158,7 @@ Image *ED_paint_canvas_image_get(const struct PaintModeSettings *settings, struc
     case PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE:
       return nullptr;
     case PAINT_CANVAS_SOURCE_IMAGE:
-      return settings->image;
+      return settings->canvas_image;
     case PAINT_CANVAS_SOURCE_MATERIAL: {
       TexPaintSlot *slot = get_active_slot(ob);
       if (slot == nullptr) {

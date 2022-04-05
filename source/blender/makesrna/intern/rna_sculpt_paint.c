@@ -552,7 +552,7 @@ static void rna_ImaPaint_canvas_update(bContext *C, PointerRNA *UNUSED(ptr))
 /** \name Paint mode settings
  * \{ */
 
-static bool rna_PaintModeSettings_image_poll(PointerRNA *UNUSED(ptr), PointerRNA value)
+static bool rna_PaintModeSettings_canvas_image_poll(PointerRNA *UNUSED(ptr), PointerRNA value)
 {
   Image *image = (Image *)value.owner_id;
   return !ELEM(image->type, IMA_TYPE_COMPOSITE, IMA_TYPE_R_RESULT);
@@ -1042,9 +1042,7 @@ static void rna_def_paint_mode(BlenderRNA *brna)
   RNA_def_struct_path_func(srna, "rna_PaintModeSettings_path");
   RNA_def_struct_ui_text(srna, "Paint Mode", "Properties of paint mode");
 
-  /* Property mode, sync API name with TexPaintSettings.mode */
-  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "canvas_source");
+  prop = RNA_def_property(srna, "canvas_source", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_canvas_source_items);
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
   RNA_def_property_enum_funcs(prop,
@@ -1054,10 +1052,9 @@ static void rna_def_paint_mode(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Source", "Source to select canvas from");
   RNA_def_property_update(prop, 0, "rna_PaintModeSettings_canvas_source_update");
 
-  /* Property canvas, sync API name with TexPaintSettings.canvas */
-  prop = RNA_def_property(srna, "canvas", PROP_POINTER, PROP_NONE);
-  RNA_def_property_pointer_sdna(prop, NULL, "image");
-  RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_PaintModeSettings_image_poll");
+  prop = RNA_def_property(srna, "canvas_image", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_funcs(
+      prop, NULL, NULL, NULL, "rna_PaintModeSettings_canvas_image_poll");
   RNA_def_property_flag(prop, PROP_EDITABLE | PROP_CONTEXT_UPDATE);
   RNA_def_property_ui_text(prop, "Texture", "Image used as as painting target");
 }
