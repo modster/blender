@@ -684,7 +684,7 @@ GPUMaterial *GPU_material_from_nodetree(Scene *scene,
 
   gpu_material_ramp_texture_build(mat);
 
-  if (mat->graph.outlink_surface || mat->graph.outlink_volume) {
+  {
     /* Create source code and search pass cache for an already compiled version. */
     mat->pass = GPU_generate_pass(mat, &mat->graph, callback, thunk);
 
@@ -704,10 +704,6 @@ GPUMaterial *GPU_material_from_nodetree(Scene *scene,
         mat->status = GPU_MAT_CREATED;
       }
     }
-  }
-  else {
-    mat->status = GPU_MAT_FAILED;
-    gpu_node_graph_free(&mat->graph);
   }
 
   /* Only free after GPU_pass_shader_get where GPUUniformBuf read data from the local tree. */

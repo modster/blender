@@ -1244,7 +1244,7 @@ Material *EEVEE_material_default_glossy_get(void)
 Material *EEVEE_material_default_error_get(void)
 {
   if (!e_data.error_mat) {
-    Material *ma = BKE_id_new_nomain(ID_MA, "EEVEEE default metal");
+    Material *ma = BKE_id_new_nomain(ID_MA, "EEVEEE default error");
 
     bNodeTree *ntree = ntreeAddTree(NULL, "Shader Nodetree", ntreeType_Shader->idname);
     ma->nodetree = ntree;
