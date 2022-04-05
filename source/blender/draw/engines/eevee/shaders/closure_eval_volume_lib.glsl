@@ -15,6 +15,10 @@ Closure closure_eval(ClosureDiffuse diffuse)
 {
   return CLOSURE_DEFAULT;
 }
+Closure closure_eval(ClosureTranslucent translucent)
+{
+  return CLOSURE_DEFAULT;
+}
 Closure closure_eval(ClosureReflection reflection)
 {
   return CLOSURE_DEFAULT;

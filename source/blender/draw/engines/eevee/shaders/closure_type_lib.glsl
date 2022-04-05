@@ -32,6 +32,7 @@ vec4 closure_to_rgba(Closure);
 
 /* Single BSDFs. */
 Closure closure_eval(ClosureDiffuse diffuse);
+Closure closure_eval(ClosureTranslucent translucent);
 Closure closure_eval(ClosureReflection reflection);
 Closure closure_eval(ClosureRefraction refraction);
 Closure closure_eval(ClosureEmission emission);

@@ -63,6 +63,21 @@ Closure closure_eval(ClosureDiffuse diffuse)
   return closure;
 }
 
+CLOSURE_EVAL_FUNCTION_DECLARE_1(TranslucentBSDF, Translucent);
+Closure closure_eval(ClosureTranslucent translucent)
+{
+  /* Glue with the old system. */
+  CLOSURE_VARS_DECLARE_1(Translucent);
+
+  in_Translucent_0.N = translucent.N;
+
+  CLOSURE_EVAL_FUNCTION_1(TranslucentBSDF, Translucent);
+
+  Closure closure = CLOSURE_DEFAULT;
+  closure.radiance += out_Translucent_0.radiance * translucent.color * translucent.weight;
+  return closure;
+}
+
 CLOSURE_EVAL_FUNCTION_DECLARE_1(GlossyBSDF, Glossy);
 Closure closure_eval(ClosureReflection reflection)
 {

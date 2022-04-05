@@ -133,6 +133,12 @@ struct ClosureDiffuse {
   uint sss_id;
 };
 
+struct ClosureTranslucent {
+  float weight;
+  vec3 color;
+  vec3 N;
+};
+
 struct ClosureReflection {
   float weight;
   vec3 color;
