@@ -2338,6 +2338,12 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
 
   int allocate_la_e = edge_reduce.feat_edges;
 
+  if (!edge_pair_arr) {
+    edge_pair_alloc_len = 256;
+    edge_pair_arr = MEM_mallocN(sizeof(EdgeFacePair) * edge_pair_alloc_len,
+                                "lineart edge_pair arr");
+  }
+
   /* Check for edge marks that would create feature edges. */
   for (int i = 0; i < me->totedge; i++) {
     MEdge *medge = &me->medge[i];
@@ -2347,7 +2353,7 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
     if (eflag) {
       int min_edges_to_add = 0;
       void **eval;
-      if (!BLI_edgehash_ensure_p(edge_hash, medge->v1, medge->v2, &eval)) {
+      if (edge_hash == NULL || !BLI_edgehash_ensure_p(edge_hash, medge->v1, medge->v2, &eval)) {
         int pair_idx = edge_pair_arr_len++;
         /* Edge has not been added before, create a new pair. */
         EdgeFacePair *pair = &edge_pair_arr[pair_idx];
@@ -2357,7 +2363,9 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
         pair->f1 = -1;
         pair->f2 = -1;
         pair->eflag = eflag;
-        *eval = POINTER_FROM_INT(pair_idx);
+        if (edge_hash) {
+          *eval = POINTER_FROM_INT(pair_idx);
+        }
         min_edges_to_add = 1;
 
         if (edge_pair_arr_len == edge_pair_alloc_len) {
@@ -2387,7 +2395,9 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
     }
   }
 
-  BLI_edgehash_free(edge_hash, NULL);
+  if (edge_hash) {
+    BLI_edgehash_free(edge_hash, NULL);
+  }
 
   la_edge_arr = lineart_mem_acquire_thread(&re_buf->render_data_pool,
                                            sizeof(LineartEdge) * allocate_la_e);
