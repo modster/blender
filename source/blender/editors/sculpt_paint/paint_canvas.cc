@@ -51,13 +51,13 @@ eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
     return orig_color_type;
   }
 
-  eV3DShadingColorType override = orig_color_type;
+  eV3DShadingColorType color_type = orig_color_type;
   switch (settings->canvas_source) {
     case PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE:
-      override = V3D_SHADING_VERTEX_COLOR;
+      color_type = V3D_SHADING_VERTEX_COLOR;
       break;
     case PAINT_CANVAS_SOURCE_IMAGE:
-      override = V3D_SHADING_TEXTURE_COLOR;
+      color_type = V3D_SHADING_TEXTURE_COLOR;
       break;
     case PAINT_CANVAS_SOURCE_MATERIAL: {
       TexPaintSlot *slot = get_active_slot(ob);
@@ -66,10 +66,10 @@ eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
       }
 
       if (slot->ima) {
-        override = V3D_SHADING_TEXTURE_COLOR;
+        color_type = V3D_SHADING_TEXTURE_COLOR;
       }
       if (slot->attribute_name) {
-        override = V3D_SHADING_VERTEX_COLOR;
+        color_type = V3D_SHADING_VERTEX_COLOR;
       }
 
       break;
@@ -77,14 +77,14 @@ eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
   }
 
   /* Reset to original color based on enabled experimental features */
-  if (!U.experimental.use_sculpt_vertex_colors && override == V3D_SHADING_VERTEX_COLOR) {
+  if (!U.experimental.use_sculpt_vertex_colors && color_type == V3D_SHADING_VERTEX_COLOR) {
     return orig_color_type;
   }
-  if (!U.experimental.use_sculpt_texture_paint && override == V3D_SHADING_TEXTURE_COLOR) {
+  if (!U.experimental.use_sculpt_texture_paint && color_type == V3D_SHADING_TEXTURE_COLOR) {
     return orig_color_type;
   }
 
-  return override;
+  return color_type;
 }
 
 Image *ED_paint_canvas_image_get(const struct PaintModeSettings *settings, struct Object *ob)
