@@ -50,7 +50,11 @@ static int node_shader_gpu_subsurface_scattering(GPUMaterial *mat,
     GPU_link(mat, "world_normals_get", &in[5].link);
   }
 
-  bool use_subsurf = GPU_material_sss_profile_create(mat, in[2].vec);
+  bNodeSocket *socket = (bNodeSocket *)BLI_findlink(&node->original->inputs, 2);
+  bNodeSocketValueRGBA *socket_data = (bNodeSocketValueRGBA *)socket->default_value;
+  /* For some reason it seems that the socket value is in ARGB format. */
+  bool use_subsurf = GPU_material_sss_profile_create(mat, &socket_data->value[1]);
+
   float use_sss = (use_subsurf) ? 1.0f : 0.0f;
 
   GPU_material_flag_set(mat, GPU_MATFLAG_DIFFUSE | GPU_MATFLAG_SUBSURFACE);

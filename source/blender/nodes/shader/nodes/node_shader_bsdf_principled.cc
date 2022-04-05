@@ -169,7 +169,10 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
   }
 
   if (use_subsurf) {
-    use_subsurf = GPU_material_sss_profile_create(mat, in[2].vec);
+    bNodeSocket *socket = (bNodeSocket *)BLI_findlink(&node->original->inputs, 2);
+    bNodeSocketValueRGBA *socket_data = (bNodeSocketValueRGBA *)socket->default_value;
+    /* For some reason it seems that the socket value is in ARGB format. */
+    use_subsurf = GPU_material_sss_profile_create(mat, &socket_data->value[1]);
   }
 
   float use_multi_scatter = (node->custom1 == SHD_GLOSSY_MULTI_GGX) ? 1.0f : 0.0f;
