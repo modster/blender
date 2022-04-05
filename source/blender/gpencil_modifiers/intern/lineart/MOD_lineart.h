@@ -14,6 +14,14 @@
 
 #include <math.h>
 
+typedef struct EdgeFacePair {
+  int v1;
+  int v2;
+  int f1;
+  int f2;
+  uint16_t eflag;
+} EdgeFacePair;
+
 typedef struct LineartStaticMemPoolNode {
   Link item;
   size_t size;
@@ -241,6 +249,12 @@ enum eLineartShadowCameraType {
   LRT_SHADOW_CAMERA_POINT = 2,
 };
 
+typedef struct LineartPendingEdges {
+  LineartEdge **array;
+  int max;
+  int next;
+} LineartPendingEdges;
+
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
 
@@ -306,6 +320,10 @@ typedef struct LineartRenderBuffer {
   ListBase floating;
   ListBase light_contour;
   ListBase shadow;
+
+  /* Note: Data here are allocated with MEM_xxx call instead of in pool. */
+  struct LineartPendingEdges pending_edges;
+  int scheduled_count;
 
   ListBase chains;
 
@@ -435,6 +453,10 @@ typedef struct LineartRenderTaskInfo {
   ListBase light_contour;
   ListBase shadow;
 
+  /* Here it doesn't really hold memory, it just stores a refernce to a portion in
+   * rb->pending_edges. */
+  struct LineartPendingEdges pending_edges;
+
 } LineartRenderTaskInfo;
 
 #define LRT_OBINDEX_SHIFT 20
@@ -468,11 +490,14 @@ typedef struct LineartObjectInfo {
   ListBase light_contour;
   ListBase shadow;
 
+  /* Note: Data here are allocated with MEM_xxx call instead of in pool. */
+  struct LineartPendingEdges pending_edges;
+
 } LineartObjectInfo;
 
 typedef struct LineartObjectLoadTaskInfo {
   struct LineartRenderBuffer *rb;
-  struct Depsgraph *dg;
+  int thread_id;
   /* LinkNode styled list */
   LineartObjectInfo *pending;
   /* Used to spread the load across several threads. This can not overflow. */
