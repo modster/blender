@@ -514,6 +514,10 @@ class _draw_tool_settings_context_mode:
             layout.prop(tool_settings.curves_sculpt, "interpolate_length")
             layout.prop(tool_settings.curves_sculpt, "interpolate_shape")
 
+        if brush.curves_sculpt_tool == 'SNAKE_HOOK':
+            layout.prop(brush, "falloff_shape", expand=True)
+            layout.prop(brush, "curve_preset")
+
         if brush.curves_sculpt_tool == 'TEST1':
             layout.prop(tool_settings.curves_sculpt, "distance")
 
@@ -2637,6 +2641,8 @@ class VIEW3D_MT_object_apply(Menu):
 
     def draw(self, _context):
         layout = self.layout
+        # Need invoke for the popup confirming the multi-user data operation
+        layout.operator_context = 'INVOKE_DEFAULT'
 
         props = layout.operator("object.transform_apply", text="Location", text_ctxt=i18n_contexts.default)
         props.location, props.rotation, props.scale = True, False, False
@@ -2859,6 +2865,9 @@ class VIEW3D_MT_object_convert(Menu):
         # Potrace lib dependency.
         if bpy.app.build_options.potrace:
             layout.operator("gpencil.trace_image", icon='OUTLINER_OB_GREASEPENCIL')
+
+        if ob and ob.type == 'CURVES':
+            layout.operator("curves.convert_to_particle_system", text="Particle System")
 
 
 class VIEW3D_MT_make_links(Menu):
@@ -3438,7 +3447,6 @@ class VIEW3D_MT_pose(Menu):
 
         layout.separator()
 
-        layout.menu("VIEW3D_MT_pose_library")
         layout.menu("VIEW3D_MT_pose_motion")
         layout.menu("VIEW3D_MT_pose_group")
 
@@ -3518,21 +3526,6 @@ class VIEW3D_MT_pose_propagate(Menu):
         layout.separator()
 
         layout.operator("pose.propagate", text="On Selected Markers").mode = 'SELECTED_MARKERS'
-
-
-class VIEW3D_MT_pose_library(Menu):
-    bl_label = "Pose Library"
-
-    def draw(self, _context):
-        layout = self.layout
-
-        layout.operator("poselib.browse_interactive", text="Browse Poses...")
-
-        layout.separator()
-
-        layout.operator("poselib.pose_add", text="Add Pose...")
-        layout.operator("poselib.pose_rename", text="Rename Pose...")
-        layout.operator("poselib.pose_remove", text="Remove Pose...")
 
 
 class VIEW3D_MT_pose_motion(Menu):
@@ -5313,7 +5306,7 @@ class VIEW3D_MT_pivot_pie(Menu):
         pie.prop_enum(context.scene.tool_settings, "transform_pivot_point", value='ACTIVE_ELEMENT')
         if (obj is None) or (mode in {'OBJECT', 'POSE', 'WEIGHT_PAINT'}):
             pie.prop(context.scene.tool_settings, "use_transform_pivot_point_align")
-        if mode in {'EDIT_GPENCIL'}:
+        if mode == 'EDIT_GPENCIL':
             pie.prop(context.scene.tool_settings.gpencil_sculpt, "use_scale_thickness")
 
 
@@ -7694,7 +7687,6 @@ classes = (
     VIEW3D_MT_pose_transform,
     VIEW3D_MT_pose_slide,
     VIEW3D_MT_pose_propagate,
-    VIEW3D_MT_pose_library,
     VIEW3D_MT_pose_motion,
     VIEW3D_MT_pose_group,
     VIEW3D_MT_pose_ik,
