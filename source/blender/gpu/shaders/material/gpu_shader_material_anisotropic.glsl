@@ -19,7 +19,7 @@ void node_bsdf_anisotropic(vec4 color,
   reflection_data.weight = weight;
   reflection_data.color = (do_multiscatter != 0.0) ?
                               F_brdf_multi_scatter(color.rgb, color.rgb, split_sum) :
-                              color.rgb;
+                              F_brdf_single_scatter(color.rgb, color.rgb, split_sum);
   reflection_data.N = N;
   reflection_data.roughness = roughness;
 
