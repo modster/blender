@@ -193,7 +193,7 @@ static void geom_add_polygon(Geometry *geom,
                                                  -offsets.get_index_offset() - 1;
     if (corner.vert_index < 0 || corner.vert_index >= global_vertices.vertices.size()) {
       fprintf(stderr,
-              "Invalid vertex index %i (valid range [0, %zi)), ignoring face\n",
+              "Invalid vertex index %i (valid range [0, %zu)), ignoring face\n",
               corner.vert_index,
               (size_t)global_vertices.vertices.size());
       face_valid = false;
@@ -202,7 +202,7 @@ static void geom_add_polygon(Geometry *geom,
       corner.uv_vert_index += corner.uv_vert_index < 0 ? global_vertices.uv_vertices.size() : -1;
       if (corner.uv_vert_index < 0 || corner.uv_vert_index >= global_vertices.uv_vertices.size()) {
         fprintf(stderr,
-                "Invalid UV index %i (valid range [0, %zi)), ignoring face\n",
+                "Invalid UV index %i (valid range [0, %zu)), ignoring face\n",
                 corner.uv_vert_index,
                 (size_t)global_vertices.uv_vertices.size());
         face_valid = false;
@@ -215,7 +215,7 @@ static void geom_add_polygon(Geometry *geom,
       if (corner.vertex_normal_index < 0 ||
           corner.vertex_normal_index >= global_vertices.vertex_normals.size()) {
         fprintf(stderr,
-                "Invalid normal index %i (valid range [0, %zi)), ignoring face\n",
+                "Invalid normal index %i (valid range [0, %zu)), ignoring face\n",
                 corner.vertex_normal_index,
                 (size_t)global_vertices.vertex_normals.size());
         face_valid = false;
@@ -318,9 +318,6 @@ static void geom_update_smooth_group(const StringRef rest_line, bool &r_state_sh
   }
 }
 
-/**
- * Open OBJ file at the path given in import parameters.
- */
 OBJParser::OBJParser(const OBJImportParams &import_params) : import_params_(import_params)
 {
   obj_file_.open(import_params_.filepath);
@@ -330,10 +327,6 @@ OBJParser::OBJParser(const OBJImportParams &import_params) : import_params_(impo
   }
 }
 
-/**
- * Read the OBJ file line by line and create OBJ Geometry instances. Also store all the vertex
- * and UV vertex coordinates in a struct accessible by all objects.
- */
 void OBJParser::parse(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
                       GlobalVertices &r_global_vertices)
 {
@@ -470,7 +463,7 @@ static StringRef skip_unsupported_options(StringRef line)
     return line;
   }
 
-  /* Remove upto start of the last option + size of the last option + space after it. */
+  /* Remove up to start of the last option + size of the last option + space after it. */
   line = line.drop_prefix(last_option_pos + last_option.size() + 1);
   for (int i = 0; i < map_options.number_of_args(last_option); i++) {
     const int64_t pos_space{line.find_first_of(' ')};
@@ -499,17 +492,11 @@ static string fix_bad_map_keys(StringRef map_key)
   return new_map_key;
 }
 
-/**
- * Return a list of all material library filepaths referenced by the OBJ file.
- */
 Span<std::string> OBJParser::mtl_libraries() const
 {
   return mtl_libraries_;
 }
 
-/**
- * Open material library file.
- */
 MTLParser::MTLParser(StringRef mtl_library, StringRefNull obj_filepath)
 {
   char obj_file_dir[FILE_MAXDIR];
@@ -523,9 +510,6 @@ MTLParser::MTLParser(StringRef mtl_library, StringRefNull obj_filepath)
   }
 }
 
-/**
- * Read MTL file(s) and add MTLMaterial instances to the given Map reference.
- */
 void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl_materials)
 {
   if (!mtl_file_.good()) {
@@ -589,7 +573,7 @@ void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl
 
     /* Parse image textures. */
     else if (line_key.find("map_") != StringRef::not_found) {
-      /* TODO howardt: fix this */
+      /* TODO(@howardt): fix this. */
       eMTLSyntaxElement line_key_enum = mtl_line_key_str_to_enum(line_key);
       if (line_key_enum == eMTLSyntaxElement::string ||
           !current_mtlmaterial->texture_maps.contains_as(line_key_enum)) {
@@ -601,7 +585,7 @@ void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl
       Vector<StringRef> str_map_xx_split;
       split_by_char(rest_line, ' ', str_map_xx_split);
 
-      /* TODO ankitm: use `skip_unsupported_options` for parsing these options too? */
+      /* TODO(@ankitm): use `skip_unsupported_options` for parsing these options too? */
       const int64_t pos_o{str_map_xx_split.first_index_of_try("-o")};
       if (pos_o != -1 && pos_o + 3 < str_map_xx_split.size()) {
         copy_string_to_float({str_map_xx_split[pos_o + 1],
