@@ -991,6 +991,9 @@ static bool ntree_branch_node_tag(bNode *fromnode, bNode *tonode, void *UNUSED(u
   return true;
 }
 
+/* Avoid adding more node execution when multiple outputs are present. */
+/* NOTE(@fclem): This is also a workaround for the old EEVEE SSS implementation where only the
+ * first executed SSS node gets a SSS profile. */
 static void ntree_shader_pruned_unused(bNodeTree *ntree, bNode *output_node)
 {
   bool changed = false;
@@ -998,6 +1001,9 @@ static void ntree_shader_pruned_unused(bNodeTree *ntree, bNode *output_node)
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     node->tmp_flag = 0;
   }
+
+  /* Avoid deleting the output node if it is the only node in the tree. */
+  output_node->tmp_flag = 1;
 
   nodeChainIterBackwards(ntree, output_node, ntree_branch_node_tag, nullptr, 0);
 
@@ -1023,15 +1029,11 @@ void ntreeGPUMaterialNodes(bNodeTree *localtree, GPUMaterial *mat)
 
   bNode *output = ntreeShaderOutputNode(localtree, SHD_OUTPUT_EEVEE);
 
-  /* Avoid adding more node execution when multiple outputs are present. */
-  /* NOTE(@fclem): This is also a workaround for the old EEVEE SSS implementation where only the
-   * first executed SSS node gets a SSS profile. */
-  ntree_shader_pruned_unused(localtree, output);
-
   /* Tree is valid if it contains no undefined implicit socket type cast. */
   bool valid_tree = ntree_shader_implicit_closure_cast(localtree);
 
   if (valid_tree && output != NULL) {
+    ntree_shader_pruned_unused(localtree, output);
     ntree_shader_shader_to_rgba_branch(localtree, output);
     ntree_shader_weight_tree_invert(localtree, output);
   }
