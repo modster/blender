@@ -102,6 +102,11 @@ vec2 attr_load_vec2(samplerBuffer cd_buf)
   return texelFetch(cd_buf, hairStrandID).rg;
 }
 
+float attr_load_float(samplerBuffer cd_buf)
+{
+  return texelFetch(cd_buf, hairStrandID).r;
+}
+
 #else
 
 #  ifdef OBINFO_LIB
@@ -136,6 +141,10 @@ vec3 attr_load_vec3(vec3 attr)
   return attr;
 }
 vec2 attr_load_vec2(vec2 attr)
+{
+  return attr;
+}
+float attr_load_float(float attr)
 {
   return attr;
 }

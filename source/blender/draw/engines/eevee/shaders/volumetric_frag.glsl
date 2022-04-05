@@ -113,6 +113,10 @@ vec2 attr_load_vec2(vec2 attr)
 {
   return vec2(0);
 }
+float attr_load_float(float attr)
+{
+  return 0.0;
+}
 vec4 attr_load_color(vec4 attr)
 {
   return vec4(0);

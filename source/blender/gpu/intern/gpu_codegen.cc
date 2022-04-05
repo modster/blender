@@ -348,6 +348,10 @@ void GPUCodegen::generate_attribs()
         iface_type = GPU_VEC3;
         load_ss << " = attr_load_orco(" << attr_name << ");\n";
         break;
+      case CD_HAIRLENGTH:
+        iface_type = input_type = GPU_FLOAT;
+        load_ss << " = attr_load_" << input_type << "(" << attr_name << ");\n";
+        break;
       case CD_TANGENT:
         iface_type = input_type = GPU_VEC4;
         load_ss << " = attr_load_tangent(" << attr_name << ");\n";
