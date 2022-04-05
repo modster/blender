@@ -11,6 +11,7 @@
 #include "BKE_customdata.h"
 #include "BKE_material.h"
 #include "BKE_paint.h"
+#include "BKE_pbvh.h"
 
 #include "DEG_depsgraph.h"
 
@@ -225,6 +226,10 @@ void ED_paint_do_msg_notify_active_tool_changed(struct bContext *C,
   if (ob == nullptr) {
     return;
   }
-  DEG_id_tag_update(&ob->id, ID_RECALC_SHADING);
+  if (ob->sculpt == nullptr) {
+    return;
+  }
+  PBVH *pbvh = ob->sculpt->pbvh;
+  BKE_pbvh_mark_update_color(pbvh);
 }
 }
