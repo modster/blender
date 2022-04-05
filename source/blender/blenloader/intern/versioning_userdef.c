@@ -354,7 +354,7 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
 #undef USER_VERSION_ATLEAST
 }
 
-/* UserDef.flag */
+/** #UserDef.flag */
 #define USER_LMOUSESELECT (1 << 14) /* deprecated */
 
 static void do_version_select_mouse(UserDef *userdef, wmKeyMapItem *kmi)
@@ -1009,6 +1009,10 @@ void blo_do_versions_userdef(UserDef *userdef)
                                     }),
                                     keymap_item_update_tweak_event,
                                     NULL);
+  }
+
+  if (!USER_VERSION_ATLEAST(302, 11)) {
+    userdef->dupflag |= USER_DUP_CURVES | USER_DUP_POINTCLOUD;
   }
 
   /**

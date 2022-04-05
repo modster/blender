@@ -2552,7 +2552,24 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  if (!MAIN_VERSION_ATLEAST(bmain, 302, 9)) {
+  if (!MAIN_VERSION_ATLEAST(bmain, 302, 10)) {
+    for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype != SPACE_FILE) {
+            continue;
+          }
+          SpaceFile *sfile = (SpaceFile *)sl;
+          if (sfile->browse_mode != FILE_BROWSE_MODE_ASSETS) {
+            continue;
+          }
+          sfile->asset_params->base_params.filter_id |= FILTER_ID_GR;
+        }
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 302, 10)) {
     /* While vertex-colors were experimental the smear tool became corrupt due
      * to bugs in the wm_toolsystem API (auto-creation of sculpt brushes
      * was broken).  Go through and reset all smear brushes. */
