@@ -240,8 +240,9 @@ GPUUniformAttrList *GPU_material_uniform_attributes(GPUMaterial *material)
 typedef struct GPUSssKernelData {
   float kernel[SSS_SAMPLES][4];
   float param[3], max_radius;
+  float avg_inv_radius;
   int samples;
-  int pad[3];
+  int pad[2];
 } GPUSssKernelData;
 
 BLI_STATIC_ASSERT_ALIGN(GPUSssKernelData, 16)
@@ -297,6 +298,8 @@ static void compute_sss_kernel(GPUSssKernelData *kd, const float radii[3], int s
   rad[0] = MAX2(radii[0], 1e-15f);
   rad[1] = MAX2(radii[1], 1e-15f);
   rad[2] = MAX2(radii[2], 1e-15f);
+
+  kd->avg_inv_radius = 3.0f / (rad[0] + rad[1] + rad[2]);
 
   /* Christensen-Burley fitting */
   float l[3], d[3];
