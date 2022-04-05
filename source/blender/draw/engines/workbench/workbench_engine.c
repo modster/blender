@@ -95,8 +95,6 @@ static void workbench_cache_sculpt_populate(WORKBENCH_PrivateData *wpd,
                                             eV3DShadingColorType color_type)
 {
   const bool use_single_drawcall = !ELEM(color_type, V3D_SHADING_MATERIAL_COLOR);
-  //  BLI_assert(color_type != V3D_SHADING_TEXTURE_COLOR);
-
   if (use_single_drawcall) {
     DRWShadingGroup *grp = workbench_material_setup(wpd, ob, 0, color_type, NULL);
     DRW_shgroup_call_sculpt(grp, ob, false, false);
