@@ -231,6 +231,16 @@ class GVArrayImpl_For_SingleValueRef : public GVArrayImpl {
   {
     type_->copy_assign(value_, r_value);
   }
+
+  void materialize(const IndexMask mask, void *dst) const override
+  {
+    type_->fill_assign_indices(value_, dst, mask);
+  }
+
+  void materialize_to_uninitialized(const IndexMask mask, void *dst) const override
+  {
+    type_->fill_construct_indices(value_, dst, mask);
+  }
 };
 
 class GVArrayImpl_For_SingleValueRef_final final : public GVArrayImpl_For_SingleValueRef {
