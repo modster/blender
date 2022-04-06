@@ -14,7 +14,6 @@
 #  include "BKE_global.h"
 
 #  include "ED_fileselect.h"
-#  include "ED_paint.h"
 #  include "ED_screen.h"
 #  include "ED_text.h"
 
@@ -57,7 +56,6 @@ static void rna_SpaceTextEditor_region_location_from_cursor(
     ED_text_region_location_from_cursor(st, region, cursor_co, r_pixel_pos);
   }
 }
-
 
 #else
 

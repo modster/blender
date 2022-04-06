@@ -44,7 +44,6 @@
 
 #include "ED_object.h"
 #include "ED_outliner.h"
-#include "ED_paint.h"
 #include "ED_render.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"

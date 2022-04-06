@@ -20,8 +20,6 @@ struct UndoStep;
 struct UndoType;
 struct bContext;
 struct wmKeyConfig;
-struct wmMsgSubscribeKey;
-struct wmMsgSubscribeValue;
 struct wmOperator;
 
 /* paint_ops.c */
@@ -128,7 +126,7 @@ eV3DShadingColorType ED_paint_shading_color_override(struct bContext *C,
 
 /**
  * Does the given tool use a paint canvas.
- * 
+ *
  * When #tref isn't given the active tool from the context is used.
  */
 bool ED_paint_tool_use_canvas(struct bContext *C, struct bToolRef *tref);

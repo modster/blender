@@ -1724,13 +1724,6 @@ BMesh *BKE_pbvh_get_bmesh(PBVH *pbvh)
   return pbvh->bm;
 }
 
-void BKE_pbvh_mark_update_color(PBVH *pbvh)
-{
-  for (int n = 0; n < pbvh->totnode; n++) {
-    BKE_pbvh_node_mark_rebuild_draw(&pbvh->nodes[n]);
-  }
-}
-
 /***************************** Node Access ***********************************/
 
 void BKE_pbvh_node_mark_update(PBVHNode *node)
