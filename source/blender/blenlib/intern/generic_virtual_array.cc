@@ -172,6 +172,16 @@ GSpan GVArrayImpl_For_GSpan::get_internal_span() const
   return GSpan(*type_, data_, size_);
 }
 
+void GVArrayImpl_For_GSpan::materialize(const IndexMask mask, void *dst) const
+{
+  type_->copy_assign_indices(data_, dst, mask);
+}
+
+void GVArrayImpl_For_GSpan::materialize_to_uninitialized(const IndexMask mask, void *dst) const
+{
+  type_->copy_construct_indices(data_, dst, mask);
+}
+
 class GVArrayImpl_For_GSpan_final final : public GVArrayImpl_For_GSpan {
  public:
   using GVArrayImpl_For_GSpan::GVArrayImpl_For_GSpan;

@@ -590,6 +590,9 @@ class GVArrayImpl_For_GSpan : public GVMutableArrayImpl {
 
   bool is_span() const override;
   GSpan get_internal_span() const override;
+
+  virtual void materialize(const IndexMask mask, void *dst) const override;
+  virtual void materialize_to_uninitialized(const IndexMask mask, void *dst) const override;
 };
 
 /** \} */
