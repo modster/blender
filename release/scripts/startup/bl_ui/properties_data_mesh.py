@@ -573,7 +573,7 @@ class DATA_PT_mesh_attributes(MeshButtonsPanel, Panel):
         layout.label(text="Name collisions: {}".format(", ".join(colliding_names)), icon='ERROR')
 
 
-class MESH_UL_color_attributes(UIList):
+class ColorAttributesListBase():
     display_domain_names = {
         'POINT': "Vertex",
         'EDGE': "Edge",
@@ -595,6 +595,8 @@ class MESH_UL_color_attributes(UIList):
 
         return ret, idxs
 
+
+class MESH_UL_color_attributes(UIList, ColorAttributesListBase):
     def draw_item(self, _context, layout, data, attribute, _icon, _active_data, _active_propname, _index):
         data_type = attribute.bl_rna.properties['data_type'].enum_items[attribute.data_type]
 
@@ -616,6 +618,12 @@ class MESH_UL_color_attributes(UIList):
         sub.alignment = 'RIGHT'
         sub.active = False
         sub.label(text="%s ▶ %s" % (domain_name, data_type.name))
+
+
+class MESH_UL_color_attributes_selector(UIList, ColorAttributesListBase):
+    def draw_item(self, _context, layout, data, attribute, _icon, _active_data, _active_propname, _index):
+        layout.emboss = 'NONE'
+        layout.prop(attribute, "name", text="", icon='COLOR')
 
 
 class DATA_PT_vertex_colors(DATA_PT_mesh_attributes, Panel):
@@ -668,6 +676,7 @@ classes = (
     DATA_PT_customdata,
     DATA_PT_custom_props_mesh,
     MESH_UL_color_attributes,
+    MESH_UL_color_attributes_selector,
 )
 
 if __name__ == "__main__":  # only for live edit.

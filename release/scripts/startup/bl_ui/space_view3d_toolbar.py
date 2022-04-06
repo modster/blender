@@ -523,7 +523,7 @@ class SelectPaintSlotHelper:
             case 'COLOR_ATTRIBUTE':
                 mesh = ob.data
                 layout.template_list(
-                    "MESH_UL_color_attributes",
+                    "MESH_UL_color_attributes_selector",
                     "color_attributes",
                     mesh,
                     "color_attributes",
