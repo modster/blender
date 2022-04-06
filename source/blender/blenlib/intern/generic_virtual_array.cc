@@ -278,6 +278,16 @@ class GVArrayImpl_For_SingleValueRef : public GVArrayImpl {
   {
     type_->fill_construct_indices(value_, dst, mask);
   }
+
+  void materialize_compressed(const IndexMask mask, void *dst) const
+  {
+    type_->fill_assign_n(value_, dst, mask.size());
+  }
+
+  void materialize_compressed_to_uninitialized(const IndexMask mask, void *dst) const
+  {
+    type_->fill_construct_n(value_, dst, mask.size());
+  }
 };
 
 class GVArrayImpl_For_SingleValueRef_final final : public GVArrayImpl_For_SingleValueRef {
