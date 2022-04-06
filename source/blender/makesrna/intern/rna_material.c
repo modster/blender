@@ -178,18 +178,14 @@ static void rna_Material_active_paint_texture_index_update(bContext *C, PointerR
       }
     }
 
-    /* For compatibility reasons with sculpt vertex paint we make the color attribute active.
-     * TODO(jbakker): In the future we should migrate vertex painting to use TexPaintSlots
-     * directly.
-     */
+    /* For compatibility reasons with vertex paint we activate the color attribute. */
     if (slot->attribute_name) {
       Object *ob = CTX_data_active_object(C);
       if (ob != NULL && ob->type == OB_MESH) {
         Mesh *mesh = ob->data;
-        int layer = CustomData_get_named_layer_index(
-            &mesh->vdata, CD_PROP_COLOR, slot->attribute_name);
-        if (layer != -1) {
-          CustomData_set_layer_active_index(&mesh->vdata, CD_PROP_COLOR, layer);
+        CustomDataLayer *layer = BKE_id_attributes_color_find(&mesh->id, slot->attribute_name);
+        if (layer != NULL) {
+          BKE_id_attributes_active_color_set(&mesh->id, layer);
         }
         DEG_id_tag_update(&ob->id, 0);
         WM_main_add_notifier(NC_GEOM | ND_DATA, &ob->id);
