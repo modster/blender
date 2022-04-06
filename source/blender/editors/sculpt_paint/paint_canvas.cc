@@ -142,9 +142,6 @@ eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
   }
 
   /* Reset to original color based on enabled experimental features */
-  if (!U.experimental.use_sculpt_vertex_colors && color_type == V3D_SHADING_VERTEX_COLOR) {
-    return orig_color_type;
-  }
   if (!U.experimental.use_sculpt_texture_paint && color_type == V3D_SHADING_TEXTURE_COLOR) {
     return orig_color_type;
   }

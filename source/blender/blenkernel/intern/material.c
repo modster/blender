@@ -1466,8 +1466,7 @@ static ePaintSlotFilter material_paint_slot_filter(const struct Object *ob)
 {
   ePaintSlotFilter slot_filter = 0;
   if (ob->mode == OB_MODE_SCULPT) {
-    SET_FLAG_FROM_TEST(
-        slot_filter, U.experimental.use_sculpt_vertex_colors, PAINT_SLOT_COLOR_ATTRIBUTE);
+    slot_filter = PAINT_SLOT_COLOR_ATTRIBUTE;
     SET_FLAG_FROM_TEST(slot_filter, U.experimental.use_sculpt_texture_paint, PAINT_SLOT_IMAGE);
   }
   else if (ob->mode == OB_MODE_TEXTURE_PAINT) {

@@ -5576,7 +5576,10 @@ def km_sculpt_curves(params):
     )
 
     items.extend([
-        ("sculpt_curves.brush_stroke", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        ("sculpt_curves.brush_stroke", {"type": 'LEFTMOUSE', "value": 'PRESS'},
+         {"properties": [("mode", 'NORMAL')]}),
+        ("sculpt_curves.brush_stroke", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True},
+         {"properties": [("mode", 'INVERT')]}),
         *_template_paint_radial_control("curves_sculpt"),
     ])
 
@@ -7369,8 +7372,7 @@ def km_3d_view_tool_sculpt_mask_by_color(params):
         "3D View Tool: Sculpt, Mask by Color",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.mask_by_color", {"type": params.tool_mouse, "value": 'ANY'}, None),
-            ("sculpt.mask_by_color", params.tool_tweak_event, None),
+            ("sculpt.mask_by_color", {"type": params.tool_mouse, "value": 'CLICK'}, None)
         ]},
     )
 

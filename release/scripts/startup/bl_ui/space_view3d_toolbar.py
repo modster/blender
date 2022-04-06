@@ -419,6 +419,9 @@ class VIEW3D_PT_tools_brush_color(Panel, View3DPaintPanel):
         elif context.vertex_paint_object:
             capabilities = brush.vertex_paint_capabilities
             return capabilities.has_color
+        elif context.sculpt_object:
+            capabilities = brush.sculpt_capabilities
+            return capabilities.has_color
 
         return False
 
@@ -518,9 +521,16 @@ class SelectPaintSlotHelper:
                 self.draw_image_interpolation(layout=layout, mode_settings=mode_settings)
 
             case 'COLOR_ATTRIBUTE':
-                me = ob.data
-                # TODO(jbakker): When vertex colors are committed change to color attributes
-                layout.template_list("MESH_UL_vcols", "vcols", me, "vertex_colors", me.vertex_colors, "active_index", rows=2)
+                mesh = ob.data
+                layout.template_list(
+                    "MESH_UL_color_attributes",
+                    "color_attributes",
+                    mesh,
+                    "color_attributes",
+                    mesh.color_attributes,
+                    "active_color_index",
+                    rows=3,
+                )
 
         if settings.missing_uvs:
             layout.separator()
@@ -560,8 +570,6 @@ class VIEW3D_PT_slots_paint_canvas(SelectPaintSlotHelper, View3DPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        if not context.preferences.experimental.use_sculpt_vertex_colors:
-            return False
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
         tool = ToolSelectPanelHelper.tool_active_from_context(context)
         if tool is None:
@@ -910,8 +918,7 @@ class VIEW3D_PT_sculpt_voxel_remesh(Panel, View3DPaintPanel):
         col.prop(mesh, "use_remesh_preserve_volume", text="Volume")
         col.prop(mesh, "use_remesh_preserve_paint_mask", text="Paint Mask")
         col.prop(mesh, "use_remesh_preserve_sculpt_face_sets", text="Face Sets")
-        if context.preferences.experimental.use_sculpt_vertex_colors:
-            col.prop(mesh, "use_remesh_preserve_vertex_colors", text="Vertex Colors")
+        col.prop(mesh, "use_remesh_preserve_vertex_colors", text="Color Attributes")
 
         layout.operator("object.voxel_remesh", text="Remesh")
 
