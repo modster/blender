@@ -154,27 +154,11 @@ template<typename T> class VArrayImpl {
   virtual void materialize_compressed(IndexMask mask, MutableSpan<T> r_span) const
   {
     BLI_assert(mask.size() == r_span.size());
-    T *dst = r_span.data();
-    /* Optimize for a few different common cases. */
-    if (this->is_span()) {
-      const T *src = this->get_internal_span().data();
-      mask.to_best_mask_type([&](auto best_mask) {
-        for (const int64_t i : IndexRange(best_mask.size())) {
-          dst[i] = src[best_mask[i]];
-        }
-      });
-    }
-    else if (this->is_single()) {
-      const T single = this->get_internal_single();
-      r_span.fill(single);
-    }
-    else {
-      mask.to_best_mask_type([&](auto best_mask) {
-        for (const int64_t i : IndexRange(best_mask.size())) {
-          dst[i] = this->get(best_mask[i]);
-        }
-      });
-    }
+    mask.to_best_mask_type([&](auto best_mask) {
+      for (const int64_t i : IndexRange(best_mask.size())) {
+        r_span[i] = this->get(best_mask[i]);
+      }
+    });
   }
 
   /**
@@ -184,26 +168,11 @@ template<typename T> class VArrayImpl {
   {
     BLI_assert(mask.size() == r_span.size());
     T *dst = r_span.data();
-    /* Optimize for a few different common cases. */
-    if (this->is_span()) {
-      const T *src = this->get_internal_span().data();
-      mask.to_best_mask_type([&](auto best_mask) {
-        for (const int64_t i : IndexRange(best_mask.size())) {
-          new (dst + i) T(src[best_mask[i]]);
-        }
-      });
-    }
-    else if (this->is_single()) {
-      const T single = this->get_internal_single();
-      uninitialized_fill_n(dst, mask.size(), single);
-    }
-    else {
-      mask.to_best_mask_type([&](auto best_mask) {
-        for (const int64_t i : IndexRange(best_mask.size())) {
-          new (dst + i) T(this->get(best_mask[i]));
-        }
-      });
-    }
+    mask.to_best_mask_type([&](auto best_mask) {
+      for (const int64_t i : IndexRange(best_mask.size())) {
+        new (dst + i) T(this->get(best_mask[i]));
+      }
+    });
   }
 
   /**
@@ -325,6 +294,25 @@ template<typename T> class VArrayImpl_For_Span : public VMutableArrayImpl<T> {
     const Span<T> other_span = other.get_internal_span();
     return data_ == other_span.data();
   }
+
+  void materialize_compressed(IndexMask mask, MutableSpan<T> r_span) const
+  {
+    mask.to_best_mask_type([&](auto best_mask) {
+      for (const int64_t i : IndexRange(best_mask.size())) {
+        r_span[i] = data_[best_mask[i]];
+      }
+    });
+  }
+
+  void materialize_compressed_to_uninitialized(IndexMask mask, MutableSpan<T> r_span) const
+  {
+    T *dst = r_span.data();
+    mask.to_best_mask_type([&](auto best_mask) {
+      for (const int64_t i : IndexRange(best_mask.size())) {
+        new (dst + i) T(data_[best_mask[i]]);
+      }
+    });
+  }
 };
 
 /**
@@ -400,6 +388,20 @@ template<typename T> class VArrayImpl_For_Single final : public VArrayImpl<T> {
   T get_internal_single() const override
   {
     return value_;
+  }
+
+  void materialize_compressed(IndexMask mask, MutableSpan<T> r_span) const override
+  {
+    BLI_assert(mask.size() == r_span.size());
+    UNUSED_VARS_NDEBUG(mask);
+    r_span.fill(value_);
+  }
+
+  void materialize_compressed_to_uninitialized(IndexMask mask,
+                                               MutableSpan<T> r_span) const override
+  {
+    BLI_assert(mask.size() == r_span.size());
+    uninitialized_fill_n(r_span.data(), mask.size(), value_);
   }
 };
 
