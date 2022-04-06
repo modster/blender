@@ -47,8 +47,7 @@ using namespace blender::ed::sculpt_paint::canvas;
 /* Does the paint tool with the given idname uses a canvas. */
 static bool paint_tool_uses_canvas(StringRef idname)
 {
-  /* TODO(jbakker): complete this list. */
-  return ELEM(idname, "builtin_brush.Paint", "builtin.color_filter");
+  return ELEM(idname, "builtin_brush.Paint", "builtin_brush.Smear", "builtin.color_filter");
 }
 
 static bool paint_tool_shading_color_follows_last_used(StringRef idname)
