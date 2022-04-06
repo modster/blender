@@ -51,6 +51,9 @@ class GVArrayImpl {
   virtual void materialize(const IndexMask mask, void *dst) const;
   virtual void materialize_to_uninitialized(const IndexMask mask, void *dst) const;
 
+  virtual void materialize_compressed(IndexMask mask, void *dst) const;
+  virtual void materialize_compressed_to_uninitialized(IndexMask mask, void *dst) const;
+
   virtual bool try_assign_VArray(void *varray) const;
   virtual bool may_have_ownership() const;
 };
@@ -593,6 +596,10 @@ class GVArrayImpl_For_GSpan : public GVMutableArrayImpl {
 
   virtual void materialize(const IndexMask mask, void *dst) const override;
   virtual void materialize_to_uninitialized(const IndexMask mask, void *dst) const override;
+
+  virtual void materialize_compressed(const IndexMask mask, void *dst) const override;
+  virtual void materialize_compressed_to_uninitialized(const IndexMask mask,
+                                                       void *dst) const override;
 };
 
 /** \} */

@@ -24,6 +24,22 @@ void GVArrayImpl::materialize_to_uninitialized(const IndexMask mask, void *dst) 
   }
 }
 
+void GVArrayImpl::materialize_compressed(IndexMask mask, void *dst) const
+{
+  for (const int64_t i : mask.index_range()) {
+    void *elem_dst = POINTER_OFFSET(dst, type_->size() * i);
+    this->get(mask[i], elem_dst);
+  }
+}
+
+void GVArrayImpl::materialize_compressed_to_uninitialized(IndexMask mask, void *dst) const
+{
+  for (const int64_t i : mask.index_range()) {
+    void *elem_dst = POINTER_OFFSET(dst, type_->size() * i);
+    this->get_to_uninitialized(mask[i], elem_dst);
+  }
+}
+
 void GVArrayImpl::get(const int64_t index, void *r_value) const
 {
   type_->destruct(r_value);
@@ -180,6 +196,17 @@ void GVArrayImpl_For_GSpan::materialize(const IndexMask mask, void *dst) const
 void GVArrayImpl_For_GSpan::materialize_to_uninitialized(const IndexMask mask, void *dst) const
 {
   type_->copy_construct_indices(data_, dst, mask);
+}
+
+void GVArrayImpl_For_GSpan::materialize_compressed(const IndexMask mask, void *dst) const
+{
+  type_->copy_assign_compressed(data_, dst, mask);
+}
+
+void GVArrayImpl_For_GSpan::materialize_compressed_to_uninitialized(const IndexMask mask,
+                                                                    void *dst) const
+{
+  type_->copy_construct_compressed(data_, dst, mask);
 }
 
 class GVArrayImpl_For_GSpan_final final : public GVArrayImpl_For_GSpan {

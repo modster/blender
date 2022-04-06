@@ -47,11 +47,53 @@ template<typename In1, typename Out1> class CustomMF_SI_SO : public MultiFunctio
   template<typename ElementFuncT> static FunctionT create_function(ElementFuncT element_fn)
   {
     return [=](IndexMask mask, const VArray<In1> &in1, MutableSpan<Out1> out1) {
-      /* Devirtualization results in a 2-3x speedup for some simple functions. */
-      devirtualize_varray(in1, [&](const auto &in1) {
-        mask.to_best_mask_type(
-            [&](const auto &mask) { execute_SI_SO(element_fn, mask, in1, out1.data()); });
-      });
+      const int64_t mask_size = mask.size();
+      const bool in1_is_single = in1.is_single();
+      const bool in1_is_span = in1.is_span();
+
+      static constexpr int64_t MaxChunkSize = 32;
+      /* Properly handle initialization. */
+      TypedBuffer<In1, MaxChunkSize> in1_buffer_owner;
+      MutableSpan<In1> in1_buffer{in1_buffer_owner.ptr(), MaxChunkSize};
+
+      if (in1_is_single) {
+        const In1 in1_single = in1.get_internal_single();
+        in1_buffer.fill(in1_single);
+      }
+
+      Span<In1> in1_span;
+      if (in1_is_span) {
+        in1_span = in1.get_internal_span();
+      }
+
+      for (int64_t chunk_start = 0; chunk_start < mask_size; chunk_start += MaxChunkSize) {
+        const int64_t chunk_size = std::min(mask_size - chunk_start, MaxChunkSize);
+        const IndexMask sliced_mask = mask.slice(chunk_start, chunk_size);
+        if (sliced_mask.is_range()) {
+          const IndexRange sliced_mask_range = sliced_mask.as_range();
+          Span<In1> in1_chunk;
+          if (in1_is_single) {
+            in1_chunk = in1_buffer;
+          }
+          else if (in1_is_span) {
+            in1_chunk = in1_span.slice(sliced_mask_range);
+          }
+          else {
+            in1.materialize_compressed_to_uninitialized(sliced_mask,
+                                                        in1_buffer.take_front(chunk_size));
+            in1_chunk = in1_buffer;
+          }
+
+          execute_SI_SO(element_fn, IndexRange(chunk_size), in1_chunk, out1.data() + chunk_start);
+        }
+        else {
+          // const Span<int64_t> sliced_mask_indices = sliced_mask.indices();
+          /* TODO */
+          BLI_assert_unreachable();
+        }
+      }
+
+      return;
     };
   }
 
