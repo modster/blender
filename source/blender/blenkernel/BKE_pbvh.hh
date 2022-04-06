@@ -203,6 +203,9 @@ struct PixelsPackage {
 };
 
 class PixelPackages : public Vector<PixelsPackage> {
+ public:
+  /* Sort the packages to improve CPU cache utilization during painting. */
+  void sort();
 };
 
 struct TileData {

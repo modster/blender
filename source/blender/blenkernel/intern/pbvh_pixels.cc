@@ -191,6 +191,7 @@ static void do_encode_pixels(void *__restrict userdata,
     }
 
     tile_data.tile_number = image_tile.get_tile_number();
+    tile_data.packages.sort();
     node_data->tiles.append(tile_data);
   }
 
@@ -415,6 +416,16 @@ void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &i
     }
     node_data->flags.dirty = false;
   }
+}
+
+void PixelPackages::sort()
+{
+  std::sort(this->begin(), this->end(), [](const PixelsPackage &a, const PixelsPackage &b) {
+    if (a.start_image_coordinate[1] < b.start_image_coordinate[1]) {
+      return true;
+    }
+    return a.start_image_coordinate[0] < b.start_image_coordinate[0];
+  });
 }
 
 }  // namespace blender::bke::pbvh::pixels
