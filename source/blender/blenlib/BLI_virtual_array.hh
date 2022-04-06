@@ -146,6 +146,58 @@ template<typename T> class VArrayImpl {
     }
   }
 
+  virtual void materialize_compressed(IndexMask mask, MutableSpan<T> r_span) const
+  {
+    BLI_assert(mask.size() == r_span.size());
+    T *dst = r_span.data();
+    /* Optimize for a few different common cases. */
+    if (this->is_span()) {
+      const T *src = this->get_internal_span().data();
+      mask.to_best_mask_type([&](auto best_mask) {
+        for (const int64_t i : IndexRange(best_mask.size())) {
+          dst[i] = src[best_mask[i]];
+        }
+      });
+    }
+    else if (this->is_single()) {
+      const T single = this->get_internal_single();
+      r_span.fill(single);
+    }
+    else {
+      mask.to_best_mask_type([&](auto best_mask) {
+        for (const int64_t i : IndexRange(best_mask.size())) {
+          dst[i] = this->get(best_mask[i]);
+        }
+      });
+    }
+  }
+
+  virtual void materialize_compressed_to_uninitialized(IndexMask mask, MutableSpan<T> r_span) const
+  {
+    BLI_assert(mask.size() == r_span.size());
+    T *dst = r_span.data();
+    /* Optimize for a few different common cases. */
+    if (this->is_span()) {
+      const T *src = this->get_internal_span().data();
+      mask.to_best_mask_type([&](auto best_mask) {
+        for (const int64_t i : IndexRange(best_mask.size())) {
+          new (dst + i) T(src[best_mask[i]]);
+        }
+      });
+    }
+    else if (this->is_single()) {
+      const T single = this->get_internal_single();
+      uninitialized_fill_n(dst, mask.size(), single);
+    }
+    else {
+      mask.to_best_mask_type([&](auto best_mask) {
+        for (const int64_t i : IndexRange(best_mask.size())) {
+          new (dst + i) T(this->get(best_mask[i]));
+        }
+      });
+    }
+  }
+
   /**
    * If this virtual wraps another #GVArray, this method should assign the wrapped array to the
    * provided reference. This allows losslessly converting between generic and typed virtual
@@ -738,6 +790,16 @@ template<typename T> class VArrayCommon {
   {
     BLI_assert(mask.min_array_size() <= this->size());
     impl_->materialize_to_uninitialized(mask, r_span);
+  }
+
+  void materialize_compressed(IndexMask mask, MutableSpan<T> r_span) const
+  {
+    impl_->materialize_compressed(mask, r_span);
+  }
+
+  void materialize_compressed_to_uninitialized(IndexMask mask, MutableSpan<T> r_span) const
+  {
+    impl_->materialize_compressed_to_uninitialized(mask, r_span);
   }
 
   /** See #GVArrayImpl::try_assign_GVArray. */
