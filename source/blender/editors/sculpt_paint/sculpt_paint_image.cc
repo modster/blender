@@ -344,7 +344,7 @@ static void do_paint_pixels(void *__restrict userdata,
       continue;
     }
 
-    for (const PixelsPackage &encoded_pixels : tile_data->encoded_pixels) {
+    for (const PixelsPackage &encoded_pixels : tile_data->packages) {
       if (!triangle_brush_test_results[encoded_pixels.triangle_index]) {
         continue;
       }

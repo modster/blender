@@ -202,6 +202,9 @@ struct PixelsPackage {
   ushort triangle_index;
 };
 
+class PixelPackages : public Vector<PixelsPackage> {
+};
+
 struct TileData {
   short tile_number;
   struct {
@@ -211,7 +214,7 @@ struct TileData {
   /* Dirty region of the tile in image space. */
   rcti dirty_region;
 
-  Vector<PixelsPackage> encoded_pixels;
+  PixelPackages packages;
 
   TileData()
   {

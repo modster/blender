@@ -96,7 +96,7 @@ static void extract_barycentric_pixels(TileData &tile_data,
       continue;
     }
     package.num_pixels = x - package.start_image_coordinate.x;
-    tile_data.encoded_pixels.append(package);
+    tile_data.packages.append(package);
   }
 }
 
@@ -186,13 +186,14 @@ static void do_encode_pixels(void *__restrict userdata,
 
     BKE_image_release_ibuf(image, image_buffer, nullptr);
 
-    if (tile_data.encoded_pixels.is_empty()) {
+    if (tile_data.packages.is_empty()) {
       continue;
     }
 
     tile_data.tile_number = image_tile.get_tile_number();
     node_data->tiles.append(tile_data);
   }
+
   node_data->triangles.cleanup_after_init();
   node->flag = static_cast<PBVHNodeFlags>(node->flag & ~PBVH_UpdatePixels);
 }
