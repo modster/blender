@@ -505,6 +505,22 @@ class GVArrayImpl_For_SlicedGVArray : public GVArrayImpl {
   {
     varray_.get_internal_single(r_value);
   }
+
+  void materialize_compressed_to_uninitialized(const IndexMask mask, void *dst) const override
+  {
+    if (mask.is_range()) {
+      const IndexRange mask_range = mask.as_range();
+      const IndexRange offset_mask_range{mask_range.start() + offset_, mask_range.size()};
+      varray_.materialize_compressed_to_uninitialized(offset_mask_range, dst);
+    }
+    else {
+      Vector<int64_t, 32> offset_mask_indices(mask.size());
+      for (const int64_t i : mask.index_range()) {
+        offset_mask_indices[i] = mask[i] + offset_;
+      }
+      varray_.materialize_compressed_to_uninitialized(offset_mask_indices.as_span(), dst);
+    }
+  }
 };
 
 /** \} */
@@ -560,6 +576,16 @@ void GVArrayCommon::materialize_to_uninitialized(const IndexMask mask, void *dst
 {
   BLI_assert(mask.min_array_size() <= impl_->size());
   impl_->materialize_to_uninitialized(mask, dst);
+}
+
+void GVArrayCommon::materialize_compressed(IndexMask mask, void *dst) const
+{
+  impl_->materialize_compressed(mask, dst);
+}
+
+void GVArrayCommon::materialize_compressed_to_uninitialized(IndexMask mask, void *dst) const
+{
+  impl_->materialize_compressed_to_uninitialized(mask, dst);
 }
 
 bool GVArrayCommon::may_have_ownership() const
