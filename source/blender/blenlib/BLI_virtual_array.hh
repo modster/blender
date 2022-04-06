@@ -457,6 +457,11 @@ template<typename T, typename GetFunc> class VArrayImpl_For_Func final : public 
       }
     });
   }
+
+  bool may_have_ownership() const override
+  {
+    return !std::is_trivially_destructible_v<GetFunc>;
+  }
 };
 
 /**
