@@ -43,6 +43,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_anim_data.h"
+#include "BKE_attribute.h"
 #include "BKE_brush.h"
 #include "BKE_curve.h"
 #include "BKE_displist.h"
@@ -1400,6 +1401,7 @@ static int count_texture_nodes_recursive(bNodeTree *nodetree, ePaintSlotFilter s
 
 struct FillTexPaintSlotsData {
   bNode *active_node;
+  const Object *ob;
   Material *ma;
   int index;
   int slot_len;
@@ -1442,8 +1444,29 @@ static bool fill_texpaint_slots_cb(bNode *node, void *userdata)
       TexPaintSlot *slot = &ma->texpaintslot[index];
       NodeShaderAttribute *storage = node->storage;
       slot->attribute_name = storage->name;
-      /* TODO(jbakker): check if attribute is a known color attribute for the active object... */
-      slot->valid = true;
+      if (storage->type == SHD_ATTRIBUTE_GEOMETRY) {
+        const Mesh *mesh = (const Mesh *)fill_data->ob->data;
+        CustomDataLayer *layer = BKE_id_attribute_find(
+            &mesh->id, storage->name, CD_PROP_COLOR, ATTR_DOMAIN_POINT);
+        if (layer == NULL) {
+          layer = BKE_id_attribute_find(
+              &mesh->id, storage->name, CD_PROP_COLOR, ATTR_DOMAIN_CORNER);
+        }
+        if (layer == NULL) {
+          layer = BKE_id_attribute_find(&mesh->id, storage->name, CD_MLOOPCOL, ATTR_DOMAIN_POINT);
+        }
+        if (layer == NULL) {
+          layer = BKE_id_attribute_find(&mesh->id, storage->name, CD_MLOOPCOL, ATTR_DOMAIN_CORNER);
+        }
+        slot->valid = layer != NULL;
+      }
+
+      /* Do not show unsupported attributes. */
+      if (!slot->valid) {
+        slot->attribute_name = NULL;
+        fill_data->index--;
+      }
+
       break;
     }
   }
@@ -1453,11 +1476,12 @@ static bool fill_texpaint_slots_cb(bNode *node, void *userdata)
 
 static void fill_texpaint_slots_recursive(bNodeTree *nodetree,
                                           bNode *active_node,
+                                          const Object *ob,
                                           Material *ma,
                                           int slot_len,
                                           ePaintSlotFilter slot_filter)
 {
-  struct FillTexPaintSlotsData fill_data = {active_node, ma, 0, slot_len};
+  struct FillTexPaintSlotsData fill_data = {active_node, ob, ma, 0, slot_len};
   ntree_foreach_texnode_recursive(nodetree, fill_texpaint_slots_cb, &fill_data, slot_filter);
 }
 
@@ -1518,7 +1542,7 @@ void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma, const struct Ob
 
   bNode *active_node = nodeGetActivePaintCanvas(ma->nodetree);
 
-  fill_texpaint_slots_recursive(ma->nodetree, active_node, ma, count, slot_filter);
+  fill_texpaint_slots_recursive(ma->nodetree, active_node, ob, ma, count, slot_filter);
 
   ma->tot_slots = count;
 
