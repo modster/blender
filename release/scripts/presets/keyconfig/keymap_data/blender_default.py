@@ -3041,7 +3041,7 @@ def km_sequencer_channels(params):
         # Rename.
         ("sequencer.rename_channel", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
         ("sequencer.rename_channel", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK'}, None),
-        ])
+    ])
     return keymap
 
 
@@ -7372,8 +7372,7 @@ def km_3d_view_tool_sculpt_mask_by_color(params):
         "3D View Tool: Sculpt, Mask by Color",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.mask_by_color", {"type": params.tool_mouse, "value": 'ANY'}, None),
-            ("sculpt.mask_by_color", params.tool_tweak_event, None),
+            ("sculpt.mask_by_color", {"type": params.tool_mouse, "value": 'CLICK'}, None)
         ]},
     )
 

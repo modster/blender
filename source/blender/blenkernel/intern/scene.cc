@@ -858,7 +858,6 @@ static void scene_foreach_cache(ID *id,
   IDCacheKey key{};
   key.id_session_uuid = id->session_uuid;
   key.offset_in_ID = offsetof(Scene, eevee.light_cache_data);
-  key.cache_v = scene->eevee.light_cache_data;
 
   function_callback(id,
                     &key,
@@ -1225,7 +1224,7 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
       }
 
       /* Active channels root pointer. */
-      if (ed->displayed_channels == old_displayed_channels || ed->displayed_channels == NULL) {
+      if (ed->displayed_channels == old_displayed_channels || ed->displayed_channels == nullptr) {
         ed->displayed_channels = &ed->channels;
       }
       else {
@@ -1260,7 +1259,7 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
           }
         }
 
-        if (ms->old_channels == old_displayed_channels || ms->old_channels == NULL) {
+        if (ms->old_channels == old_displayed_channels || ms->old_channels == nullptr) {
           ms->old_channels = &ed->channels;
         }
         else {
