@@ -219,6 +219,14 @@ class _draw_tool_settings_context_mode:
 
         ups = tool_settings.unified_paint_settings
 
+        if capabilities.has_color:
+            row = layout.row(align=True)
+            row.ui_units_x = 4
+            UnifiedPaintPanel.prop_unified_color(row, context, brush, "color", text="")
+            UnifiedPaintPanel.prop_unified_color(row, context, brush, "secondary_color", text="")
+            row.separator()
+            layout.prop(brush, "blend", text="", expand=False)
+
         size = "size"
         size_owner = ups if ups.use_unified_size else brush
         if size_owner.use_locked_size == 'SCENE':
@@ -252,10 +260,6 @@ class _draw_tool_settings_context_mode:
         # direction
         if not capabilities.has_direction:
             layout.row().prop(brush, "direction", expand=True, text="")
-
-        if capabilities.has_color:
-            UnifiedPaintPanel.prop_unified_color(layout, context, brush, "color", text="")
-            layout.prop(brush, "blend", text="", expand=False)
 
         return True
 
@@ -513,6 +517,13 @@ class _draw_tool_settings_context_mode:
             layout.prop(tool_settings.curves_sculpt, "curve_length")
             layout.prop(tool_settings.curves_sculpt, "interpolate_length")
             layout.prop(tool_settings.curves_sculpt, "interpolate_shape")
+
+        if brush.curves_sculpt_tool == 'GROW_SHRINK':
+            layout.prop(brush, "direction", expand=True, text="")
+            layout.prop(brush, "falloff_shape", expand=True)
+            layout.prop(brush.curves_sculpt_settings, "scale_uniform")
+            layout.prop(brush.curves_sculpt_settings, "minimum_length")
+            layout.prop(brush, "curve_preset")
 
         if brush.curves_sculpt_tool == 'SNAKE_HOOK':
             layout.prop(brush, "falloff_shape", expand=True)
@@ -1867,7 +1878,7 @@ class VIEW3D_MT_paint_gpencil(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        layout.operator("gpencil.vertex_color_set", text="Set Vertex Colors")
+        layout.operator("gpencil.vertex_color_set", text="Set Color Attribute")
         layout.operator("gpencil.stroke_reset_vertex_color")
         layout.separator()
         layout.operator("gpencil.vertex_color_invert", text="Invert")
@@ -1900,7 +1911,7 @@ class VIEW3D_MT_select_gpencil(Menu):
         layout.operator_menu_enum("gpencil.select_grouped", "type", text="Grouped")
 
         if context.mode == 'VERTEX_GPENCIL':
-            layout.operator("gpencil.select_vertex_color", text="Vertex Color")
+            layout.operator("gpencil.select_vertex_color", text="Color Attribute")
 
         layout.separator()
 
@@ -3446,7 +3457,6 @@ class VIEW3D_MT_pose(Menu):
 
         layout.separator()
 
-        layout.menu("VIEW3D_MT_pose_library")
         layout.menu("VIEW3D_MT_pose_motion")
         layout.menu("VIEW3D_MT_pose_group")
 
@@ -3526,21 +3536,6 @@ class VIEW3D_MT_pose_propagate(Menu):
         layout.separator()
 
         layout.operator("pose.propagate", text="On Selected Markers").mode = 'SELECTED_MARKERS'
-
-
-class VIEW3D_MT_pose_library(Menu):
-    bl_label = "Pose Library"
-
-    def draw(self, _context):
-        layout = self.layout
-
-        layout.operator("poselib.browse_interactive", text="Browse Poses...")
-
-        layout.separator()
-
-        layout.operator("poselib.pose_add", text="Add Pose...")
-        layout.operator("poselib.pose_rename", text="Rename Pose...")
-        layout.operator("poselib.pose_remove", text="Remove Pose...")
 
 
 class VIEW3D_MT_pose_motion(Menu):
@@ -7581,7 +7576,7 @@ class TOPBAR_PT_gpencil_materials(GreasePencilMaterialsPanel, Panel):
 class TOPBAR_PT_gpencil_vertexcolor(GreasePencilVertexcolorPanel, Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
-    bl_label = "Vertex Color"
+    bl_label = "Color Attribute"
     bl_ui_units_x = 10
 
     @classmethod
@@ -7683,7 +7678,6 @@ classes = (
     VIEW3D_MT_pose_transform,
     VIEW3D_MT_pose_slide,
     VIEW3D_MT_pose_propagate,
-    VIEW3D_MT_pose_library,
     VIEW3D_MT_pose_motion,
     VIEW3D_MT_pose_group,
     VIEW3D_MT_pose_ik,
