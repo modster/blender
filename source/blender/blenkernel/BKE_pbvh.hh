@@ -81,6 +81,12 @@ class EncodedBarycentricWeights {
   {
     return BarycentricWeights(float3(encoded.x, encoded.y, 1.0 - encoded.x - encoded.y));
   }
+
+  EncodedBarycentricWeights &operator-=(const float2 &other)
+  {
+    encoded -= other;
+    return *this;
+  }
 };
 
 /**
@@ -286,5 +292,7 @@ Triangles &BKE_pbvh_pixels_triangles_get(PBVHNode &node);
 TileData *BKE_pbvh_pixels_tile_data_get(PBVHNode &node, const image::ImageTileWrapper &image_tile);
 void BKE_pbvh_pixels_mark_dirty(PBVHNode &node);
 void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &image_user);
+/** Extend pixels to fix uv seams for the given nodes. */
+void BKE_pbvh_pixels_fix_seams(PBVH &pbvh, Image &image, ImageUser &image_user);
 
 }  // namespace blender::bke::pbvh::pixels

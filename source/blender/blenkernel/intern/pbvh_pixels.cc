@@ -196,7 +196,6 @@ static void do_encode_pixels(void *__restrict userdata,
   }
 
   node_data->triangles.cleanup_after_init();
-  node->flag = static_cast<PBVHNodeFlags>(node->flag & ~PBVH_UpdatePixels);
 }
 
 static bool should_pixels_be_updated(PBVHNode *node)
@@ -267,6 +266,7 @@ static bool find_nodes_to_update(PBVH *pbvh,
     PBVHNode *node = &pbvh->nodes[n];
     if (should_pixels_be_updated(node)) {
       r_nodes_to_update.append(node);
+      node->flag = static_cast<PBVHNodeFlags>(node->flag | PBVH_UpdatePixels);
 
       if (node->pixels.node_data == nullptr) {
         NodeData *node_data = MEM_new<NodeData>(__func__);
@@ -325,6 +325,12 @@ static void update_pixels(PBVH *pbvh,
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, nodes_to_update.size());
   BLI_task_parallel_range(0, nodes_to_update.size(), &user_data, do_encode_pixels, &settings);
+  // BKE_pbvh_pixels_fix_seams(*pbvh, *image, *image_user);
+
+  /* Clear the UpdatePixels flag. */
+  for (PBVHNode *node : nodes_to_update) {
+    node->flag = static_cast<PBVHNodeFlags>(node->flag & ~PBVH_UpdatePixels);
+  }
 
 //#define DO_PRINT_STATISTICS
 #ifdef DO_PRINT_STATISTICS
@@ -353,20 +359,46 @@ static void update_pixels(PBVH *pbvh,
   }
 #endif
 
-//#define DO_WATERTIGHT_CHECK
+#define DO_WATERTIGHT_CHECK
 #ifdef DO_WATERTIGHT_CHECK
-  for (int n = 0; n < nodes_to_initialize.size(); n++) {
-    PBVHNode *node = nodes[n];
-    NodeData *node_data = static_cast<NodeData *>(BKE_pbvh_node_texture_paint_data_get(node));
-    for (PixelsPackage &encoded_pixels : node_data->encoded_pixels) {
-      int pixel_offset = encoded_pixels.start_image_coordinate.y * image_buffer->x +
-                         encoded_pixels.start_image_coordinate.x;
-      for (int x = 0; x < encoded_pixels.num_pixels; x++) {
-        copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
-        pixel_offset += 1;
+  ImageUser watertight = *image_user;
+  LISTBASE_FOREACH (ImageTile *, tile_data, &image->tiles) {
+    image::ImageTileWrapper image_tile(tile_data);
+    watertight.tile = image_tile.get_tile_number();
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &watertight, NULL);
+    if (image_buffer == nullptr) {
+      continue;
+    }
+    for (int n = 0; n < pbvh->totnode; n++) {
+      PBVHNode *node = &pbvh->nodes[n];
+      if ((node->flag & PBVH_Leaf) == 0) {
+        continue;
+      }
+      NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
+      TileData *tile_node_data = node_data->find_tile_data(image_tile);
+      if (tile_node_data == nullptr) {
+        continue;
+      }
+
+      for (PixelsPackage &encoded_pixels : tile_node_data->packages) {
+        int pixel_offset = encoded_pixels.start_image_coordinate.y * image_buffer->x +
+                           encoded_pixels.start_image_coordinate.x;
+        for (int x = 0; x < encoded_pixels.num_pixels; x++) {
+          if (image_buffer->rect_float) {
+            copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
+          }
+          if (image_buffer->rect) {
+            uint8_t *dest = static_cast<uint8_t *>(
+                static_cast<void *>(&image_buffer->rect[pixel_offset]));
+            copy_v4_uchar(dest, 255);
+          }
+          pixel_offset += 1;
+        }
       }
     }
+    BKE_image_release_ibuf(image, image_buffer, NULL);
   }
+  BKE_image_partial_update_mark_full_update(image);
 
 #endif
 }
