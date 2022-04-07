@@ -1235,12 +1235,33 @@ static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
   op->customdata = NULL;
 }
 
-/* Init new temporary data. */
-static bool gpencil_asset_import_set_init_values(bContext *C,
-                                                 const wmOperator *op,
-                                                 ID *id,
-                                                 tGPDasset *tgpa)
+/* Allocate memory and initialize values */
+static tGPDasset *gpencil_session_init_asset_import(bContext *C, wmOperator *op)
 {
+  Main *bmain = CTX_data_main(C);
+  ID *id = NULL;
+
+  PropertyRNA *prop_name = RNA_struct_find_property(op->ptr, "name");
+  PropertyRNA *prop_type = RNA_struct_find_property(op->ptr, "type");
+
+  /* These shouldn't fail when created by outliner dropping as it checks the ID is valid. */
+  if (!RNA_property_is_set(op->ptr, prop_name) || !RNA_property_is_set(op->ptr, prop_type)) {
+    return NULL;
+  }
+  const short id_type = RNA_property_enum_get(op->ptr, prop_type);
+  char name[MAX_ID_NAME - 2];
+  RNA_property_string_get(op->ptr, prop_name, name);
+  id = BKE_libblock_find_name(bmain, id_type, name);
+  if (id == NULL) {
+    return NULL;
+  }
+  const int object_type = BKE_object_obdata_to_type(id);
+  if (object_type != OB_GPENCIL) {
+    return NULL;
+  }
+
+  tGPDasset *tgpa = MEM_callocN(sizeof(tGPDasset), "GPencil Asset Import Data");
+
   /* Save current settings. */
   tgpa->win = CTX_wm_window(C);
   tgpa->bmain = CTX_data_main(C);
@@ -1270,40 +1291,6 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   tgpa->data_len = 0;
   tgpa->data = NULL;
 
-  return true;
-}
-
-/* Allocate memory and initialize values */
-static tGPDasset *gpencil_session_init_asset_import(bContext *C, wmOperator *op)
-{
-  Main *bmain = CTX_data_main(C);
-  ID *id = NULL;
-
-  PropertyRNA *prop_name = RNA_struct_find_property(op->ptr, "name");
-  PropertyRNA *prop_type = RNA_struct_find_property(op->ptr, "type");
-
-  /* These shouldn't fail when created by outliner dropping as it checks the ID is valid. */
-  if (!RNA_property_is_set(op->ptr, prop_name) || !RNA_property_is_set(op->ptr, prop_type)) {
-    return NULL;
-  }
-  const short id_type = RNA_property_enum_get(op->ptr, prop_type);
-  char name[MAX_ID_NAME - 2];
-  RNA_property_string_get(op->ptr, prop_name, name);
-  id = BKE_libblock_find_name(bmain, id_type, name);
-  if (id == NULL) {
-    return NULL;
-  }
-  const int object_type = BKE_object_obdata_to_type(id);
-  if (object_type != OB_GPENCIL) {
-    return NULL;
-  }
-
-  tGPDasset *tgpa = MEM_callocN(sizeof(tGPDasset), "GPencil Asset Import Data");
-
-  /* Save initial values. */
-  gpencil_asset_import_set_init_values(C, op, id, tgpa);
-
-  /* return context data for running operator */
   return tgpa;
 }
 
