@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "BLI_map.hh"
 #include "BLI_math_vec_types.hh"
@@ -567,8 +568,8 @@ class NodeOperation : public Operation {
  private:
   /* The node that this operation represents. */
   DNode node_;
-  /* A vector storing the results mapped to the inputs that are not linked. */
-  Vector<Result> unlinked_inputs_results_;
+  /* A vector storing unique pointers to the results mapped to unlinked inputs. */
+  Vector<std::unique_ptr<Result>> unlinked_inputs_results_;
   /* A mapping between each unlinked input in the node identified by its identifier and its
    * corresponding input socket. */
   Map<StringRef, DInputSocket> unlinked_inputs_sockets_;

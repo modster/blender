@@ -2,6 +2,7 @@
  * Copyright 2022 Blender Foundation. All rights reserved. */
 
 #include <limits>
+#include <memory>
 #include <string>
 
 #include "BLI_assert.h"
@@ -697,9 +698,8 @@ void NodeOperation::populate_results_for_unlinked_inputs()
     /* Construct a result of an appropriate type, add it to the results vector, and map the input
      * to it. */
     const ResultType result_type = get_node_socket_result_type(origin.socket_ref());
-    const Result result = Result(result_type, texture_pool());
-    unlinked_inputs_results_.append(result);
-    map_input_to_result(input->identifier(), &unlinked_inputs_results_.last());
+    unlinked_inputs_results_.append(std::make_unique<Result>(result_type, texture_pool()));
+    map_input_to_result(input->identifier(), unlinked_inputs_results_.last().get());
 
     /* Map the input to the socket to later allocate and initialize its value. */
     const DInputSocket origin_input{origin.context(), &origin->as_input()};
