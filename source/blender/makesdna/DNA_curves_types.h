@@ -28,6 +28,7 @@ typedef enum CurveType {
   CURVE_TYPE_BEZIER = 2,
   CURVE_TYPE_NURBS = 3,
 } CurveType;
+#define CURVE_TYPES_NUM 4
 
 typedef enum HandleType {
   /** The handle can be moved anywhere, and doesn't influence the point's other handle. */
@@ -138,7 +139,7 @@ typedef struct Curves {
   void *batch_cache;
 } Curves;
 
-/* Curves.flag */
+/** #Curves.flag */
 enum {
   HA_DS_EXPAND = (1 << 0),
 };

@@ -165,7 +165,7 @@ BLI_INLINE int text_pixel_x_to_column(SpaceText *st, const int x)
 
 static bool text_new_poll(bContext *UNUSED(C))
 {
-  return 1;
+  return true;
 }
 
 static bool text_data_poll(bContext *C)
@@ -182,15 +182,15 @@ static bool text_edit_poll(bContext *C)
   Text *text = CTX_data_edit_text(C);
 
   if (!text) {
-    return 0;
+    return false;
   }
 
-  if (ID_IS_LINKED(text)) {
+  if (!BKE_id_is_editable(CTX_data_main(C), &text->id)) {
     // BKE_report(op->reports, RPT_ERROR, "Cannot edit external library data");
-    return 0;
+    return false;
   }
 
-  return 1;
+  return true;
 }
 
 bool text_space_edit_poll(bContext *C)
@@ -199,15 +199,15 @@ bool text_space_edit_poll(bContext *C)
   Text *text = CTX_data_edit_text(C);
 
   if (!st || !text) {
-    return 0;
+    return false;
   }
 
-  if (ID_IS_LINKED(text)) {
+  if (!BKE_id_is_editable(CTX_data_main(C), &text->id)) {
     // BKE_report(op->reports, RPT_ERROR, "Cannot edit external library data");
-    return 0;
+    return false;
   }
 
-  return 1;
+  return true;
 }
 
 static bool text_region_edit_poll(bContext *C)
@@ -217,19 +217,19 @@ static bool text_region_edit_poll(bContext *C)
   ARegion *region = CTX_wm_region(C);
 
   if (!st || !text) {
-    return 0;
+    return false;
   }
 
   if (!region || region->regiontype != RGN_TYPE_WINDOW) {
-    return 0;
+    return false;
   }
 
-  if (ID_IS_LINKED(text)) {
+  if (!BKE_id_is_editable(CTX_data_main(C), &text->id)) {
     // BKE_report(op->reports, RPT_ERROR, "Cannot edit external library data");
-    return 0;
+    return false;
   }
 
-  return 1;
+  return true;
 }
 
 /** \} */
@@ -788,9 +788,7 @@ static int text_run_script(bContext *C, ReportList *reports)
       }
     }
 
-    BKE_report(
-        reports, RPT_ERROR, "Python script failed, check the message in the system console");
-
+    /* No need to report the error, this has already been handled by #BPY_run_text. */
     return OPERATOR_FINISHED;
   }
 #else
@@ -923,7 +921,7 @@ static int text_paste_exec(bContext *C, wmOperator *op)
     buf = new_buf;
   }
 
-  txt_insert_buf(text, buf);
+  txt_insert_buf(text, buf, buf_len);
   text_update_edited(text);
 
   MEM_freeN(buf);
@@ -3589,7 +3587,7 @@ static int text_find_and_replace(bContext *C, wmOperator *op, short mode)
     if (found) {
       if (mode == TEXT_REPLACE) {
         ED_text_undo_push_init(C);
-        txt_insert_buf(text, st->replacestr);
+        txt_insert_buf(text, st->replacestr, strlen(st->replacestr));
         if (text->curl && text->curl->format) {
           MEM_freeN(text->curl->format);
           text->curl->format = NULL;
@@ -3673,7 +3671,7 @@ static int text_replace_all(bContext *C)
     ED_text_undo_push_init(C);
 
     do {
-      txt_insert_buf(text, st->replacestr);
+      txt_insert_buf(text, st->replacestr, strlen(st->replacestr));
       if (text->curl && text->curl->format) {
         MEM_freeN(text->curl->format);
         text->curl->format = NULL;

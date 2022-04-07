@@ -201,6 +201,8 @@ void WM_OT_usd_export(struct wmOperatorType *ot)
   ot->poll = WM_operator_winactive;
   ot->ui = wm_usd_export_draw;
 
+  ot->flag = OPTYPE_REGISTER; /* No UNDO possible. */
+
   WM_operator_properties_filesel(ot,
                                  FILE_TYPE_FOLDER | FILE_TYPE_USD,
                                  FILE_BLENDER,
@@ -459,6 +461,8 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
   ot->poll = WM_operator_winactive;
   ot->ui = wm_usd_import_draw;
 
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
   WM_operator_properties_filesel(ot,
                                  FILE_TYPE_FOLDER | FILE_TYPE_USD,
                                  FILE_BLENDER,
@@ -520,7 +524,8 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
 
   RNA_def_boolean(ot->srna, "read_mesh_uvs", true, "UV Coordinates", "Read mesh UV coordinates");
 
-  RNA_def_boolean(ot->srna, "read_mesh_colors", false, "Vertex Colors", "Read mesh vertex colors");
+  RNA_def_boolean(
+      ot->srna, "read_mesh_colors", false, "Color Attributes", "Read mesh color attributes");
 
   RNA_def_string(ot->srna,
                  "prim_path_mask",
