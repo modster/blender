@@ -1835,7 +1835,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     dot_2 = dot_v3v3_db(view_vector, tri2->gn);
 
     if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
-      edge_flag_result |= LRT_EDGE_FLAG_LIGHT_CONTOUR;
+      // edge_flag_result |= LRT_EDGE_FLAG_LIGHT_CONTOUR;
     }
   }
 
@@ -3250,7 +3250,7 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
   dot_r = dot_v3v3_db(Rv, tri->gn);
   dot_f = dot_v3v3_db(Cv, tri->gn);
 
-  if ((e->flags & LRT_EDGE_FLAG_PROJECTED_SHADOW) &&
+  if (((e->flags & LRT_EDGE_FLAG_PROJECTED_SHADOW) || (e->flags & LRT_EDGE_FLAG_LIGHT_CONTOUR)) &&
       (e->target_reference == tri->target_reference || !e->target_reference) &&
       LRT_SHADOW_CLOSE_ENOUGH(dot_l, 0) && LRT_SHADOW_CLOSE_ENOUGH(dot_r, 0)) {
     /* Currently unable to precisely determine if the edge is really from this triangle. */
@@ -5771,7 +5771,7 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
     tot_orig_edges++;
   }
 
-  int edge_alloc = tot_orig_edges + tot_edges;
+  int edge_alloc = tot_edges + tot_orig_edges;
 
   if (G.debug_value == 4000) {
     printf("Line art shadow segments total: %d\n", tot_edges);
@@ -5828,7 +5828,7 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
     //}
     e->v1 = v1;
     e->v2 = v2;
-    e->flags = LRT_EDGE_FLAG_PROJECTED_SHADOW;
+    e->flags = LRT_EDGE_FLAG_LIGHT_CONTOUR;
     i++;
   }
   return true;
