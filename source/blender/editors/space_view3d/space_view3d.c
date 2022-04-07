@@ -629,6 +629,14 @@ static char *view3d_object_data_drop_tooltip(bContext *UNUSED(C),
   return BLI_strdup(TIP_("Create object instance from object-data"));
 }
 
+static char *view3d_gpencil_data_drop_tooltip(bContext *UNUSED(C),
+                                              wmDrag *UNUSED(drag),
+                                              const int UNUSED(xy[2]),
+                                              wmDropBox *UNUSED(drop))
+{
+  return BLI_strdup(TIP_("Add strokes to active object"));
+}
+
 static bool view3d_ima_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   if (ED_region_overlap_isect_any_xy(CTX_wm_area(C), event->xy)) {
@@ -954,7 +962,7 @@ static void view3d_dropboxes(void)
                  view3d_gpencil_drop_poll,
                  view3d_id_drop_copy_with_type,
                  WM_drag_free_imported_drag_ID,
-                 view3d_object_data_drop_tooltip);
+                 view3d_gpencil_data_drop_tooltip);
 }
 
 static void view3d_widgets(void)
