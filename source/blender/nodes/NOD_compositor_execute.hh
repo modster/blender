@@ -110,16 +110,40 @@ class Context {
 };
 
 /* --------------------------------------------------------------------
- * Domain.
+ * Realization Options.
  */
 
-/* Possible interpolations to use when realizing an input of some domain on another domain. See the
- * Domain class for more information. */
+/* Possible interpolations to use when realizing an input result of some domain on another domain.
+ * See the RealizationOptions class for more information. */
 enum class Interpolation : uint8_t {
   Nearest,
   Bilinear,
   Bicubic,
 };
+
+/* The options that describe how an input result prefer to be realized on some other domain. This
+ * is used by the RealizeOnDomainProcessorOperation to identify the appropriate method of
+ * realization. See the Domain class for more information. */
+class RealizationOptions {
+ public:
+  /* The interpolation method that should be used when performing realization. Since realizing a
+   * result involves projecting it on a different domain, which in turn, involves sampling the
+   * result at arbitrary locations, the interpolation identifies the method used for computing the
+   * value at those arbitrary locations. */
+  Interpolation interpolation = Interpolation::Nearest;
+  /* If true, the result will be repeated infinitely along the horizontal axis when realizing the
+   * result. If false, regions outside of bounds of the result along the horizontal axis will be
+   * filled with zeros. */
+  bool repeat_x = false;
+  /* If true, the result will be repeated infinitely along the vertical axis when realizing the
+   * result. If false, regions outside of bounds of the result along the vertical axis will be
+   * filled with zeros. */
+  bool repeat_y = false;
+};
+
+/* --------------------------------------------------------------------
+ * Domain.
+ */
 
 /* A domain is a rectangular area of a certain size in pixels that is transformed by a certain
  * transformation in pixel space relative to some reference space.
@@ -138,10 +162,11 @@ enum class Interpolation : uint8_t {
  * RealizeOnDomainProcessorOperation, except inputs whose descriptor sets skip_realization or
  * expects_single_value, see InputDescriptor for more information. The realization process simply
  * projects the input domain on the operation domain, copies the area of input that intersects the
- * operation domain, and fill the rest with zeros. The realization happens using the interpolation
- * method defined set in the realization_interpolation member. This process is illustrated below.
- * It follows that operations should expect all their inputs to have the same domain and
- * consequently size, except for inputs that explicitly skip realization.
+ * operation domain, and fill the rest with zeros or repetitions of the input domain; depending on
+ * the realization_options, see the RealizationOptions class for more information. This process is
+ * illustrated below, assuming no repetition in either directions. It follows that operations
+ * should expect all their inputs to have the same domain and consequently size, except for inputs
+ * that explicitly skip realization.
  *
  *                                   Realized Result
  *             +-------------+       +-------------+
@@ -187,9 +212,9 @@ class Domain {
   /* The 2D transformation of the domain defining its translation in pixels, rotation, and scale in
    * 2D space. */
   Transformation2D transformation;
-  /* The interpolation method that should be used when realizing the input whose domain is this
-   * one. */
-  Interpolation realization_interpolation = Interpolation::Nearest;
+  /* The options that describe how this domain prefer to be realized on some other domain. See the
+   * RealizationOptions for more information. */
+  RealizationOptions realization_options;
 
  public:
   /* A size only constructor that sets the transformation to identity. */
@@ -302,8 +327,9 @@ class Result {
    * transformation by the current transformation of the domain of the result. */
   void transform(const Transformation2D &transformation);
 
-  /* Set the interpolation method that will be used when realizing this result if needed. */
-  void set_realization_interpolation(Interpolation interpolation);
+  /* Get a reference to the realization options of this result. See the RealizationOptions class
+   * for more information. */
+  RealizationOptions &get_realization_options();
 
   /* If the result is a single value result of type float, return its float value. Otherwise, an
    * uninitialized value is returned. */

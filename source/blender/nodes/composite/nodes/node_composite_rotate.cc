@@ -76,7 +76,7 @@ class RotateOperation : public NodeOperation {
     const Transformation2D transformation = Transformation2D::from_rotation(rotation);
 
     result.transform(transformation);
-    result.set_realization_interpolation(get_interpolation());
+    result.get_realization_options().interpolation = get_interpolation();
   }
 
   Interpolation get_interpolation()

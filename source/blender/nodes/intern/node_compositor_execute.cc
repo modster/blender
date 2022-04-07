@@ -129,8 +129,8 @@ Domain Domain::identity()
   return Domain(int2(1), Transformation2D::identity());
 }
 
-/* Only compare the size and transformation members, as other members only describe the method of
- * realization on another domain, which is not technically a proprty of the domain. */
+/* Do not compare realization_options as it only describe the method of realization on another
+ * domain, which is not technically a proprty of the domain itself. */
 bool operator==(const Domain &a, const Domain &b)
 {
   return a.size == b.size && a.transformation == b.transformation;
@@ -225,9 +225,9 @@ void Result::transform(const Transformation2D &transformation)
   domain_.transform(transformation);
 }
 
-void Result::set_realization_interpolation(Interpolation interpolation)
+RealizationOptions &Result::get_realization_options()
 {
-  domain_.realization_interpolation = interpolation;
+  return domain_.realization_options;
 }
 
 float Result::get_float_value() const
@@ -988,12 +988,19 @@ void RealizeOnDomainProcessorOperation::execute()
   /* Set the inverse of the transform to the shader. */
   GPU_shader_uniform_mat3(shader, "inverse_transformation", inverse_transformation.matrix());
 
-  /* Make out-of-bound texture access return zero. */
-  GPU_texture_wrap_mode(input.texture(), false, false);
-
-  /* Set the approperiate sampler interpolation. */
-  const bool use_bilinear = input.domain().realization_interpolation != Interpolation::Nearest;
+  /* The texture sampler should use bilinear interpolation for both the bilinear and bicubic
+   * cases, as the logic used by the bicubic realization shader expects textures to use bilinear
+   * interpolation. */
+  const bool use_bilinear = ELEM(input.get_realization_options().interpolation,
+                                 Interpolation::Bilinear,
+                                 Interpolation::Bicubic);
   GPU_texture_filter_mode(input.texture(), use_bilinear);
+
+  /* Make out-of-bound texture access return zero by clamping to border color. And make texture
+   * wrap appropriately if the input repeats. */
+  const bool repeats = input.get_realization_options().repeat_x ||
+                       input.get_realization_options().repeat_y;
+  GPU_texture_wrap_mode(input.texture(), repeats, false);
 
   input.bind_as_texture(shader, "input_sampler");
   result.bind_as_image(shader, "domain");

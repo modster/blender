@@ -91,7 +91,7 @@ class TransformOperation : public NodeOperation {
         translation, rotation, scale);
 
     result.transform(transformation);
-    result.set_realization_interpolation(get_interpolation());
+    result.get_realization_options().interpolation = get_interpolation();
   }
 
   Interpolation get_interpolation()
