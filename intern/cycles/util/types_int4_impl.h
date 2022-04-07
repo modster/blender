@@ -83,6 +83,8 @@ ccl_device_inline int4 make_int4(const float3 &f)
 {
 #  ifdef __KERNEL_SSE__
   int4 a(_mm_cvtps_epi32(f.m128));
+#  elif defined(__KERNEL_ONEAPI__)
+  int4 a = {(int)f.x, (int)f.y, (int)f.z, 0};
 #  else
   int4 a = {(int)f.x, (int)f.y, (int)f.z, (int)f.w};
 #  endif

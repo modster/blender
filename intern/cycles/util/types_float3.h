@@ -10,7 +10,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-#if !defined(__KERNEL_GPU__) || defined(__KERNEL_ONEAPI__)
+#if !defined(__KERNEL_GPU__)
 struct ccl_try_align(16) float3
 {
 #  ifdef __KERNEL_SSE__

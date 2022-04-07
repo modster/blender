@@ -156,6 +156,19 @@ void oneapi_kernel_##name(KernelGlobalsGPU *ccl_restrict kg, \
 typedef unsigned char uchar;
 using sycl::half;
 
+typedef struct float3 {
+  float x, y, z;
+} float3;
+
+ccl_always_inline float3 make_float3(float x, float y, float z)
+{
+  return {x, y, z};
+}
+ccl_always_inline float3 make_float3(float x)
+{
+  return {x, x, x};
+}
+
 /* math functions */
 #define fabsf(x) sycl::fabs((x))
 #define copysignf(x, y) sycl::copysign((x), (y))

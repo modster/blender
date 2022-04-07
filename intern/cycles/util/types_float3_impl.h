@@ -14,7 +14,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-#if !defined(__KERNEL_GPU__) || defined(__KERNEL_ONEAPI__)
+#if !defined(__KERNEL_GPU__)
 #  ifdef __KERNEL_SSE__
 __forceinline float3::float3()
 {
