@@ -1726,7 +1726,7 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
 }
 
 static uint16_t lineart_identify_medge_feature_edges(
-    LineartRenderBuffer *rb, Mesh *me, int edge_index, MEdge *medge, bool freestyle_edge_cdindex)
+    LineartRenderBuffer *rb, Mesh *me, int edge_index, MEdge *medge, int freestyle_edge_cdindex)
 {
   if (medge->flag & ME_LOOSEEDGE) {
     return LRT_EDGE_FLAG_LOOSE;
