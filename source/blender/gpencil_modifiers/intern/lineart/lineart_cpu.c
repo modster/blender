@@ -482,10 +482,6 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
       eip = rti->pending_edges.array[i];
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
-
-    for (eip = rti->shadow.first; eip && eip != rti->shadow.last; eip = eip->next) {
-      lineart_occlusion_single_line(rb, eip, rti->thread_id);
-    }
   }
 }
 
@@ -3894,6 +3890,8 @@ static void lineart_destroy_render_data_keep_init(LineartRenderBuffer *rb)
   BLI_listbase_clear(&rb->line_buffer_pointers);
   BLI_listbase_clear(&rb->triangle_buffer_pointers);
 
+  MEM_freeN(rb->pending_edges.array);
+
   lineart_mem_destroy(&rb->render_data_pool);
 }
 
@@ -5950,7 +5948,7 @@ static void lineart_transform_and_add_shadow(LineartRenderBuffer *rb,
   }
   LineartEdge *e = eeln->pointer;
   for (int i = 0; i < eeln->element_count; i++) {
-    lineart_add_edge_to_list(rb, &e[i]);
+    lineart_add_edge_to_list(&rb->pending_edges, &e[i]);
   }
   BLI_addtail(&rb->vertex_buffer_pointers, veln);
   BLI_addtail(&rb->line_buffer_pointers, eeln);
