@@ -1209,9 +1209,10 @@ static void gpencil_asset_import_update(bContext *C, const wmOperator *op, tGPDa
 static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
 {
   tGPDasset *tgpa = op->customdata;
-  bGPdata *gpd = tgpa->gpd;
 
   if (tgpa) {
+    bGPdata *gpd = tgpa->gpd;
+
     /* Clear status message area. */
     ED_area_status_text(tgpa->area, NULL);
     ED_workspace_status_text(C, NULL);
@@ -1225,8 +1226,9 @@ static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
     }
 
     MEM_SAFE_FREE(tgpa);
+    DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
   }
-  DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+
   WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED | ND_DATA, NULL);
 
   /* Clear pointer. */
