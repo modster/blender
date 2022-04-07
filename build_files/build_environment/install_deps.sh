@@ -1,21 +1,5 @@
 #!/usr/bin/env bash
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # A shell script installing/building all needed dependencies to build Blender, for some Linux distributions.
 
@@ -376,30 +360,31 @@ USE_CXX11=true
 # XXX_VERSION_SHORT is used for various things, like preferred version (when distribution provides several of them),
 #                   and to name shortcuts to built libraries' installation directories...
 
+CLANG_FORMAT_VERSION="10.0"
 CLANG_FORMAT_VERSION_MIN="6.0"
-CLANG_FORMAT_VERSION_MEX="10.0"
+CLANG_FORMAT_VERSION_MEX="14.0"
 
-PYTHON_VERSION="3.9.7"
-PYTHON_VERSION_SHORT="3.9"
-PYTHON_VERSION_MIN="3.7"
-PYTHON_VERSION_MEX="3.11"
+PYTHON_VERSION="3.10.2"
+PYTHON_VERSION_SHORT="3.10"
+PYTHON_VERSION_MIN="3.10"
+PYTHON_VERSION_MEX="3.12"
 PYTHON_VERSION_INSTALLED=$PYTHON_VERSION_SHORT
 PYTHON_FORCE_BUILD=false
 PYTHON_FORCE_REBUILD=false
 PYTHON_SKIP=false
 
 # Additional Python modules.
-PYTHON_IDNA_VERSION="3.2"
+PYTHON_IDNA_VERSION="3.3"
 PYTHON_IDNA_VERSION_MIN="2.0"
 PYTHON_IDNA_VERSION_MEX="4.0"
 PYTHON_IDNA_NAME="idna"
 
-PYTHON_CHARSET_NORMALIZER_VERSION="2.0.6"
+PYTHON_CHARSET_NORMALIZER_VERSION="2.0.10"
 PYTHON_CHARSET_NORMALIZER_VERSION_MIN="2.0.6"
 PYTHON_CHARSET_NORMALIZER_VERSION_MEX="2.1.0"  # requests uses `charset_normalizer~=2.0.0`
 PYTHON_CHARSET_NORMALIZER_NAME="charset-normalizer"
 
-PYTHON_URLLIB3_VERSION="1.26.7"
+PYTHON_URLLIB3_VERSION="1.26.8"
 PYTHON_URLLIB3_VERSION_MIN="1.0"
 PYTHON_URLLIB3_VERSION_MEX="2.0"
 PYTHON_URLLIB3_NAME="urllib3"
@@ -409,17 +394,17 @@ PYTHON_CERTIFI_VERSION_MIN="2021.0"
 PYTHON_CERTIFI_VERSION_MEX="2023.0"
 PYTHON_CERTIFI_NAME="certifi"
 
-PYTHON_REQUESTS_VERSION="2.23.0"
+PYTHON_REQUESTS_VERSION="2.27.1"
 PYTHON_REQUESTS_VERSION_MIN="2.0"
 PYTHON_REQUESTS_VERSION_MEX="3.0"
 PYTHON_REQUESTS_NAME="requests"
 
-PYTHON_ZSTANDARD_VERSION="0.15.2"
+PYTHON_ZSTANDARD_VERSION="0.16.0"
 PYTHON_ZSTANDARD_VERSION_MIN="0.15.2"
-PYTHON_ZSTANDARD_VERSION_MEX="0.16.0"
+PYTHON_ZSTANDARD_VERSION_MEX="0.20.0"
 PYTHON_ZSTANDARD_NAME="zstandard"
 
-PYTHON_NUMPY_VERSION="1.21.2"
+PYTHON_NUMPY_VERSION="1.22.0"
 PYTHON_NUMPY_VERSION_MIN="1.14"
 PYTHON_NUMPY_VERSION_MEX="2.0"
 PYTHON_NUMPY_NAME="numpy"
@@ -447,8 +432,8 @@ PYTHON_MODULES_PIP=(
 )
 
 
-BOOST_VERSION="1.73.0"
-BOOST_VERSION_SHORT="1.73"
+BOOST_VERSION="1.78.0"
+BOOST_VERSION_SHORT="1.78"
 BOOST_VERSION_MIN="1.49"
 BOOST_VERSION_MEX="2.0"
 BOOST_FORCE_BUILD=false
@@ -457,15 +442,15 @@ BOOST_SKIP=false
 
 TBB_VERSION="2020"
 TBB_VERSION_SHORT="2020"
-TBB_VERSION_UPDATE="_U2"  # Used for source packages...
+TBB_VERSION_UPDATE="_U3"  # Used for source packages...
 TBB_VERSION_MIN="2018"
 TBB_VERSION_MEX="2022"
 TBB_FORCE_BUILD=false
 TBB_FORCE_REBUILD=false
 TBB_SKIP=false
 
-OCIO_VERSION="2.0.0"
-OCIO_VERSION_SHORT="2.0"
+OCIO_VERSION="2.1.1"
+OCIO_VERSION_SHORT="2.1"
 OCIO_VERSION_MIN="2.0"
 OCIO_VERSION_MEX="3.0"
 OCIO_FORCE_BUILD=false
@@ -481,10 +466,10 @@ OPENEXR_FORCE_REBUILD=false
 OPENEXR_SKIP=false
 _with_built_openexr=false
 
-OIIO_VERSION="2.2.15.1"
-OIIO_VERSION_SHORT="2.2"
+OIIO_VERSION="2.3.13.0"
+OIIO_VERSION_SHORT="2.3"
 OIIO_VERSION_MIN="2.1.12"
-OIIO_VERSION_MEX="2.3.0"
+OIIO_VERSION_MEX="2.4.0"
 OIIO_FORCE_BUILD=false
 OIIO_FORCE_REBUILD=false
 OIIO_SKIP=false
@@ -499,7 +484,7 @@ LLVM_FORCE_REBUILD=false
 LLVM_SKIP=false
 
 # OSL needs to be compiled for now!
-OSL_VERSION="1.11.14.1"
+OSL_VERSION="1.11.17.0"
 OSL_VERSION_SHORT="1.11"
 OSL_VERSION_MIN="1.11"
 OSL_VERSION_MEX="2.0"
@@ -508,7 +493,7 @@ OSL_FORCE_REBUILD=false
 OSL_SKIP=false
 
 # OpenSubdiv needs to be compiled for now
-OSD_VERSION="3.4.3"
+OSD_VERSION="3.4.4"
 OSD_VERSION_SHORT="3.4"
 OSD_VERSION_MIN="3.4"
 OSD_VERSION_MEX="4.0"
@@ -517,19 +502,19 @@ OSD_FORCE_REBUILD=false
 OSD_SKIP=false
 
 # OpenVDB needs to be compiled for now
-OPENVDB_BLOSC_VERSION="1.5.0"
+OPENVDB_BLOSC_VERSION="1.21.1"
 
-OPENVDB_VERSION="8.0.1"
-OPENVDB_VERSION_SHORT="8.0"
-OPENVDB_VERSION_MIN="8.0"
-OPENVDB_VERSION_MEX="8.1"
+OPENVDB_VERSION="9.0.0"
+OPENVDB_VERSION_SHORT="9.0"
+OPENVDB_VERSION_MIN="9.0"
+OPENVDB_VERSION_MEX="9.1"
 OPENVDB_FORCE_BUILD=false
 OPENVDB_FORCE_REBUILD=false
 OPENVDB_SKIP=false
 
 # Alembic needs to be compiled for now
-ALEMBIC_VERSION="1.7.16"
-ALEMBIC_VERSION_SHORT="1.7"
+ALEMBIC_VERSION="1.8.3"
+ALEMBIC_VERSION_SHORT="1.8"
 ALEMBIC_VERSION_MIN="1.7"
 ALEMBIC_VERSION_MEX="2.0"
 ALEMBIC_FORCE_BUILD=false
@@ -552,15 +537,15 @@ OPENCOLLADA_FORCE_BUILD=false
 OPENCOLLADA_FORCE_REBUILD=false
 OPENCOLLADA_SKIP=false
 
-EMBREE_VERSION="3.10.0"
-EMBREE_VERSION_SHORT="3.10"
-EMBREE_VERSION_MIN="3.10"
+EMBREE_VERSION="3.13.3"
+EMBREE_VERSION_SHORT="3.13"
+EMBREE_VERSION_MIN="3.13"
 EMBREE_VERSION_MEX="4.0"
 EMBREE_FORCE_BUILD=false
 EMBREE_FORCE_REBUILD=false
 EMBREE_SKIP=false
 
-OIDN_VERSION="1.4.1"
+OIDN_VERSION="1.4.3"
 OIDN_VERSION_SHORT="1.4"
 OIDN_VERSION_MIN="1.4.0"
 OIDN_VERSION_MEX="1.5"
@@ -568,7 +553,7 @@ OIDN_FORCE_BUILD=false
 OIDN_FORCE_REBUILD=false
 OIDN_SKIP=false
 
-ISPC_VERSION="1.16.0"
+ISPC_VERSION="1.17.0"
 
 FFMPEG_VERSION="4.4"
 FFMPEG_VERSION_SHORT="4.4"
@@ -579,7 +564,7 @@ FFMPEG_FORCE_REBUILD=false
 FFMPEG_SKIP=false
 _ffmpeg_list_sep=";"
 
-XR_OPENXR_VERSION="1.0.17"
+XR_OPENXR_VERSION="1.0.22"
 XR_OPENXR_VERSION_SHORT="1.0"
 XR_OPENXR_VERSION_MIN="1.0.8"
 XR_OPENXR_VERSION_MEX="2.0"
@@ -1044,7 +1029,7 @@ OPENEXR_SOURCE_REPO_UID="0ac2ea34c8f3134148a5df4052e40f155b76f6fb"
 #~ OPENEXR_SOURCE=( "https://github.com/openexr/openexr/archive/$OPENEXR_SOURCE_REPO_UID.tar.gz" )
 
 OIIO_USE_REPO=false
-OIIO_SOURCE=( "https://github.com/OpenImageIO/oiio/archive/Release-$OIIO_VERSION.tar.gz" )
+OIIO_SOURCE=( "https://github.com/OpenImageIO/oiio/archive/refs/tags/v$OIIO_VERSION.tar.gz" )
 #~ OIIO_SOURCE_REPO=( "https://github.com/OpenImageIO/oiio.git" )
 #~ OIIO_SOURCE_REPO_UID="c9e67275a0b248ead96152f6d2221cc0c0f278a4"
 
@@ -1116,7 +1101,7 @@ FFMPEG_SOURCE=( "http://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2" )
 XR_OPENXR_USE_REPO=false
 XR_OPENXR_SOURCE=("https://github.com/KhronosGroup/OpenXR-SDK/archive/release-${XR_OPENXR_VERSION}.tar.gz")
 XR_OPENXR_SOURCE_REPO=("https://github.com/KhronosGroup/OpenXR-SDK.git")
-XR_OPENXR_REPO_UID="bf21ccb1007bb531b45d9978919a56ea5059c245"
+XR_OPENXR_REPO_UID="458984d7f59d1ae6dc1b597d94b02e4f7132eaba"
 XR_OPENXR_REPO_BRANCH="master"
 
 # C++11 is required now
@@ -2049,7 +2034,7 @@ compile_OIIO() {
       else
         download OIIO_SOURCE[@] "$_src.tar.gz"
         INFO "Unpacking OpenImageIO-$OIIO_VERSION"
-        tar -C $SRC --transform "s,(.*/?)oiio-Release-[^/]*(.*),\1OpenImageIO-$OIIO_VERSION\2,x" -xf $_src.tar.gz
+        tar -C $SRC --transform "s,(.*/?)oiio-[^/]*(.*),\1OpenImageIO-$OIIO_VERSION\2,x" -xf $_src.tar.gz
       fi
     fi
 
@@ -4036,13 +4021,13 @@ install_DEB() {
     INFO "Forced Python building, as requested..."
     _do_compile_python=true
   else
-    check_package_version_ge_lt_DEB python3-dev $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
+    check_package_version_ge_lt_DEB python${PYTHON_VERSION_SHORT}-dev $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
     if [ $? -eq 0 ]; then
-      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_DEB python3-dev` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
-
-      install_packages_DEB python3-dev
+      install_packages_DEB python${PYTHON_VERSION_SHORT}-dev
       clean_Python
       PRINT ""
+
+      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_DEB python${PYTHON_VERSION_SHORT}-dev` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
 
       for module in "${PYTHON_MODULES_PACKAGES[@]}"
       do
@@ -4681,10 +4666,10 @@ install_RPM() {
   else
     check_package_version_ge_lt_RPM python3-devel $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
     if [ $? -eq 0 ]; then
-      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_RPM python3-devel` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
-
       install_packages_RPM python3-devel
       clean_Python
+
+      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_RPM python3-devel` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
 
       for module in "${PYTHON_MODULES_PACKAGES[@]}"
       do
@@ -5224,11 +5209,11 @@ install_ARCH() {
   else
     check_package_version_ge_lt_ARCH python $PYTHON_VERSION_MIN $PYTHON_VERSION_MEX
     if [ $? -eq 0 ]; then
-      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_ARCH python` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
-
       install_packages_ARCH python
       clean_Python
       PRINT ""
+
+      PYTHON_VERSION_INSTALLED=$(echo `get_package_version_ARCH python` | sed -r 's/^([0-9]+\.[0-9]+).*/\1/')
 
       for module in "${PYTHON_MODULES_PACKAGES[@]}"
       do

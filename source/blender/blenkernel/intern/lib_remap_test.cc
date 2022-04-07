@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2022 by Blender Foundation.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2022 Blender Foundation. */
 #include "testing/testing.h"
 
 #include "BLI_utildefines.h"
@@ -304,7 +289,7 @@ TEST(lib_remap, never_null_usage_flag_not_requested_on_delete)
   EXPECT_EQ(context.test_data.object->data, context.test_data.mesh);
   EXPECT_EQ(context.test_data.object->id.tag & LIB_TAG_DOIT, 0);
 
-  /* Never null usage isn't requested so the flag should not be set.*/
+  /* Never null usage isn't requested so the flag should not be set. */
   BKE_libblock_remap(
       context.test_data.bmain, context.test_data.mesh, nullptr, ID_REMAP_SKIP_NEVER_NULL_USAGE);
   EXPECT_EQ(context.test_data.object->data, context.test_data.mesh);
@@ -339,7 +324,7 @@ TEST(lib_remap, never_null_usage_flag_not_requested_on_remap)
   EXPECT_EQ(context.test_data.object->data, context.test_data.mesh);
   EXPECT_EQ(context.test_data.object->id.tag & LIB_TAG_DOIT, 0);
 
-  /* Never null usage isn't requested so the flag should not be set.*/
+  /* Never null usage isn't requested so the flag should not be set. */
   BKE_libblock_remap(
       context.test_data.bmain, context.test_data.mesh, other_mesh, ID_REMAP_SKIP_NEVER_NULL_USAGE);
   EXPECT_EQ(context.test_data.object->data, other_mesh);

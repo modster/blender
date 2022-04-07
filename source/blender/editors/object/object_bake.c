@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2004 by Blender Foundation
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2004 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup edobj
@@ -108,7 +92,7 @@ typedef struct {
   ListBase data;
   /** Clear the images before baking */
   bool bake_clear;
-  /** margin size in pixels*/
+  /** Margin size in pixels. */
   int bake_margin;
   /** margin type */
   char bake_margin_type;
@@ -531,7 +515,7 @@ static void multiresbake_freejob(void *bkv)
     /* delete here, since this delete will be called from main thread */
     for (link = data->images.first; link; link = link->next) {
       Image *ima = (Image *)link->data;
-      BKE_image_free_gputextures(ima);
+      BKE_image_partial_update_mark_full_update(ima);
     }
 
     MEM_freeN(data->ob_image.array);
@@ -587,7 +571,7 @@ static int multiresbake_image_exec(bContext *C, wmOperator *op)
 
 /* ****************** render BAKING ********************** */
 
-/* catch esc */
+/** Catch escape key to cancel. */
 static int objects_bake_render_modal(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
 {
   /* no running blender, remove handler and pass through */

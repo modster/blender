@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2012 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2012 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup edmask
@@ -652,21 +636,6 @@ static void draw_mask_layers(const bContext *C,
 
   GPU_program_point_size(false);
   GPU_blend(GPU_BLEND_NONE);
-}
-
-void ED_mask_draw(const bContext *C, const char draw_flag, const char draw_type)
-{
-  ScrArea *area = CTX_wm_area(C);
-  Mask *mask = CTX_data_edit_mask(C);
-  int width, height;
-
-  if (!mask) {
-    return;
-  }
-
-  ED_mask_get_size(area, &width, &height);
-
-  draw_mask_layers(C, mask, draw_flag, draw_type, width, height);
 }
 
 static float *mask_rasterize(Mask *mask, const int width, const int height)

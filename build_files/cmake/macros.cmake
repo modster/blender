@@ -1,22 +1,5 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2006 Blender Foundation. All rights reserved.
 
 macro(list_insert_after
   list_id item_check item_add
@@ -896,7 +879,7 @@ function(delayed_install
   destination)
 
   foreach(f ${files})
-    if(IS_ABSOLUTE ${f})
+    if(IS_ABSOLUTE ${f} OR "${base}" STREQUAL "")
       set_property(GLOBAL APPEND PROPERTY DELAYED_INSTALL_FILES ${f})
     else()
       set_property(GLOBAL APPEND PROPERTY DELAYED_INSTALL_FILES ${base}/${f})
@@ -1197,21 +1180,21 @@ endfunction()
 macro(openmp_delayload
   projectname
   )
-    if(MSVC)
-      if(WITH_OPENMP)
-        if(MSVC_CLANG)
-          set(OPENMP_DLL_NAME "libomp")
-        elseif(MSVC_VERSION EQUAL 1800)
-          set(OPENMP_DLL_NAME "vcomp120")
-        else()
-          set(OPENMP_DLL_NAME "vcomp140")
-        endif()
-        set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_RELEASE " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
-        set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_DEBUG " /DELAYLOAD:${OPENMP_DLL_NAME}d.dll delayimp.lib")
-        set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_RELWITHDEBINFO " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
-        set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_MINSIZEREL " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
+  if(MSVC)
+    if(WITH_OPENMP)
+      if(MSVC_CLANG)
+        set(OPENMP_DLL_NAME "libomp")
+      elseif(MSVC_VERSION EQUAL 1800)
+        set(OPENMP_DLL_NAME "vcomp120")
+      else()
+        set(OPENMP_DLL_NAME "vcomp140")
       endif()
+      set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_RELEASE " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
+      set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_DEBUG " /DELAYLOAD:${OPENMP_DLL_NAME}d.dll delayimp.lib")
+      set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_RELWITHDEBINFO " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
+      set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_MINSIZEREL " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
     endif()
+  endif()
 endmacro()
 
 macro(set_and_warn_dependency

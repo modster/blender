@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2005 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup gpu
@@ -26,6 +10,7 @@
 #include "BLI_string_utils.h"
 
 #include "GPU_capabilities.h"
+#include "GPU_debug.h"
 #include "GPU_matrix.h"
 #include "GPU_platform.h"
 
@@ -102,6 +87,16 @@ static void standard_defines(Vector<const char *> &sources)
   }
   else if (GPU_type_matches(GPU_DEVICE_ANY, GPU_OS_UNIX, GPU_DRIVER_ANY)) {
     sources.append("#define OS_UNIX\n");
+  }
+  /* API Definition */
+  eGPUBackendType backend = GPU_backend_get_type();
+  switch (backend) {
+    case GPU_BACKEND_OPENGL:
+      sources.append("#define GPU_OPENGL\n");
+      break;
+    default:
+      BLI_assert(false && "Invalid GPU Backend Type");
+      break;
   }
 
   if (GPU_crappy_amd_driver()) {
@@ -249,12 +244,31 @@ GPUShader *GPU_shader_create_compute(const char *computecode,
                               shname);
 }
 
+const GPUShaderCreateInfo *GPU_shader_create_info_get(const char *info_name)
+{
+  return gpu_shader_create_info_get(info_name);
+}
+
+GPUShader *GPU_shader_create_from_info_name(const char *info_name)
+{
+  using namespace blender::gpu::shader;
+  const GPUShaderCreateInfo *_info = gpu_shader_create_info_get(info_name);
+  const ShaderCreateInfo &info = *reinterpret_cast<const ShaderCreateInfo *>(_info);
+  if (!info.do_static_compilation_) {
+    printf("Warning: Trying to compile \"%s\" which was not marked for static compilation.\n",
+           info.name_.c_str());
+  }
+  return GPU_shader_create_from_info(_info);
+}
+
 GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
 {
   using namespace blender::gpu::shader;
   const ShaderCreateInfo &info = *reinterpret_cast<const ShaderCreateInfo *>(_info);
 
   const_cast<ShaderCreateInfo &>(info).finalize();
+
+  GPU_debug_group_begin(GPU_DEBUG_SHADER_COMPILATION_GROUP);
 
   /* At least a vertex shader and a fragment shader are required, or only a compute shader. */
   if (info.compute_source_.is_empty()) {
@@ -284,22 +298,23 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
 
   std::string defines = shader->defines_declare(info);
   std::string resources = shader->resources_declare(info);
-  char *shader_shared_utils = nullptr;
 
   defines += "#define USE_GPU_SHADER_CREATE_INFO\n";
 
-  Vector<char *> typedefs;
-  for (auto filename : info.typedef_sources_) {
-    typedefs.append(gpu_shader_dependency_get_source(filename.c_str()));
+  Vector<const char *> typedefs;
+  if (!info.typedef_sources_.is_empty() || !info.typedef_source_generated.empty()) {
+    typedefs.append(gpu_shader_dependency_get_source("GPU_shader_shared_utils.h").c_str());
   }
-  if (!typedefs.is_empty()) {
-    shader_shared_utils = gpu_shader_dependency_get_source("gpu_shader_shared_utils.h");
+  if (!info.typedef_source_generated.empty()) {
+    typedefs.append(info.typedef_source_generated.c_str());
+  }
+  for (auto filename : info.typedef_sources_) {
+    typedefs.append(gpu_shader_dependency_get_source(filename).c_str());
   }
 
   if (!info.vertex_source_.is_empty()) {
-    uint32_t builtins = 0;
+    auto code = gpu_shader_dependency_get_resolved_source(info.vertex_source_);
     std::string interface = shader->vertex_interface_declare(info);
-    char *code = gpu_shader_dependency_get_resolved_source(info.vertex_source_.c_str(), &builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
@@ -308,26 +323,19 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    if (!typedefs.is_empty()) {
-      sources.append(shader_shared_utils);
-    }
-    for (auto *types : typedefs) {
-      sources.append(types);
-    }
+    sources.extend(typedefs);
     sources.append(resources.c_str());
     sources.append(interface.c_str());
-    sources.append(code);
+    sources.extend(code);
+    sources.extend(info.dependencies_generated);
+    sources.append(info.vertex_source_generated.c_str());
 
     shader->vertex_shader_from_glsl(sources);
-
-    free(code);
   }
 
   if (!info.fragment_source_.is_empty()) {
-    uint32_t builtins = 0;
+    auto code = gpu_shader_dependency_get_resolved_source(info.fragment_source_);
     std::string interface = shader->fragment_interface_declare(info);
-    char *code = gpu_shader_dependency_get_resolved_source(info.fragment_source_.c_str(),
-                                                           &builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
@@ -336,84 +344,57 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    if (!typedefs.is_empty()) {
-      sources.append(shader_shared_utils);
-    }
-    for (auto *types : typedefs) {
-      sources.append(types);
-    }
+    sources.extend(typedefs);
     sources.append(resources.c_str());
     sources.append(interface.c_str());
-    sources.append(code);
+    sources.extend(code);
+    sources.extend(info.dependencies_generated);
+    sources.append(info.fragment_source_generated.c_str());
 
     shader->fragment_shader_from_glsl(sources);
-
-    free(code);
   }
 
   if (!info.geometry_source_.is_empty()) {
-    uint32_t builtins = 0;
-    std::string interface = shader->geometry_interface_declare(info);
+    auto code = gpu_shader_dependency_get_resolved_source(info.geometry_source_);
     std::string layout = shader->geometry_layout_declare(info);
-    char *code = gpu_shader_dependency_get_resolved_source(info.geometry_source_.c_str(),
-                                                           &builtins);
+    std::string interface = shader->geometry_interface_declare(info);
 
     Vector<const char *> sources;
     standard_defines(sources);
     sources.append("#define GPU_GEOMETRY_SHADER\n");
     sources.append(defines.c_str());
-    if (!typedefs.is_empty()) {
-      sources.append(shader_shared_utils);
-    }
-    for (auto *types : typedefs) {
-      sources.append(types);
-    }
+    sources.extend(typedefs);
     sources.append(resources.c_str());
     sources.append(layout.c_str());
     sources.append(interface.c_str());
-    sources.append(code);
+    sources.extend(code);
 
     shader->geometry_shader_from_glsl(sources);
-
-    free(code);
   }
 
   if (!info.compute_source_.is_empty()) {
-    uint32_t builtins = 0;
-    char *code = gpu_shader_dependency_get_resolved_source(info.compute_source_.c_str(),
-                                                           &builtins);
+    auto code = gpu_shader_dependency_get_resolved_source(info.compute_source_);
+    std::string layout = shader->compute_layout_declare(info);
 
     Vector<const char *> sources;
     standard_defines(sources);
     sources.append("#define GPU_COMPUTE_SHADER\n");
     sources.append(defines.c_str());
-    if (!typedefs.is_empty()) {
-      sources.append(shader_shared_utils);
-    }
-    for (auto *types : typedefs) {
-      sources.append(types);
-    }
+    sources.extend(typedefs);
     sources.append(resources.c_str());
-    sources.append(code);
+    sources.append(layout.c_str());
+    sources.extend(code);
 
     shader->compute_shader_from_glsl(sources);
-
-    free(code);
-  }
-
-  for (auto *types : typedefs) {
-    free(types);
-  }
-
-  if (shader_shared_utils) {
-    free(shader_shared_utils);
   }
 
   if (!shader->finalize(&info)) {
     delete shader;
+    GPU_debug_group_end();
     return nullptr;
   }
 
+  GPU_debug_group_end();
   return wrap(shader);
 }
 

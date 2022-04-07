@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2019, Blender Foundation.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2019 Blender Foundation. */
 
 /** \file
  * \ingroup draw_engine
@@ -239,7 +224,7 @@ void OVERLAY_grid_cache_init(OVERLAY_Data *vedata)
     sh = OVERLAY_shader_grid_background();
     grp = DRW_shgroup_create(sh, psl->grid_ps);
     float color_back[4];
-    interp_v4_v4v4(color_back, G_draw.block.colorBackground, G_draw.block.colorGrid, 0.5);
+    interp_v4_v4v4(color_back, G_draw.block.color_background, G_draw.block.color_grid, 0.5);
     DRW_shgroup_uniform_vec4_copy(grp, "color", color_back);
     DRW_shgroup_uniform_texture_ref(grp, "depthBuffer", &dtxl->depth);
     unit_m4(mat);

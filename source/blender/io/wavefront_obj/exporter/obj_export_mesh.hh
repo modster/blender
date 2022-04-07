@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup obj
@@ -32,6 +18,7 @@
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_object_types.h"
 
 #include "IO_wavefront_obj.h"
 
@@ -57,7 +44,11 @@ using unique_bmesh_ptr = std::unique_ptr<BMesh, CustomBMeshDeleter>;
 
 class OBJMesh : NonCopyable {
  private:
-  Object *export_object_eval_;
+  /**
+   * We need to copy the entire Object structure here because the dependency graph iterator
+   * sometimes builds an Object in a temporary space that doesn't persist.
+   */
+  Object export_object_eval_;
   Mesh *export_mesh_eval_;
   /**
    * For curves which are converted to mesh, and triangulated meshes, a new mesh is allocated.
@@ -68,6 +59,8 @@ class OBJMesh : NonCopyable {
    * object's world transform matrix.
    */
   float world_and_axes_transform_[4][4];
+  float world_and_axes_normal_transform_[3][3];
+  bool mirrored_transform_;
 
   /**
    * Total UV vertices in a mesh's texture map.
@@ -77,15 +70,23 @@ class OBJMesh : NonCopyable {
    * Per-polygon-per-vertex UV vertex indices.
    */
   Vector<Vector<int>> uv_indices_;
+  /*
+   * UV vertices.
+   */
+  Vector<float2> uv_coords_;
   /**
    * Per-loop normal index.
    */
   Vector<int> loop_to_normal_index_;
   /*
+   * Normal coords.
+   */
+  Vector<float3> normal_coords_;
+  /*
    * Total number of normal indices (maximum entry, plus 1, in
    * the loop_to_norm_index_ vector).
    */
-  int tot_normal_indices_ = NEGATIVE_INIT;
+  int tot_normal_indices_ = 0;
   /**
    * Total smooth groups in an object.
    */
@@ -94,6 +95,10 @@ class OBJMesh : NonCopyable {
    * Polygon aligned array of their smooth groups.
    */
   int *poly_smooth_groups_ = nullptr;
+  /**
+   * Order in which the polygons should be written into the file (sorted by material index).
+   */
+  Vector<int> poly_order_;
 
  public:
   /**
@@ -103,11 +108,18 @@ class OBJMesh : NonCopyable {
   OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Object *mesh_object);
   ~OBJMesh();
 
+  /* Clear various arrays to release potentially large memory allocations. */
+  void clear();
+
   int tot_vertices() const;
   int tot_polygons() const;
   int tot_uv_vertices() const;
   int tot_normal_indices() const;
   int tot_edges() const;
+  bool is_mirrored_transform() const
+  {
+    return mirrored_transform_;
+  }
 
   /**
    * \return Total materials in the object.
@@ -160,10 +172,14 @@ class OBJMesh : NonCopyable {
   Vector<int> calc_poly_vertex_indices(int poly_index) const;
   /**
    * Calculate UV vertex coordinates of an Object.
-   *
-   * \note Also store the UV vertex indices in the member variable.
+   * Stores the coordinates and UV vertex indices in the member variables.
    */
-  void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords);
+  void store_uv_coords_and_indices();
+  /* Get UV coordinates computed by store_uv_coords_and_indices. */
+  const Vector<float2> &get_uv_coords() const
+  {
+    return uv_coords_;
+  }
   Span<int> calc_poly_uv_indices(int poly_index) const;
   /**
    * Calculate polygon normal of a polygon at given index.
@@ -172,13 +188,18 @@ class OBJMesh : NonCopyable {
    */
   float3 calc_poly_normal(int poly_index) const;
   /**
-   * Find the unqique normals of the mesh and return them in \a r_normal_coords.
-   * Store the indices into that vector with for each loop in this OBJMesh.
+   * Find the unique normals of the mesh and stores them in a member variable.
+   * Also stores the indices into that vector with for each loop.
    */
-  void store_normal_coords_and_indices(Vector<float3> &r_normal_coords);
+  void store_normal_coords_and_indices();
+  /* Get normals calculate by store_normal_coords_and_indices. */
+  const Vector<float3> &get_normal_coords() const
+  {
+    return normal_coords_;
+  }
   /**
    * Calculate a polygon's polygon/loop normal indices.
-   * \param poly_index Index of the polygon to calculate indices for.
+   * \param poly_index: Index of the polygon to calculate indices for.
    * \return Vector of normal indices, aligned with vertices of polygon.
    */
   Vector<int> calc_poly_normal_indices(int poly_index) const;
@@ -200,6 +221,22 @@ class OBJMesh : NonCopyable {
    * Calculate vertex indices of an edge's corners if it is a loose edge.
    */
   std::optional<std::array<int, 2>> calc_loose_edge_vert_indices(int edge_index) const;
+
+  /**
+   * Calculate the order in which the polygons should be written into the file (sorted by material
+   * index).
+   */
+  void calc_poly_order();
+
+  /**
+   * Remap polygon index according to polygon writing order.
+   * When materials are not being written, the polygon order array
+   * might be empty, in which case remap is a no-op.
+   */
+  int remap_poly_index(int i) const
+  {
+    return i < 0 || i >= poly_order_.size() ? i : poly_order_[i];
+  }
 
  private:
   /**

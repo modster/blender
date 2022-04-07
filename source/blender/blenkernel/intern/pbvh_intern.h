@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -29,6 +15,8 @@ typedef struct {
 typedef struct {
   float bmin[3], bmax[3], bcentroid[3];
 } BBC;
+
+struct MeshElemMap;
 
 /* NOTE: this structure is getting large, might want to split it into
  * union'd structs */
@@ -73,6 +61,13 @@ struct PBVHNode {
    */
   const int *vert_indices;
   unsigned int uniq_verts, face_verts;
+
+  /* Array of indices into the Mesh's MLoop array.
+   * PBVH_FACES only.  The first part of the array
+   * are loops unique to this node, see comment for
+   * vert_indices for more details.*/
+  int *loop_indices;
+  unsigned int loop_indices_num;
 
   /* An array mapping face corners into the vert_indices
    * array. The array is sized to match 'totprim', and each of
@@ -153,8 +148,8 @@ struct PBVH {
   int totgrid;
   BLI_bitmap **grid_hidden;
 
-  /* Only used during BVH build and update,
-   * don't need to remain valid after */
+  /* Used during BVH build and later to mark that a vertex needs to update
+   * (its normal must be recalculated). */
   BLI_bitmap *vert_bitmap;
 
 #ifdef PERFCNTRS
@@ -179,9 +174,17 @@ struct PBVH {
 
   struct BMLog *bm_log;
   struct SubdivCCG *subdiv_ccg;
+
+  const struct MeshElemMap *pmap;
+
+  CustomDataLayer *color_layer;
+  AttributeDomain color_domain;
+
+  bool is_drawing;
 };
 
 /* pbvh.c */
+
 void BB_reset(BB *bb);
 /**
  * Expand the bounding box to include a new coordinate.
@@ -230,6 +233,7 @@ bool ray_face_nearest_tri(const float ray_start[3],
 void pbvh_update_BB_redraw(PBVH *bvh, PBVHNode **nodes, int totnode, int flag);
 
 /* pbvh_bmesh.c */
+
 bool pbvh_bmesh_node_raycast(PBVHNode *node,
                              const float ray_start[3],
                              const float ray_normal[3],

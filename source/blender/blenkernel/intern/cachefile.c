@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2016 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -433,9 +417,7 @@ float BKE_cachefile_time_offset(const CacheFile *cache_file, const float time, c
   return cache_file->is_sequence ? frame : frame / fps - time_offset;
 }
 
-bool BKE_cache_file_uses_render_procedural(const CacheFile *cache_file,
-                                           Scene *scene,
-                                           const int dag_eval_mode)
+bool BKE_cache_file_uses_render_procedural(const CacheFile *cache_file, Scene *scene)
 {
   RenderEngineType *render_engine_type = RE_engines_find(scene->r.engine);
 
@@ -444,9 +426,7 @@ bool BKE_cache_file_uses_render_procedural(const CacheFile *cache_file,
     return false;
   }
 
-  /* The render time procedural is only enabled during viewport rendering. */
-  const bool is_final_render = (eEvaluationMode)dag_eval_mode == DAG_EVAL_RENDER;
-  return cache_file->use_render_procedural && !is_final_render;
+  return cache_file->use_render_procedural;
 }
 
 CacheFileLayer *BKE_cachefile_add_layer(CacheFile *cache_file, const char filename[1024])

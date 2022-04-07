@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2009 by Nicholas Bishop
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2009 by Nicholas Bishop. All rights reserved. */
 
 #pragma once
 
@@ -27,6 +11,8 @@
 #include "BLI_utildefines.h"
 #include "DNA_brush_enums.h"
 #include "DNA_object_enums.h"
+
+#include "BKE_attribute.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,9 +76,11 @@ typedef enum ePaintMode {
   PAINT_MODE_VERTEX_GPENCIL = 7,
   PAINT_MODE_SCULPT_GPENCIL = 8,
   PAINT_MODE_WEIGHT_GPENCIL = 9,
+  /** Curves. */
+  PAINT_MODE_SCULPT_CURVES = 10,
 
   /** Keep last. */
-  PAINT_MODE_INVALID = 10,
+  PAINT_MODE_INVALID = 11,
 } ePaintMode;
 
 #define PAINT_MODE_HAS_BRUSH(mode) !ELEM(mode, PAINT_MODE_SCULPT_UV)
@@ -499,7 +487,6 @@ typedef struct SculptSession {
 
   /* These are always assigned to base mesh data when using PBVH_FACES and PBVH_GRIDS. */
   struct MVert *mvert;
-  const float (*vert_normals)[3];
   struct MPoly *mpoly;
   struct MLoop *mloop;
 
@@ -508,6 +495,11 @@ typedef struct SculptSession {
 
   struct KeyBlock *shapekey_active;
   struct MPropCol *vcol;
+  struct MLoopCol *mcol;
+
+  AttributeDomain vcol_domain;
+  CustomDataType vcol_type;
+
   float *vmask;
 
   /* Mesh connectivity maps. */
@@ -617,10 +609,6 @@ typedef struct SculptSession {
   float init_pivot_rot[4];
   float init_pivot_scale[3];
 
-  float prev_pivot_pos[3];
-  float prev_pivot_rot[4];
-  float prev_pivot_scale[3];
-
   union {
     struct {
       struct SculptVertexPaintGeomMap gmap;
@@ -682,7 +670,8 @@ void BKE_sculpt_update_object_after_eval(struct Depsgraph *depsgraph, struct Obj
  * Sculpt mode handles multi-res differently from regular meshes, but only if
  * it's the last modifier on the stack and it is not on the first level.
  */
-struct MultiresModifierData *BKE_sculpt_multires_active(struct Scene *scene, struct Object *ob);
+struct MultiresModifierData *BKE_sculpt_multires_active(const struct Scene *scene,
+                                                        struct Object *ob);
 int BKE_sculpt_mask_layers_ensure(struct Object *ob, struct MultiresModifierData *mmd);
 void BKE_sculpt_toolsettings_data_ensure(struct Scene *scene);
 

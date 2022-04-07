@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2016 Blender Foundation. All rights reserved. */
 
 #pragma once
 
@@ -67,8 +51,7 @@ void BKE_cachefile_reader_free(struct CacheFile *cache_file, struct CacheReader 
  * load the data directly if they support it.
  */
 bool BKE_cache_file_uses_render_procedural(const struct CacheFile *cache_file,
-                                           struct Scene *scene,
-                                           int dag_eval_mode);
+                                           struct Scene *scene);
 
 /* Add a layer to the cache_file. Return NULL if the filename is already that of an existing layer
  * or if the number of layers exceeds the maximum allowed layer count. */

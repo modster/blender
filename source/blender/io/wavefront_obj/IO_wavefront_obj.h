@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup obj
@@ -69,6 +55,7 @@ struct OBJExportParams {
 
   /* File Write Options. */
   bool export_selected_objects;
+  bool apply_modifiers;
   eEvaluationMode export_eval_mode;
   bool export_uv;
   bool export_normals;
@@ -90,6 +77,23 @@ struct OBJExportParams {
   bool smooth_groups_bitflags;
 };
 
+struct OBJImportParams {
+  /** Full path to the source OBJ file to import. */
+  char filepath[FILE_MAX];
+  /** Value 0 disables clamping. */
+  float clamp_size;
+  eTransformAxisForward forward_axis;
+  eTransformAxisUp up_axis;
+};
+
+/**
+ * Time the full import process.
+ */
+void OBJ_import(bContext *C, const struct OBJImportParams *import_params);
+
+/**
+ * C-interface for the exporter.
+ */
 void OBJ_export(bContext *C, const struct OBJExportParams *export_params);
 
 #ifdef __cplusplus

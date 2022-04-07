@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup editorui
@@ -173,6 +157,8 @@ enum {
   UI_BLOCK_POPOVER_ONCE = 1 << 22,
   /** Always show key-maps, even for non-menus. */
   UI_BLOCK_SHOW_SHORTCUT_ALWAYS = 1 << 23,
+  /** Don't show library override state for buttons in this block. */
+  UI_BLOCK_NO_DRAW_OVERRIDDEN_STATE = 1 << 24,
   /** The block is only used during the search process and will not be drawn.
    * Currently just for the case of a closed panel's sub-panel (and its sub-panels). */
   UI_BLOCK_SEARCH_ONLY = 1 << 25,
@@ -612,6 +598,7 @@ typedef bool (*uiMenuStepFunc)(struct bContext *C, int direction, void *arg1);
 typedef void (*uiFreeArgFunc)(void *arg);
 
 /* interface_query.c */
+
 bool UI_but_has_tooltip_label(const uiBut *but);
 bool UI_but_is_tool(const uiBut *but);
 /* file selectors are exempt from utf-8 checks */
@@ -625,6 +612,7 @@ bool UI_block_can_add_separator(const uiBlock *block);
 struct uiList *UI_list_find_mouse_over(const struct ARegion *region, const struct wmEvent *event);
 
 /* interface_region_menu_popup.c */
+
 /**
  * Popup Menus
  *
@@ -648,7 +636,7 @@ uiPopupMenu *UI_popup_menu_begin_ex(struct bContext *C,
  * Set the whole structure to work.
  */
 void UI_popup_menu_end(struct bContext *C, struct uiPopupMenu *pup);
-bool UI_popup_menu_end_or_cancel(struct bContext *C, struct uiPopupMenu *head);
+bool UI_popup_menu_end_or_cancel(struct bContext *C, struct uiPopupMenu *pup);
 struct uiLayout *UI_popup_menu_layout(uiPopupMenu *pup);
 
 void UI_popup_menu_reports(struct bContext *C, struct ReportList *reports) ATTR_NONNULL();
@@ -690,6 +678,7 @@ struct uiLayout *UI_popover_layout(uiPopover *pup);
 void UI_popover_once_clear(uiPopover *pup);
 
 /* interface_region_menu_pie.c */
+
 /* Pie menus */
 typedef struct uiPieMenu uiPieMenu;
 
@@ -1370,6 +1359,8 @@ uiBut *uiDefIconTextButO_ptr(uiBlock *block,
 /* for passing inputs to ButO buttons */
 struct PointerRNA *UI_but_operator_ptr_get(uiBut *but);
 
+struct bContextStore *UI_but_context_get(const uiBut *but);
+
 void UI_but_unit_type_set(uiBut *but, int unit_type);
 int UI_but_unit_type_get(const uiBut *but);
 
@@ -1607,12 +1598,14 @@ typedef enum {
 } eButLabelAlign;
 
 /* Return info for uiDefAutoButsRNA */
-typedef enum {
+typedef enum eAutoPropButsReturn {
   /* Returns when no buttons were added */
   UI_PROP_BUTS_NONE_ADDED = 1 << 0,
   /* Returned when any property failed the custom check callback (check_prop) */
   UI_PROP_BUTS_ANY_FAILED_CHECK = 1 << 1,
 } eAutoPropButsReturn;
+
+ENUM_OPERATORS(eAutoPropButsReturn, UI_PROP_BUTS_ANY_FAILED_CHECK);
 
 uiBut *uiDefAutoButR(uiBlock *block,
                      struct PointerRNA *ptr,
@@ -1624,6 +1617,14 @@ uiBut *uiDefAutoButR(uiBlock *block,
                      int y,
                      int width,
                      int height);
+void uiDefAutoButsArrayR(uiBlock *block,
+                         PointerRNA *ptr,
+                         PropertyRNA *prop,
+                         const int icon,
+                         const int x,
+                         const int y,
+                         const int tot_width,
+                         const int height);
 /**
  * \a check_prop callback filters functions to avoid drawing certain properties,
  * in cases where PROP_HIDDEN flag can't be used for a property.
@@ -2916,7 +2917,7 @@ uiBut *UI_context_active_but_prop_get(const struct bContext *C,
                                       struct PointerRNA *r_ptr,
                                       struct PropertyRNA **r_prop,
                                       int *r_index);
-void UI_context_active_but_prop_handle(struct bContext *C);
+void UI_context_active_but_prop_handle(struct bContext *C, bool handle_undo);
 void UI_context_active_but_clear(struct bContext *C, struct wmWindow *win, struct ARegion *region);
 
 struct wmOperator *UI_context_active_operator_get(const struct bContext *C);
@@ -2947,7 +2948,7 @@ uiBlock *UI_region_block_find_mouse_over(const struct ARegion *region,
  */
 struct ARegion *UI_region_searchbox_region_get(const struct ARegion *button_region);
 
-/* uiFontStyle.align */
+/** #uiFontStyle.align */
 typedef enum eFontStyle_Align {
   UI_STYLE_TEXT_LEFT = 0,
   UI_STYLE_TEXT_CENTER = 1,

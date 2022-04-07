@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2012 by Blender Foundation
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2012 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup render
@@ -33,11 +17,14 @@
 #include "BLI_math.h"
 #include "BLI_threads.h"
 
+#include "BKE_DerivedMesh.h"
 #include "BKE_ccg.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
+#include "BKE_lib_id.h"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
+#include "BKE_mesh_tangent.h"
 #include "BKE_modifier.h"
 #include "BKE_multires.h"
 #include "BKE_subsurf.h"
@@ -79,7 +66,7 @@ typedef struct {
   MLoopUV *mloopuv;
   const MLoopTri *mlooptri;
   float *pvtangent;
-  const float *precomputed_normals;
+  const float (*precomputed_normals)[3];
   int w, h;
   int tri_index;
   DerivedMesh *lores_dm, *hires_dm;
@@ -119,25 +106,25 @@ typedef struct BakeImBufuserData {
 } BakeImBufuserData;
 
 static void multiresbake_get_normal(const MResolvePixelData *data,
-                                    float norm[],
                                     const int tri_num,
-                                    const int vert_index)
+                                    const int vert_index,
+                                    float r_normal[3])
 {
   const int poly_index = data->mlooptri[tri_num].poly;
   const MPoly *mp = &data->mpoly[poly_index];
   const bool smoothnormal = (mp->flag & ME_SMOOTH) != 0;
 
-  if (!smoothnormal) { /* flat */
-    if (data->precomputed_normals) {
-      copy_v3_v3(norm, &data->precomputed_normals[poly_index]);
-    }
-    else {
-      BKE_mesh_calc_poly_normal(mp, &data->mloop[mp->loopstart], data->mvert, norm);
-    }
+  if (smoothnormal) {
+    const int vi = data->mloop[data->mlooptri[tri_num].tri[vert_index]].v;
+    copy_v3_v3(r_normal, data->vert_normals[vi]);
   }
   else {
-    const int vi = data->mloop[data->mlooptri[tri_num].tri[vert_index]].v;
-    copy_v3_v3(norm, data->vert_normals[vi]);
+    if (data->precomputed_normals) {
+      copy_v3_v3(r_normal, data->precomputed_normals[poly_index]);
+    }
+    else {
+      BKE_mesh_calc_poly_normal(mp, &data->mloop[mp->loopstart], data->mvert, r_normal);
+    }
   }
 }
 
@@ -173,9 +160,9 @@ static void flush_pixel(const MResolvePixelData *data, const int x, const int y)
   st1 = data->mloopuv[data->mlooptri[data->tri_index].tri[1]].uv;
   st2 = data->mloopuv[data->mlooptri[data->tri_index].tri[2]].uv;
 
-  multiresbake_get_normal(data, no0, data->tri_index, 0); /* can optimize these 3 into one call */
-  multiresbake_get_normal(data, no1, data->tri_index, 1);
-  multiresbake_get_normal(data, no2, data->tri_index, 2);
+  multiresbake_get_normal(data, data->tri_index, 0, no0); /* can optimize these 3 into one call */
+  multiresbake_get_normal(data, data->tri_index, 1, no1);
+  multiresbake_get_normal(data, data->tri_index, 2, no2);
 
   resolve_tri_uv_v2(fUV, st, st0, st1, st2);
 
@@ -480,7 +467,6 @@ static void do_multires_bake(MultiresBakeRender *bkr,
     MPoly *mpoly = dm->getPolyArray(dm);
     MLoop *mloop = dm->getLoopArray(dm);
     MLoopUV *mloopuv = dm->getLoopDataArray(dm, CD_MLOOPUV);
-    const float *precomputed_normals = dm->getPolyDataArray(dm, CD_NORMAL);
     float *pvtangent = NULL;
 
     ListBase threads;
@@ -488,9 +474,36 @@ static void do_multires_bake(MultiresBakeRender *bkr,
 
     void *bake_data = NULL;
 
+    Mesh *temp_mesh = BKE_mesh_new_nomain(
+        dm->getNumVerts(dm), dm->getNumEdges(dm), 0, dm->getNumLoops(dm), dm->getNumPolys(dm));
+    memcpy(temp_mesh->mvert, dm->getVertArray(dm), temp_mesh->totvert * sizeof(*temp_mesh->mvert));
+    memcpy(temp_mesh->medge, dm->getEdgeArray(dm), temp_mesh->totedge * sizeof(*temp_mesh->medge));
+    memcpy(temp_mesh->mpoly, dm->getPolyArray(dm), temp_mesh->totpoly * sizeof(*temp_mesh->mpoly));
+    memcpy(temp_mesh->mloop, dm->getLoopArray(dm), temp_mesh->totloop * sizeof(*temp_mesh->mloop));
+    const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(temp_mesh);
+    const float(*poly_normals)[3] = BKE_mesh_poly_normals_ensure(temp_mesh);
+
     if (require_tangent) {
       if (CustomData_get_layer_index(&dm->loopData, CD_TANGENT) == -1) {
-        DM_calc_loop_tangents(dm, true, NULL, 0);
+        BKE_mesh_calc_loop_tangent_ex(
+            dm->getVertArray(dm),
+            dm->getPolyArray(dm),
+            dm->getNumPolys(dm),
+            dm->getLoopArray(dm),
+            dm->getLoopTriArray(dm),
+            dm->getNumLoopTri(dm),
+            &dm->loopData,
+            true,
+            NULL,
+            0,
+            vert_normals,
+            poly_normals,
+            (const float(*)[3])dm->getLoopDataArray(dm, CD_NORMAL),
+            (const float(*)[3])dm->getVertDataArray(dm, CD_ORCO), /* may be nullptr */
+            /* result */
+            &dm->loopData,
+            dm->getNumLoops(dm),
+            &dm->tangent_mask);
       }
 
       pvtangent = DM_get_loop_data_layer(dm, CD_TANGENT);
@@ -524,11 +537,12 @@ static void do_multires_bake(MultiresBakeRender *bkr,
 
       handle->data.mpoly = mpoly;
       handle->data.mvert = mvert;
+      handle->data.vert_normals = vert_normals;
       handle->data.mloopuv = mloopuv;
       handle->data.mlooptri = mlooptri;
       handle->data.mloop = mloop;
       handle->data.pvtangent = pvtangent;
-      handle->data.precomputed_normals = precomputed_normals; /* don't strictly need this */
+      handle->data.precomputed_normals = poly_normals; /* don't strictly need this */
       handle->data.w = ibuf->x;
       handle->data.h = ibuf->y;
       handle->data.lores_dm = dm;
@@ -574,6 +588,8 @@ static void do_multires_bake(MultiresBakeRender *bkr,
     }
 
     MEM_freeN(handles);
+
+    BKE_id_free(NULL, temp_mesh);
 
     BKE_image_release_ibuf(ima, ibuf, NULL);
   }
@@ -1045,23 +1061,23 @@ static void create_ao_raytree(MultiresBakeRender *bkr, MAOBakeData *ao_data)
   RayFace *face;
   CCGElem **grid_data;
   CCGKey key;
-  int num_grids, grid_size /*, face_side */, num_faces;
+  int grids_num, grid_size /*, face_side */, faces_num;
   int i;
 
-  num_grids = hidm->getNumGrids(hidm);
+  grids_num = hidm->getNumGrids(hidm);
   grid_size = hidm->getGridSize(hidm);
   grid_data = hidm->getGridData(hidm);
   hidm->getGridKey(hidm, &key);
 
   /* face_side = (grid_size << 1) - 1; */ /* UNUSED */
-  num_faces = num_grids * (grid_size - 1) * (grid_size - 1);
+  faces_num = grids_num * (grid_size - 1) * (grid_size - 1);
 
   raytree = ao_data->raytree = RE_rayobject_create(
-      bkr->raytrace_structure, num_faces, bkr->octree_resolution);
-  face = ao_data->rayfaces = (RayFace *)MEM_callocN(num_faces * sizeof(RayFace),
+      bkr->raytrace_structure, faces_num, bkr->octree_resolution);
+  face = ao_data->rayfaces = (RayFace *)MEM_callocN(faces_num * sizeof(RayFace),
                                                     "ObjectRen faces");
 
-  for (i = 0; i < num_grids; i++) {
+  for (i = 0; i < grids_num; i++) {
     int x, y;
     for (x = 0; x < grid_size - 1; x++) {
       for (y = 0; y < grid_size - 1; y++) {

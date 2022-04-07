@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 #pragma once
 
 /** \file
@@ -23,6 +7,7 @@
  */
 
 #include "BKE_mesh_types.h"
+#include "BLI_compiler_attrs.h"
 #include "BLI_utildefines.h"
 
 struct BLI_Stack;
@@ -85,6 +70,13 @@ struct Mesh *BKE_mesh_from_bmesh_for_eval_nomain(struct BMesh *bm,
                                                  const struct Mesh *me_settings);
 
 /**
+ * Add original index (#CD_ORIGINDEX) layers if they don't already exist. This is meant to be used
+ * when creating an evaluated mesh from an original edit mode mesh, to allow mapping from the
+ * evaluated vertices to the originals.
+ */
+void BKE_mesh_ensure_default_orig_index_customdata(struct Mesh *mesh);
+
+/**
  * Find the index of the loop in 'poly' which references vertex,
  * returns -1 if not found
  */
@@ -118,6 +110,9 @@ void BKE_mesh_looptri_get_real_edges(const struct Mesh *mesh,
 void BKE_mesh_free_data_for_undo(struct Mesh *me);
 void BKE_mesh_clear_geometry(struct Mesh *me);
 struct Mesh *BKE_mesh_add(struct Main *bmain, const char *name);
+
+void BKE_mesh_free_editmesh(struct Mesh *mesh);
+
 /**
  * A version of #BKE_mesh_copy_parameters that is intended for evaluated output
  * (the modifier stack for example).
@@ -323,6 +318,8 @@ void BKE_mesh_vert_coords_apply_with_mat4(struct Mesh *mesh,
                                           const float mat[4][4]);
 void BKE_mesh_vert_coords_apply(struct Mesh *mesh, const float (*vert_coords)[3]);
 
+void BKE_mesh_anonymous_attributes_remove(struct Mesh *mesh);
+
 /* *** mesh_tessellate.c *** */
 
 /**
@@ -342,8 +339,7 @@ int BKE_mesh_tessface_calc_ex(struct CustomData *fdata,
                               struct MVert *mvert,
                               int totface,
                               int totloop,
-                              int totpoly,
-                              bool do_face_nor_copy);
+                              int totpoly);
 void BKE_mesh_tessface_calc(struct Mesh *mesh);
 
 /**
@@ -409,6 +405,9 @@ void BKE_mesh_assert_normals_dirty_or_calculated(const struct Mesh *mesh);
  * \note In order to clear the dirty flag, this function should be followed by a call to
  * #BKE_mesh_vertex_normals_clear_dirty. This is separate so that normals are still tagged dirty
  * while they are being assigned.
+ *
+ * \warning The memory returned by this function is not initialized if it was not previously
+ * allocated.
  */
 float (*BKE_mesh_vertex_normals_for_write(struct Mesh *mesh))[3];
 
@@ -419,8 +418,22 @@ float (*BKE_mesh_vertex_normals_for_write(struct Mesh *mesh))[3];
  * \note In order to clear the dirty flag, this function should be followed by a call to
  * #BKE_mesh_poly_normals_clear_dirty. This is separate so that normals are still tagged dirty
  * while they are being assigned.
+ *
+ * \warning The memory returned by this function is not initialized if it was not previously
+ * allocated.
  */
 float (*BKE_mesh_poly_normals_for_write(struct Mesh *mesh))[3];
+
+/**
+ * Free any cached vertex or poly normals. Face corner (loop) normals are also derived data,
+ * but are not handled with the same method yet, so they are not included. It's important that this
+ * is called after the mesh changes size, since otherwise cached normal arrays might not be large
+ * enough (though it may be called indirectly by other functions).
+ *
+ * \note Normally it's preferred to call #BKE_mesh_normals_tag_dirty instead,
+ * but this can be used in specific situations to reset a mesh or reduce memory usage.
+ */
+void BKE_mesh_clear_derived_normals(struct Mesh *mesh);
 
 /**
  * Mark the mesh's vertex normals non-dirty, for when they are calculated or assigned manually.
@@ -457,6 +470,21 @@ void BKE_mesh_calc_normals_poly(const struct MVert *mvert,
                                 const struct MPoly *mpoly,
                                 int mpoly_len,
                                 float (*r_poly_normals)[3]);
+
+/**
+ * Calculate face and vertex normals directly into result arrays.
+ *
+ * \note Usually #BKE_mesh_vertex_normals_ensure is the preferred way to access vertex normals,
+ * since they may already be calculated and cached on the mesh.
+ */
+void BKE_mesh_calc_normals_poly_and_vertex(const struct MVert *mvert,
+                                           int mvert_len,
+                                           const struct MLoop *mloop,
+                                           int mloop_len,
+                                           const struct MPoly *mpoly,
+                                           int mpoly_len,
+                                           float (*r_poly_normals)[3],
+                                           float (*r_vert_normals)[3]);
 
 /**
  * Calculate vertex and face normals, storing the result in custom data layers on the mesh.
@@ -543,7 +571,7 @@ typedef struct MLoopNorSpaceArray {
   struct LinkNode
       *loops_pool; /* Allocated once, avoids to call BLI_linklist_prepend_arena() for each loop! */
   char data_type;  /* Whether we store loop indices, or pointers to BMLoop. */
-  int num_spaces;  /* Number of clnors spaces defined in this array. */
+  int spaces_num;  /* Number of clnors spaces defined in this array. */
   struct MemArena *mem;
 } MLoopNorSpaceArray;
 /**
@@ -929,7 +957,7 @@ void BKE_mesh_calc_relative_deform(const struct MPoly *mpoly,
                                    const float (*vert_cos_org)[3],
                                    float (*vert_cos_new)[3]);
 
-/* *** mesh_validate.c *** */
+/* *** mesh_validate.cc *** */
 
 /**
  * Validates and corrects a Mesh.
@@ -1037,6 +1065,14 @@ void BKE_mesh_batch_cache_free(struct Mesh *me);
 
 extern void (*BKE_mesh_batch_cache_dirty_tag_cb)(struct Mesh *me, eMeshBatchDirtyMode mode);
 extern void (*BKE_mesh_batch_cache_free_cb)(struct Mesh *me);
+
+/* mesh_debug.c */
+
+#ifndef NDEBUG
+char *BKE_mesh_debug_info(const struct Mesh *me)
+    ATTR_NONNULL(1) ATTR_MALLOC ATTR_WARN_UNUSED_RESULT;
+void BKE_mesh_debug_print(const struct Mesh *me) ATTR_NONNULL(1);
+#endif
 
 /* Inlines */
 

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 #pragma once
 
 /** \file
@@ -23,6 +7,8 @@
  */
 
 #include "BLI_utildefines.h"
+
+#include "BLI_rect.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,7 +64,7 @@ struct StampData *BKE_stamp_info_from_scene_static(const struct Scene *scene);
  * Check whether the given metadata field name translates to a known field of a stamp.
  */
 bool BKE_stamp_is_known_field(const char *field_name);
-void BKE_imbuf_stamp_info(struct RenderResult *rr, struct ImBuf *ibuf);
+void BKE_imbuf_stamp_info(const struct RenderResult *rr, struct ImBuf *ibuf);
 void BKE_stamp_info_from_imbuf(struct RenderResult *rr, struct ImBuf *ibuf);
 void BKE_stamp_info_callback(void *data,
                              struct StampData *stamp_data,
@@ -96,15 +82,14 @@ void BKE_image_stamp_buf(struct Scene *scene,
                          int height,
                          int channels);
 bool BKE_imbuf_alpha_test(struct ImBuf *ibuf);
-int BKE_imbuf_write_stamp(struct Scene *scene,
-                          struct RenderResult *rr,
+int BKE_imbuf_write_stamp(const struct Scene *scene,
+                          const struct RenderResult *rr,
                           struct ImBuf *ibuf,
                           const char *name,
                           const struct ImageFormatData *imf);
 /**
  * \note imf->planes is ignored here, its assumed the image channels are already set.
  */
-void BKE_imbuf_write_prepare(struct ImBuf *ibuf, const struct ImageFormatData *imf);
 int BKE_imbuf_write(struct ImBuf *ibuf, const char *name, const struct ImageFormatData *imf);
 /**
  * Same as #BKE_imbuf_write() but crappy workaround not to permanently modify _some_,
@@ -114,43 +99,6 @@ int BKE_imbuf_write_as(struct ImBuf *ibuf,
                        const char *name,
                        struct ImageFormatData *imf,
                        bool save_copy);
-void BKE_image_path_from_imformat(char *string,
-                                  const char *base,
-                                  const char *relbase,
-                                  int frame,
-                                  const struct ImageFormatData *im_format,
-                                  bool use_ext,
-                                  bool use_frames,
-                                  const char *suffix);
-void BKE_image_path_from_imtype(char *string,
-                                const char *base,
-                                const char *relbase,
-                                int frame,
-                                char imtype,
-                                bool use_ext,
-                                bool use_frames,
-                                const char *suffix);
-int BKE_image_path_ensure_ext_from_imformat(char *string, const struct ImageFormatData *im_format);
-int BKE_image_path_ensure_ext_from_imtype(char *string, char imtype);
-char BKE_image_ftype_to_imtype(int ftype, const struct ImbFormatOptions *options);
-int BKE_image_imtype_to_ftype(char imtype, struct ImbFormatOptions *r_options);
-
-bool BKE_imtype_is_movie(char imtype);
-bool BKE_imtype_supports_zbuf(char imtype);
-bool BKE_imtype_supports_compress(char imtype);
-bool BKE_imtype_supports_quality(char imtype);
-bool BKE_imtype_requires_linear_float(char imtype);
-char BKE_imtype_valid_channels(char imtype, bool write_file);
-char BKE_imtype_valid_depths(char imtype);
-
-/**
- * String is from command line `--render-format` argument,
- * keep in sync with `creator_args.c` help info.
- */
-char BKE_imtype_from_arg(const char *arg);
-
-void BKE_imformat_defaults(struct ImageFormatData *im_format);
-void BKE_imbuf_to_image_format(struct ImageFormatData *im_format, const struct ImBuf *imbuf);
 
 /**
  * Used by sequencer too.
@@ -184,10 +132,6 @@ struct RenderResult;
 /* image-user gets a new image, check settings */
 #define IMA_SIGNAL_USER_NEW_IMAGE 6
 #define IMA_SIGNAL_COLORMANAGE 7
-
-#define IMA_CHAN_FLAG_BW 1
-#define IMA_CHAN_FLAG_RGB 2
-#define IMA_CHAN_FLAG_ALPHA 4
 
 /**
  * Checks whether there's an image buffer for given image and user.
@@ -385,7 +329,7 @@ void BKE_image_merge(struct Main *bmain, struct Image *dest, struct Image *sourc
 bool BKE_image_scale(struct Image *image, int width, int height);
 
 /**
- * Check if texture has alpha (depth=32).
+ * Check if texture has alpha (planes == 32 || planes == 16).
  */
 bool BKE_image_has_alpha(struct Image *image);
 
@@ -500,7 +444,7 @@ bool BKE_image_is_dirty(struct Image *image);
 void BKE_image_mark_dirty(struct Image *image, struct ImBuf *ibuf);
 bool BKE_image_buffer_format_writable(struct ImBuf *ibuf);
 
-bool BKE_image_is_dirty_writable(struct Image *image, bool *is_format_writable);
+bool BKE_image_is_dirty_writable(struct Image *image, bool *r_is_writable);
 
 /**
  * Guess offset for the first frame in the sequence.
@@ -561,19 +505,27 @@ struct GPUTexture *BKE_image_get_gpu_tilemap(struct Image *image,
  * Is the alpha of the `GPUTexture` for a given image/ibuf premultiplied.
  */
 bool BKE_image_has_gpu_texture_premultiplied_alpha(struct Image *image, struct ImBuf *ibuf);
+
 /**
  * Partial update of texture for texture painting.
  * This is often much quicker than fully updating the texture for high resolution images.
  */
 void BKE_image_update_gputexture(
     struct Image *ima, struct ImageUser *iuser, int x, int y, int w, int h);
+
 /**
  * Mark areas on the #GPUTexture that needs to be updated. The areas are marked in chunks.
  * The next time the #GPUTexture is used these tiles will be refreshes. This saves time
  * when writing to the same place multiple times This happens for during foreground rendering.
  */
-void BKE_image_update_gputexture_delayed(
-    struct Image *ima, struct ImBuf *ibuf, int x, int y, int w, int h);
+void BKE_image_update_gputexture_delayed(struct Image *ima,
+                                         struct ImageTile *image_tile,
+                                         struct ImBuf *ibuf,
+                                         int x,
+                                         int y,
+                                         int w,
+                                         int h);
+
 /**
  * Called on entering and exiting texture paint mode,
  * temporary disabling/enabling mipmapping on all images for quick texture
@@ -590,6 +542,32 @@ struct RenderSlot *BKE_image_add_renderslot(struct Image *ima, const char *name)
 bool BKE_image_remove_renderslot(struct Image *ima, struct ImageUser *iuser, int slot);
 struct RenderSlot *BKE_image_get_renderslot(struct Image *ima, int index);
 bool BKE_image_clear_renderslot(struct Image *ima, struct ImageUser *iuser, int slot);
+
+/* --- image_partial_update.cc --- */
+/** Image partial updates. */
+struct PartialUpdateUser;
+
+/**
+ * \brief Create a new PartialUpdateUser. An Object that contains data to use partial updates.
+ */
+struct PartialUpdateUser *BKE_image_partial_update_create(const struct Image *image);
+
+/**
+ * \brief free a partial update user.
+ */
+void BKE_image_partial_update_free(struct PartialUpdateUser *user);
+
+/* --- partial updater (image side) --- */
+struct PartialUpdateRegister;
+
+void BKE_image_partial_update_register_free(struct Image *image);
+/** \brief Mark a region of the image to update. */
+void BKE_image_partial_update_mark_region(struct Image *image,
+                                          const struct ImageTile *image_tile,
+                                          const struct ImBuf *image_buffer,
+                                          const rcti *updated_region);
+/** \brief Mark the whole image to be updated. */
+void BKE_image_partial_update_mark_full_update(struct Image *image);
 
 #ifdef __cplusplus
 }

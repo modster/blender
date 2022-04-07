@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2021 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup gpu
@@ -30,12 +14,15 @@
 
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
+#include "GPU_material.h"
 #include "GPU_texture.h"
+
+#include <iostream>
 
 namespace blender::gpu::shader {
 
 #ifndef GPU_SHADER_CREATE_INFO
-/* Helps intelisense / auto-completion. */
+/* Helps intellisense / auto-completion. */
 #  define GPU_SHADER_INTERFACE_INFO(_interface, _inst_name) \
     StageInterfaceInfo _interface(#_interface, _inst_name); \
     _interface
@@ -62,13 +49,74 @@ enum class Type {
   BOOL,
 };
 
+/* All of these functions is a bit out of place */
+static inline Type to_type(const eGPUType type)
+{
+  switch (type) {
+    case GPU_FLOAT:
+      return Type::FLOAT;
+    case GPU_VEC2:
+      return Type::VEC2;
+    case GPU_VEC3:
+      return Type::VEC3;
+    case GPU_VEC4:
+      return Type::VEC4;
+    case GPU_MAT3:
+      return Type::MAT3;
+    case GPU_MAT4:
+      return Type::MAT4;
+    default:
+      BLI_assert_msg(0, "Error: Cannot convert eGPUType to shader::Type.");
+      return Type::FLOAT;
+  }
+}
+
+static inline std::ostream &operator<<(std::ostream &stream, const Type type)
+{
+  switch (type) {
+    case Type::FLOAT:
+      return stream << "float";
+    case Type::VEC2:
+      return stream << "vec2";
+    case Type::VEC3:
+      return stream << "vec3";
+    case Type::VEC4:
+      return stream << "vec4";
+    case Type::MAT3:
+      return stream << "mat3";
+    case Type::MAT4:
+      return stream << "mat4";
+    default:
+      BLI_assert(0);
+      return stream;
+  }
+}
+
+static inline std::ostream &operator<<(std::ostream &stream, const eGPUType type)
+{
+  switch (type) {
+    case GPU_CLOSURE:
+      return stream << "Closure";
+    default:
+      return stream << to_type(type);
+  }
+}
+
 enum class BuiltinBits {
-  /** Allow getting barycentic coordinates inside the fragment shader. NOTE: emulated on OpenGL. */
+  NONE = 0,
+  /**
+   * Allow getting barycentric coordinates inside the fragment shader.
+   * \note Emulated on OpenGL.
+   */
   BARYCENTRIC_COORD = (1 << 0),
   FRAG_COORD = (1 << 2),
   FRONT_FACING = (1 << 4),
   GLOBAL_INVOCATION_ID = (1 << 5),
   INSTANCE_ID = (1 << 6),
+  /**
+   * Allow setting the target layer when the output is a layered frame-buffer.
+   * \note Emulated through geometry shader on older hardware.
+   */
   LAYER = (1 << 7),
   LOCAL_INVOCATION_ID = (1 << 8),
   LOCAL_INVOCATION_INDEX = (1 << 9),
@@ -81,6 +129,17 @@ enum class BuiltinBits {
   WORK_GROUP_SIZE = (1 << 16),
 };
 ENUM_OPERATORS(BuiltinBits, BuiltinBits::WORK_GROUP_SIZE);
+
+/**
+ * Follow convention described in:
+ * https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_conservative_depth.txt
+ */
+enum class DepthWrite {
+  ANY = 0,
+  GREATER,
+  LESS,
+  UNCHANGED,
+};
 
 /* Samplers & images. */
 enum class ImageType {
@@ -122,10 +181,13 @@ enum class ImageType {
 
 /* Storage qualifiers. */
 enum class Qualifier {
-  RESTRICT = (1 << 0),
-  READ_ONLY = (1 << 1),
-  WRITE_ONLY = (1 << 2),
-  QUALIFIER_MAX = (WRITE_ONLY << 1) - 1,
+  /** Restrict flag is set by default. Unless specified otherwise. */
+  NO_RESTRICT = (1 << 0),
+  READ = (1 << 1),
+  WRITE = (1 << 2),
+  /** Shorthand version of combined flags. */
+  READ_WRITE = READ | WRITE,
+  QUALIFIER_MAX = (WRITE << 1) - 1,
 };
 ENUM_OPERATORS(Qualifier, Qualifier::QUALIFIER_MAX);
 
@@ -149,7 +211,7 @@ enum class Interpolation {
 };
 
 /** Input layout for geometry shader. */
-enum class InputLayout {
+enum class PrimitiveIn {
   POINTS = 0,
   LINES,
   LINES_ADJACENCY,
@@ -158,7 +220,7 @@ enum class InputLayout {
 };
 
 /** Output layout for geometry shader. */
-enum class OutputLayout {
+enum class PrimitiveOut {
   POINTS = 0,
   LINE_STRIP,
   TRIANGLE_STRIP,
@@ -204,7 +266,7 @@ struct StageInterfaceInfo {
 };
 
 /**
- * @brief Describe inputs & outputs, stage interfaces, resources and sources of a shader.
+ * \brief Describe inputs & outputs, stage interfaces, resources and sources of a shader.
  *        If all data is correctly provided, this is all that is needed to create and compile
  *        a GPUShader.
  *
@@ -218,37 +280,99 @@ struct ShaderCreateInfo {
   bool do_static_compilation_ = false;
   /** If true, all additionally linked create info will be merged into this one. */
   bool finalized_ = false;
+  /** If true, all resources will have an automatic location assigned. */
+  bool auto_resource_location_ = false;
+  /** If true, force depth and stencil tests to always happen before fragment shader invocation. */
+  bool early_fragment_test_ = false;
+  /** Allow optimization when fragment shader writes to `gl_FragDepth`. */
+  DepthWrite depth_write_ = DepthWrite::ANY;
   /**
    * Maximum length of all the resource names including each null terminator.
    * Only for names used by gpu::ShaderInterface.
    */
   size_t interface_names_size_ = 0;
-  /** Only for compute shaders. */
-  int local_group_size_[3] = {0, 0, 0};
+  /** Manually set builtins. */
+  BuiltinBits builtins_ = BuiltinBits::NONE;
+  /** Manually set generated code. */
+  std::string vertex_source_generated = "";
+  std::string fragment_source_generated = "";
+  std::string typedef_source_generated = "";
+  /** Manually set generated dependencies. */
+  Vector<const char *, 0> dependencies_generated;
+
+#define TEST_EQUAL(a, b, _member) \
+  if (!((a)._member == (b)._member)) { \
+    return false; \
+  }
+
+#define TEST_VECTOR_EQUAL(a, b, _vector) \
+  TEST_EQUAL(a, b, _vector.size()); \
+  for (auto i : _vector.index_range()) { \
+    TEST_EQUAL(a, b, _vector[i]); \
+  }
 
   struct VertIn {
     int index;
     Type type;
     StringRefNull name;
+
+    bool operator==(const VertIn &b)
+    {
+      TEST_EQUAL(*this, b, index);
+      TEST_EQUAL(*this, b, type);
+      TEST_EQUAL(*this, b, name);
+      return true;
+    }
   };
   Vector<VertIn> vertex_inputs_;
 
-  struct GeomIn {
-    InputLayout layout;
-  };
-  GeomIn geom_in_;
+  struct GeometryStageLayout {
+    PrimitiveIn primitive_in;
+    int invocations;
+    PrimitiveOut primitive_out;
+    /** Set to -1 by default to check if used. */
+    int max_vertices = -1;
 
-  struct GeomOut {
-    OutputLayout layout;
-    int max_vertices;
+    bool operator==(const GeometryStageLayout &b)
+    {
+      TEST_EQUAL(*this, b, primitive_in);
+      TEST_EQUAL(*this, b, invocations);
+      TEST_EQUAL(*this, b, primitive_out);
+      TEST_EQUAL(*this, b, max_vertices);
+      return true;
+    }
   };
-  GeomOut geom_out_;
+  GeometryStageLayout geometry_layout_;
+
+  struct ComputeStageLayout {
+    int local_size_x = -1;
+    int local_size_y = -1;
+    int local_size_z = -1;
+
+    bool operator==(const ComputeStageLayout &b)
+    {
+      TEST_EQUAL(*this, b, local_size_x);
+      TEST_EQUAL(*this, b, local_size_y);
+      TEST_EQUAL(*this, b, local_size_z);
+      return true;
+    }
+  };
+  ComputeStageLayout compute_layout_;
 
   struct FragOut {
     int index;
     Type type;
     DualBlend blend;
     StringRefNull name;
+
+    bool operator==(const FragOut &b)
+    {
+      TEST_EQUAL(*this, b, index);
+      TEST_EQUAL(*this, b, type);
+      TEST_EQUAL(*this, b, blend);
+      TEST_EQUAL(*this, b, name);
+      return true;
+    }
   };
   Vector<FragOut> fragment_outputs_;
 
@@ -294,6 +418,35 @@ struct ShaderCreateInfo {
     };
 
     Resource(BindType type, int _slot) : bind_type(type), slot(_slot){};
+
+    bool operator==(const Resource &b)
+    {
+      TEST_EQUAL(*this, b, bind_type);
+      TEST_EQUAL(*this, b, slot);
+      switch (bind_type) {
+        case UNIFORM_BUFFER:
+          TEST_EQUAL(*this, b, uniformbuf.type_name);
+          TEST_EQUAL(*this, b, uniformbuf.name);
+          break;
+        case STORAGE_BUFFER:
+          TEST_EQUAL(*this, b, storagebuf.qualifiers);
+          TEST_EQUAL(*this, b, storagebuf.type_name);
+          TEST_EQUAL(*this, b, storagebuf.name);
+          break;
+        case SAMPLER:
+          TEST_EQUAL(*this, b, sampler.type);
+          TEST_EQUAL(*this, b, sampler.sampler);
+          TEST_EQUAL(*this, b, sampler.name);
+          break;
+        case IMAGE:
+          TEST_EQUAL(*this, b, image.format);
+          TEST_EQUAL(*this, b, image.type);
+          TEST_EQUAL(*this, b, image.qualifiers);
+          TEST_EQUAL(*this, b, image.name);
+          break;
+      }
+      return true;
+    }
   };
   /**
    * Resources are grouped by frequency of change.
@@ -307,10 +460,17 @@ struct ShaderCreateInfo {
   Vector<StageInterfaceInfo *> geometry_out_interfaces_;
 
   struct PushConst {
-    int index;
     Type type;
     StringRefNull name;
     int array_size;
+
+    bool operator==(const PushConst &b)
+    {
+      TEST_EQUAL(*this, b, type);
+      TEST_EQUAL(*this, b, name);
+      TEST_EQUAL(*this, b, array_size);
+      return true;
+    }
   };
 
   Vector<PushConst> push_constants_;
@@ -350,15 +510,48 @@ struct ShaderCreateInfo {
     return *(Self *)this;
   }
 
-  Self &geometry_layout(InputLayout layout_in, OutputLayout layout_out, int max_vertices)
+  /**
+   * IMPORTANT: invocations count is only used if GL_ARB_gpu_shader5 is supported. On
+   * implementations that do not supports it, the max_vertices will be multiplied by invocations.
+   * Your shader needs to account for this fact. Use `#ifdef GPU_ARB_gpu_shader5` and make a code
+   * path that does not rely on #gl_InvocationID.
+   */
+  Self &geometry_layout(PrimitiveIn prim_in,
+                        PrimitiveOut prim_out,
+                        int max_vertices,
+                        int invocations = -1)
   {
-    geom_in_.layout = layout_in;
-    geom_out_.layout = layout_out;
-    geom_out_.max_vertices = max_vertices;
+    geometry_layout_.primitive_in = prim_in;
+    geometry_layout_.primitive_out = prim_out;
+    geometry_layout_.max_vertices = max_vertices;
+    geometry_layout_.invocations = invocations;
     return *(Self *)this;
   }
 
-  /* Only needed if geometry shader is enabled. */
+  Self &local_group_size(int local_size_x = -1, int local_size_y = -1, int local_size_z = -1)
+  {
+    compute_layout_.local_size_x = local_size_x;
+    compute_layout_.local_size_y = local_size_y;
+    compute_layout_.local_size_z = local_size_z;
+    return *(Self *)this;
+  }
+
+  /**
+   * Force fragment tests before fragment shader invocation.
+   * IMPORTANT: This is incompatible with using the gl_FragDepth output.
+   */
+  Self &early_fragment_test(bool enable)
+  {
+    early_fragment_test_ = enable;
+    return *(Self *)this;
+  }
+
+  /**
+   * Only needed if geometry shader is enabled.
+   * IMPORTANT: Input and output instance name will have respectively "_in" and "_out" suffix
+   * appended in the geometry shader IF AND ONLY IF the vertex_out interface instance name matches
+   * the geometry_out interface instance name.
+   */
   Self &geometry_out(StageInterfaceInfo &interface)
   {
     geometry_out_interfaces_.append(&interface);
@@ -473,37 +666,15 @@ struct ShaderCreateInfo {
   /** \name Push constants
    *
    * Data managed by GPUShader. Can be set through uniform functions. Must be less than 128bytes.
-   * One slot represents 4bytes. Each element needs to have enough empty space left after it.
-   * example:
-   * [0] = PUSH_CONSTANT(MAT4, "ModelMatrix"),
-   * ---- 16 slots occupied by ModelMatrix ----
-   * [16] = PUSH_CONSTANT(VEC4, "color"),
-   * ---- 4 slots occupied by color ----
-   * [20] = PUSH_CONSTANT(BOOL, "srgbToggle"),
-   * The maximum slot is 31.
    * \{ */
 
-  Self &push_constant(int slot, Type type, StringRefNull name, int array_size = 0)
+  Self &push_constant(Type type, StringRefNull name, int array_size = 0)
   {
     BLI_assert_msg(name.find("[") == -1,
                    "Array syntax is forbidden for push constants."
                    "Use the array_size parameter instead.");
-    push_constants_.append({slot, type, name, array_size});
+    push_constants_.append({type, name, array_size});
     interface_names_size_ += name.size() + 1;
-    return *(Self *)this;
-  }
-
-  /** \} */
-
-  /* -------------------------------------------------------------------- */
-  /** \name Compute shaders Local Group Size
-   * \{ */
-
-  Self &local_group_size(int x, int y = 1, int z = 1)
-  {
-    local_group_size_[0] = x;
-    local_group_size_[1] = y;
-    local_group_size_[2] = z;
     return *(Self *)this;
   }
 
@@ -531,6 +702,25 @@ struct ShaderCreateInfo {
     return *(Self *)this;
   }
 
+  Self &builtins(BuiltinBits builtin)
+  {
+    builtins_ |= builtin;
+    return *(Self *)this;
+  }
+
+  /* Defines how the fragment shader will write to gl_FragDepth. */
+  Self &depth_write(DepthWrite value)
+  {
+    depth_write_ = value;
+    return *(Self *)this;
+  }
+
+  Self &auto_resource_location(bool value)
+  {
+    auto_resource_location_ = value;
+    return *(Self *)this;
+  }
+
   /** \} */
 
   /* -------------------------------------------------------------------- */
@@ -543,7 +733,9 @@ struct ShaderCreateInfo {
                         StringRefNull info_name1 = "",
                         StringRefNull info_name2 = "",
                         StringRefNull info_name3 = "",
-                        StringRefNull info_name4 = "")
+                        StringRefNull info_name4 = "",
+                        StringRefNull info_name5 = "",
+                        StringRefNull info_name6 = "")
   {
     additional_infos_.append(info_name0);
     if (!info_name1.is_empty()) {
@@ -557,6 +749,12 @@ struct ShaderCreateInfo {
     }
     if (!info_name4.is_empty()) {
       additional_infos_.append(info_name4);
+    }
+    if (!info_name5.is_empty()) {
+      additional_infos_.append(info_name5);
+    }
+    if (!info_name6.is_empty()) {
+      additional_infos_.append(info_name6);
     }
     return *(Self *)this;
   }
@@ -589,7 +787,81 @@ struct ShaderCreateInfo {
   /* WARNING: Recursive. */
   void finalize();
 
+  /** Error detection that some backend compilers do not complain about. */
+  void validate(const ShaderCreateInfo &other_info);
+
   /** \} */
+
+  /* -------------------------------------------------------------------- */
+  /** \name Operators.
+   *
+   * \{ */
+
+  /* Comparison operator for GPUPass cache. We only compare if it will create the same shader code.
+   * So we do not compare name and some other internal stuff. */
+  bool operator==(const ShaderCreateInfo &b)
+  {
+    TEST_EQUAL(*this, b, builtins_);
+    TEST_EQUAL(*this, b, vertex_source_generated);
+    TEST_EQUAL(*this, b, fragment_source_generated);
+    TEST_EQUAL(*this, b, typedef_source_generated);
+    TEST_VECTOR_EQUAL(*this, b, vertex_inputs_);
+    TEST_EQUAL(*this, b, geometry_layout_);
+    TEST_EQUAL(*this, b, compute_layout_);
+    TEST_VECTOR_EQUAL(*this, b, fragment_outputs_);
+    TEST_VECTOR_EQUAL(*this, b, pass_resources_);
+    TEST_VECTOR_EQUAL(*this, b, batch_resources_);
+    TEST_VECTOR_EQUAL(*this, b, vertex_out_interfaces_);
+    TEST_VECTOR_EQUAL(*this, b, geometry_out_interfaces_);
+    TEST_VECTOR_EQUAL(*this, b, push_constants_);
+    TEST_VECTOR_EQUAL(*this, b, typedef_sources_);
+    TEST_EQUAL(*this, b, vertex_source_);
+    TEST_EQUAL(*this, b, geometry_source_);
+    TEST_EQUAL(*this, b, fragment_source_);
+    TEST_EQUAL(*this, b, compute_source_);
+    TEST_VECTOR_EQUAL(*this, b, additional_infos_);
+    TEST_VECTOR_EQUAL(*this, b, defines_);
+    return true;
+  }
+
+  /** Debug print */
+  friend std::ostream &operator<<(std::ostream &stream, const ShaderCreateInfo &info)
+  {
+    /* TODO(@fclem): Complete print. */
+
+    auto print_resource = [&](const Resource &res) {
+      switch (res.bind_type) {
+        case Resource::BindType::UNIFORM_BUFFER:
+          stream << "UNIFORM_BUFFER(" << res.slot << ", " << res.uniformbuf.name << ")"
+                 << std::endl;
+          break;
+        case Resource::BindType::STORAGE_BUFFER:
+          stream << "STORAGE_BUFFER(" << res.slot << ", " << res.storagebuf.name << ")"
+                 << std::endl;
+          break;
+        case Resource::BindType::SAMPLER:
+          stream << "SAMPLER(" << res.slot << ", " << res.sampler.name << ")" << std::endl;
+          break;
+        case Resource::BindType::IMAGE:
+          stream << "IMAGE(" << res.slot << ", " << res.image.name << ")" << std::endl;
+          break;
+      }
+    };
+
+    /* TODO(@fclem): Order the resources. */
+    for (auto &res : info.batch_resources_) {
+      print_resource(res);
+    }
+    for (auto &res : info.pass_resources_) {
+      print_resource(res);
+    }
+    return stream;
+  }
+
+  /** \} */
+
+#undef TEST_EQUAL
+#undef TEST_VECTOR_EQUAL
 };
 
 }  // namespace blender::gpu::shader

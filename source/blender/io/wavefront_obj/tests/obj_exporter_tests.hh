@@ -1,4 +1,4 @@
-/* Apache License, Version 2.0 */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /**
  * This file contains default values for several items like
@@ -86,6 +86,7 @@ struct OBJExportParamsDefault {
     params.up_axis = OBJ_AXIS_Y_UP;
     params.scaling_factor = 1.f;
 
+    params.apply_modifiers = true;
     params.export_eval_mode = DAG_EVAL_VIEWPORT;
     params.export_selected_objects = false;
     params.export_uv = true;
@@ -138,7 +139,7 @@ const std::map<std::string, std::unique_ptr<NurbsObject>> all_nurbs_truth = []()
       "NurbsCircle",
       std::make_unique<NurbsObject>(
           "NurbsCircle", coordinates_NurbsCircle, std::vector<int>{3}, std::vector<int>{11}));
-  /* This is actually an Object containing a NurbsPath and a NurbsCurve spline.  */
+  /* This is actually an Object containing a NurbsPath and a NurbsCurve spline. */
   all_nurbs.emplace("NurbsPathCurve",
                     std::make_unique<NurbsObject>("NurbsPathCurve",
                                                   coordinates_NurbsPathCurve,

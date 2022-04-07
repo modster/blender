@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup obj
@@ -22,12 +8,18 @@
 
 #include <cstdio>
 #include <string>
-#include <system_error>
 #include <type_traits>
+#include <vector>
 
 #include "BLI_compiler_attrs.h"
+#include "BLI_fileops.h"
 #include "BLI_string_ref.hh"
 #include "BLI_utility_mixins.hh"
+
+/* SEP macro from BLI path utils clashes with SEP symbol in fmt headers. */
+#undef SEP
+#define FMT_HEADER_ONLY
+#include <fmt/format.h>
 
 namespace blender::io::obj {
 
@@ -88,6 +80,7 @@ enum class eMTLSyntaxElement {
 
 template<eFileType filetype> struct FileTypeTraits;
 
+/* Used to prevent mixing of say OBJ file format with MTL syntax elements. */
 template<> struct FileTypeTraits<eFileType::OBJ> {
   using SyntaxType = eOBJSyntaxElement;
 };
@@ -96,15 +89,19 @@ template<> struct FileTypeTraits<eFileType::MTL> {
   using SyntaxType = eMTLSyntaxElement;
 };
 
-template<eFileType type> struct Formatting {
+struct FormattingSyntax {
+  /* Formatting syntax with the file format key like `newmtl %s\n`. */
   const char *fmt = nullptr;
+  /* Number of arguments needed by the syntax. */
   const int total_args = 0;
-  /* Fail to compile by default. */
-  const bool is_type_valid = false;
+  /* Whether types of the given arguments are accepted by the syntax above. Fail to compile by
+   * default.
+   */
+  const bool are_types_valid = false;
 };
 
 /**
- * Type dependent but always false. Use to add a conditional compile-time error.
+ * Type dependent but always false. Use to add a `constexpr` conditional compile-time error.
  */
 template<typename T> struct always_false : std::false_type {
 };
@@ -118,55 +115,62 @@ constexpr bool is_type_integral = (... && std::is_integral_v<std::decay_t<T>>);
 template<typename... T>
 constexpr bool is_type_string_related = (... && std::is_constructible_v<std::string, T>);
 
-template<eFileType filetype, typename... T>
-constexpr std::enable_if_t<filetype == eFileType::OBJ, Formatting<filetype>>
-syntax_elem_to_formatting(const eOBJSyntaxElement key)
+/* GCC (at least 9.3) while compiling the obj_exporter_tests.cc with optimizations on,
+ * results in "obj_export_io.hh:205:18: warning: ‘%s’ directive output truncated writing 34 bytes
+ * into a region of size 6" and similar warnings. Yes the output is truncated, and that is covered
+ * as an edge case by tests on purpose. */
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
+template<typename... T>
+constexpr FormattingSyntax syntax_elem_to_formatting(const eOBJSyntaxElement key)
 {
   switch (key) {
     case eOBJSyntaxElement::vertex_coords: {
-      return {"v %f %f %f\n", 3, is_type_float<T...>};
+      return {"v {:.6f} {:.6f} {:.6f}\n", 3, is_type_float<T...>};
     }
     case eOBJSyntaxElement::uv_vertex_coords: {
-      return {"vt %f %f\n", 2, is_type_float<T...>};
+      return {"vt {:.6f} {:.6f}\n", 2, is_type_float<T...>};
     }
     case eOBJSyntaxElement::normal: {
-      return {"vn %.4f %.4f %.4f\n", 3, is_type_float<T...>};
+      return {"vn {:.4f} {:.4f} {:.4f}\n", 3, is_type_float<T...>};
     }
     case eOBJSyntaxElement::poly_element_begin: {
       return {"f", 0, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::vertex_uv_normal_indices: {
-      return {" %d/%d/%d", 3, is_type_integral<T...>};
+      return {" {}/{}/{}", 3, is_type_integral<T...>};
     }
     case eOBJSyntaxElement::vertex_normal_indices: {
-      return {" %d//%d", 2, is_type_integral<T...>};
+      return {" {}//{}", 2, is_type_integral<T...>};
     }
     case eOBJSyntaxElement::vertex_uv_indices: {
-      return {" %d/%d", 2, is_type_integral<T...>};
+      return {" {}/{}", 2, is_type_integral<T...>};
     }
     case eOBJSyntaxElement::vertex_indices: {
-      return {" %d", 1, is_type_integral<T...>};
+      return {" {}", 1, is_type_integral<T...>};
     }
     case eOBJSyntaxElement::poly_usemtl: {
-      return {"usemtl %s\n", 1, is_type_string_related<T...>};
+      return {"usemtl {}\n", 1, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::edge: {
-      return {"l %d %d\n", 2, is_type_integral<T...>};
+      return {"l {} {}\n", 2, is_type_integral<T...>};
     }
     case eOBJSyntaxElement::cstype: {
       return {"cstype bspline\n", 0, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::nurbs_degree: {
-      return {"deg %d\n", 1, is_type_integral<T...>};
+      return {"deg {}\n", 1, is_type_integral<T...>};
     }
     case eOBJSyntaxElement::curve_element_begin: {
       return {"curv 0.0 1.0", 0, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::nurbs_parameter_begin: {
-      return {"parm 0.0", 0, is_type_string_related<T...>};
+      return {"parm u 0.0", 0, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::nurbs_parameters: {
-      return {" %f", 1, is_type_float<T...>};
+      return {" {:.6f}", 1, is_type_float<T...>};
     }
     case eOBJSyntaxElement::nurbs_parameter_end: {
       return {" 1.0\n", 0, is_type_string_related<T...>};
@@ -184,156 +188,167 @@ syntax_elem_to_formatting(const eOBJSyntaxElement key)
       return {"\n", 0, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::mtllib: {
-      return {"mtllib %s\n", 1, is_type_string_related<T...>};
+      return {"mtllib {}\n", 1, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::smooth_group: {
-      return {"s %d\n", 1, is_type_integral<T...>};
+      return {"s {}\n", 1, is_type_integral<T...>};
     }
     case eOBJSyntaxElement::object_group: {
-      return {"g %s\n", 1, is_type_string_related<T...>};
+      return {"g {}\n", 1, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::object_name: {
-      return {"o %s\n", 1, is_type_string_related<T...>};
+      return {"o {}\n", 1, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::string: {
-      return {"%s", 1, is_type_string_related<T...>};
+      return {"{}", 1, is_type_string_related<T...>};
     }
   }
 }
 
-template<eFileType filetype, typename... T>
-constexpr std::enable_if_t<filetype == eFileType::MTL, Formatting<filetype>>
-syntax_elem_to_formatting(const eMTLSyntaxElement key)
+template<typename... T>
+constexpr FormattingSyntax syntax_elem_to_formatting(const eMTLSyntaxElement key)
 {
   switch (key) {
     case eMTLSyntaxElement::newmtl: {
-      return {"newmtl %s\n", 1, is_type_string_related<T...>};
+      return {"newmtl {}\n", 1, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::Ni: {
-      return {"Ni %.6f\n", 1, is_type_float<T...>};
+      return {"Ni {:.6f}\n", 1, is_type_float<T...>};
     }
     case eMTLSyntaxElement::d: {
-      return {"d %.6f\n", 1, is_type_float<T...>};
+      return {"d {:.6f}\n", 1, is_type_float<T...>};
     }
     case eMTLSyntaxElement::Ns: {
-      return {"Ns %.6f\n", 1, is_type_float<T...>};
+      return {"Ns {:.6f}\n", 1, is_type_float<T...>};
     }
     case eMTLSyntaxElement::illum: {
-      return {"illum %d\n", 1, is_type_integral<T...>};
+      return {"illum {}\n", 1, is_type_integral<T...>};
     }
     case eMTLSyntaxElement::Ka: {
-      return {"Ka %.6f %.6f %.6f\n", 3, is_type_float<T...>};
+      return {"Ka {:.6f} {:.6f} {:.6f}\n", 3, is_type_float<T...>};
     }
     case eMTLSyntaxElement::Kd: {
-      return {"Kd %.6f %.6f %.6f\n", 3, is_type_float<T...>};
+      return {"Kd {:.6f} {:.6f} {:.6f}\n", 3, is_type_float<T...>};
     }
     case eMTLSyntaxElement::Ks: {
-      return {"Ks %.6f %.6f %.6f\n", 3, is_type_float<T...>};
+      return {"Ks {:.6f} {:.6f} {:.6f}\n", 3, is_type_float<T...>};
     }
     case eMTLSyntaxElement::Ke: {
-      return {"Ke %.6f %.6f %.6f\n", 3, is_type_float<T...>};
+      return {"Ke {:.6f} {:.6f} {:.6f}\n", 3, is_type_float<T...>};
     }
-    /* Keep only one space between options since filepaths may have leading spaces too. */
+    /* Note: first texture map related argument, if present, will have its own leading space. */
     case eMTLSyntaxElement::map_Kd: {
-      return {"map_Kd %s %s\n", 2, is_type_string_related<T...>};
+      return {"map_Kd{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_Ks: {
-      return {"map_Ks %s %s\n", 2, is_type_string_related<T...>};
+      return {"map_Ks{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_Ns: {
-      return {"map_Ns %s %s\n", 2, is_type_string_related<T...>};
+      return {"map_Ns{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_d: {
-      return {"map_d %s %s\n", 2, is_type_string_related<T...>};
+      return {"map_d{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_refl: {
-      return {"map_refl %s %s\n", 2, is_type_string_related<T...>};
+      return {"map_refl{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_Ke: {
-      return {"map_Ke %s %s\n", 2, is_type_string_related<T...>};
+      return {"map_Ke{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::map_Bump: {
-      return {"map_Bump %s %s\n", 2, is_type_string_related<T...>};
+      return {"map_Bump{} {}\n", 2, is_type_string_related<T...>};
     }
     case eMTLSyntaxElement::string: {
-      return {"%s", 1, is_type_string_related<T...>};
+      return {"{}", 1, is_type_string_related<T...>};
     }
   }
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic pop
+#endif
 
-template<eFileType filetype> class FileHandler : NonCopyable, NonMovable {
+/**
+ * File format and syntax agnostic file buffer writer.
+ * All writes are done into an internal chunked memory buffer
+ * (list of default 64 kilobyte blocks).
+ * Call write_fo_file once in a while to write the memory buffer(s)
+ * into the given file.
+ */
+template<eFileType filetype, size_t buffer_chunk_size = 64 * 1024>
+class FormatHandler : NonCopyable, NonMovable {
  private:
-  FILE *outfile_ = nullptr;
-  std::string outfile_path_;
+  typedef std::vector<char> VectorChar;
+  std::vector<VectorChar> blocks_;
 
  public:
-  FileHandler(std::string outfile_path) noexcept(false) : outfile_path_(std::move(outfile_path))
+  /* Write contents to the buffer(s) into a file, and clear the buffers. */
+  void write_to_file(FILE *f)
   {
-    outfile_ = std::fopen(outfile_path_.c_str(), "w");
-    if (!outfile_) {
-      throw std::system_error(errno, std::system_category(), "Cannot open file");
-    }
+    for (const auto &b : blocks_)
+      fwrite(b.data(), 1, b.size(), f);
+    blocks_.clear();
   }
 
-  ~FileHandler()
+  std::string get_as_string() const
   {
-    if (outfile_ && std::fclose(outfile_)) {
-      std::cerr << "Error: could not close the file '" << outfile_path_
-                << "'  properly, it may be corrupted." << std::endl;
-    }
+    std::string s;
+    for (const auto &b : blocks_)
+      s.append(b.data(), b.size());
+    return s;
+  }
+  size_t get_block_count() const
+  {
+    return blocks_.size();
   }
 
+  void append_from(FormatHandler<filetype, buffer_chunk_size> &v)
+  {
+    blocks_.insert(blocks_.end(),
+                   std::make_move_iterator(v.blocks_.begin()),
+                   std::make_move_iterator(v.blocks_.end()));
+    v.blocks_.clear();
+  }
+
+  /**
+   * Example invocation: `writer->write<eMTLSyntaxElement::newmtl>("foo")`.
+   *
+   * \param key: Must match what the instance's filetype expects; i.e., `eMTLSyntaxElement` for
+   * `eFileType::MTL`.
+   */
   template<typename FileTypeTraits<filetype>::SyntaxType key, typename... T>
-  constexpr void write(T &&...args) const
+  constexpr void write(T &&...args)
   {
-    constexpr Formatting<filetype> fmt_nargs_valid = syntax_elem_to_formatting<filetype, T...>(
-        key);
-    write__impl<fmt_nargs_valid.total_args>(fmt_nargs_valid.fmt, std::forward<T>(args)...);
-    /* Types of all arguments and the number of arguments should match
-     * what the formatting specifies. */
-    return std::enable_if_t < fmt_nargs_valid.is_type_valid &&
-               (sizeof...(T) == fmt_nargs_valid.total_args),
-           void > ();
+    /* Get format syntax, number of arguments expected and whether types of given arguments are
+     * valid.
+     */
+    constexpr FormattingSyntax fmt_nargs_valid = syntax_elem_to_formatting<T...>(key);
+    BLI_STATIC_ASSERT(fmt_nargs_valid.are_types_valid &&
+                          (sizeof...(T) == fmt_nargs_valid.total_args),
+                      "Types of all arguments and the number of arguments should match what the "
+                      "formatting specifies.");
+    write_impl(fmt_nargs_valid.fmt, std::forward<T>(args)...);
   }
 
  private:
-  /* Remove this after upgrading to C++20. */
-  template<typename T> using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
-
-  /**
-   * Make #std::string etc., usable for `fprintf` family.
-   * \return: `const char *` or the original argument if the argument is
-   * not related to #std::string.
-   */
-  template<typename T> constexpr auto string_to_primitive(T &&arg) const
+  /* Ensure the last block contains at least this amount of free space.
+   * If not, add a new block with max of block size & the amount of space needed. */
+  void ensure_space(size_t at_least)
   {
-    if constexpr (std::is_same_v<remove_cvref_t<T>, std::string> ||
-                  std::is_same_v<remove_cvref_t<T>, blender::StringRefNull>) {
-      return arg.c_str();
-    }
-    else if constexpr (std::is_same_v<remove_cvref_t<T>, blender::StringRef>) {
-      BLI_STATIC_ASSERT(
-          (always_false<T>::value),
-          "Null-terminated string not present. Please use blender::StringRefNull instead.");
-      /* Another trick to cause a compile-time error: returning nothing to #std::printf. */
-      return;
-    }
-    else {
-      return std::forward<T>(arg);
+    if (blocks_.empty() || (blocks_.back().capacity() - blocks_.back().size() < at_least)) {
+      VectorChar &b = blocks_.emplace_back(VectorChar());
+      b.reserve(std::max(at_least, buffer_chunk_size));
     }
   }
 
-  template<int total_args, typename... T>
-  constexpr std::enable_if_t<(total_args != 0), void> write__impl(const char *fmt,
-                                                                  T &&...args) const
+  template<typename... T> void write_impl(const char *fmt, T &&...args)
   {
-    std::fprintf(outfile_, fmt, string_to_primitive(std::forward<T>(args))...);
-  }
-  template<int total_args, typename... T>
-  constexpr std::enable_if_t<(total_args == 0), void> write__impl(const char *fmt,
-                                                                  T &&...args) const
-  {
-    std::fputs(fmt, outfile_);
+    /* Format into a local buffer. */
+    fmt::memory_buffer buf;
+    fmt::format_to(fmt::appender(buf), fmt, std::forward<T>(args)...);
+    size_t len = buf.size();
+    ensure_space(len);
+    VectorChar &bb = blocks_.back();
+    bb.insert(bb.end(), buf.begin(), buf.end());
   }
 };
 

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2016 by Mike Erwin. All rights reserved. */
 
 /** \file
  * \ingroup gpu
@@ -117,7 +101,28 @@ static inline int image_binding(int32_t program,
   switch (type) {
     case GL_IMAGE_1D:
     case GL_IMAGE_2D:
-    case GL_IMAGE_3D: {
+    case GL_IMAGE_3D:
+    case GL_IMAGE_CUBE:
+    case GL_IMAGE_BUFFER:
+    case GL_IMAGE_1D_ARRAY:
+    case GL_IMAGE_2D_ARRAY:
+    case GL_IMAGE_CUBE_MAP_ARRAY:
+    case GL_INT_IMAGE_1D:
+    case GL_INT_IMAGE_2D:
+    case GL_INT_IMAGE_3D:
+    case GL_INT_IMAGE_CUBE:
+    case GL_INT_IMAGE_BUFFER:
+    case GL_INT_IMAGE_1D_ARRAY:
+    case GL_INT_IMAGE_2D_ARRAY:
+    case GL_INT_IMAGE_CUBE_MAP_ARRAY:
+    case GL_UNSIGNED_INT_IMAGE_1D:
+    case GL_UNSIGNED_INT_IMAGE_2D:
+    case GL_UNSIGNED_INT_IMAGE_3D:
+    case GL_UNSIGNED_INT_IMAGE_CUBE:
+    case GL_UNSIGNED_INT_IMAGE_BUFFER:
+    case GL_UNSIGNED_INT_IMAGE_1D_ARRAY:
+    case GL_UNSIGNED_INT_IMAGE_2D_ARRAY:
+    case GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY: {
       /* For now just assign a consecutive index. In the future, we should set it in
        * the shader using layout(binding = i) and query its value. */
       int binding = *image_len;
@@ -298,6 +303,7 @@ GLShaderInterface::GLShaderInterface(GLuint program)
     input->binding = input->location = binding;
 
     name_buffer_offset += this->set_input_name(input, name, name_len);
+    enabled_ssbo_mask_ |= (input->binding != -1) ? (1lu << input->binding) : 0lu;
   }
 
   /* Builtin Uniforms */
@@ -355,14 +361,32 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
     }
   }
 
+  size_t workaround_names_size = 0;
+  Vector<StringRefNull> workaround_uniform_names;
+  auto check_enabled_uniform = [&](const char *uniform_name) {
+    if (glGetUniformLocation(program, uniform_name) != -1) {
+      workaround_uniform_names.append(uniform_name);
+      workaround_names_size += StringRefNull(uniform_name).size() + 1;
+      uniform_len_++;
+    }
+  };
+
+  if (!GLContext::shader_draw_parameters_support) {
+    check_enabled_uniform("gpu_BaseInstance");
+  }
+
   BLI_assert_msg(ubo_len_ <= 16, "enabled_ubo_mask_ is uint16_t");
 
   int input_tot_len = attr_len_ + ubo_len_ + uniform_len_ + ssbo_len_;
   inputs_ = (ShaderInput *)MEM_callocN(sizeof(ShaderInput) * input_tot_len, __func__);
   ShaderInput *input = inputs_;
 
-  name_buffer_ = (char *)MEM_mallocN(info.interface_names_size_, "name_buffer");
+  name_buffer_ = (char *)MEM_mallocN(info.interface_names_size_ + workaround_names_size,
+                                     "name_buffer");
   uint32_t name_buffer_offset = 0;
+
+  /* Necessary to make #glUniform works. TODO(fclem) Remove. */
+  glUseProgram(program);
 
   /* Attributes */
   for (const ShaderCreateInfo::VertIn &attr : info.vertex_inputs_) {
@@ -373,7 +397,9 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
     else {
       input->location = input->binding = attr.index;
     }
-    enabled_attr_mask_ |= (1 << input->location);
+    if (input->location != -1) {
+      enabled_attr_mask_ |= (1 << input->location);
+    }
     input++;
   }
 
@@ -382,7 +408,7 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
     if (res.bind_type == ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER) {
       copy_input_name(input, res.uniformbuf.name, name_buffer_, name_buffer_offset);
       if (true || !GLContext::explicit_location_support) {
-        input->location = glGetUniformBlockIndex(program, res.uniformbuf.name.c_str());
+        input->location = glGetUniformBlockIndex(program, name_buffer_ + input->name_offset);
         glUniformBlockBinding(program, input->location, res.slot);
       }
       input->binding = res.slot;
@@ -419,10 +445,15 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
   }
   for (const ShaderCreateInfo::PushConst &uni : info.push_constants_) {
     copy_input_name(input, uni.name, name_buffer_, name_buffer_offset);
-    /* Until we make use of explicit uniform location. */
-    if (true || !GLContext::explicit_location_support) {
-      input->location = glGetUniformLocation(program, uni.name.c_str());
-    }
+    input->location = glGetUniformLocation(program, name_buffer_ + input->name_offset);
+    input->binding = -1;
+    input++;
+  }
+
+  /* Compatibility uniforms. */
+  for (auto &name : workaround_uniform_names) {
+    copy_input_name(input, name, name_buffer_, name_buffer_offset);
+    input->location = glGetUniformLocation(program, name_buffer_ + input->name_offset);
     input->binding = -1;
     input++;
   }
@@ -432,7 +463,7 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
     if (res.bind_type == ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER) {
       copy_input_name(input, res.storagebuf.name, name_buffer_, name_buffer_offset);
       input->location = input->binding = res.slot;
-      enabled_ubo_mask_ |= (1 << input->binding);
+      enabled_ssbo_mask_ |= (1 << input->binding);
       input++;
     }
   }
@@ -474,7 +505,7 @@ GLShaderInterface::~GLShaderInterface()
 void GLShaderInterface::ref_add(GLVaoCache *ref)
 {
   for (int i = 0; i < refs_.size(); i++) {
-    if (refs_[i] == NULL) {
+    if (refs_[i] == nullptr) {
       refs_[i] = ref;
       return;
     }
@@ -486,7 +517,7 @@ void GLShaderInterface::ref_remove(GLVaoCache *ref)
 {
   for (int i = 0; i < refs_.size(); i++) {
     if (refs_[i] == ref) {
-      refs_[i] = NULL;
+      refs_[i] = nullptr;
       break; /* cannot have duplicates */
     }
   }

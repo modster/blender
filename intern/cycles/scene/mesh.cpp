@@ -1,18 +1,5 @@
-/*
- * Copyright 2011-2013 Blender Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2011-2022 Blender Foundation */
 
 #include "bvh/build.h"
 #include "bvh/bvh.h"
@@ -53,7 +40,7 @@ void Mesh::Triangle::motion_verts(const float3 *verts,
 {
   /* Figure out which steps we need to fetch and their interpolation factor. */
   const size_t max_step = num_steps - 1;
-  const size_t step = min((int)(time * max_step), max_step - 1);
+  const size_t step = min((size_t)(time * max_step), max_step - 1);
   const float t = time * max_step - step;
   /* Fetch vertex coordinates. */
   float3 curr_verts[3];
@@ -81,7 +68,7 @@ void Mesh::Triangle::verts_for_step(const float3 *verts,
     r_verts[2] = verts[v[2]];
   }
   else {
-    /* Center step not stored in the attribute array array. */
+    /* Center step not stored in the attribute array. */
     if (step > center_step) {
       step--;
     }
@@ -141,6 +128,9 @@ NODE_DEFINE(Mesh)
   subdivision_type_enum.insert("catmull_clark", SUBDIVISION_CATMULL_CLARK);
   SOCKET_ENUM(subdivision_type, "Subdivision Type", subdivision_type_enum, SUBDIVISION_NONE);
 
+  SOCKET_INT_ARRAY(subd_vert_creases, "Subdivision Vertex Crease", array<int>());
+  SOCKET_FLOAT_ARRAY(
+      subd_vert_creases_weight, "Subdivision Vertex Crease Weights", array<float>());
   SOCKET_INT_ARRAY(subd_creases_edge, "Subdivision Crease Edges", array<int>());
   SOCKET_FLOAT_ARRAY(subd_creases_weight, "Subdivision Crease Weights", array<float>());
   SOCKET_INT_ARRAY(subd_face_corners, "Subdivision Face Corners", array<int>());
@@ -152,8 +142,8 @@ NODE_DEFINE(Mesh)
   SOCKET_INT(num_ngons, "NGons Number", 0);
 
   /* Subdivisions parameters */
-  SOCKET_FLOAT(subd_dicing_rate, "Subdivision Dicing Rate", 0.0f)
-  SOCKET_INT(subd_max_level, "Subdivision Dicing Rate", 0);
+  SOCKET_FLOAT(subd_dicing_rate, "Subdivision Dicing Rate", 1.0f)
+  SOCKET_INT(subd_max_level, "Max Subdivision Level", 1);
   SOCKET_TRANSFORM(subd_objecttoworld, "Subdivision Object Transform", transform_identity());
 
   return type;
@@ -367,7 +357,7 @@ void Mesh::add_triangle(int v0, int v1, int v2, int shader_, bool smooth_)
   }
 }
 
-void Mesh::add_subd_face(int *corners, int num_corners, int shader_, bool smooth_)
+void Mesh::add_subd_face(const int *corners, int num_corners, int shader_, bool smooth_)
 {
   int start_corner = subd_face_corners.size();
 
@@ -408,7 +398,7 @@ Mesh::SubdFace Mesh::get_subd_face(size_t index) const
   return s;
 }
 
-void Mesh::add_crease(int v0, int v1, float weight)
+void Mesh::add_edge_crease(int v0, int v1, float weight)
 {
   subd_creases_edge.push_back_slow(v0);
   subd_creases_edge.push_back_slow(v1);
@@ -417,6 +407,15 @@ void Mesh::add_crease(int v0, int v1, float weight)
   tag_subd_creases_edge_modified();
   tag_subd_creases_edge_modified();
   tag_subd_creases_weight_modified();
+}
+
+void Mesh::add_vertex_crease(int v, float weight)
+{
+  subd_vert_creases.push_back_slow(v);
+  subd_vert_creases_weight.push_back_slow(weight);
+
+  tag_subd_vert_creases_modified();
+  tag_subd_vert_creases_weight_modified();
 }
 
 void Mesh::copy_center_to_motion_step(const int motion_step)

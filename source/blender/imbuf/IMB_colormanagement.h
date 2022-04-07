@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2012 by Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2012 Blender Foundation. All rights reserved. */
 
 #pragma once
 
@@ -35,6 +19,7 @@ extern "C" {
 struct ColorManagedColorspaceSettings;
 struct ColorManagedDisplaySettings;
 struct ColorManagedViewSettings;
+struct ColorManagedOutputSettings;
 struct ColormanageProcessor;
 struct EnumPropertyItem;
 struct ImBuf;
@@ -68,6 +53,7 @@ bool IMB_colormanagement_space_is_data(struct ColorSpace *colorspace);
 bool IMB_colormanagement_space_is_scene_linear(struct ColorSpace *colorspace);
 bool IMB_colormanagement_space_is_srgb(struct ColorSpace *colorspace);
 bool IMB_colormanagement_space_name_is_data(const char *name);
+bool IMB_colormanagement_space_name_is_scene_linear(const char *name);
 
 /**
  * Convert a float RGB triplet to the correct luminance weighted average.
@@ -254,23 +240,10 @@ void IMB_colormanagement_imbuf_make_display_space(
  * in image format write callback and if float_colorspace is not NULL, no color
  * space transformation should be applied on this buffer.
  */
-struct ImBuf *IMB_colormanagement_imbuf_for_write(
-    struct ImBuf *ibuf,
-    bool save_as_render,
-    bool allocate_result,
-    const struct ColorManagedViewSettings *view_settings,
-    const struct ColorManagedDisplaySettings *display_settings,
-    struct ImageFormatData *image_format_data);
-
-void IMB_colormanagement_buffer_make_display_space(
-    float *buffer,
-    unsigned char *display_buffer,
-    int width,
-    int height,
-    int channels,
-    float dither,
-    const struct ColorManagedViewSettings *view_settings,
-    const struct ColorManagedDisplaySettings *display_settings);
+struct ImBuf *IMB_colormanagement_imbuf_for_write(struct ImBuf *ibuf,
+                                                  bool save_as_render,
+                                                  bool allocate_result,
+                                                  const struct ImageFormatData *image_format);
 
 /** \} */
 

@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2016 by Mike Erwin. All rights reserved. */
 
 /** \file
  * \ingroup gpu
@@ -68,6 +52,7 @@ class ShaderInterface {
   uint16_t enabled_ubo_mask_ = 0;
   uint8_t enabled_ima_mask_ = 0;
   uint64_t enabled_tex_mask_ = 0;
+  uint16_t enabled_ssbo_mask_ = 0;
   /** Location of builtin uniforms. Fast access, no lookup needed. */
   int32_t builtins_[GPU_NUM_UNIFORMS];
   int32_t builtin_blocks_[GPU_NUM_UNIFORM_BLOCKS];
@@ -106,6 +91,10 @@ class ShaderInterface {
   inline const ShaderInput *ssbo_get(const char *name) const
   {
     return input_lookup(inputs_ + attr_len_ + ubo_len_ + uniform_len_, ssbo_len_, name);
+  }
+  inline const ShaderInput *ssbo_get(const int binding) const
+  {
+    return input_lookup(inputs_ + attr_len_ + ubo_len_ + uniform_len_, ssbo_len_, binding);
   }
 
   inline const char *input_name_get(const ShaderInput *input) const
@@ -189,11 +178,11 @@ inline const char *ShaderInterface::builtin_uniform_name(GPUUniformBuiltin u)
     case GPU_UNIFORM_COLOR:
       return "color";
     case GPU_UNIFORM_BASE_INSTANCE:
-      return "baseInstance";
+      return "gpu_BaseInstance";
     case GPU_UNIFORM_RESOURCE_CHUNK:
-      return "resourceChunk";
+      return "drw_resourceChunk";
     case GPU_UNIFORM_RESOURCE_ID:
-      return "resourceId";
+      return "drw_ResourceID";
     case GPU_UNIFORM_SRGB_TRANSFORM:
       return "srgbTarget";
 
@@ -211,6 +200,13 @@ inline const char *ShaderInterface::builtin_uniform_block_name(GPUUniformBlockBu
       return "modelBlock";
     case GPU_UNIFORM_BLOCK_INFO:
       return "infoBlock";
+
+    case GPU_UNIFORM_BLOCK_DRW_VIEW:
+      return "drw_view";
+    case GPU_UNIFORM_BLOCK_DRW_MODEL:
+      return "drw_matrices";
+    case GPU_UNIFORM_BLOCK_DRW_INFOS:
+      return "drw_infos";
     default:
       return NULL;
   }

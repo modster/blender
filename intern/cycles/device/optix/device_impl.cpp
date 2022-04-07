@@ -1,19 +1,6 @@
-/*
+/* SPDX-License-Identifier: Apache-2.0
  * Copyright 2019, NVIDIA Corporation.
- * Copyright 2019, Blender Foundation.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ * Copyright 2019-2022 Blender Foundation. */
 
 #ifdef WITH_OPTIX
 
@@ -45,6 +32,191 @@
 #  include <optix_denoiser_tiling.h>
 
 CCL_NAMESPACE_BEGIN
+
+// A minimal copy of functionality `optix_denoiser_tiling.h` which allows to fix integer overflow
+// issues without bumping SDK or driver requirement.
+//
+// The original code is Copyright NVIDIA Corporation, BSD-3-Clause.
+namespace {
+
+static OptixResult optixUtilDenoiserSplitImage(const OptixImage2D &input,
+                                               const OptixImage2D &output,
+                                               unsigned int overlapWindowSizeInPixels,
+                                               unsigned int tileWidth,
+                                               unsigned int tileHeight,
+                                               std::vector<OptixUtilDenoiserImageTile> &tiles)
+{
+  if (tileWidth == 0 || tileHeight == 0)
+    return OPTIX_ERROR_INVALID_VALUE;
+
+  unsigned int inPixelStride = optixUtilGetPixelStride(input);
+  unsigned int outPixelStride = optixUtilGetPixelStride(output);
+
+  int inp_w = std::min(tileWidth + 2 * overlapWindowSizeInPixels, input.width);
+  int inp_h = std::min(tileHeight + 2 * overlapWindowSizeInPixels, input.height);
+  int inp_y = 0, copied_y = 0;
+
+  do {
+    int inputOffsetY = inp_y == 0 ? 0 :
+                                    std::max((int)overlapWindowSizeInPixels,
+                                             inp_h - ((int)input.height - inp_y));
+    int copy_y = inp_y == 0 ? std::min(input.height, tileHeight + overlapWindowSizeInPixels) :
+                              std::min(tileHeight, input.height - copied_y);
+
+    int inp_x = 0, copied_x = 0;
+    do {
+      int inputOffsetX = inp_x == 0 ? 0 :
+                                      std::max((int)overlapWindowSizeInPixels,
+                                               inp_w - ((int)input.width - inp_x));
+      int copy_x = inp_x == 0 ? std::min(input.width, tileWidth + overlapWindowSizeInPixels) :
+                                std::min(tileWidth, input.width - copied_x);
+
+      OptixUtilDenoiserImageTile tile;
+      tile.input.data = input.data + (size_t)(inp_y - inputOffsetY) * input.rowStrideInBytes +
+                        +(size_t)(inp_x - inputOffsetX) * inPixelStride;
+      tile.input.width = inp_w;
+      tile.input.height = inp_h;
+      tile.input.rowStrideInBytes = input.rowStrideInBytes;
+      tile.input.pixelStrideInBytes = input.pixelStrideInBytes;
+      tile.input.format = input.format;
+
+      tile.output.data = output.data + (size_t)inp_y * output.rowStrideInBytes +
+                         (size_t)inp_x * outPixelStride;
+      tile.output.width = copy_x;
+      tile.output.height = copy_y;
+      tile.output.rowStrideInBytes = output.rowStrideInBytes;
+      tile.output.pixelStrideInBytes = output.pixelStrideInBytes;
+      tile.output.format = output.format;
+
+      tile.inputOffsetX = inputOffsetX;
+      tile.inputOffsetY = inputOffsetY;
+      tiles.push_back(tile);
+
+      inp_x += inp_x == 0 ? tileWidth + overlapWindowSizeInPixels : tileWidth;
+      copied_x += copy_x;
+    } while (inp_x < static_cast<int>(input.width));
+
+    inp_y += inp_y == 0 ? tileHeight + overlapWindowSizeInPixels : tileHeight;
+    copied_y += copy_y;
+  } while (inp_y < static_cast<int>(input.height));
+
+  return OPTIX_SUCCESS;
+}
+
+static OptixResult optixUtilDenoiserInvokeTiled(OptixDenoiser denoiser,
+                                                CUstream stream,
+                                                const OptixDenoiserParams *params,
+                                                CUdeviceptr denoiserState,
+                                                size_t denoiserStateSizeInBytes,
+                                                const OptixDenoiserGuideLayer *guideLayer,
+                                                const OptixDenoiserLayer *layers,
+                                                unsigned int numLayers,
+                                                CUdeviceptr scratch,
+                                                size_t scratchSizeInBytes,
+                                                unsigned int overlapWindowSizeInPixels,
+                                                unsigned int tileWidth,
+                                                unsigned int tileHeight)
+{
+  if (!guideLayer || !layers)
+    return OPTIX_ERROR_INVALID_VALUE;
+
+  std::vector<std::vector<OptixUtilDenoiserImageTile>> tiles(numLayers);
+  std::vector<std::vector<OptixUtilDenoiserImageTile>> prevTiles(numLayers);
+  for (unsigned int l = 0; l < numLayers; l++) {
+    if (const OptixResult res = ccl::optixUtilDenoiserSplitImage(layers[l].input,
+                                                                 layers[l].output,
+                                                                 overlapWindowSizeInPixels,
+                                                                 tileWidth,
+                                                                 tileHeight,
+                                                                 tiles[l]))
+      return res;
+
+    if (layers[l].previousOutput.data) {
+      OptixImage2D dummyOutput = layers[l].previousOutput;
+      if (const OptixResult res = ccl::optixUtilDenoiserSplitImage(layers[l].previousOutput,
+                                                                   dummyOutput,
+                                                                   overlapWindowSizeInPixels,
+                                                                   tileWidth,
+                                                                   tileHeight,
+                                                                   prevTiles[l]))
+        return res;
+    }
+  }
+
+  std::vector<OptixUtilDenoiserImageTile> albedoTiles;
+  if (guideLayer->albedo.data) {
+    OptixImage2D dummyOutput = guideLayer->albedo;
+    if (const OptixResult res = ccl::optixUtilDenoiserSplitImage(guideLayer->albedo,
+                                                                 dummyOutput,
+                                                                 overlapWindowSizeInPixels,
+                                                                 tileWidth,
+                                                                 tileHeight,
+                                                                 albedoTiles))
+      return res;
+  }
+
+  std::vector<OptixUtilDenoiserImageTile> normalTiles;
+  if (guideLayer->normal.data) {
+    OptixImage2D dummyOutput = guideLayer->normal;
+    if (const OptixResult res = ccl::optixUtilDenoiserSplitImage(guideLayer->normal,
+                                                                 dummyOutput,
+                                                                 overlapWindowSizeInPixels,
+                                                                 tileWidth,
+                                                                 tileHeight,
+                                                                 normalTiles))
+      return res;
+  }
+  std::vector<OptixUtilDenoiserImageTile> flowTiles;
+  if (guideLayer->flow.data) {
+    OptixImage2D dummyOutput = guideLayer->flow;
+    if (const OptixResult res = ccl::optixUtilDenoiserSplitImage(guideLayer->flow,
+                                                                 dummyOutput,
+                                                                 overlapWindowSizeInPixels,
+                                                                 tileWidth,
+                                                                 tileHeight,
+                                                                 flowTiles))
+      return res;
+  }
+
+  for (size_t t = 0; t < tiles[0].size(); t++) {
+    std::vector<OptixDenoiserLayer> tlayers;
+    for (unsigned int l = 0; l < numLayers; l++) {
+      OptixDenoiserLayer layer = {};
+      layer.input = (tiles[l])[t].input;
+      layer.output = (tiles[l])[t].output;
+      if (layers[l].previousOutput.data)
+        layer.previousOutput = (prevTiles[l])[t].input;
+      tlayers.push_back(layer);
+    }
+
+    OptixDenoiserGuideLayer gl = {};
+    if (guideLayer->albedo.data)
+      gl.albedo = albedoTiles[t].input;
+
+    if (guideLayer->normal.data)
+      gl.normal = normalTiles[t].input;
+
+    if (guideLayer->flow.data)
+      gl.flow = flowTiles[t].input;
+
+    if (const OptixResult res = optixDenoiserInvoke(denoiser,
+                                                    stream,
+                                                    params,
+                                                    denoiserState,
+                                                    denoiserStateSizeInBytes,
+                                                    &gl,
+                                                    &tlayers[0],
+                                                    numLayers,
+                                                    (tiles[0])[t].inputOffsetX,
+                                                    (tiles[0])[t].inputOffsetY,
+                                                    scratch,
+                                                    scratchSizeInBytes))
+      return res;
+  }
+  return OPTIX_SUCCESS;
+}
+
+}  // namespace
 
 OptiXDevice::Denoiser::Denoiser(OptiXDevice *device)
     : device(device), queue(device), state(device, "__denoiser_state", true)
@@ -226,7 +398,7 @@ bool OptiXDevice::load_kernels(const uint kernel_features)
   pipeline_options.usesMotionBlur = false;
   pipeline_options.traversableGraphFlags =
       OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
-  pipeline_options.numPayloadValues = 6;
+  pipeline_options.numPayloadValues = 8;
   pipeline_options.numAttributeValues = 2; /* u, v */
   pipeline_options.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_options.pipelineLaunchParamsVariableName = "__params"; /* See globals.h */
@@ -1088,20 +1260,20 @@ bool OptiXDevice::denoise_run(DenoiseContext &context, const DenoisePass &pass)
   /* Finally run denoising. */
   OptixDenoiserParams params = {}; /* All parameters are disabled/zero. */
 
-  optix_assert(optixUtilDenoiserInvokeTiled(denoiser_.optix_denoiser,
-                                            denoiser_.queue.stream(),
-                                            &params,
-                                            denoiser_.state.device_pointer,
-                                            denoiser_.sizes.stateSizeInBytes,
-                                            &guide_layers,
-                                            &image_layers,
-                                            1,
-                                            denoiser_.state.device_pointer +
-                                                denoiser_.sizes.stateSizeInBytes,
-                                            denoiser_.sizes.withOverlapScratchSizeInBytes,
-                                            denoiser_.sizes.overlapWindowSizeInPixels,
-                                            denoiser_.configured_size.x,
-                                            denoiser_.configured_size.y));
+  optix_assert(ccl::optixUtilDenoiserInvokeTiled(denoiser_.optix_denoiser,
+                                                 denoiser_.queue.stream(),
+                                                 &params,
+                                                 denoiser_.state.device_pointer,
+                                                 denoiser_.sizes.stateSizeInBytes,
+                                                 &guide_layers,
+                                                 &image_layers,
+                                                 1,
+                                                 denoiser_.state.device_pointer +
+                                                     denoiser_.sizes.stateSizeInBytes,
+                                                 denoiser_.sizes.withOverlapScratchSizeInBytes,
+                                                 denoiser_.sizes.overlapWindowSizeInPixels,
+                                                 denoiser_.configured_size.x,
+                                                 denoiser_.configured_size.y));
 
   return true;
 }
@@ -1586,7 +1758,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
         if (ob->is_traceable() && ob->use_motion()) {
           total_motion_transform_size = align_up(total_motion_transform_size,
                                                  OPTIX_TRANSFORM_BYTE_ALIGNMENT);
-          const size_t motion_keys = max(ob->get_motion().size(), 2) - 2;
+          const size_t motion_keys = max(ob->get_motion().size(), (size_t)2) - 2;
           total_motion_transform_size = total_motion_transform_size +
                                         sizeof(OptixSRTMotionTransform) +
                                         motion_keys * sizeof(OptixSRTData);
@@ -1660,7 +1832,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
 
       /* Insert motion traversable if object has motion. */
       if (motion_blur && ob->use_motion()) {
-        size_t motion_keys = max(ob->get_motion().size(), 2) - 2;
+        size_t motion_keys = max(ob->get_motion().size(), (size_t)2) - 2;
         size_t motion_transform_size = sizeof(OptixSRTMotionTransform) +
                                        motion_keys * sizeof(OptixSRTData);
 

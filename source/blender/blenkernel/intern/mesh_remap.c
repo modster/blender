@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -1524,15 +1510,11 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
           bvhtree_from_mesh_verts_ex(&treedata[tindex],
                                      verts_src,
                                      num_verts_src,
-                                     false,
                                      verts_active,
                                      num_verts_active,
                                      0.0,
                                      2,
-                                     6,
-                                     0,
-                                     NULL,
-                                     NULL);
+                                     6);
         }
 
         MEM_freeN(verts_active);
@@ -1563,20 +1545,14 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
           }
           bvhtree_from_mesh_looptri_ex(&treedata[tindex],
                                        verts_src,
-                                       false,
                                        loops_src,
-                                       false,
                                        looptri_src,
                                        num_looptri_src,
-                                       false,
                                        looptri_active,
                                        num_looptri_active,
                                        0.0,
                                        2,
-                                       6,
-                                       0,
-                                       NULL,
-                                       NULL);
+                                       6);
         }
 
         MEM_freeN(looptri_active);

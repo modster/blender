@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 
 /** \file
  * \ingroup edinterface
@@ -230,8 +214,8 @@ struct uiBut {
   BIFIconID icon;
   /** Copied from the #uiBlock.emboss */
   eUIEmbossType emboss;
-  /** direction in a pie menu, used for collision detection (RadialDirection) */
-  signed char pie_dir;
+  /** direction in a pie menu, used for collision detection. */
+  RadialDirection pie_dir;
   /** could be made into a single flag */
   bool changed;
   /** so buttons can support unit systems which are not RNA */
@@ -866,6 +850,7 @@ struct uiPopupBlockHandle {
 /* exposed as public API in UI_interface.h */
 
 /* interface_region_color_picker.c */
+
 void ui_color_picker_rgb_to_hsv_compat(const float rgb[3], float r_cp[3]);
 void ui_color_picker_rgb_to_hsv(const float rgb[3], float r_cp[3]);
 void ui_color_picker_hsv_to_rgb(const float r_cp[3], float rgb[3]);
@@ -970,7 +955,7 @@ void ui_pie_menu_level_create(uiBlock *block,
                               const EnumPropertyItem *items,
                               int totitem,
                               wmOperatorCallContext context,
-                              int flag);
+                              wmOperatorCallContext flag);
 
 /* interface_region_popup.c */
 
@@ -1291,7 +1276,8 @@ void ui_layout_remove_but(uiLayout *layout, const uiBut *but);
  */
 bool ui_layout_replace_but_ptr(uiLayout *layout, const void *old_but_ptr, uiBut *new_but);
 /**
- * \note May reallocate \a but, so the possibly new address is returned.
+ * \note May reallocate \a but, so the possibly new address is returned. May also override the
+ *       #UI_BUT_DISABLED flag depending on if a search pointer-property pair was provided/found.
  */
 uiBut *ui_but_add_search(uiBut *but,
                          PointerRNA *ptr,
@@ -1529,6 +1515,7 @@ uiButTreeRow *ui_block_view_find_treerow_in_old_block(const uiBlock *new_block,
                                                       const uiTreeViewItemHandle *new_item_handle);
 
 /* interface_templates.c */
+
 struct uiListType *UI_UL_cache_file_layers(void);
 
 #ifdef __cplusplus

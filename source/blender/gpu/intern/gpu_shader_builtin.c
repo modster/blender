@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2005 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup gpu
@@ -40,9 +24,6 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 #include "GPU_uniform_buffer.h"
-
-/* TODO(jbakker): Need a better way to retrieve create_infos. */
-#include "gpu_shader_create_info_private.hh"
 
 /* Adjust these constants as needed. */
 #define MAX_DEFINE_LENGTH 256
@@ -192,8 +173,18 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
                                   .create_info = "gpu_shader_2D_flat_color"},
     [GPU_SHADER_2D_SMOOTH_COLOR] = {.name = "GPU_SHADER_2D_SMOOTH_COLOR",
                                     .create_info = "gpu_shader_2D_smooth_color"},
-    [GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE] = {.name = "GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE",
-                                            .create_info = "gpu_shader_2D_image_overlays_merge"},
+    [GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE] =
+        {
+            .name = "GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE",
+#ifdef __APPLE__
+            /* GPUShaderCreateInfo is disabled on MacOS due to mismatch with OCIO shader. See
+             * T95052 for more details. */
+            .vert = datatoc_gpu_shader_2D_image_vert_glsl,
+            .frag = datatoc_gpu_shader_image_overlays_merge_frag_glsl,
+#else
+            .create_info = "gpu_shader_2D_image_overlays_merge",
+#endif
+        },
     [GPU_SHADER_2D_IMAGE_OVERLAYS_STEREO_MERGE] =
         {.name = "GPU_SHADER_2D_IMAGE_OVERLAYS_STEREO_MERGE",
          .create_info = "gpu_shader_2D_image_overlays_stereo_merge"},
@@ -356,7 +347,7 @@ GPUShader *GPU_shader_get_builtin_shader_with_config(eGPUBuiltinShader shader,
     /* common case */
     if (sh_cfg == GPU_SHADER_CFG_DEFAULT) {
       if (stages->create_info != NULL) {
-        *sh_p = GPU_shader_create_from_info(gpu_shader_create_info_get(stages->create_info));
+        *sh_p = GPU_shader_create_from_info_name(stages->create_info);
       }
       else {
         *sh_p = GPU_shader_create_from_arrays_named(
@@ -382,8 +373,7 @@ GPUShader *GPU_shader_get_builtin_shader_with_config(eGPUBuiltinShader shader,
                       GPU_SHADER_3D_LINE_DASHED_UNIFORM_COLOR));
       /* In rare cases geometry shaders calculate clipping themselves. */
       if (stages->clipped_create_info != NULL) {
-        *sh_p = GPU_shader_create_from_info(
-            gpu_shader_create_info_get(stages->clipped_create_info));
+        *sh_p = GPU_shader_create_from_info_name(stages->clipped_create_info);
       }
       else {
         const char *world_clip_lib = datatoc_gpu_shader_cfg_world_clip_lib_glsl;

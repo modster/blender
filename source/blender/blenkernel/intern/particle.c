@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2007 by Janne Karhu.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2007 by Janne Karhu. All rights reserved. */
 
 /** \file
  * \ingroup bke
@@ -1673,7 +1657,8 @@ static void interpolate_pathcache(ParticleCacheKey *first, float t, ParticleCach
 /*          Particles on a dm                   */
 /************************************************/
 
-void psys_interpolate_face(MVert *mvert,
+void psys_interpolate_face(Mesh *mesh,
+                           MVert *mvert,
                            const float (*vert_normals)[3],
                            MFace *mface,
                            MTFace *tface,
@@ -1793,6 +1778,7 @@ void psys_interpolate_face(MVert *mvert,
       else {
         interp_v3_v3v3v3(orco, o1, o2, o3, w);
       }
+      BKE_mesh_orco_verts_transform(mesh, (float(*)[3])orco, 1, true);
     }
     else {
       copy_v3_v3(orco, vec);
@@ -2137,6 +2123,7 @@ void psys_particle_on_dm(Mesh *mesh_final,
     if (orco) {
       if (orcodata) {
         copy_v3_v3(orco, orcodata[mapindex]);
+        BKE_mesh_orco_verts_transform(mesh_final, (float(*)[3])orco, 1, true);
       }
       else {
         copy_v3_v3(orco, vec);
@@ -2162,8 +2149,18 @@ void psys_particle_on_dm(Mesh *mesh_final,
     }
 
     if (from == PART_FROM_VOLUME) {
-      psys_interpolate_face(
-          mvert, vert_normals, mface, mtface, orcodata, mapfw, vec, tmpnor, utan, vtan, orco);
+      psys_interpolate_face(mesh_final,
+                            mvert,
+                            vert_normals,
+                            mface,
+                            mtface,
+                            orcodata,
+                            mapfw,
+                            vec,
+                            tmpnor,
+                            utan,
+                            vtan,
+                            orco);
       if (nor) {
         copy_v3_v3(nor, tmpnor);
       }
@@ -2175,8 +2172,18 @@ void psys_particle_on_dm(Mesh *mesh_final,
       add_v3_v3(vec, tmpnor);
     }
     else {
-      psys_interpolate_face(
-          mvert, vert_normals, mface, mtface, orcodata, mapfw, vec, nor, utan, vtan, orco);
+      psys_interpolate_face(mesh_final,
+                            mvert,
+                            vert_normals,
+                            mface,
+                            mtface,
+                            orcodata,
+                            mapfw,
+                            vec,
+                            nor,
+                            utan,
+                            vtan,
+                            orco);
     }
   }
 }
@@ -2654,8 +2661,8 @@ void psys_find_parents(ParticleSimulationData *sim, const bool use_render_params
   int from = PART_FROM_FACE;
   totparent = (int)(totchild * part->parents * 0.3f);
 
-  if (use_render_params && part->child_nbr && part->ren_child_nbr) {
-    totparent *= (float)part->child_nbr / (float)part->ren_child_nbr;
+  if (use_render_params && part->child_percent && part->child_render_percent) {
+    totparent *= (float)part->child_percent / (float)part->child_render_percent;
   }
 
   /* hard limit, workaround for it being ignored above */
@@ -2729,8 +2736,8 @@ static bool psys_thread_context_init_path(ParticleThreadContext *ctx,
   if (totchild && part->childtype == PART_CHILD_FACES) {
     totparent = (int)(totchild * part->parents * 0.3f);
 
-    if (use_render_params && part->child_nbr && part->ren_child_nbr) {
-      totparent *= (float)part->child_nbr / (float)part->ren_child_nbr;
+    if (use_render_params && part->child_percent && part->child_render_percent) {
+      totparent *= (float)part->child_percent / (float)part->child_render_percent;
     }
 
     /* part->parents could still be 0 so we can't test with totparent */
@@ -4640,7 +4647,7 @@ void psys_get_particle_on_path(ParticleSimulationData *sim,
        * account when subdividing for instance. */
       pind.mesh = psys_in_edit_mode(sim->depsgraph, psys) ?
                       NULL :
-                      psys->hair_out_mesh; /* XXX(@sybren) EEK. */
+                      psys->hair_out_mesh; /* XXX(@sybren): EEK. */
       init_particle_interpolation(sim->ob, psys, pa, &pind);
       do_particle_interpolation(psys, p, pa, t, &pind, state);
 

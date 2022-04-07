@@ -1,20 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2009 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2009 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup edrend
@@ -64,6 +49,8 @@
 #include "BKE_workspace.h"
 #include "BKE_world.h"
 
+#include "NOD_composite.h"
+
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 
@@ -88,6 +75,7 @@
 #include "ED_screen.h"
 
 #include "RNA_define.h"
+#include "RNA_prototypes.h"
 
 #include "UI_interface.h"
 
@@ -323,7 +311,7 @@ static int material_slot_assign_exec(bContext *C, wmOperator *UNUSED(op))
         }
       }
     }
-    else if (ELEM(ob->type, OB_CURVE, OB_SURF)) {
+    else if (ELEM(ob->type, OB_CURVES_LEGACY, OB_SURF)) {
       Nurb *nu;
       ListBase *nurbs = BKE_curve_editNurbs_get((Curve *)ob->data);
 
@@ -424,7 +412,7 @@ static int material_slot_de_select(bContext *C, bool select)
         changed = EDBM_deselect_by_material(em, mat_nr_active, select);
       }
     }
-    else if (ELEM(ob->type, OB_CURVE, OB_SURF)) {
+    else if (ELEM(ob->type, OB_CURVES_LEGACY, OB_SURF)) {
       ListBase *nurbs = BKE_curve_editNurbs_get((Curve *)ob->data);
       Nurb *nu;
       BPoint *bp;
@@ -1127,6 +1115,86 @@ void SCENE_OT_view_layer_remove_aov(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name View Layer Add Lightgroup Operator
+ * \{ */
+
+static int view_layer_add_lightgroup_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+
+  BKE_view_layer_add_lightgroup(view_layer);
+
+  if (scene->nodetree) {
+    ntreeCompositUpdateRLayers(scene->nodetree);
+  }
+
+  DEG_id_tag_update(&scene->id, 0);
+  DEG_relations_tag_update(CTX_data_main(C));
+  WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
+
+  return OPERATOR_FINISHED;
+}
+
+void SCENE_OT_view_layer_add_lightgroup(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Add Lightgroup";
+  ot->idname = "SCENE_OT_view_layer_add_lightgroup";
+  ot->description = "Add a Light Group";
+
+  /* api callbacks */
+  ot->exec = view_layer_add_lightgroup_exec;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name View Layer Remove Lightgroup Operator
+ * \{ */
+
+static int view_layer_remove_lightgroup_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+
+  if (view_layer->active_lightgroup == nullptr) {
+    return OPERATOR_FINISHED;
+  }
+
+  BKE_view_layer_remove_lightgroup(view_layer, view_layer->active_lightgroup);
+
+  if (scene->nodetree) {
+    ntreeCompositUpdateRLayers(scene->nodetree);
+  }
+
+  DEG_id_tag_update(&scene->id, 0);
+  DEG_relations_tag_update(CTX_data_main(C));
+  WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
+
+  return OPERATOR_FINISHED;
+}
+
+void SCENE_OT_view_layer_remove_lightgroup(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Remove Lightgroup";
+  ot->idname = "SCENE_OT_view_layer_remove_lightgroup";
+  ot->description = "Remove Active Lightgroup";
+
+  /* api callbacks */
+  ot->exec = view_layer_remove_lightgroup_exec;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Light Cache Bake Operator
  * \{ */
 
@@ -1154,7 +1222,7 @@ static void light_cache_bake_tag_cache(Scene *scene, wmOperator *op)
   }
 }
 
-/* catch esc */
+/** Catch escape key to cancel. */
 static int light_cache_bake_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   Scene *scene = (Scene *)op->customdata;

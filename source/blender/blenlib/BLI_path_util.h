@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2001-2002 NaN Holding BV. All rights reserved. */
 #pragma once
 
 /** \file
@@ -49,7 +33,7 @@ void BLI_setenv_if_new(const char *env, const char *val) ATTR_NONNULL(1);
  * This function uses an alternative method to get environment variables that does pick up on
  * runtime environment variables. The result will be UTF-8 encoded.
  */
-const char *BLI_getenv(const char *env) ATTR_NONNULL(1);
+const char *BLI_getenv(const char *env) ATTR_NONNULL(1) ATTR_WARN_UNUSED_RESULT;
 
 /**
  * Returns in `string` the concatenation of `dir` and `file` (also with `relabase` on the
@@ -220,12 +204,12 @@ bool BLI_path_filename_ensure(char *filepath, size_t maxlen, const char *filenam
  * or before dot if no digits.
  * \param tail: Optional area to return copy of part of string following digits,
  * or from dot if no digits.
- * \param r_num_len: Optional to return number of digits found.
+ * \param r_digits_len: Optional to return number of digits found.
  */
 int BLI_path_sequence_decode(const char *string,
                              char *head,
                              char *tail,
-                             unsigned short *r_num_len);
+                             unsigned short *r_digits_len);
 /**
  * Returns in area pointed to by string a string of the form `<head><pic><tail>`,
  * where pic is formatted as `numlen` digits with leading zeroes.
@@ -314,7 +298,7 @@ bool BLI_path_parent_dir_until_exists(char *path) ATTR_NONNULL();
 bool BLI_path_abs(char *path, const char *basepath) ATTR_NONNULL();
 /**
  * Replaces "#" character sequence in last slash-separated component of `path`
- * with frame as decimal integer, with leading zeroes as necessary, to make digits digits.
+ * with frame as decimal integer, with leading zeroes as necessary, to make digits.
  */
 bool BLI_path_frame(char *path, int frame, int digits) ATTR_NONNULL();
 /**
@@ -326,7 +310,7 @@ bool BLI_path_frame_range(char *path, int sta, int end, int digits) ATTR_NONNULL
 /**
  * Get the frame from a filename formatted by blender's frame scheme
  */
-bool BLI_path_frame_get(char *path, int *r_frame, int *numdigits) ATTR_NONNULL();
+bool BLI_path_frame_get(char *path, int *r_frame, int *r_digits_len) ATTR_NONNULL();
 /**
  * Given a `path` with digits representing frame numbers, replace the digits with the '#'
  * character and extract the extension.
@@ -337,13 +321,13 @@ void BLI_path_frame_strip(char *path, char *r_ext) ATTR_NONNULL();
 /**
  * Check if we have '#' chars, usable for #BLI_path_frame, #BLI_path_frame_range
  */
-bool BLI_path_frame_check_chars(const char *path) ATTR_NONNULL();
+bool BLI_path_frame_check_chars(const char *path) ATTR_NONNULL(1) ATTR_WARN_UNUSED_RESULT;
 /**
  * Checks for a relative path (ignoring Blender's "//") prefix
  * (unlike `!BLI_path_is_rel(path)`).
  * When false, #BLI_path_abs_from_cwd would expand the absolute path.
  */
-bool BLI_path_is_abs_from_cwd(const char *path) ATTR_NONNULL();
+bool BLI_path_is_abs_from_cwd(const char *path) ATTR_NONNULL(1) ATTR_WARN_UNUSED_RESULT;
 /**
  * Checks for relative path, expanding them relative to the current working directory.
  * \returns true if the expansion was performed.
@@ -367,7 +351,7 @@ bool BLI_path_is_rel(const char *path) ATTR_NONNULL() ATTR_WARN_UNUSED_RESULT;
 /**
  * Return true if the path is a UNC share.
  */
-bool BLI_path_is_unc(const char *path);
+bool BLI_path_is_unc(const char *path) ATTR_NONNULL(1) ATTR_WARN_UNUSED_RESULT;
 
 /**
  * Creates a display string from path to be used menus and the user interface.
@@ -403,6 +387,20 @@ bool BLI_path_suffix(char *string, size_t maxlen, const char *suffix, const char
 #  define BLI_path_cmp strcmp
 #  define BLI_path_ncmp strncmp
 #endif
+
+/**
+ * Returns the result of #BLI_path_cmp with both paths normalized and slashes made native.
+ *
+ * \note #BLI_path_cmp is used for Blender's internal logic to consider paths to be the same
+ * #BLI_path_cmp_normalized may be used in when handling other kinds of paths
+ * (e.g. importers/exporters) but should be used consistently.
+ *
+ * Checking the normalized paths is not a guarantee the paths reference different files.
+ * An equivalent to Python's `os.path.samefile` could be supported for checking if paths
+ * point to the same location on the file-system (following symbolic-links).
+ */
+int BLI_path_cmp_normalized(const char *p1, const char *p2)
+    ATTR_NONNULL(1, 2) ATTR_WARN_UNUSED_RESULT;
 
 /* These values need to be hard-coded in structs, dna does not recognize defines */
 /* also defined in `DNA_space_types.h`. */

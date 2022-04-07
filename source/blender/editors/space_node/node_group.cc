@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2005 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spnode
@@ -52,6 +36,7 @@
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+#include "RNA_prototypes.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -62,9 +47,7 @@
 #include "NOD_socket.h"
 #include "node_intern.hh" /* own include */
 
-using blender::float2;
-using blender::Map;
-using blender::Vector;
+namespace blender::ed::space_node {
 
 /* -------------------------------------------------------------------- */
 /** \name Local Utilities
@@ -778,6 +761,18 @@ static void node_group_make_insert_selected(const bContext &C, bNodeTree &ntree,
 
   ListBase anim_basepaths = {nullptr, nullptr};
 
+  /* Detach unselected nodes inside frames when the frame is put into the group. Otherwise the
+   * `parent` pointer becomes dangling. */
+  LISTBASE_FOREACH (bNode *, node, &ntree.nodes) {
+    if (node->parent == nullptr) {
+      continue;
+    }
+    if (node_group_make_use_node(*node->parent, gnode) &&
+        !node_group_make_use_node(*node, gnode)) {
+      nodeDetachNode(node);
+    }
+  }
+
   /* move nodes over */
   LISTBASE_FOREACH_MUTABLE (bNode *, node, &ntree.nodes) {
     if (node_group_make_use_node(*node, gnode)) {
@@ -846,6 +841,12 @@ static void node_group_make_insert_selected(const bContext &C, bNodeTree &ntree,
       nodeRemLink(&ntree, link);
     }
     else if (toselect && !fromselect) {
+      /* Remove hidden links to not create unconnected sockets in the interface. */
+      if (nodeLinkIsHidden(link)) {
+        nodeRemLink(&ntree, link);
+        continue;
+      }
+
       bNodeSocket *link_sock;
       bNode *link_node;
       node_socket_skip_reroutes(&ntree.links, link->tonode, link->tosock, &link_node, &link_sock);
@@ -866,6 +867,12 @@ static void node_group_make_insert_selected(const bContext &C, bNodeTree &ntree,
       link->tosock = node_group_find_input_socket(gnode, iosock->identifier);
     }
     else if (fromselect && !toselect) {
+      /* Remove hidden links to not create unconnected sockets in the interface. */
+      if (nodeLinkIsHidden(link)) {
+        nodeRemLink(&ntree, link);
+        continue;
+      }
+
       /* First check whether the source of this link is already connected to an output.
        * If yes, reuse that output instead of duplicating it. */
       bool connected = false;
@@ -1109,3 +1116,5 @@ void NODE_OT_group_insert(wmOperatorType *ot)
 }
 
 /** \} */
+
+}  // namespace blender::ed::space_node

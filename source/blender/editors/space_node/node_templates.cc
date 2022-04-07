@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup edinterface
@@ -40,6 +26,7 @@
 #include "BKE_node_tree_update.h"
 
 #include "RNA_access.h"
+#include "RNA_prototypes.h"
 
 #include "NOD_node_declaration.hh"
 #include "NOD_socket.h"
@@ -53,8 +40,9 @@
 
 #include "ED_undo.h"
 
-using blender::Vector;
 using blender::nodes::NodeDeclaration;
+
+namespace blender::ed::space_node {
 
 /************************* Node Socket Manipulation **************************/
 
@@ -81,11 +69,11 @@ static bool node_link_item_compare(bNode *node, NodeLinkItem *item)
   return true;
 }
 
-static void node_link_item_apply(Main *bmain, bNode *node, NodeLinkItem *item)
+static void node_link_item_apply(bNodeTree *ntree, bNode *node, NodeLinkItem *item)
 {
   if (ELEM(node->type, NODE_GROUP, NODE_CUSTOM_GROUP)) {
     node->id = (ID *)item->ngroup;
-    BKE_ntree_update_main_tree(bmain, item->ngroup, nullptr);
+    BKE_ntree_update_tag_node_property(ntree, node);
   }
   else {
     /* nothing to do for now */
@@ -249,7 +237,8 @@ static void node_socket_add_replace(const bContext *C,
       nodePositionRelative(node_from, node_to, sock_from_tmp, sock_to);
     }
 
-    node_link_item_apply(bmain, node_from, item);
+    node_link_item_apply(ntree, node_from, item);
+    ED_node_tree_propagate_change(C, bmain, ntree);
   }
 
   nodeSetActive(ntree, node_from);
@@ -716,9 +705,13 @@ static void ui_template_node_link_menu(bContext *C, uiLayout *layout, void *but_
   ui_node_menu_column(arg, NODE_CLASS_GROUP, N_("Group"));
 }
 
+}  // namespace blender::ed::space_node
+
 void uiTemplateNodeLink(
     uiLayout *layout, bContext *C, bNodeTree *ntree, bNode *node, bNodeSocket *input)
 {
+  using namespace blender::ed::space_node;
+
   uiBlock *block = uiLayoutGetBlock(layout);
   NodeLinkArg *arg;
   uiBut *but;
@@ -759,6 +752,8 @@ void uiTemplateNodeLink(
     }
   }
 }
+
+namespace blender::ed::space_node {
 
 /**************************** Node Tree Layout *******************************/
 
@@ -889,7 +884,7 @@ static void ui_node_draw_input(
           if (node_tree->type == NTREE_GEOMETRY && snode != nullptr) {
             /* Only add the attribute search in the node editor, in other places there is not
              * enough context. */
-            node_geometry_add_attribute_search_button(*C, *node_tree, *node, inputptr, *row);
+            node_geometry_add_attribute_search_button(*C, *node, inputptr, *row);
           }
           else {
             uiItemR(sub, &inputptr, "default_value", 0, "", ICON_NONE);
@@ -912,9 +907,13 @@ static void ui_node_draw_input(
   node->flag &= ~NODE_TEST;
 }
 
+}  // namespace blender::ed::space_node
+
 void uiTemplateNodeView(
     uiLayout *layout, bContext *C, bNodeTree *ntree, bNode *node, bNodeSocket *input)
 {
+  using namespace blender::ed::space_node;
+
   bNode *tnode;
 
   if (!ntree) {

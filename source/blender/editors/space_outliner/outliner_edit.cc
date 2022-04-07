@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2004 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2004 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup spoutliner
@@ -46,6 +30,7 @@
 #include "BKE_context.h"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
+#include "BKE_lib_override.h"
 #include "BKE_lib_query.h"
 #include "BKE_lib_remap.h"
 #include "BKE_main.h"
@@ -74,6 +59,9 @@
 #include "GPU_material.h"
 
 #include "outliner_intern.hh"
+#include "tree/tree_element_rna.hh"
+
+using namespace blender::ed::outliner;
 
 static void outliner_show_active(SpaceOutliner *space_outliner,
                                  ARegion *region,
@@ -238,8 +226,11 @@ static int outliner_item_openclose_invoke(bContext *C, wmOperator *op, const wmE
   const bool toggle_all = RNA_boolean_get(op->ptr, "all");
 
   float view_mval[2];
-  UI_view2d_region_to_view(
-      &region->v2d, event->mval[0], event->mval[1], &view_mval[0], &view_mval[1]);
+
+  int mval[2];
+  WM_event_drag_start_mval(event, region, mval);
+
+  UI_view2d_region_to_view(&region->v2d, mval[0], mval[1], &view_mval[0], &view_mval[1]);
 
   TreeElement *te = outliner_find_item_at_y(space_outliner, &space_outliner->tree, view_mval[1]);
 
@@ -253,7 +244,7 @@ static int outliner_item_openclose_invoke(bContext *C, wmOperator *op, const wmE
     outliner_tag_redraw_avoid_rebuild_on_open_change(space_outliner, region);
 
     /* Only toggle once for single click toggling */
-    if (event->type == LEFTMOUSE) {
+    if ((event->type == LEFTMOUSE) && (event->val != KM_CLICK_DRAG)) {
       return OPERATOR_FINISHED;
     }
 
@@ -456,6 +447,17 @@ static void id_delete(bContext *C, ReportList *reports, TreeElement *te, TreeSto
   BLI_assert(((tselem->type == TSE_SOME_ID) && (te->idcode != 0)) ||
              (tselem->type == TSE_LAYER_COLLECTION));
   UNUSED_VARS_NDEBUG(te);
+
+  if (ID_IS_OVERRIDE_LIBRARY(id)) {
+    if (!ID_IS_OVERRIDE_LIBRARY_REAL(id) ||
+        (id->override_library->flag & IDOVERRIDE_LIBRARY_FLAG_NO_HIERARCHY) == 0) {
+      BKE_reportf(reports,
+                  RPT_WARNING,
+                  "Cannot delete library override id '%s', it is part of an override hierarchy",
+                  id->name);
+      return;
+    }
+  }
 
   if (te->idcode == ID_LI && ((Library *)id)->parent != nullptr) {
     BKE_reportf(reports, RPT_WARNING, "Cannot delete indirectly linked library '%s'", id->name);
@@ -739,7 +741,7 @@ void id_remap_fn(bContext *C,
   RNA_enum_set(&op_props, "id_type", GS(tselem->id->name));
   RNA_enum_set_identifier(C, &op_props, "old_id", tselem->id->name + 2);
 
-  WM_operator_name_call_ptr(C, ot, WM_OP_INVOKE_DEFAULT, &op_props);
+  WM_operator_name_call_ptr(C, ot, WM_OP_INVOKE_DEFAULT, &op_props, nullptr);
 
   WM_operator_properties_free(&op_props);
 }
@@ -885,10 +887,10 @@ static int lib_relocate(
     RNA_string_set(&op_props, "directory", dir);
     RNA_string_set(&op_props, "filename", filename);
 
-    ret = WM_operator_name_call_ptr(C, ot, WM_OP_EXEC_DEFAULT, &op_props);
+    ret = WM_operator_name_call_ptr(C, ot, WM_OP_EXEC_DEFAULT, &op_props, nullptr);
   }
   else {
-    ret = WM_operator_name_call_ptr(C, ot, WM_OP_INVOKE_DEFAULT, &op_props);
+    ret = WM_operator_name_call_ptr(C, ot, WM_OP_INVOKE_DEFAULT, &op_props, nullptr);
   }
 
   WM_operator_properties_free(&op_props);
@@ -1714,11 +1716,6 @@ static void tree_element_to_path(TreeElement *te,
                                  short *UNUSED(groupmode))
 {
   ListBase hierarchy = {nullptr, nullptr};
-  LinkData *ld;
-  TreeElement *tem, *temnext;
-  TreeStoreElem *tse /* , *tsenext */ /* UNUSED */;
-  PointerRNA *ptr, *nextptr;
-  PropertyRNA *prop;
   char *newpath = nullptr;
 
   /* optimize tricks:
@@ -1738,20 +1735,19 @@ static void tree_element_to_path(TreeElement *te,
    */
 
   /* step 1: flatten out hierarchy of parents into a flat chain */
-  for (tem = te->parent; tem; tem = tem->parent) {
-    ld = MEM_cnew<LinkData>("LinkData for tree_element_to_path()");
+  for (TreeElement *tem = te->parent; tem; tem = tem->parent) {
+    LinkData *ld = MEM_cnew<LinkData>("LinkData for tree_element_to_path()");
     ld->data = tem;
     BLI_addhead(&hierarchy, ld);
   }
 
   /* step 2: step down hierarchy building the path
    * (NOTE: addhead in previous loop was needed so that we can loop like this) */
-  for (ld = reinterpret_cast<LinkData *>(hierarchy.first); ld; ld = ld->next) {
+  LISTBASE_FOREACH (LinkData *, ld, &hierarchy) {
     /* get data */
-    tem = (TreeElement *)ld->data;
-    tse = TREESTORE(tem);
-    ptr = &tem->rnaptr;
-    prop = reinterpret_cast<PropertyRNA *>(tem->directdata);
+    TreeElement *tem = (TreeElement *)ld->data;
+    TreeElementRNACommon *tem_rna = tree_element_cast<TreeElementRNACommon>(tem);
+    PointerRNA ptr = tem_rna->getPointerRNA();
 
     /* check if we're looking for first ID, or appending to path */
     if (*id) {
@@ -1759,19 +1755,19 @@ static void tree_element_to_path(TreeElement *te,
        * - to prevent memory leaks, we must write to newpath not path,
        *   then free old path + swap them.
        */
-      if (tse->type == TSE_RNA_PROPERTY) {
+      if (TreeElementRNAProperty *tem_rna_prop = tree_element_cast<TreeElementRNAProperty>(tem)) {
+        PropertyRNA *prop = tem_rna_prop->getPropertyRNA();
+
         if (RNA_property_type(prop) == PROP_POINTER) {
           /* for pointer we just append property name */
-          newpath = RNA_path_append(*path, ptr, prop, 0, nullptr);
+          newpath = RNA_path_append(*path, &ptr, prop, 0, nullptr);
         }
         else if (RNA_property_type(prop) == PROP_COLLECTION) {
           char buf[128], *name;
 
-          temnext = (TreeElement *)(ld->next->data);
-          // tsenext = TREESTORE(temnext); /* UNUSED */
-
-          nextptr = &temnext->rnaptr;
-          name = RNA_struct_name_get_alloc(nextptr, buf, sizeof(buf), nullptr);
+          TreeElement *temnext = (TreeElement *)(ld->next->data);
+          PointerRNA nextptr = tree_element_cast<TreeElementRNACommon>(temnext)->getPointerRNA();
+          name = RNA_struct_name_get_alloc(&nextptr, buf, sizeof(buf), nullptr);
 
           if (name) {
             /* if possible, use name as a key in the path */
@@ -1789,6 +1785,7 @@ static void tree_element_to_path(TreeElement *te,
               if (temsub == temnext) {
                 break;
               }
+              index++;
             }
             newpath = RNA_path_append(*path, nullptr, prop, index, nullptr);
           }
@@ -1808,11 +1805,11 @@ static void tree_element_to_path(TreeElement *te,
     else {
       /* no ID, so check if entry is RNA-struct,
        * and if that RNA-struct is an ID datablock to extract info from. */
-      if (tse->type == TSE_RNA_STRUCT) {
+      if (tree_element_cast<TreeElementRNAStruct>(tem)) {
         /* ptr->data not ptr->owner_id seems to be the one we want,
          * since ptr->data is sometimes the owner of this ID? */
-        if (RNA_struct_is_ID(ptr->type)) {
-          *id = reinterpret_cast<ID *>(ptr->data);
+        if (RNA_struct_is_ID(ptr.type)) {
+          *id = reinterpret_cast<ID *>(ptr.data);
 
           /* clear path */
           if (*path) {
@@ -1827,8 +1824,7 @@ static void tree_element_to_path(TreeElement *te,
   /* step 3: if we've got an ID, add the current item to the path */
   if (*id) {
     /* add the active property to the path */
-    ptr = &te->rnaptr;
-    prop = reinterpret_cast<PropertyRNA *>(te->directdata);
+    PropertyRNA *prop = tree_element_cast<TreeElementRNACommon>(te)->getPropertyRNA();
 
     /* array checks */
     if (tselem->type == TSE_RNA_ARRAY_ELEM) {
@@ -1886,9 +1882,12 @@ static void do_outliner_drivers_editop(SpaceOutliner *space_outliner,
       short flag = 0;
       short groupmode = KSP_GROUP_KSNAME;
 
+      TreeElementRNACommon *te_rna = tree_element_cast<TreeElementRNACommon>(te);
+      PointerRNA ptr = te_rna ? te_rna->getPointerRNA() : PointerRNA_NULL;
+      PropertyRNA *prop = te_rna ? te_rna->getPropertyRNA() : nullptr;
+
       /* check if RNA-property described by this selected element is an animatable prop */
-      if (ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM) &&
-          RNA_property_animateable(&te->rnaptr, reinterpret_cast<PropertyRNA *>(te->directdata))) {
+      if (prop && RNA_property_animateable(&ptr, prop)) {
         /* get id + path + index info from the selected element */
         tree_element_to_path(te, tselem, &id, &path, &array_index, &flag, &groupmode);
       }
@@ -1901,8 +1900,7 @@ static void do_outliner_drivers_editop(SpaceOutliner *space_outliner,
         /* array checks */
         if (flag & KSP_FLAG_WHOLE_ARRAY) {
           /* entire array was selected, so add drivers for all */
-          arraylen = RNA_property_array_length(&te->rnaptr,
-                                               reinterpret_cast<PropertyRNA *>(te->directdata));
+          arraylen = RNA_property_array_length(&ptr, prop);
         }
         else {
           arraylen = array_index;
@@ -2084,8 +2082,10 @@ static void do_outliner_keyingset_editop(SpaceOutliner *space_outliner,
       short groupmode = KSP_GROUP_KSNAME;
 
       /* check if RNA-property described by this selected element is an animatable prop */
-      if (ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM) &&
-          RNA_property_animateable(&te->rnaptr, reinterpret_cast<PropertyRNA *>(te->directdata))) {
+      const TreeElementRNACommon *te_rna = tree_element_cast<TreeElementRNACommon>(te);
+      PointerRNA ptr = te_rna->getPointerRNA();
+      if (te_rna && te_rna->getPropertyRNA() &&
+          RNA_property_animateable(&ptr, te_rna->getPropertyRNA())) {
         /* get id + path + index info from the selected element */
         tree_element_to_path(te, tselem, &id, &path, &array_index, &flag, &groupmode);
       }

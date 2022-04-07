@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spoutliner
@@ -33,7 +19,9 @@
 #include "tree_element_id.hh"
 #include "tree_element_nla.hh"
 #include "tree_element_overrides.hh"
+#include "tree_element_rna.hh"
 #include "tree_element_scene_objects.hh"
+#include "tree_element_seq.hh"
 #include "tree_element_view_layer.hh"
 
 #include "../outliner_intern.hh"
@@ -86,11 +74,35 @@ std::unique_ptr<AbstractTreeElement> AbstractTreeElement::createFromType(const i
     case TSE_LIBRARY_OVERRIDE:
       return std::make_unique<TreeElementOverridesProperty>(
           legacy_te, *static_cast<TreeElementOverridesData *>(idv));
+    case TSE_RNA_STRUCT:
+      return std::make_unique<TreeElementRNAStruct>(legacy_te,
+                                                    *reinterpret_cast<PointerRNA *>(idv));
+    case TSE_RNA_PROPERTY:
+      return std::make_unique<TreeElementRNAProperty>(
+          legacy_te, *reinterpret_cast<PointerRNA *>(idv), legacy_te.index);
+    case TSE_RNA_ARRAY_ELEM:
+      return std::make_unique<TreeElementRNAArrayElement>(
+          legacy_te, *reinterpret_cast<PointerRNA *>(idv), legacy_te.index);
+    case TSE_SEQUENCE:
+      return std::make_unique<TreeElementSequence>(legacy_te, *reinterpret_cast<Sequence *>(idv));
+    case TSE_SEQ_STRIP:
+      return std::make_unique<TreeElementSequenceStrip>(legacy_te,
+                                                        *reinterpret_cast<Strip *>(idv));
+    case TSE_SEQUENCE_DUP:
+      return std::make_unique<TreeElementSequenceStripDuplicate>(
+          legacy_te, *reinterpret_cast<Sequence *>(idv));
     default:
       break;
   }
 
   return nullptr;
+}
+
+void AbstractTreeElement::uncollapse_by_default(TreeElement *legacy_te)
+{
+  if (!TREESTORE(legacy_te)->used) {
+    TREESTORE(legacy_te)->flag &= ~TSE_CLOSED;
+  }
 }
 
 void tree_element_expand(const AbstractTreeElement &tree_element, SpaceOutliner &space_outliner)
@@ -102,7 +114,6 @@ void tree_element_expand(const AbstractTreeElement &tree_element, SpaceOutliner 
     return;
   }
   tree_element.expand(space_outliner);
-  tree_element.postExpand(space_outliner);
 }
 
 bool tree_element_warnings_get(TreeElement *te, int *r_icon, const char **r_message)

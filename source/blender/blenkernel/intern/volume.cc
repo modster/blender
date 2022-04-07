@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -583,8 +569,7 @@ static void volume_foreach_cache(ID *id,
   Volume *volume = (Volume *)id;
   IDCacheKey key = {
       /* id_session_uuid */ id->session_uuid,
-      /*offset_in_ID*/ offsetof(Volume, runtime.grids),
-      /* cache_v */ volume->runtime.grids,
+      /* offset_in_ID */ offsetof(Volume, runtime.grids),
   };
 
   function_callback(id, &key, (void **)&volume->runtime.grids, 0, user_data);
@@ -1345,9 +1330,6 @@ VolumeGridType BKE_volume_grid_type_openvdb(const openvdb::GridBase &grid)
   if (grid.isType<openvdb::Vec3dGrid>()) {
     return VOLUME_GRID_VECTOR_DOUBLE;
   }
-  if (grid.isType<openvdb::StringGrid>()) {
-    return VOLUME_GRID_STRING;
-  }
   if (grid.isType<openvdb::MaskGrid>()) {
     return VOLUME_GRID_MASK;
   }
@@ -1383,7 +1365,6 @@ int BKE_volume_grid_channels(const VolumeGrid *grid)
     case VOLUME_GRID_VECTOR_DOUBLE:
     case VOLUME_GRID_VECTOR_INT:
       return 3;
-    case VOLUME_GRID_STRING:
     case VOLUME_GRID_POINTS:
     case VOLUME_GRID_UNKNOWN:
       return 0;
@@ -1624,13 +1605,8 @@ struct CreateGridWithChangedResolutionOp {
 
   template<typename GridType> typename openvdb::GridBase::Ptr operator()()
   {
-    if constexpr (std::is_same_v<GridType, openvdb::StringGrid>) {
-      return {};
-    }
-    else {
-      return create_grid_with_changed_resolution(static_cast<const GridType &>(grid),
-                                                 resolution_factor);
-    }
+    return create_grid_with_changed_resolution(static_cast<const GridType &>(grid),
+                                               resolution_factor);
   }
 };
 

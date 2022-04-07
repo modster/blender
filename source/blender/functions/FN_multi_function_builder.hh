@@ -1,18 +1,4 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -63,10 +49,21 @@ template<typename In1, typename Out1> class CustomMF_SI_SO : public MultiFunctio
     return [=](IndexMask mask, const VArray<In1> &in1, MutableSpan<Out1> out1) {
       /* Devirtualization results in a 2-3x speedup for some simple functions. */
       devirtualize_varray(in1, [&](const auto &in1) {
-        mask.foreach_index(
-            [&](int i) { new (static_cast<void *>(&out1[i])) Out1(element_fn(in1[i])); });
+        mask.to_best_mask_type(
+            [&](const auto &mask) { execute_SI_SO(element_fn, mask, in1, out1.data()); });
       });
     };
+  }
+
+  template<typename ElementFuncT, typename MaskT, typename In1Array>
+  BLI_NOINLINE static void execute_SI_SO(const ElementFuncT &element_fn,
+                                         MaskT mask,
+                                         const In1Array &in1,
+                                         Out1 *__restrict r_out)
+  {
+    for (const int64_t i : mask) {
+      new (r_out + i) Out1(element_fn(in1[i]));
+    }
   }
 
   void call(IndexMask mask, MFParams params, MFContext UNUSED(context)) const override
@@ -116,10 +113,22 @@ class CustomMF_SI_SI_SO : public MultiFunction {
                MutableSpan<Out1> out1) {
       /* Devirtualization results in a 2-3x speedup for some simple functions. */
       devirtualize_varray2(in1, in2, [&](const auto &in1, const auto &in2) {
-        mask.foreach_index(
-            [&](int i) { new (static_cast<void *>(&out1[i])) Out1(element_fn(in1[i], in2[i])); });
+        mask.to_best_mask_type(
+            [&](const auto &mask) { execute_SI_SI_SO(element_fn, mask, in1, in2, out1.data()); });
       });
     };
+  }
+
+  template<typename ElementFuncT, typename MaskT, typename In1Array, typename In2Array>
+  BLI_NOINLINE static void execute_SI_SI_SO(const ElementFuncT &element_fn,
+                                            MaskT mask,
+                                            const In1Array &in1,
+                                            const In2Array &in2,
+                                            Out1 *__restrict r_out)
+  {
+    for (const int64_t i : mask) {
+      new (r_out + i) Out1(element_fn(in1[i], in2[i]));
+    }
   }
 
   void call(IndexMask mask, MFParams params, MFContext UNUSED(context)) const override
@@ -174,10 +183,27 @@ class CustomMF_SI_SI_SI_SO : public MultiFunction {
                const VArray<In2> &in2,
                const VArray<In3> &in3,
                MutableSpan<Out1> out1) {
-      mask.foreach_index([&](int i) {
-        new (static_cast<void *>(&out1[i])) Out1(element_fn(in1[i], in2[i], in3[i]));
-      });
+      /* Virtual arrays are not devirtualized yet, to avoid generating lots of code without further
+       * consideration. */
+      execute_SI_SI_SI_SO(element_fn, mask, in1, in2, in3, out1.data());
     };
+  }
+
+  template<typename ElementFuncT,
+           typename MaskT,
+           typename In1Array,
+           typename In2Array,
+           typename In3Array>
+  BLI_NOINLINE static void execute_SI_SI_SI_SO(const ElementFuncT &element_fn,
+                                               MaskT mask,
+                                               const In1Array &in1,
+                                               const In2Array &in2,
+                                               const In3Array &in3,
+                                               Out1 *__restrict r_out)
+  {
+    for (const int64_t i : mask) {
+      new (r_out + i) Out1(element_fn(in1[i], in2[i], in3[i]));
+    }
   }
 
   void call(IndexMask mask, MFParams params, MFContext UNUSED(context)) const override
@@ -237,10 +263,29 @@ class CustomMF_SI_SI_SI_SI_SO : public MultiFunction {
                const VArray<In3> &in3,
                const VArray<In4> &in4,
                MutableSpan<Out1> out1) {
-      mask.foreach_index([&](int i) {
-        new (static_cast<void *>(&out1[i])) Out1(element_fn(in1[i], in2[i], in3[i], in4[i]));
-      });
+      /* Virtual arrays are not devirtualized yet, to avoid generating lots of code without further
+       * consideration. */
+      execute_SI_SI_SI_SI_SO(element_fn, mask, in1, in2, in3, in4, out1.data());
     };
+  }
+
+  template<typename ElementFuncT,
+           typename MaskT,
+           typename In1Array,
+           typename In2Array,
+           typename In3Array,
+           typename In4Array>
+  BLI_NOINLINE static void execute_SI_SI_SI_SI_SO(const ElementFuncT &element_fn,
+                                                  MaskT mask,
+                                                  const In1Array &in1,
+                                                  const In2Array &in2,
+                                                  const In3Array &in3,
+                                                  const In4Array &in4,
+                                                  Out1 *__restrict r_out)
+  {
+    for (const int64_t i : mask) {
+      new (r_out + i) Out1(element_fn(in1[i], in2[i], in3[i], in4[i]));
+    }
   }
 
   void call(IndexMask mask, MFParams params, MFContext UNUSED(context)) const override
@@ -282,7 +327,11 @@ template<typename Mut1> class CustomMF_SM : public MultiFunction {
   template<typename ElementFuncT> static FunctionT create_function(ElementFuncT element_fn)
   {
     return [=](IndexMask mask, MutableSpan<Mut1> mut1) {
-      mask.foreach_index([&](int i) { element_fn(mut1[i]); });
+      mask.to_best_mask_type([&](const auto &mask) {
+        for (const int64_t i : mask) {
+          element_fn(mut1[i]);
+        }
+      });
     };
   }
 
@@ -318,9 +367,11 @@ template<typename From, typename To> class CustomMF_Convert : public MultiFuncti
     const VArray<From> &inputs = params.readonly_single_input<From>(0);
     MutableSpan<To> outputs = params.uninitialized_single_output<To>(1);
 
-    for (int64_t i : mask) {
-      new (static_cast<void *>(&outputs[i])) To(inputs[i]);
-    }
+    mask.to_best_mask_type([&](const auto &mask) {
+      for (int64_t i : mask) {
+        new (static_cast<void *>(&outputs[i])) To(inputs[i]);
+      }
+    });
   }
 };
 
@@ -380,7 +431,11 @@ template<typename T> class CustomMF_Constant : public MultiFunction {
   void call(IndexMask mask, MFParams params, MFContext UNUSED(context)) const override
   {
     MutableSpan<T> output = params.uninitialized_single_output<T>(0);
-    mask.foreach_index([&](int i) { new (&output[i]) T(value_); });
+    mask.to_best_mask_type([&](const auto &mask) {
+      for (const int64_t i : mask) {
+        new (&output[i]) T(value_);
+      }
+    });
   }
 
   uint64_t hash() const override

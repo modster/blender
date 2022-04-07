@@ -1,21 +1,5 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2020 Blender Foundation. All rights reserved. */
 
 /** \file
  * \ingroup edsculpt
@@ -197,15 +181,19 @@ static void color_filter_task_cb(void *__restrict userdata,
         fade = clamp_f(fade, -1.0f, 1.0f);
         float smooth_color[4];
         SCULPT_neighbor_color_average(ss, smooth_color, vd.index);
-        blend_color_interpolate_float(final_color, vd.col, smooth_color, fade);
+
+        float col[4];
+        SCULPT_vertex_color_get(ss, vd.index, col);
+
+        blend_color_interpolate_float(final_color, col, smooth_color, fade);
         break;
       }
     }
 
-    copy_v3_v3(vd.col, final_color);
+    SCULPT_vertex_color_set(ss, vd.index, final_color);
 
     if (vd.mvert) {
-      vd.mvert->flag |= ME_VERT_PBVH_UPDATE;
+      BKE_pbvh_vert_mark_update(ss->pbvh, vd.index);
     }
   }
   BKE_pbvh_vertex_iter_end;
@@ -221,7 +209,7 @@ static int sculpt_color_filter_modal(bContext *C, wmOperator *op, const wmEvent 
   float filter_strength = RNA_float_get(op->ptr, "strength");
 
   if (event->type == LEFTMOUSE && event->val == KM_RELEASE) {
-    SCULPT_undo_push_end();
+    SCULPT_undo_push_end(ob);
     SCULPT_filter_cache_free(ss);
     SCULPT_flush_update_done(C, ob, SCULPT_UPDATE_COLOR);
     return OPERATOR_FINISHED;
@@ -231,7 +219,7 @@ static int sculpt_color_filter_modal(bContext *C, wmOperator *op, const wmEvent 
     return OPERATOR_RUNNING_MODAL;
   }
 
-  const float len = event->prev_click_xy[0] - event->xy[0];
+  const float len = event->prev_press_xy[0] - event->xy[0];
   filter_strength = filter_strength * -len * 0.001f;
 
   float fill_color[3];
@@ -263,7 +251,6 @@ static int sculpt_color_filter_invoke(bContext *C, wmOperator *op, const wmEvent
   Object *ob = CTX_data_active_object(C);
   Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
   SculptSession *ss = ob->sculpt;
-  int mode = RNA_enum_get(op->ptr, "type");
   PBVH *pbvh = ob->sculpt->pbvh;
 
   const bool use_automasking = SCULPT_is_automasking_enabled(sd, ss, NULL);
@@ -285,7 +272,7 @@ static int sculpt_color_filter_invoke(bContext *C, wmOperator *op, const wmEvent
     return OPERATOR_CANCELLED;
   }
 
-  if (!ss->vcol) {
+  if (!SCULPT_has_colors(ss)) {
     return OPERATOR_CANCELLED;
   }
 
@@ -296,10 +283,9 @@ static int sculpt_color_filter_invoke(bContext *C, wmOperator *op, const wmEvent
   /* CTX_data_ensure_evaluated_depsgraph should be used at the end to include the updates of
    * earlier steps modifying the data. */
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
-  const bool needs_topology_info = mode == COLOR_FILTER_SMOOTH || use_automasking;
-  BKE_sculpt_update_object_for_edit(depsgraph, ob, needs_topology_info, false, true);
+  BKE_sculpt_update_object_for_edit(depsgraph, ob, true, false, true);
 
-  if (BKE_pbvh_type(pbvh) == PBVH_FACES && needs_topology_info && !ob->sculpt->pmap) {
+  if (BKE_pbvh_type(pbvh) == PBVH_FACES && !ob->sculpt->pmap) {
     return OPERATOR_CANCELLED;
   }
 
