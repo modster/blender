@@ -61,6 +61,9 @@ typedef enum eLineartEdgeFlag {
   LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 10),
   LRT_EDGE_FLAG_CLIPPED = (1 << 11),
   /** Limited to 16 bits for the entire thing. */
+
+  /** For object loading code to use only. */
+  LRT_EDGE_FLAG_INHIBIT = (1 << 14),
 } eLineartEdgeFlag;
 
 #define LRT_EDGE_FLAG_ALL_TYPE 0x01ff
