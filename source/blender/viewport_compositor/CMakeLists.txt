@@ -18,10 +18,12 @@ set(INC
 set(SRC
   intern/compositor_execute.cc
   intern/scheduler.cc
+  intern/texture_pool.cc
   intern/utils.cc
 
   VPC_compositor_execute.hh
   VPC_scheduler.hh
+  VPC_texture_pool.hh
   VPC_utils.hh
 )
 

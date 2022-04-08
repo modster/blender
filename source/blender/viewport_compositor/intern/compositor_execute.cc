@@ -39,64 +39,10 @@
 
 #include "VPC_compositor_execute.hh"
 #include "VPC_scheduler.hh"
+#include "VPC_texture_pool.hh"
 #include "VPC_utils.hh"
 
 namespace blender::viewport_compositor {
-
-/* --------------------------------------------------------------------
- * Texture Pool.
- */
-
-TexturePoolKey::TexturePoolKey(int2 size, eGPUTextureFormat format) : size(size), format(format)
-{
-}
-
-TexturePoolKey::TexturePoolKey(const GPUTexture *texture)
-{
-  size = int2{GPU_texture_width(texture), GPU_texture_height(texture)};
-  format = GPU_texture_format(texture);
-}
-
-uint64_t TexturePoolKey::hash() const
-{
-  return get_default_hash_3(size.x, size.y, format);
-}
-
-bool operator==(const TexturePoolKey &a, const TexturePoolKey &b)
-{
-  return a.size == b.size && a.format == b.format;
-}
-
-GPUTexture *TexturePool::acquire(int2 size, eGPUTextureFormat format)
-{
-  const TexturePoolKey key = TexturePoolKey(size, format);
-  Vector<GPUTexture *> &available_textures = textures_.lookup_or_add_default(key);
-  if (available_textures.is_empty()) {
-    return allocate_texture(size, format);
-  }
-  return available_textures.pop_last();
-}
-
-GPUTexture *TexturePool::acquire_color(int2 size)
-{
-  return acquire(size, GPU_RGBA16F);
-}
-
-/* Vectors are and should be stored in RGBA textures. */
-GPUTexture *TexturePool::acquire_vector(int2 size)
-{
-  return acquire(size, GPU_RGBA16F);
-}
-
-GPUTexture *TexturePool::acquire_float(int2 size)
-{
-  return acquire(size, GPU_R16F);
-}
-
-void TexturePool::release(GPUTexture *texture)
-{
-  textures_.lookup(TexturePoolKey(texture)).append(texture);
-}
 
 /* --------------------------------------------------------------------
  * Context.
