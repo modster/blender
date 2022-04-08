@@ -558,38 +558,6 @@ static bool rna_PaintModeSettings_canvas_image_poll(PointerRNA *UNUSED(ptr), Poi
   return !ELEM(image->type, IMA_TYPE_COMPOSITE, IMA_TYPE_R_RESULT);
 }
 
-static int rna_PaintModeSettings_canvas_source_get(PointerRNA *ptr)
-{
-  PaintModeSettings *settings = ptr->data;
-  if (!U.experimental.use_sculpt_texture_paint &&
-      settings->canvas_source == PAINT_CANVAS_SOURCE_IMAGE) {
-    return PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE;
-  }
-
-  return settings->canvas_source;
-}
-
-static const EnumPropertyItem *rna_PaintModeSettings_canvas_source_itemf(bContext *UNUSED(C),
-                                                                         PointerRNA *UNUSED(ptr),
-                                                                         PropertyRNA *UNUSED(prop),
-                                                                         bool *r_free)
-{
-  EnumPropertyItem *items = NULL;
-  int totitem = 0;
-
-  for (int index = 0; rna_enum_canvas_source_items[index].identifier != NULL; index++) {
-    if (!U.experimental.use_sculpt_texture_paint &&
-        rna_enum_canvas_source_items[index].value == PAINT_CANVAS_SOURCE_IMAGE) {
-      continue;
-    }
-    RNA_enum_item_add(&items, &totitem, &rna_enum_canvas_source_items[index]);
-  }
-
-  RNA_enum_item_end(&items, &totitem);
-  *r_free = true;
-  return items;
-}
-
 static void rna_PaintModeSettings_canvas_source_update(bContext *C, PointerRNA *UNUSED(ptr))
 {
   Scene *scene = CTX_data_scene(C);
@@ -1045,10 +1013,6 @@ static void rna_def_paint_mode(BlenderRNA *brna)
   prop = RNA_def_property(srna, "canvas_source", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_canvas_source_items);
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
-  RNA_def_property_enum_funcs(prop,
-                              "rna_PaintModeSettings_canvas_source_get",
-                              NULL,
-                              "rna_PaintModeSettings_canvas_source_itemf");
   RNA_def_property_ui_text(prop, "Source", "Source to select canvas from");
   RNA_def_property_update(prop, 0, "rna_PaintModeSettings_canvas_source_update");
 

@@ -1477,13 +1477,9 @@ static void fill_texpaint_slots_recursive(bNodeTree *nodetree,
 /** Check which type of paint slots should be filled for the given object. */
 static ePaintSlotFilter material_paint_slot_filter(const struct Object *ob)
 {
-  ePaintSlotFilter slot_filter = 0;
-  if (ob->mode == OB_MODE_SCULPT) {
-    slot_filter = PAINT_SLOT_COLOR_ATTRIBUTE;
-    SET_FLAG_FROM_TEST(slot_filter, U.experimental.use_sculpt_texture_paint, PAINT_SLOT_IMAGE);
-  }
-  else if (ob->mode == OB_MODE_TEXTURE_PAINT) {
-    slot_filter = PAINT_SLOT_IMAGE;
+  ePaintSlotFilter slot_filter = PAINT_SLOT_IMAGE;
+  if (ob->mode == OB_MODE_SCULPT && U.experimental.use_sculpt_texture_paint) {
+    slot_filter |= PAINT_SLOT_COLOR_ATTRIBUTE;
   }
   return slot_filter;
 }

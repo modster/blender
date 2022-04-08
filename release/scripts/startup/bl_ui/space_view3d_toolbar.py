@@ -570,6 +570,9 @@ class VIEW3D_PT_slots_paint_canvas(SelectPaintSlotHelper, View3DPanel, Panel):
 
     @classmethod
     def poll(cls, context):
+        if not context.preferences.experimental.use_sculpt_texture_paint:
+            return False
+
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
         tool = ToolSelectPanelHelper.tool_active_from_context(context)
         if tool is None:
@@ -578,6 +581,7 @@ class VIEW3D_PT_slots_paint_canvas(SelectPaintSlotHelper, View3DPanel, Panel):
 
     def get_mode_settings(self, context):
         return context.tool_settings.paint_mode
+
     def draw_image_interpolation(self, **kwargs):
         pass
 
