@@ -479,12 +479,15 @@ void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &i
 
 void PixelPackages::sort()
 {
+  /* This fails when using GCC. (read out of bounds.) */
+  #if 0
   std::sort(this->begin(), this->end(), [](const PixelsPackage &a, const PixelsPackage &b) {
     if (a.start_image_coordinate[1] < b.start_image_coordinate[1]) {
       return true;
     }
     return a.start_image_coordinate[0] < b.start_image_coordinate[0];
   });
+  #endif
 }
 
 }  // namespace blender::bke::pbvh::pixels
