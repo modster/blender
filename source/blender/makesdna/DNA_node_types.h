@@ -1298,6 +1298,11 @@ typedef struct NodeGeometryMeshCone {
   uint8_t fill_type;
 } NodeGeometryMeshCone;
 
+typedef struct NodeGeometryMergeByDistance {
+  /* GeometryNodeMergeByDistanceMode. */
+  uint8_t mode;
+} NodeGeometryMergeByDistance;
+
 typedef struct NodeGeometryMeshLine {
   /* GeometryNodeMeshLineMode. */
   uint8_t mode;
@@ -2008,6 +2013,11 @@ typedef enum GeometryNodeMeshCircleFillType {
   GEO_NODE_MESH_CIRCLE_FILL_NGON = 1,
   GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN = 2,
 } GeometryNodeMeshCircleFillType;
+
+typedef enum GeometryNodeMergeByDistanceMode {
+  GEO_NODE_MERGE_BY_DISTANCE_MODE_ALL = 0,
+  GEO_NODE_MERGE_BY_DISTANCE_MODE_CONNECTED = 1,
+} GeometryNodeMergeByDistanceMode;
 
 typedef enum GeometryNodeMeshLineMode {
   GEO_NODE_MESH_LINE_MODE_END_POINTS = 0,
