@@ -31,7 +31,7 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
-#include "NOD_compositor_execute.hh"
+#include "VPC_compositor_execute.hh"
 
 #include "node_composite_util.hh"
 

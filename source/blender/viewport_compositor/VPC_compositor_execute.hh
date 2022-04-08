@@ -21,6 +21,8 @@
 
 #include "NOD_derived_node_tree.hh"
 
+#include "VPC_scheduler.hh"
+
 namespace blender::viewport_compositor {
 
 /* --------------------------------------------------------------------
@@ -849,9 +851,6 @@ class GPUMaterialNode {
  * GPU Material Operation.
  */
 
-/* A type representing an ordered set of nodes defining a contiguous subset of the node execution
- * schedule. */
-using SubSchedule = VectorSet<DNode>;
 /* A type representing a map that associates the identifier of each input of the operation with the
  * output socket it is linked to. */
 using InputIdentifierToOutputSocketMap = Map<StringRef, DOutputSocket>;
@@ -889,7 +888,7 @@ using InputIdentifierToOutputSocketMap = Map<StringRef, DOutputSocket>;
 class GPUMaterialOperation : public Operation {
  private:
   /* The execution sub-schedule that will be compiled into this GPU material operation. */
-  SubSchedule sub_schedule_;
+  Schedule sub_schedule_;
   /* The GPU material backing the operation. */
   GPUMaterial *material_;
   /* A map that associates each node in the execution sub-schedule with an instance of its GPU
@@ -921,7 +920,7 @@ class GPUMaterialOperation : public Operation {
  public:
   /* Construct and compile a GPU material from the give execution sub-schedule by calling
    * GPU_material_from_callbacks with the appropriate callbacks. */
-  GPUMaterialOperation(Context &context, SubSchedule &sub_schedule);
+  GPUMaterialOperation(Context &context, Schedule &sub_schedule);
 
   /* Free the GPU material and the GPU material nodes. */
   ~GPUMaterialOperation();
@@ -1046,56 +1045,6 @@ class GPUMaterialOperation : public Operation {
 };
 
 /* --------------------------------------------------------------------
- * Scheduler.
- */
-
-/* A type representing the ordered set of nodes defining the schedule of node execution. */
-using Schedule = VectorSet<DNode>;
-
-/* A class that computes the execution schedule of the nodes. It essentially does a post-order
- * depth first traversal of the node tree from the output node to the leaf input nodes, with
- * informed order of traversal of children based on a heuristic estimation of the number of
- * needed buffers. */
-class Scheduler {
- private:
-  /* The derived and reference node trees representing the compositor setup. */
-  NodeTreeRefMap tree_ref_map_;
-  DerivedNodeTree tree_;
-  /* A mapping between nodes and heuristic estimations of the number of needed intermediate buffers
-   * to compute the nodes and all of their dependencies. */
-  Map<DNode, int> needed_buffers_;
-  /* An ordered set of nodes defining the schedule of node execution. */
-  Schedule schedule_;
-
- public:
-  Scheduler(bNodeTree *node_tree);
-
-  /* Compute the execution schedule of the nodes. */
-  void schedule();
-
-  /* Get a reference to the computed schedule. */
-  Schedule &get_schedule();
-
- private:
-  /* Computes the output node whose result should be computed and drawn. The output node is the
-   * node marked as NODE_DO_OUTPUT. If multiple types of output nodes are marked, then the
-   * preference will be CMP_NODE_COMPOSITE > CMP_NODE_VIEWER > CMP_NODE_SPLITVIEWER. */
-  DNode compute_output_node() const;
-
-  /* Computes a heuristic estimation of the number of needed intermediate buffers to compute this
-   * node and all of its dependencies. The method recursively computes the needed buffers for all
-   * node dependencies and stores them in the needed_buffers_ map. So the root/output node can be
-   * provided to compute the needed buffers for all nodes. */
-  int compute_needed_buffers(DNode node);
-
-  /* Computes the execution schedule of the nodes and stores it in the schedule_. This is
-   * essentially a post-order depth first traversal of the node tree from the output node to the
-   * leaf input nodes, with informed order of traversal of children based on a heuristic estimation
-   * of the number of needed buffers. */
-  void compute_schedule(DNode node);
-};
-
-/* --------------------------------------------------------------------
  * GPU Material Compile Group
  */
 
@@ -1113,7 +1062,7 @@ class Scheduler {
 class GPUMaterialCompileGroup {
  private:
   /* The contiguous subset of the execution node schedule that is part of this group. */
-  SubSchedule sub_schedule_;
+  Schedule sub_schedule_;
 
  public:
   /* Add the given node to the GPU material compile group. */
@@ -1137,7 +1086,7 @@ class GPUMaterialCompileGroup {
   void reset();
 
   /* Returns the contiguous subset of the execution node schedule that is part of this group. */
-  SubSchedule &get_sub_schedule();
+  Schedule &get_sub_schedule();
 };
 
 /* --------------------------------------------------------------------
@@ -1158,8 +1107,9 @@ class Compiler {
  private:
   /* A reference to the compositor context provided by the compositor engine. */
   Context &context_;
-  /* The scheduler instance used to compute the node execution schedule. */
-  Scheduler scheduler_;
+  /* The derived and reference node trees representing the compositor setup. */
+  NodeTreeRefMap tree_ref_map_;
+  DerivedNodeTree tree_;
   /* The compiled operations stream. This contains ordered pointers to the operations that were
    * compiled and needs to be evaluated. Those should be freed when no longer needed. */
   OperationsStream operations_stream_;

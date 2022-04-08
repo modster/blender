@@ -59,7 +59,6 @@ set(SRC
   intern/geometry_nodes_eval_log.cc
   intern/math_functions.cc
   intern/node_common.cc
-  intern/node_compositor_execute.cc
   intern/node_declaration.cc
   intern/node_exec.cc
   intern/node_geometry_exec.cc
@@ -73,7 +72,6 @@ set(SRC
 
   NOD_common.h
   NOD_composite.h
-  NOD_compositor_execute.hh
   NOD_derived_node_tree.hh
   NOD_function.h
   NOD_geometry.h

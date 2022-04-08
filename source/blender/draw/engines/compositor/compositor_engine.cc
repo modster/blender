@@ -28,7 +28,7 @@
 
 #include "IMB_colormanagement.h"
 
-#include "NOD_compositor_execute.hh"
+#include "VPC_compositor_execute.hh"
 
 #include "GPU_texture.h"
 

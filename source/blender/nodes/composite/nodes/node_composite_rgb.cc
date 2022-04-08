@@ -25,7 +25,7 @@
 
 #include "DNA_node_types.h"
 
-#include "NOD_compositor_execute.hh"
+#include "VPC_compositor_execute.hh"
 
 #include "node_composite_util.hh"
 

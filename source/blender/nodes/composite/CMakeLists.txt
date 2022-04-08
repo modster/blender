@@ -33,6 +33,7 @@ set(INC
   ../../makesrna
   ../../render
   ../../windowmanager
+  ../../viewport_compositor
   ../../../../intern/guardedalloc
 
   # dna_type_offsets.h
@@ -137,6 +138,7 @@ set(SRC
 
 set(LIB
   bf_nodes
+  bf_viewport_compositor
 )
 
 if(WITH_IMAGE_OPENEXR)

@@ -11,6 +11,7 @@
 #include "BLI_map.hh"
 #include "BLI_math_vec_types.hh"
 #include "BLI_math_vector.h"
+#include "BLI_stack.hh"
 #include "BLI_transformation_2d.hh"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
@@ -27,15 +28,18 @@
 #include "GPU_texture.h"
 #include "GPU_uniform_buffer.h"
 
-#include "../../gpu/intern/gpu_shader_create_info.hh"
+#include "gpu_shader_create_info.hh"
 
 #include "IMB_colormanagement.h"
 
-#include "NOD_compositor_execute.hh"
 #include "NOD_derived_node_tree.hh"
 #include "NOD_node_declaration.hh"
 
 #include "MEM_guardedalloc.h"
+
+#include "VPC_compositor_execute.hh"
+#include "VPC_scheduler.hh"
+#include "VPC_utils.hh"
 
 namespace blender::viewport_compositor {
 
@@ -666,23 +670,6 @@ void NodeOperation::pre_execute()
   }
 }
 
-/* Get the origin socket of the given node input. If the input is not linked, the socket itself is
- * returned. If the input is linked, the socket that is linked to it is returned, which could
- * either be an input or an output. An input socket is returned when the given input is connected
- * to an unlinked input of a group input node. */
-static DSocket get_node_input_origin_socket(DInputSocket input)
-{
-  /* The input is unlinked. Return the socket itself. */
-  if (input->logically_linked_sockets().is_empty()) {
-    return input;
-  }
-
-  /* Only a single origin socket is guaranteed to exist. */
-  DSocket socket;
-  input.foreach_origin_socket([&](const DSocket origin) { socket = origin; });
-  return socket;
-}
-
 void NodeOperation::populate_results_for_unlinked_inputs()
 {
   for (const InputSocketRef *input_ref : node_->inputs()) {
@@ -1153,7 +1140,7 @@ void GPUMaterialNode::populate_outputs()
  * GPU Material Operation.
  */
 
-GPUMaterialOperation::GPUMaterialOperation(Context &context, SubSchedule &sub_schedule)
+GPUMaterialOperation::GPUMaterialOperation(Context &context, Schedule &sub_schedule)
     : Operation(context), sub_schedule_(sub_schedule)
 {
   material_ = GPU_material_from_callbacks(
@@ -1466,154 +1453,6 @@ void GPUMaterialOperation::generate_material(void *thunk,
 }
 
 /* --------------------------------------------------------------------
- * Scheduler.
- */
-
-Scheduler::Scheduler(bNodeTree *node_tree) : tree_(*node_tree, tree_ref_map_)
-{
-}
-
-void Scheduler::schedule()
-{
-  /* Get the output node whose result should be computed and drawn. */
-  DNode output_node = compute_output_node();
-
-  /* Compute the number of buffers needed by each node. */
-  compute_needed_buffers(output_node);
-
-  /* Compute the execution schedule of the nodes. */
-  compute_schedule(output_node);
-}
-
-Schedule &Scheduler::get_schedule()
-{
-  return schedule_;
-}
-
-/* The output node is the one marked as NODE_DO_OUTPUT. If multiple types of output nodes are
- * marked, then preference will be CMP_NODE_COMPOSITE > CMP_NODE_VIEWER > CMP_NODE_SPLITVIEWER. */
-DNode Scheduler::compute_output_node() const
-{
-  const NodeTreeRef &root_tree = tree_.root_context().tree();
-  for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeComposite")) {
-    if (node->bnode()->flag & NODE_DO_OUTPUT) {
-      return DNode(&tree_.root_context(), node);
-    }
-  }
-  for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeViewer")) {
-    if (node->bnode()->flag & NODE_DO_OUTPUT) {
-      return DNode(&tree_.root_context(), node);
-    }
-  }
-  for (const NodeRef *node : root_tree.nodes_by_type("CompositorNodeSplitViewer")) {
-    if (node->bnode()->flag & NODE_DO_OUTPUT) {
-      return DNode(&tree_.root_context(), node);
-    }
-  }
-  return DNode();
-}
-
-/* Consider a node that takes n number of buffers as an input from a number of node dependencies,
- * which we shall call the input nodes. The node also computes and outputs m number of buffers.
- * In order for the node to compute its output, a number of intermediate buffers will be needed.
- * Since the node takes n buffers and outputs m buffers, then the number of buffers directly
- * needed by the node is (n + m). But each of the input buffers are computed by a node that, in
- * turn, needs a number of buffers to compute its output. So the total number of buffers needed
- * to compute the output of the node is max(n + m, d) where d is the number of buffers needed by
- * the input node that needs the largest number of buffers. We only consider the input node that
- * needs the largest number of buffers, because those buffers can be reused by any input node
- * that needs a lesser number of buffers.
- *
- * If the node tree was, in fact, a tree, then this would be an accurate computation. However,
- * the node tree is in fact a graph that allows output sharing, so the computation in this case
- * is merely a heuristic estimation that works well in most cases. */
-int Scheduler::compute_needed_buffers(DNode node)
-{
-  /* Compute the number of buffers that the node takes as an input as well as the number of
-   * buffers needed to compute the most demanding dependency node. */
-  int input_buffers = 0;
-  int buffers_needed_by_dependencies = 0;
-  for (const InputSocketRef *input_ref : node->inputs()) {
-    const DInputSocket input{node.context(), input_ref};
-    /* Only consider inputs that are linked, that is, those that take a buffer. */
-    input.foreach_origin_socket([&](const DSocket origin) {
-      input_buffers++;
-      /* The origin node was already computed before, so skip it. */
-      if (needed_buffers_.contains(origin.node())) {
-        return;
-      }
-      /* Recursively compute the number of buffers needed to compute this dependency node. */
-      const int buffers_needed_by_origin = compute_needed_buffers(origin.node());
-      if (buffers_needed_by_origin > buffers_needed_by_dependencies) {
-        buffers_needed_by_dependencies = buffers_needed_by_origin;
-      }
-    });
-  }
-
-  /* Compute the number of buffers that will be computed/output by this node. */
-  int output_buffers = 0;
-  for (const OutputSocketRef *output : node->outputs()) {
-    if (!output->logically_linked_sockets().is_empty()) {
-      output_buffers++;
-    }
-  }
-
-  /* Compute the heuristic estimation of the number of needed intermediate buffers to compute
-   * this node and all of its dependencies. */
-  const int total_buffers = MAX2(input_buffers + output_buffers, buffers_needed_by_dependencies);
-  needed_buffers_.add_new(node, total_buffers);
-  return total_buffers;
-}
-
-/* There are multiple different possible orders of evaluating a node graph, each of which needs
- * to allocate a number of intermediate buffers to store its intermediate results. It follows
- * that we need to find the evaluation order which uses the least amount of intermediate buffers.
- * For instance, consider a node that takes two input buffers A and B. Each of those buffers is
- * computed through a number of nodes constituting a sub-graph whose root is the node that
- * outputs that buffer. Suppose the number of intermediate buffers needed to compute A and B are
- * N(A) and N(B) respectively and N(A) > N(B). Then evaluating the sub-graph computing A would be
- * a better option than that of B, because had B was computed first, its outputs will need to be
- * stored in extra buffers in addition to the buffers needed by A.
- *
- * This is a heuristic generalization of the Sethi–Ullman algorithm, a generalization that
- * doesn't always guarantee an optimal evaluation order, as the optimal evaluation order is very
- * difficult to compute, however, this method works well in most cases. */
-void Scheduler::compute_schedule(DNode node)
-{
-  /* Compute the nodes directly connected to the node inputs sorted by their needed buffers such
-   * that the node with the highest number of needed buffers comes first. */
-  Vector<DNode> sorted_origin_nodes;
-  for (const InputSocketRef *input_ref : node->inputs()) {
-    const DInputSocket input{node.context(), input_ref};
-    input.foreach_origin_socket([&](const DSocket origin) {
-      /* The origin node was added before or was already schedule, so skip it. The number of
-       * origin nodes is very small, so linear search is okay. */
-      if (sorted_origin_nodes.contains(origin.node()) || schedule_.contains(origin.node())) {
-        return;
-      }
-      /* Sort on insertion, the number of origin nodes is very small, so this is okay. */
-      int insertion_position = 0;
-      for (int i = 0; i < sorted_origin_nodes.size(); i++) {
-        if (needed_buffers_.lookup(origin.node()) >
-            needed_buffers_.lookup(sorted_origin_nodes[i])) {
-          break;
-        }
-        insertion_position++;
-      }
-      sorted_origin_nodes.insert(insertion_position, origin.node());
-    });
-  }
-
-  /* Recursively schedule origin nodes. Nodes with higher number of needed intermediate buffers
-   * are scheduled first. */
-  for (const DNode &origin_node : sorted_origin_nodes) {
-    compute_schedule(origin_node);
-  }
-
-  schedule_.add(node);
-}
-
-/* --------------------------------------------------------------------
  * GPU Material Compile Group.
  */
 
@@ -1673,7 +1512,7 @@ VectorSet<DNode> &GPUMaterialCompileGroup::get_sub_schedule()
  */
 
 Compiler::Compiler(Context &context, bNodeTree *node_tree)
-    : context_(context), scheduler_(node_tree)
+    : context_(context), tree_(*node_tree, tree_ref_map_)
 {
 }
 
@@ -1686,9 +1525,8 @@ Compiler::~Compiler()
 
 void Compiler::compile()
 {
-  scheduler_.schedule();
-
-  for (const DNode &node : scheduler_.get_schedule()) {
+  const Schedule schedule = compute_schedule(tree_);
+  for (const DNode &node : schedule) {
     /* First check if the material compile group is complete, and if it is, compile it. */
     if (gpu_material_compile_group_.is_complete(node)) {
       compile_gpu_material_group();
@@ -1753,7 +1591,7 @@ void Compiler::compile_gpu_material_group()
   /* Get the sub schedule that is part of the GPU material group, instantiate a GPU Material
    * Operation from it, and add it to the operations stream. This instance should be freed by the
    * compiler when it is no longer needed. */
-  SubSchedule &sub_schedule = gpu_material_compile_group_.get_sub_schedule();
+  Schedule &sub_schedule = gpu_material_compile_group_.get_sub_schedule();
   GPUMaterialOperation *operation = new GPUMaterialOperation(context_, sub_schedule);
   operations_stream_.append(operation);
 

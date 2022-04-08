@@ -129,6 +129,7 @@ add_subdirectory(sequencer)
 add_subdirectory(shader_fx)
 add_subdirectory(io)
 add_subdirectory(functions)
+add_subdirectory(viewport_compositor)
 add_subdirectory(makesdna)
 add_subdirectory(makesrna)
 
