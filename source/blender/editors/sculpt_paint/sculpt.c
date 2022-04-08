@@ -5192,6 +5192,16 @@ static bool sculpt_stroke_test_start(bContext *C, struct wmOperator *op, const f
     Object *ob = CTX_data_active_object(C);
     SculptSession *ss = ob->sculpt;
     Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
+    Brush *brush = BKE_paint_brush(&sd->paint);
+
+    /* NOTE: This should be removed when paint mode is available. Paint mode can force based on the
+     * canvas it is painting on. (ref. use_sculpt_texture_paint). */
+    if (brush && SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool)) {
+      View3D *v3d = CTX_wm_view3d(C);
+      if (v3d) {
+        v3d->shading.color_type = V3D_SHADING_VERTEX_COLOR;
+      }
+    }
 
     ED_view3d_init_mats_rv3d(ob, CTX_wm_region_view3d(C));
 
