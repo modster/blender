@@ -2712,7 +2712,8 @@ void uiItemPointerR_prop(uiLayout *layout,
                          struct PointerRNA *searchptr,
                          struct PropertyRNA *searchprop,
                          const char *name,
-                         int icon);
+                         int icon,
+                         bool results_are_suggestions);
 void uiItemPointerR(uiLayout *layout,
                     struct PointerRNA *ptr,
                     const char *propname,
@@ -2948,7 +2949,7 @@ uiBlock *UI_region_block_find_mouse_over(const struct ARegion *region,
  */
 struct ARegion *UI_region_searchbox_region_get(const struct ARegion *button_region);
 
-/* uiFontStyle.align */
+/** #uiFontStyle.align */
 typedef enum eFontStyle_Align {
   UI_STYLE_TEXT_LEFT = 0,
   UI_STYLE_TEXT_CENTER = 1,

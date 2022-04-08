@@ -1074,11 +1074,13 @@ class _defs_edit_mesh:
                 else:
                     extra = True
             if extra:
+                layout.use_property_decorate = False
                 layout.use_property_split = True
+
                 layout.prop(props, "visible_measurements")
                 layout.prop(props, "angle_snapping")
                 layout.label(text="Angle Snapping Increment")
-                layout.row().prop(props, "angle_snapping_increment", text="", expand=True)
+                layout.prop(props, "angle_snapping_increment", text="")
             if show_extra:
                 layout.popover("TOPBAR_PT_tool_settings_extra", text="...")
         return dict(
@@ -1307,19 +1309,12 @@ class _defs_sculpt:
 
     @staticmethod
     def generate_from_brushes(context):
-        exclude_filter = {}
-        # Use 'bpy.context' instead of 'context' since it can be None.
-        prefs = bpy.context.preferences
-        if not prefs.experimental.use_sculpt_vertex_colors:
-            exclude_filter = {'PAINT', 'SMEAR'}
-
         return generate_from_enum_ex(
             context,
             idname_prefix="builtin_brush.",
             icon_prefix="brush.sculpt.",
             type=bpy.types.Brush,
             attr="sculpt_tool",
-            exclude_filter=exclude_filter,
         )
 
     @ToolDef.from_fn
@@ -2954,24 +2949,11 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
                 _defs_sculpt.trim_lasso,
             ),
             _defs_sculpt.project_line,
+            _defs_sculpt.mask_by_color,
             None,
             _defs_sculpt.mesh_filter,
             _defs_sculpt.cloth_filter,
-            lambda context: (
-                (_defs_sculpt.color_filter,)
-                if context is None or (
-                        context.preferences.view.show_developer_ui and
-                        context.preferences.experimental.use_sculpt_vertex_colors)
-                else ()
-            ),
-            None,
-            lambda context: (
-                (_defs_sculpt.mask_by_color,)
-                if context is None or (
-                        context.preferences.view.show_developer_ui and
-                        context.preferences.experimental.use_sculpt_vertex_colors)
-                else ()
-            ),
+            _defs_sculpt.color_filter,
             None,
             _defs_sculpt.face_set_edit,
             None,

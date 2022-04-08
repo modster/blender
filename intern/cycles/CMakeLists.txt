@@ -3,11 +3,7 @@
 
 # Standalone or with Blender
 if(NOT WITH_BLENDER)
-  if(WITH_CYCLES_STANDALONE OR NOT WITH_CYCLES_HYDRA_RENDER_DELEGATE)
-    set(CYCLES_INSTALL_PATH ${CMAKE_INSTALL_PREFIX})
-  else()
-    set(CYCLES_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/hdCycles/resources)
-  endif()
+  set(CYCLES_INSTALL_PATH ${CMAKE_INSTALL_PREFIX})
 else()
   set(WITH_CYCLES_BLENDER ON)
   # WINDOWS_PYTHON_DEBUG needs to write into the user addons folder since it will
@@ -219,6 +215,15 @@ add_definitions(
   -DCCL_NAMESPACE_END=}
 )
 
+include_directories(
+  SYSTEM
+  ${BOOST_INCLUDE_DIR}
+  ${OPENIMAGEIO_INCLUDE_DIRS}
+  ${OPENEXR_INCLUDE_DIRS}
+  ${PUGIXML_INCLUDE_DIR}
+  ${TBB_INCLUDE_DIRS}
+)
+
 if(WITH_CYCLES_DEBUG)
   add_definitions(-DWITH_CYCLES_DEBUG)
 endif()
@@ -263,7 +268,6 @@ endif()
 
 if(WITH_CYCLES_EMBREE)
   add_definitions(-DWITH_EMBREE)
-  add_definitions(-DEMBREE_STATIC_LIB)
   include_directories(
     SYSTEM
     ${EMBREE_INCLUDE_DIRS}
@@ -288,7 +292,6 @@ endif()
 
 if(WITH_OPENIMAGEDENOISE)
   add_definitions(-DWITH_OPENIMAGEDENOISE)
-  add_definitions(-DOIDN_STATIC_LIB)
   include_directories(
     SYSTEM
     ${OPENIMAGEDENOISE_INCLUDE_DIRS}
@@ -316,17 +319,6 @@ if(NOT OPENIMAGEIO_PUGIXML_FOUND)
   add_definitions(-DWITH_SYSTEM_PUGIXML)
 endif()
 
-include_directories(
-  SYSTEM
-  ${BOOST_INCLUDE_DIR}
-  ${OPENIMAGEIO_INCLUDE_DIRS}
-  ${OPENIMAGEIO_INCLUDE_DIRS}/OpenImageIO
-  ${OPENEXR_INCLUDE_DIR}
-  ${OPENEXR_INCLUDE_DIRS}
-  ${PUGIXML_INCLUDE_DIR}
-  ${TBB_INCLUDE_DIRS}
-)
-
 if(CYCLES_STANDALONE_REPOSITORY)
   include_directories(../third_party/atomic)
 else()
@@ -343,9 +335,12 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_C_COMPILER_ID MATCHES "Clang")
   unset(_has_no_error_unused_macros)
 endif()
 
-if(WITH_CYCLES_HYDRA_RENDER_DELEGATE AND NOT WITH_USD)
+if(WITH_CYCLES_HYDRA_RENDER_DELEGATE AND (NOT WITH_USD))
   message(STATUS "USD not found, disabling WITH_CYCLES_HYDRA_RENDER_DELEGATE")
   set(WITH_CYCLES_HYDRA_RENDER_DELEGATE OFF)
+endif()
+if(WITH_CYCLES_HYDRA_RENDER_DELEGATE AND (NOT WITH_BLENDER) AND (NOT WITH_CYCLES_STANDALONE))
+  set(CYCLES_INSTALL_PATH ${CYCLES_INSTALL_PATH}/hdCycles/resources)
 endif()
 
 if(WITH_CYCLES_CUDA_BINARIES AND (NOT WITH_CYCLES_CUBIN_COMPILER))
