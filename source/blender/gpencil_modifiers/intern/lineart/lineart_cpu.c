@@ -1618,6 +1618,24 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
       edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
     }
 
+    if (rb->use_contour_secondary) {
+      if (rb->cam_is_persp_secondary) {
+        sub_v3_v3v3_db(view_vector, vert->gloc, rb->camera_pos_secondary);
+      }
+      else {
+        view_vector = rb->view_vector_secondary;
+      }
+
+      dot_1 = dot_v3v3_db(view_vector, tri1->gn);
+      dot_2 = dot_v3v3_db(view_vector, tri2->gn);
+
+      if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+        /* Note: we only allow one contour type for now, either it's from light camera or it's from
+         * viewing camera, hence directly assign. */
+        edge_flag_result = LRT_EDGE_FLAG_CONTOUR_SECONDARY;
+      }
+    }
+
     if (!only_contour) {
 
       if (rb->use_crease) {
@@ -2436,6 +2454,7 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
       }
       la_edge->flags = use_type;
       la_edge->object_ref = orig_ob;
+      la_edge->from_shadow = (LineartEdge *)LRT_EDGE_IDENTIFIER(ob_info, la_edge);
       BLI_addtail(&la_edge->segments, la_seg);
       if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
           usage == OBJECT_LRT_NO_INTERSECTION) {
@@ -2958,7 +2977,8 @@ static void lineart_main_load_geometries(
 
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
     /* Do the increment even for discarded objects, so that in different culling conditions we can
-     * get the same reference to the same object. */
+     * get the same reference to the same object. Also because we increse this count before
+     * assigning, it ensures we can use 0x0 as a invalid value for identifying special cases. */
     obindex++;
 
     LineartObjectInfo *obi = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
@@ -3831,6 +3851,19 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
   mul_v3_mat3_m4v3(trans, inv, direction);
   copy_m4_m4(rb->cam_obmat, obmat_no_scale);
   copy_v3db_v3fl(rb->view_vector, trans);
+
+  if (rb->use_contour_secondary) {
+    copy_m4_m4(obmat_no_scale, rb->cam_obmat_secondary);
+
+    normalize_v3(obmat_no_scale[0]);
+    normalize_v3(obmat_no_scale[1]);
+    normalize_v3(obmat_no_scale[2]);
+    invert_m4_m4(inv, obmat_no_scale);
+    transpose_m4(inv);
+    mul_v3_mat3_m4v3(trans, inv, direction);
+    copy_m4_m4(rb->cam_obmat_secondary, obmat_no_scale);
+    copy_v3db_v3fl(rb->view_vector_secondary, trans);
+  }
 }
 
 static void lineart_destroy_render_data(LineartRenderBuffer *rb)
@@ -4852,6 +4885,9 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
       e->v2 = v2;
       e->t1 = is->tri1;
       e->t2 = is->tri2;
+      /* This is so we can also match intersection edges from shadow to later viewing stage. */
+      e->from_shadow = (LineartEdge *)((((uint64_t)e->t1->target_reference) << 32) |
+                                       e->t2->target_reference);
       e->flags = LRT_EDGE_FLAG_INTERSECTION;
       e->intersection_mask = (is->tri1->intersection_mask | is->tri2->intersection_mask);
       BLI_addtail(&e->segments, es);
@@ -5278,6 +5314,10 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
   int segment_count = 0;
   LRT_ITER_ALL_LINES_BEGIN
   {
+    /* Only contour and loose edges can actually cast shadows. */
+    if (!(e->flags & (LRT_EDGE_FLAG_CONTOUR | LRT_EDGE_FLAG_LOOSE))) {
+      continue;
+    }
     LISTBASE_FOREACH (LineartEdgeSegment *, es, &e->segments) {
       DISCARD_NONSENSE_SEGMENTS
       segment_count++;
@@ -5293,6 +5333,9 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
   int i = 0;
   LRT_ITER_ALL_LINES_BEGIN
   {
+    if (!(e->flags & (LRT_EDGE_FLAG_CONTOUR | LRT_EDGE_FLAG_LOOSE))) {
+      continue;
+    }
     LISTBASE_FOREACH (LineartEdgeSegment *, es, &e->segments) {
       DISCARD_NONSENSE_SEGMENTS
 
@@ -5862,6 +5905,9 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   rb->do_shadow_cast = true;
   rb->shadow_data_pool = shadow_data_pool;
 
+  copy_v3_v3_db(rb->camera_pos_secondary, rb->camera_pos);
+  copy_m4_m4(rb->cam_obmat_secondary, rb->cam_obmat);
+
   copy_m4_m4(rb->cam_obmat, lmd->light_contour_object->obmat);
   copy_v3db_v3fl(rb->camera_pos, rb->cam_obmat[3]);
   rb->cam_is_persp = is_persp;
@@ -5878,10 +5924,16 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
     rb->far_clip = 200.0f;
   }
   rb->tile_recursive_level = is_persp ? LRT_TILE_RECURSIVE_PERSPECTIVE : LRT_TILE_RECURSIVE_ORTHO;
-  rb->use_crease = rb->use_material = rb->use_edge_marks = rb->use_intersections =
-      rb->use_light_contour = false;
+
+  /* Contour and loose edge from light viewing direction will be casted as shadow, so only force
+   * them on. Other line types are enabled as-is if preserving lit/shaded information is required
+   * for those feature lines. */
+  if (!rb->needs_shadow_separation) {
+    rb->use_crease = rb->use_material = rb->use_edge_marks = rb->use_intersections =
+        rb->use_light_contour = false;
+  }
   rb->use_loose = true;
-  rb->use_contour = true; /* Only contour from light viewing direction will be casted as shadow. */
+  rb->use_contour = true;
 
   rb->max_occlusion_level = 0; /* No point getting see-through projections there. */
   rb->use_back_face_culling = false;

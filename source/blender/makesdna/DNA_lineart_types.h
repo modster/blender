@@ -60,6 +60,7 @@ typedef enum eLineartEdgeFlag {
   /** Also used as discarded line mark. */
   LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 10),
   LRT_EDGE_FLAG_CLIPPED = (1 << 11),
+  LRT_EDGE_FLAG_CONTOUR_SECONDARY = (1 << 12),
   /** Limited to 16 bits for the entire thing. */
 
   /** For object loading code to use only. */

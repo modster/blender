@@ -159,8 +159,6 @@ typedef enum eLineArtVertFlags {
 } eLineArtVertFlags;
 
 typedef struct LineartEdge {
-  /** We only need link node kind of list here. */
-  struct LineartEdge *next;
   struct LineartVert *v1, *v2;
   /**
    * Local vertex index for two ends, not pouting in #RenderVert because all verts are loaded, so
@@ -175,6 +173,13 @@ typedef struct LineartEdge {
   uint16_t flags;
   uint8_t intersection_mask;
 
+  /** Matches the shadow result, used to determine whether a line is in the shadow or not.
+   * Usages:
+   * - Intersection lines: ((e->t1->target_reference << 32) | e->t2->target_reference);
+   * - Other lines: LRT_EDGE_IDENTIFIER(obi, e);
+   * - After shadow calculation: (search the shadow result and set reference to that);
+   */
+  struct LineartEdge *from_shadow;
   int target_reference;
 
   /**
@@ -306,6 +311,7 @@ typedef struct LineartRenderBuffer {
 
   /*  Render status */
   double view_vector[3];
+  double view_vector_secondary[3]; /* For shadow. */
 
   int triangle_size;
 
@@ -350,6 +356,10 @@ typedef struct LineartRenderBuffer {
   bool use_loose;
   bool use_light_contour;
   bool use_shadow;
+  bool use_contour_secondary; /* From viewing camera, during shadow calculation. */
+
+  bool needs_shadow_separation;
+
   bool fuzzy_intersections;
   bool fuzzy_everything;
   bool allow_boundaries;
@@ -374,8 +384,12 @@ typedef struct LineartRenderBuffer {
 
   /* Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;
+  bool cam_is_persp_secondary; /* "Secondary" ones are from viewing camera (as opposed to shadow
+                                  camera), during shadow calculation. */
   float cam_obmat[4][4];
+  float cam_obmat_secondary[4][4];
   double camera_pos[3];
+  double camera_pos_secondary[3];
   double active_camera_pos[3]; /* Stroke offset calculation may use active or selected camera. */
   double near_clip, far_clip;
   float shift_x, shift_y;
@@ -461,6 +475,9 @@ typedef struct LineartRenderTaskInfo {
 
 #define LRT_OBINDEX_SHIFT 20
 #define LRT_OBINDEX_LOWER 0x0fffff /* Lower 20 bits. */
+#define LRT_EDGE_IDENTIFIER(obi, e) \
+  ((((obi->obindex << LRT_OBINDEX_SHIFT) | (e->v1->index & LRT_OBINDEX_LOWER)) << 32) | \
+   ((obi->obindex << LRT_OBINDEX_SHIFT) | (e->v2->index & LRT_OBINDEX_LOWER)))
 
 typedef struct LineartObjectInfo {
   struct LineartObjectInfo *next;
