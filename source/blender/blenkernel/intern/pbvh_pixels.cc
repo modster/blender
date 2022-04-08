@@ -25,6 +25,7 @@ namespace blender::bke::pbvh::pixels::extractor {
 /** Durind debugging this check could be enabled. It will write to each image pixel that is covered
  * by the pbvh. */
 constexpr bool USE_WATERTIGHT_CHECK = false;
+constexpr bool USE_WATERTIGHT_SEAM_CHECK = true;
 
 /**
  * Keep track of visited polygons.
@@ -212,8 +213,6 @@ static void do_encode_pixels(void *__restrict userdata,
     tile_data.packages.sort();
     node_data->tiles.append(tile_data);
   }
-
-  node_data->triangles.cleanup_after_init();
 }
 
 static bool should_pixels_be_updated(PBVHNode *node)
@@ -334,7 +333,12 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
                            encoded_pixels.start_image_coordinate.x;
         for (int x = 0; x < encoded_pixels.num_pixels; x++) {
           if (image_buffer->rect_float) {
-            copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
+            if (USE_WATERTIGHT_SEAM_CHECK) {
+              image_buffer->rect_float[pixel_offset * 4] += 0.5;
+            }
+            else {
+              copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
+            }
           }
           if (image_buffer->rect) {
             uint8_t *dest = static_cast<uint8_t *>(
@@ -385,7 +389,10 @@ static void update_pixels(PBVH *pbvh,
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, nodes_to_update.size());
   BLI_task_parallel_range(0, nodes_to_update.size(), &user_data, do_encode_pixels, &settings);
-  BKE_pbvh_pixels_fix_seams(*pbvh, *image, *image_user);
+  if (USE_WATERTIGHT_CHECK && USE_WATERTIGHT_SEAM_CHECK) {
+    apply_watertight_check(pbvh, image, image_user);
+  }
+  BKE_pbvh_pixels_fix_seams(*pbvh, *image, *image_user, ldata_uv);
   if (USE_WATERTIGHT_CHECK) {
     apply_watertight_check(pbvh, image, image_user);
   }

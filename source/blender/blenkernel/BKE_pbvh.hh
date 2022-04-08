@@ -8,6 +8,7 @@
 #include "BLI_vector.hh"
 
 #include "DNA_image_types.h"
+#include "DNA_meshdata_types.h"
 
 #include "BKE_image.h"
 #include "BKE_image_wrappers.hh"
@@ -183,11 +184,6 @@ struct Triangles {
     return paint_input[index];
   }
 
-  void cleanup_after_init()
-  {
-    loop_indices.clear();
-  }
-
   void clear()
   {
     paint_input.clear();
@@ -306,6 +302,9 @@ TileData *BKE_pbvh_pixels_tile_data_get(PBVHNode &node, const image::ImageTileWr
 void BKE_pbvh_pixels_mark_dirty(PBVHNode &node);
 void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &image_user);
 /** Extend pixels to fix uv seams for the given nodes. */
-void BKE_pbvh_pixels_fix_seams(PBVH &pbvh, Image &image, ImageUser &image_user);
+void BKE_pbvh_pixels_fix_seams(PBVH &pbvh,
+                               Image &image,
+                               ImageUser &image_user,
+                               const MLoopUV *ldata_uv);
 
 }  // namespace blender::bke::pbvh::pixels
