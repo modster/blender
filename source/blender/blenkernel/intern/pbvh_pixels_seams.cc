@@ -11,6 +11,12 @@
 namespace blender::bke::pbvh::pixels {
 using namespace blender::bke::image;
 
+struct ExtendUVContext {
+  PBVH *pbvh;
+  const ImBuf *image_buffer;
+  const MLoopUV *ldata_uv;
+};
+
 bool intersect_uv_pixel(const ushort2 &pixel_coordinate,
                         const ImBuf &image_buffer,
                         const float2 triangle_uvs[3])
@@ -53,15 +59,14 @@ struct UVSeamExtenderRowPackage {
   int extend_xmin_len = 0;
   int extend_xmax_len = 0;
 
-  UVSeamExtenderRowPackage(PixelsPackage *package,
+  UVSeamExtenderRowPackage(ExtendUVContext &context,
+                           PixelsPackage *package,
                            TrianglePaintInput *triangle_paint_data,
-                           const ImBuf &image_buffer,
                            bool is_new,
-                           const int3 loop_indices,
-                           const MLoopUV *ldata_uv)
+                           const int3 &loop_indices)
       : package(package), triangle_paint_data(triangle_paint_data), is_new(is_new)
   {
-    init_extend_x_len(image_buffer, loop_indices, ldata_uv);
+    init_extend_x_len(context, loop_indices);
   }
 
   bool should_extend_start() const
@@ -91,29 +96,27 @@ struct UVSeamExtenderRowPackage {
   }
 
  private:
-  void init_extend_x_len(const ImBuf &image_buffer,
-                         const int3 loop_indices,
-                         const MLoopUV *ldata_uv)
+  void init_extend_x_len(ExtendUVContext &context, const int3 &loop_indices)
   {
     if (!is_new) {
       return;
     }
 
     float2 triangle_uvs[3];
-    triangle_uvs[0] = ldata_uv[loop_indices[0]].uv;
-    triangle_uvs[1] = ldata_uv[loop_indices[1]].uv;
-    triangle_uvs[2] = ldata_uv[loop_indices[2]].uv;
+    triangle_uvs[0] = context.ldata_uv[loop_indices[0]].uv;
+    triangle_uvs[1] = context.ldata_uv[loop_indices[1]].uv;
+    triangle_uvs[2] = context.ldata_uv[loop_indices[2]].uv;
 
-    init_extend_xmin_len(image_buffer, triangle_uvs);
-    init_extend_xmax_len(image_buffer, triangle_uvs);
+    init_extend_xmin_len(context, triangle_uvs);
+    init_extend_xmax_len(context, triangle_uvs);
     BLI_assert(extend_xmin_len);
     BLI_assert(extend_xmax_len);
   }
 
-  void init_extend_xmin_len(const ImBuf &image_buffer, const float2 triangle_uvs[3])
+  void init_extend_xmin_len(ExtendUVContext &context, const float2 triangle_uvs[3])
   {
     int result = 0;
-    while (should_extend_xmin(image_buffer, result, triangle_uvs)) {
+    while (should_extend_xmin(*context.image_buffer, result, triangle_uvs)) {
       result++;
     }
     extend_xmin_len = result + ADDITIONAL_EXTEND_X;
@@ -128,10 +131,10 @@ struct UVSeamExtenderRowPackage {
     return intersect_uv_pixel(pixel, image_buffer, triangle_uvs);
   }
 
-  void init_extend_xmax_len(const ImBuf &image_buffer, const float2 triangle_uvs[3])
+  void init_extend_xmax_len(ExtendUVContext &context, const float2 triangle_uvs[3])
   {
     int result = 0;
-    while (should_extend_xmax(image_buffer, result, triangle_uvs)) {
+    while (should_extend_xmax(*context.image_buffer, result, triangle_uvs)) {
       result++;
     }
     extend_xmax_len = result + ADDITIONAL_EXTEND_X;
@@ -223,14 +226,11 @@ class UVSeamExtender {
   int image_buffer_width_;
 
  public:
-  explicit UVSeamExtender(PBVH &pbvh,
-                          const ImageTileWrapper &image_tile,
-                          const ImBuf &image_buffer,
-                          const MLoopUV *ldata_uv)
-      : image_buffer_width_(image_buffer.x)
+  explicit UVSeamExtender(ExtendUVContext &context, const ImageTileWrapper &image_tile)
+      : image_buffer_width_(context.image_buffer->x)
   {
-    rows.resize(image_buffer.y);
-    init(pbvh, image_tile, image_buffer, ldata_uv);
+    rows.resize(context.image_buffer->y);
+    init(context, image_tile);
   }
 
   void extend_x()
@@ -243,47 +243,36 @@ class UVSeamExtender {
   }
 
  private:
-  void init(PBVH &pbvh,
-            const ImageTileWrapper &image_tile,
-            const ImBuf &image_buffer,
-            const MLoopUV *ldata_uv)
+  void init(ExtendUVContext &context, const ImageTileWrapper &image_tile)
   {
-    for (int n = 0; n < pbvh.totnode; n++) {
-      PBVHNode &node = pbvh.nodes[n];
+    for (int n = 0; n < context.pbvh->totnode; n++) {
+      PBVHNode &node = context.pbvh->nodes[n];
       if ((node.flag & PBVH_Leaf) == 0) {
         continue;
       }
-      init(node, image_tile, image_buffer, ldata_uv);
+      init(context, node, image_tile);
     }
   }
 
-  void init(PBVHNode &node,
-            const ImageTileWrapper &image_tile,
-            const ImBuf &image_buffer,
-            const MLoopUV *ldata_uv)
+  void init(ExtendUVContext &context, PBVHNode &node, const ImageTileWrapper &image_tile)
   {
     NodeData &node_data = *static_cast<NodeData *>(node.pixels.node_data);
     TileData *tile_node_data = node_data.find_tile_data(image_tile);
     if (tile_node_data == nullptr) {
       return;
     }
-    init(node, node_data, *tile_node_data, image_buffer, ldata_uv);
+    init(context, node, node_data, *tile_node_data);
   }
 
-  void init(PBVHNode &node,
-            NodeData &node_data,
-            TileData &tile_data,
-            const ImBuf &image_buffer,
-            const MLoopUV *ldata_uv)
+  void init(ExtendUVContext &context, PBVHNode &node, NodeData &node_data, TileData &tile_data)
   {
     for (PixelsPackage &package : tile_data.packages) {
       UVSeamExtenderRowPackage row_package(
+          context,
           &package,
           &node_data.triangles.get_paint_input(package.triangle_index),
-          image_buffer,
           (node.flag & PBVH_UpdatePixels) != 0,
-          node_data.triangles.get_loop_indices(package.triangle_index),
-          ldata_uv);
+          node_data.triangles.get_loop_indices(package.triangle_index));
       append(row_package);
     }
   }
@@ -300,15 +289,21 @@ void BKE_pbvh_pixels_fix_seams(PBVH &pbvh,
                                ImageUser &image_user,
                                const MLoopUV *ldata_uv)
 {
+  ExtendUVContext context;
+  context.ldata_uv = ldata_uv;
+  context.pbvh = &pbvh;
+
   ImageUser local_image_user = image_user;
   LISTBASE_FOREACH (ImageTile *, tile_data, &image.tiles) {
-    image::ImageTileWrapper image_tile(tile_data);
+    ImageTileWrapper image_tile(tile_data);
+
     local_image_user.tile = image_tile.get_tile_number();
     ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &local_image_user, NULL);
     if (image_buffer == nullptr) {
       continue;
     }
-    UVSeamExtender extender(pbvh, image_tile, *image_buffer, ldata_uv);
+    context.image_buffer = image_buffer;
+    UVSeamExtender extender(context, image_tile);
     extender.extend_x();
     BKE_image_release_ibuf(&image, image_buffer, NULL);
   }
