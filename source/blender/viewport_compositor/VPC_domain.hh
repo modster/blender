@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "BLI_math_vec_types.hh"
 #include "BLI_transformation_2d.hh"
 
