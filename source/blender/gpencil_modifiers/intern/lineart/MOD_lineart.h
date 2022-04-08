@@ -160,11 +160,7 @@ typedef enum eLineArtVertFlags {
 
 typedef struct LineartEdge {
   struct LineartVert *v1, *v2;
-  /**
-   * Local vertex index for two ends, not pouting in #RenderVert because all verts are loaded, so
-   * as long as fewer than half of the mesh edges are becoming a feature line, we save more memory.
-   */
-  int v1_obindex, v2_obindex;
+
   struct LineartTriangle *t1, *t2;
   ListBase segments;
   char min_occ;

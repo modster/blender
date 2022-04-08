@@ -773,7 +773,7 @@ static void lineart_discard_duplicated_edges(LineartEdge *old_e, int v1id, int v
 {
   LineartEdge *e = old_e;
   e++;
-  while (e->v1_obindex == v1id && e->v2_obindex == v2id) {
+  while (e->v1 && e->v2 && e->v1->index == v1id && e->v2->index == v2id) {
     e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
     e++;
   }
@@ -805,7 +805,6 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
   int v_count = *r_v_count;
   int e_count = *r_e_count;
   int t_count = *r_t_count;
-  int v1_obi, v2_obi;
   uint16_t new_flag = 0;
 
   LineartEdge *new_e, *e, *old_e;
@@ -829,13 +828,9 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
   e = new_e;
 
 #define INCREASE_EDGE \
-  v1_obi = e->v1_obindex; \
-  v2_obi = e->v2_obindex; \
   new_e = &((LineartEdge *)e_eln->pointer)[e_count]; \
   e_count++; \
   e = new_e; \
-  e->v1_obindex = v1_obi; \
-  e->v2_obindex = v2_obi; \
   es = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdgeSegment)); \
   BLI_addtail(&e->segments, es);
 
@@ -844,10 +839,12 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
     old_e = ta->e[e_num]; \
     new_flag = old_e->flags; \
     old_e->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
-    lineart_discard_duplicated_edges(old_e, old_e->v1_obindex, old_e->v2_obindex); \
+    lineart_discard_duplicated_edges(old_e, old_e->v1->index, old_e->v2->index); \
     INCREASE_EDGE \
     e->v1 = (v1_link); \
     e->v2 = (v2_link); \
+    e->v1->index = (v1_link)->index; \
+    e->v2->index = (v1_link)->index; \
     e->flags = new_flag; \
     e->object_ref = ob; \
     e->t1 = ((old_e->t1 == tri) ? (new_tri) : (old_e->t1)); \
@@ -865,15 +862,15 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
 #define REMOVE_TRIANGLE_EDGE \
   if (ta->e[0]) { \
     ta->e[0]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
-    lineart_discard_duplicated_edges(ta->e[0], ta->e[0]->v1_obindex, ta->e[0]->v2_obindex); \
+    lineart_discard_duplicated_edges(ta->e[0], ta->e[0]->v1->index, ta->e[0]->v2->index); \
   } \
   if (ta->e[1]) { \
     ta->e[1]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
-    lineart_discard_duplicated_edges(ta->e[1], ta->e[1]->v1_obindex, ta->e[1]->v2_obindex); \
+    lineart_discard_duplicated_edges(ta->e[1], ta->e[1]->v1->index, ta->e[1]->v2->index); \
   } \
   if (ta->e[2]) { \
     ta->e[2]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
-    lineart_discard_duplicated_edges(ta->e[2], ta->e[2]->v1_obindex, ta->e[2]->v2_obindex); \
+    lineart_discard_duplicated_edges(ta->e[2], ta->e[2]->v1->index, ta->e[2]->v2->index); \
   }
 
   switch (in0 + in1 + in2) {
@@ -1159,6 +1156,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
+
         e->t1 = tri1;
         e->object_ref = ob;
 
@@ -1207,6 +1205,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
+
         e->t1 = tri1;
         e->object_ref = ob;
 
@@ -2254,11 +2253,6 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
 
   BLI_task_parallel_range(
       0, me->totvert, &vert_data, lineart_mvert_transform_task, &vert_settings);
-  /* Register a global index increment. See #lineart_triangle_share_edge() and
-   * #lineart_main_load_geometries() for detailed. It's okay that global_vindex might eventually
-   * overflow, in such large scene it's virtually impossible for two vertex of the same numeric
-   * index to come close together. */
-  ob_info->global_i_offset = me->totvert;
 
   /* Convert all mesh triangles into lineart triangles.
    * Also create an edge map to get connectivity between edges and triangles. */
@@ -2436,8 +2430,6 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
 
       la_edge->v1 = &la_v_arr[e_f_pair->v1];
       la_edge->v2 = &la_v_arr[e_f_pair->v2];
-      la_edge->v1_obindex = la_edge->v1->index;
-      la_edge->v2_obindex = la_edge->v2->index;
       if (e_f_pair->f1 != -1) {
         int findex = e_f_pair->f1;
         la_edge->t1 = lineart_triangle_from_index(re_buf, la_tri_arr, findex);
@@ -2618,11 +2610,6 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     lineart_vert_transform(v, i, orv, model_view, model_view_proj);
     orv[i].index = i;
   }
-  /* Register a global index increment. See #lineart_triangle_share_edge() and
-   * #lineart_main_load_geometries() for details. It's okay that global_vindex might eventually
-   * overflow, in such large scene it's virtually impossible for two vertices of the same numeric
-   * index to come close together. */
-  obi->global_i_offset = bm->totvert;
 
   tri = ort;
   for (i = 0; i < bm->totface; i++) {
@@ -2727,8 +2714,6 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
 
       la_e->v1 = &orv[BM_elem_index_get(e->v1)];
       la_e->v2 = &orv[BM_elem_index_get(e->v2)];
-      la_e->v1_obindex = la_e->v1->index;
-      la_e->v2_obindex = la_e->v2->index;
       if (e->l) {
         int findex = BM_elem_index_get(e->l->f);
         la_e->t1 = lineart_triangle_from_index(rb, ort, findex);
@@ -3080,7 +3065,13 @@ static void lineart_main_load_geometries(
       for (int vi = 0; vi < v_count; vi++) {
         v[vi].index += global_i;
       }
+      /* Register a global index increment. See #lineart_triangle_share_edge() and
+       * #lineart_main_load_geometries() for detailed. It's okay that global_vindex might
+       * eventually overflow, in such large scene it's virtually impossible for two vertex of the
+       * same numeric index to come close together. */
+      obi->global_i_offset = global_i;
       global_i += v_count;
+
       lineart_finalize_object_edge_list(&rb->pending_edges, obi);
     }
   }
