@@ -43,6 +43,32 @@ static void node_geo_exec(GeoNodeExecParams params)
     }
   });
 
+  ///
+  //  GField field = get_input_attribute_field(params, data_type);
+  //
+  //  auto return_default = [&]() {
+  //    attribute_math::convert_to_static_type(data_type, [&](auto dummy) {
+  //      using T = decltype(dummy);
+  //      output_attribute_field(params, fn::make_constant_field<T>(T()));
+  //    });
+  //  };
+  //
+  //  GField output_field;
+  //  if (geometry.has_curves() && !geometry.has_mesh() && !geometry.has_pointcloud()) {
+  //    params.error_message_add(NodeWarningType::Error,
+  //                             TIP_("The source geometry must contain a mesh or a point cloud"));
+  //    return return_default();
+  //  }
+  //  auto fn = std::make_unique<NearestTransferFunction>(
+  //      std::move(geometry), std::move(field), domain);
+  //  auto op = std::make_shared<FieldOperation>(
+  //      FieldOperation(std::move(fn), {params.extract_input<Field<float3>>("Source Position")}));
+  //  output_field = GField(std::move(op));
+  //  break;
+  //  output_attribute_field(params, std::move(output_field));
+  //
+  ///
+
   params.set_output("Mesh", std::move(geometry_set));
 #else
   params.error_message_add(NodeWarningType::Error,
