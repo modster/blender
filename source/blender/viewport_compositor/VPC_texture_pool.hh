@@ -13,6 +13,10 @@
 
 namespace blender::viewport_compositor {
 
+/* --------------------------------------------------------------------
+ * Texture Pool Key.
+ */
+
 /* A key structure used to identify a texture specification in a texture pool. Defines a hash and
  * an equality operator for use in a hash map. */
 class TexturePoolKey {
@@ -25,6 +29,10 @@ class TexturePoolKey {
 
   uint64_t hash() const;
 };
+
+/* --------------------------------------------------------------------
+ * Texture Pool.
+ */
 
 /* A pool of textures that can be used to allocate textures and reused transparently throughout the
  * evaluation of the compositor. This texture pool only pools textures throughout a single

@@ -39,46 +39,12 @@
 
 #include "VPC_compositor_execute.hh"
 #include "VPC_context.hh"
+#include "VPC_domain.hh"
 #include "VPC_scheduler.hh"
 #include "VPC_texture_pool.hh"
 #include "VPC_utils.hh"
 
 namespace blender::viewport_compositor {
-
-/* --------------------------------------------------------------------
- * Domain.
- */
-
-Domain::Domain(int2 size) : size(size), transformation(Transformation2D::identity())
-{
-}
-
-Domain::Domain(int2 size, Transformation2D transformation)
-    : size(size), transformation(transformation)
-{
-}
-
-void Domain::transform(const Transformation2D &input_transformation)
-{
-  transformation = input_transformation * transformation;
-}
-
-Domain Domain::identity()
-{
-  return Domain(int2(1), Transformation2D::identity());
-}
-
-/* Do not compare realization_options as it only describe the method of realization on another
- * domain, which is not technically a proprty of the domain itself. */
-bool operator==(const Domain &a, const Domain &b)
-{
-  return a.size == b.size && a.transformation == b.transformation;
-}
-
-bool operator!=(const Domain &a, const Domain &b)
-{
-  return !(a == b);
-}
 
 /* --------------------------------------------------------------------
  * Result.
