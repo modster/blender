@@ -22,6 +22,8 @@
 
 namespace blender::bke::pbvh::pixels::extractor {
 
+#define DO_WATERTIGHT_CHECK
+
 /**
  * Keep track of visited polygons.
  *
@@ -49,13 +51,26 @@ class VisitedPolygons : std::vector<bool> {
 /**
  * @brief Calculate the delta of two neighbour uv coordinates in the given image buffer.
  */
-static float3 calc_barycentric_delta(const ImBuf *image_buffer,
-                                     const float2 uvs[3],
-                                     const int x,
-                                     const int y)
+static float3 calc_barycentric_delta_x(const ImBuf *image_buffer,
+                                       const float2 uvs[3],
+                                       const int x,
+                                       const int y)
 {
   const float2 start_uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
   const float2 end_uv(float(x + 1) / image_buffer->x, float(y) / image_buffer->y);
+  const BarycentricWeights start_barycentric(uvs[0], uvs[1], uvs[2], start_uv);
+  const BarycentricWeights end_barycentric(uvs[0], uvs[1], uvs[2], end_uv);
+  const float3 delta_barycentric = end_barycentric - start_barycentric;
+  return delta_barycentric;
+}
+
+static float3 calc_barycentric_delta_y(const ImBuf *image_buffer,
+                                       const float2 uvs[3],
+                                       const int x,
+                                       const int y)
+{
+  const float2 start_uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
+  const float2 end_uv(float(x) / image_buffer->x, float(y + 1) / image_buffer->y);
   const BarycentricWeights start_barycentric(uvs[0], uvs[1], uvs[2], start_uv);
   const BarycentricWeights end_barycentric(uvs[0], uvs[1], uvs[2], end_uv);
   const float3 delta_barycentric = end_barycentric - start_barycentric;
@@ -179,7 +194,8 @@ static void do_encode_pixels(void *__restrict userdata,
       const int maxx = min_ii(ceil(maxu * image_buffer->x), image_buffer->x);
 
       TrianglePaintInput &triangle = triangles.get_paint_input(triangle_index);
-      triangle.add_barycentric_coord_x = calc_barycentric_delta(image_buffer, uvs, minx, miny);
+      triangle.add_barycentric_coord_x = calc_barycentric_delta_x(image_buffer, uvs, minx, miny);
+      triangle.add_barycentric_coord_y = calc_barycentric_delta_y(image_buffer, uvs, minx, miny);
       extract_barycentric_pixels(
           tile_data, image_buffer, triangle_index, uvs, minx, miny, maxx, maxy);
     }
@@ -290,6 +306,56 @@ static bool find_nodes_to_update(PBVH *pbvh,
   return true;
 }
 
+/** Durind debugging this check could be enabled. It will write to each image pixel that is covered
+ * by the pbvh. */
+constexpr bool do_watertight_check()
+{
+  return false;
+}
+
+static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_user)
+{
+  ImageUser watertight = *image_user;
+  LISTBASE_FOREACH (ImageTile *, tile_data, &image->tiles) {
+    image::ImageTileWrapper image_tile(tile_data);
+    watertight.tile = image_tile.get_tile_number();
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &watertight, NULL);
+    if (image_buffer == nullptr) {
+      continue;
+    }
+    for (int n = 0; n < pbvh->totnode; n++) {
+      PBVHNode *node = &pbvh->nodes[n];
+      if ((node->flag & PBVH_Leaf) == 0) {
+        continue;
+      }
+      NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
+      TileData *tile_node_data = node_data->find_tile_data(image_tile);
+      if (tile_node_data == nullptr) {
+        continue;
+      }
+
+      for (PixelsPackage &encoded_pixels : tile_node_data->packages) {
+        int pixel_offset = encoded_pixels.start_image_coordinate.y * image_buffer->x +
+                           encoded_pixels.start_image_coordinate.x;
+        for (int x = 0; x < encoded_pixels.num_pixels; x++) {
+          if (image_buffer->rect_float) {
+            image_buffer->rect_float[pixel_offset * 4] += 0.5;
+            // copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
+          }
+          if (image_buffer->rect) {
+            uint8_t *dest = static_cast<uint8_t *>(
+                static_cast<void *>(&image_buffer->rect[pixel_offset]));
+            copy_v4_uchar(dest, 255);
+          }
+          pixel_offset += 1;
+        }
+      }
+    }
+    BKE_image_release_ibuf(image, image_buffer, NULL);
+  }
+  BKE_image_partial_update_mark_full_update(image);
+}
+
 static void update_pixels(PBVH *pbvh,
                           const MeshElemMap *pmap,
                           const struct MPoly *mpoly,
@@ -325,7 +391,13 @@ static void update_pixels(PBVH *pbvh,
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, nodes_to_update.size());
   BLI_task_parallel_range(0, nodes_to_update.size(), &user_data, do_encode_pixels, &settings);
-  // BKE_pbvh_pixels_fix_seams(*pbvh, *image, *image_user);
+  if (do_watertight_check()) {
+    apply_watertight_check(pbvh, image, image_user);
+  }
+  BKE_pbvh_pixels_fix_seams(*pbvh, *image, *image_user);
+  if (do_watertight_check()) {
+    apply_watertight_check(pbvh, image, image_user);
+  }
 
   /* Clear the UpdatePixels flag. */
   for (PBVHNode *node : nodes_to_update) {
@@ -357,49 +429,6 @@ static void update_pixels(PBVH *pbvh,
            compressed_data_len,
            float(compressed_data_len) / num_pixels);
   }
-#endif
-
-#define DO_WATERTIGHT_CHECK
-#ifdef DO_WATERTIGHT_CHECK
-  ImageUser watertight = *image_user;
-  LISTBASE_FOREACH (ImageTile *, tile_data, &image->tiles) {
-    image::ImageTileWrapper image_tile(tile_data);
-    watertight.tile = image_tile.get_tile_number();
-    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &watertight, NULL);
-    if (image_buffer == nullptr) {
-      continue;
-    }
-    for (int n = 0; n < pbvh->totnode; n++) {
-      PBVHNode *node = &pbvh->nodes[n];
-      if ((node->flag & PBVH_Leaf) == 0) {
-        continue;
-      }
-      NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
-      TileData *tile_node_data = node_data->find_tile_data(image_tile);
-      if (tile_node_data == nullptr) {
-        continue;
-      }
-
-      for (PixelsPackage &encoded_pixels : tile_node_data->packages) {
-        int pixel_offset = encoded_pixels.start_image_coordinate.y * image_buffer->x +
-                           encoded_pixels.start_image_coordinate.x;
-        for (int x = 0; x < encoded_pixels.num_pixels; x++) {
-          if (image_buffer->rect_float) {
-            copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
-          }
-          if (image_buffer->rect) {
-            uint8_t *dest = static_cast<uint8_t *>(
-                static_cast<void *>(&image_buffer->rect[pixel_offset]));
-            copy_v4_uchar(dest, 255);
-          }
-          pixel_offset += 1;
-        }
-      }
-    }
-    BKE_image_release_ibuf(image, image_buffer, NULL);
-  }
-  BKE_image_partial_update_mark_full_update(image);
-
 #endif
 }
 

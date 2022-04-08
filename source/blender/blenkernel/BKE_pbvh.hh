@@ -49,6 +49,18 @@ class BarycentricWeights {
     return BarycentricWeights(weights + rhs);
   }
 
+  BarycentricWeights &operator-=(const float3 &rhs)
+  {
+    weights -= rhs;
+    return *this;
+  }
+
+  BarycentricWeights &operator+=(const float3 &rhs)
+  {
+    weights += rhs;
+    return *this;
+  }
+
   operator const float *() const
   {
     return weights;
@@ -116,6 +128,7 @@ struct Triangle {
 struct TrianglePaintInput {
   int3 vert_indices;
   float3 add_barycentric_coord_x;
+  float3 add_barycentric_coord_y;
 
   TrianglePaintInput(const Triangle &triangle)
       : vert_indices(triangle.vert_indices),
