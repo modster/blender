@@ -162,7 +162,7 @@ static LineartEdgeSegment *lineart_give_segment(LineartRenderBuffer *rb)
   BLI_spin_unlock(&rb->lock_cuts);
 
   /* Otherwise allocate some new memory. */
-  return (LineartEdgeSegment *)lineart_mem_acquire_thread(&rb->render_data_pool,
+  return (LineartEdgeSegment *)lineart_mem_acquire_thread(rb->edge_data_pool,
                                                           sizeof(LineartEdgeSegment));
 }
 
@@ -174,7 +174,8 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
                              double start,
                              double end,
                              uchar material_mask_bits,
-                             uchar mat_occlusion)
+                             uchar mat_occlusion,
+                             uchar shadow_bits)
 {
   LineartEdgeSegment *es, *ies, *next_es, *prev_es;
   LineartEdgeSegment *cut_start_before = 0, *cut_end_before = 0;
@@ -311,6 +312,8 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
   for (es = ns; es && es != ns2; es = es->next) {
     es->occlusion += mat_occlusion;
     es->material_mask_bits |= material_mask_bits;
+    /* Currently only register lit/shade, see LineartEdgeSegment::shadow_mask_bits for details. */
+    es->shadow_mask_bits |= shadow_bits;
   }
 
   /* Reduce adjacent cutting points of the same level, which saves memory. */
@@ -432,7 +435,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
                                                       rb->shift_y,
                                                       &l,
                                                       &r)) {
-        lineart_edge_cut(rb, e, l, r, tri->base.material_mask_bits, tri->base.mat_occlusion);
+        lineart_edge_cut(rb, e, l, r, tri->base.material_mask_bits, tri->base.mat_occlusion, 0);
         if (e->min_occ > rb->max_occlusion_level) {
           /* No need to calculate any longer on this line because no level more than set value is
            * going to show up in the rendered result. */
@@ -733,12 +736,10 @@ static LineartElementLinkNode *lineart_memory_get_edge_space(LineartRenderBuffer
 {
   LineartElementLinkNode *eln;
 
-  LineartEdge *render_edges = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdge) * 64);
+  LineartEdge *render_edges = lineart_mem_acquire(rb->edge_data_pool, sizeof(LineartEdge) * 64);
 
-  eln = lineart_list_append_pointer_pool_sized(&rb->line_buffer_pointers,
-                                               &rb->render_data_pool,
-                                               render_edges,
-                                               sizeof(LineartElementLinkNode));
+  eln = lineart_list_append_pointer_pool_sized(
+      &rb->line_buffer_pointers, rb->edge_data_pool, render_edges, sizeof(LineartElementLinkNode));
   eln->element_count = 64;
   eln->crease_threshold = rb->crease_threshold;
   eln->flags |= LRT_ELEMENT_IS_ADDITIONAL;
@@ -1475,12 +1476,21 @@ static void lineart_mvert_transform_task(void *__restrict userdata,
   v->index = i;
 }
 
-static int lineart_edge_type_duplication_count(char eflag)
+static const int LRT_MESH_EDGE_TYPES[] = {
+    LRT_EDGE_FLAG_EDGE_MARK,
+    LRT_EDGE_FLAG_CONTOUR,
+    LRT_EDGE_FLAG_CREASE,
+    LRT_EDGE_FLAG_MATERIAL,
+    LRT_EDGE_FLAG_LOOSE,
+    LRT_EDGE_FLAG_CONTOUR_SECONDARY,
+};
+
+static int lineart_edge_type_duplication_count(int eflag)
 {
   int count = 0;
   /* See eLineartEdgeFlag for details. */
   for (int i = 0; i < 6; i++) {
-    if (eflag & (1 << i)) {
+    if (eflag & LRT_MESH_EDGE_TYPES[i]) {
       count++;
     }
   }
@@ -1618,6 +1628,7 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
     }
 
     if (rb->use_contour_secondary) {
+      view_vector = vv;
       if (rb->cam_is_persp_secondary) {
         sub_v3_v3v3_db(view_vector, vert->gloc, rb->camera_pos_secondary);
       }
@@ -1629,9 +1640,7 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
       dot_2 = dot_v3v3_db(view_vector, tri2->gn);
 
       if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
-        /* Note: we only allow one contour type for now, either it's from light camera or it's from
-         * viewing camera, hence directly assign. */
-        edge_flag_result = LRT_EDGE_FLAG_CONTOUR_SECONDARY;
+        edge_flag_result |= LRT_EDGE_FLAG_CONTOUR_SECONDARY;
       }
     }
 
@@ -2112,8 +2121,49 @@ static void lineart_load_tri_reduce(const void *__restrict UNUSED(userdata),
   BLI_edgehash_free(data_reduce->edge_hash, NULL);
 }
 
+static LineartElementLinkNode *lineart_find_matching_eln(ListBase *shadow_elns, int obindex)
+{
+  LISTBASE_FOREACH (LineartElementLinkNode *, eln, shadow_elns) {
+    if (eln->obindex == obindex) {
+      return eln;
+    }
+  }
+  return NULL;
+}
+
+static LineartEdge *lineart_find_matching_edge(LineartElementLinkNode *shadow_eln,
+                                               uint64_t edge_identifier)
+{
+  LineartEdge *elist = (LineartEdge *)shadow_eln->pointer;
+  for (int i = 0; i < shadow_eln->element_count; i++) {
+    if (elist[i].from_shadow == (LineartEdge *)edge_identifier) {
+      return &elist[i];
+    }
+  }
+  return NULL;
+}
+
+static void lineart_register_shadow_cuts(LineartRenderBuffer *rb,
+                                         LineartEdge *e,
+                                         LineartEdge *shadow_edge)
+{
+  LISTBASE_FOREACH (LineartEdgeSegment *, es, &shadow_edge->segments) {
+    if (es->occlusion != 0) {
+      /* Convert to view space cutting points. */
+      double la1 = es->at;
+      double la2 = es->next ? es->next->at : 1.0f;
+      la1 = la1 * e->v2->fbcoord[3] /
+            (e->v1->fbcoord[3] - la1 * (e->v1->fbcoord[3] - e->v2->fbcoord[3]));
+      la2 = la2 * e->v2->fbcoord[3] /
+            (e->v1->fbcoord[3] - la2 * (e->v1->fbcoord[3] - e->v2->fbcoord[3]));
+      lineart_edge_cut(rb, e, la1, la2, 0, 10, es->occlusion != 0);
+    }
+  }
+}
+
 static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
-                                                  LineartRenderBuffer *re_buf)
+                                                  LineartRenderBuffer *re_buf,
+                                                  ListBase *shadow_elns)
 {
   LineartElementLinkNode *elem_link_node;
   LineartVert *la_v_arr;
@@ -2392,18 +2442,24 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
     BLI_edgehash_free(edge_hash, NULL);
   }
 
-  la_edge_arr = lineart_mem_acquire_thread(&re_buf->render_data_pool,
+  la_edge_arr = lineart_mem_acquire_thread(re_buf->edge_data_pool,
                                            sizeof(LineartEdge) * allocate_la_e);
-  la_seg_arr = lineart_mem_acquire_thread(&re_buf->render_data_pool,
+  la_seg_arr = lineart_mem_acquire_thread(re_buf->edge_data_pool,
                                           sizeof(LineartEdgeSegment) * allocate_la_e);
   BLI_spin_lock(&re_buf->lock_task);
   elem_link_node = lineart_list_append_pointer_pool_sized_thread(&re_buf->line_buffer_pointers,
-                                                                 &re_buf->render_data_pool,
+                                                                 re_buf->edge_data_pool,
                                                                  la_edge_arr,
                                                                  sizeof(LineartElementLinkNode));
   BLI_spin_unlock(&re_buf->lock_task);
   elem_link_node->element_count = allocate_la_e;
   elem_link_node->object_ref = orig_ob;
+  elem_link_node->obindex = ob_info->obindex;
+
+  LineartElementLinkNode *shadow_eln = NULL;
+  if (shadow_elns) {
+    shadow_eln = lineart_find_matching_eln(shadow_elns, ob_info->obindex);
+  }
 
   // Start of the edge/seg arr
   LineartEdge *la_edge;
@@ -2423,7 +2479,7 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
 
     /* See eLineartEdgeFlag for details. */
     for (int flag_bit = 0; flag_bit < 6; flag_bit++) {
-      char use_type = 1 << flag_bit;
+      int use_type = LRT_MESH_EDGE_TYPES[flag_bit];
       if (!(use_type & e_f_pair->eflag)) {
         continue;
       }
@@ -2448,6 +2504,15 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
       la_edge->object_ref = orig_ob;
       la_edge->from_shadow = (LineartEdge *)LRT_EDGE_IDENTIFIER(ob_info, la_edge);
       BLI_addtail(&la_edge->segments, la_seg);
+
+      if (shadow_eln) {
+        LineartEdge *shadow_e = lineart_find_matching_edge(shadow_eln,
+                                                           (uint64_t)la_edge->from_shadow);
+        if (shadow_e) {
+          lineart_register_shadow_cuts(re_buf, la_edge, shadow_e);
+        }
+      }
+
       if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
           usage == OBJECT_LRT_NO_INTERSECTION) {
         lineart_add_edge_to_list_thread(ob_info, la_edge);
@@ -2683,12 +2748,12 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     e->head.hflag |= eflag;
   }
 
-  o_la_e = lineart_mem_acquire_thread(&rb->render_data_pool, sizeof(LineartEdge) * allocate_la_e);
-  o_la_s = lineart_mem_acquire_thread(&rb->render_data_pool,
+  o_la_e = lineart_mem_acquire_thread(rb->edge_data_pool, sizeof(LineartEdge) * allocate_la_e);
+  o_la_s = lineart_mem_acquire_thread(rb->edge_data_pool,
                                       sizeof(LineartEdgeSegment) * allocate_la_e);
   BLI_spin_lock(&rb->lock_task);
   eln = lineart_list_append_pointer_pool_sized_thread(
-      &rb->line_buffer_pointers, &rb->render_data_pool, o_la_e, sizeof(LineartElementLinkNode));
+      &rb->line_buffer_pointers, rb->edge_data_pool, o_la_e, sizeof(LineartElementLinkNode));
   BLI_spin_unlock(&rb->lock_task);
   eln->element_count = allocate_la_e;
   eln->object_ref = orig_ob;
@@ -2706,8 +2771,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     bool edge_added = false;
 
     /* See eLineartEdgeFlag for details. */
-    for (int flag_bit = 0; flag_bit < LRT_EDGE_FLAG_TYPE_MAX_BITS; flag_bit++) {
-      uint8_t use_type = 1 << flag_bit;
+    for (int flag_bit = 0; flag_bit < 6; flag_bit++) {
+      int use_type = LRT_MESH_EDGE_TYPES[flag_bit];
       if (!(use_type & e->head.hflag)) {
         continue;
       }
@@ -2759,7 +2824,7 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
   //- Assign the number of objects instead of number of threads
   printf("thread start: %d\n", olti->thread_id);
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
-    lineart_geometry_object_load_no_bmesh(obi, olti->rb);
+    lineart_geometry_object_load_no_bmesh(obi, olti->rb, olti->shadow_elns);
     // lineart_geometry_object_load(obi, olti->rb);
     printf("thread id: %d processed: %d\n", olti->thread_id, obi->original_me->totpoly);
   }
@@ -2899,7 +2964,8 @@ static void lineart_main_load_geometries(
     Object *camera /* Still use camera arg for convenience. */,
     LineartRenderBuffer *rb,
     bool allow_duplicates,
-    bool do_shadow_casting)
+    bool do_shadow_casting,
+    ListBase *shadow_elns)
 {
   double proj[4][4], view[4][4], result[4][4];
   float inv[4][4];
@@ -3034,6 +3100,7 @@ static void lineart_main_load_geometries(
   printf("thread count: %d\n", thread_count);
   for (int i = 0; i < thread_count; i++) {
     olti[i].rb = rb;
+    olti[i].shadow_elns = shadow_elns;
     olti[i].thread_id = i;
     BLI_task_pool_push(tp, (TaskRunFunction)lineart_object_load_worker, &olti[i], 0, NULL);
   }
@@ -4075,6 +4142,9 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
                                        LRT_FILTER_FACE_MARK_KEEP_CONTOUR) != 0;
 
   rb->chain_data_pool = &lc->chain_data_pool;
+
+  /* See LineartRenderBuffer::edge_data_pool for explaination. */
+  rb->edge_data_pool = &rb->render_data_pool;
 
   BLI_spin_init(&rb->lock_task);
   BLI_spin_init(&rb->lock_cuts);
@@ -5367,6 +5437,16 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
   }
   LRT_ITER_ALL_LINES_END
 
+  LRT_ITER_ALL_LINES_BEGIN
+  {
+    /* Transform the cutting position to global space for regular feature lines.  */
+    LISTBASE_FOREACH (LineartEdgeSegment *, es, &e->segments) {
+      es->at = e->v1->fbcoord[3] * es->at /
+               (es->at * e->v1->fbcoord[3] + (1 - es->at) * e->v2->fbcoord[3]);
+    }
+  }
+  LRT_ITER_ALL_LINES_END
+
   if (G.debug_value == 4000) {
     printf("Shadow: Added %d raw containers\n", segment_count);
   }
@@ -5874,7 +5954,8 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
                                              LineartGpencilModifierData *lmd,
                                              LineartStaticMemPool *shadow_data_pool,
                                              LineartElementLinkNode **r_veln,
-                                             LineartElementLinkNode **r_eeln)
+                                             LineartElementLinkNode **r_eeln,
+                                             ListBase *r_calculated_edges_eln_list)
 {
   if (!original_rb->use_shadow || !lmd->light_contour_object) {
     return false;
@@ -5896,11 +5977,15 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   rb->do_shadow_cast = true;
   rb->shadow_data_pool = shadow_data_pool;
 
+  /* See LineartRenderBuffer::edge_data_pool for explaination. */
+  rb->edge_data_pool = shadow_data_pool;
+
   copy_v3_v3_db(rb->camera_pos_secondary, rb->camera_pos);
   copy_m4_m4(rb->cam_obmat_secondary, rb->cam_obmat);
 
   copy_m4_m4(rb->cam_obmat, lmd->light_contour_object->obmat);
   copy_v3db_v3fl(rb->camera_pos, rb->cam_obmat[3]);
+  rb->cam_is_persp_secondary = rb->cam_is_persp;
   rb->cam_is_persp = is_persp;
   rb->near_clip = is_persp ? lmd->shadow_camera_near : -lmd->shadow_camera_far;
   rb->far_clip = lmd->shadow_camera_far;
@@ -5919,12 +6004,14 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   /* Contour and loose edge from light viewing direction will be casted as shadow, so only force
    * them on. Other line types are enabled as-is if preserving lit/shaded information is required
    * for those feature lines. */
-  if (!rb->needs_shadow_separation) {
-    rb->use_crease = rb->use_material = rb->use_edge_marks = rb->use_intersections =
-        rb->use_light_contour = false;
-  }
+  // if (!rb->needs_shadow_separation) {
+  // rb->use_crease = rb->use_material = rb->use_edge_marks = rb->use_intersections =
+  //    rb->use_light_contour = false;
+  //}
   rb->use_loose = true;
   rb->use_contour = true;
+  rb->use_contour_secondary = true;
+  rb->allow_duplicated_types = true;
 
   rb->max_occlusion_level = 0; /* No point getting see-through projections there. */
   rb->use_back_face_culling = false;
@@ -5948,7 +6035,7 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   lineart_main_get_view_vector(rb);
 
   lineart_main_load_geometries(
-      depsgraph, scene, NULL, rb, lmd->flags & LRT_ALLOW_DUPLI_OBJECTS, true);
+      depsgraph, scene, NULL, rb, lmd->flags & LRT_ALLOW_DUPLI_OBJECTS, true, NULL);
 
   if (!rb->vertex_buffer_pointers.first) {
     /* No geometry loaded, return early. */
@@ -5974,6 +6061,8 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   /* Do shadow cast stuff then get generated vert/edge data. */
   lineart_shadow_cast(rb);
   bool any_generated = lineart_shadow_cast_generate_edges(rb, r_veln, r_eeln);
+
+  memcpy(r_calculated_edges_eln_list, &rb->line_buffer_pointers, sizeof(ListBase));
 
   lineart_destroy_render_data_keep_init(rb);
   MEM_freeN(rb);
@@ -6049,14 +6138,25 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   rb->_source_object = lmd->source_object;
 
   LineartElementLinkNode *shadow_veln, *shadow_eeln;
-  bool shadow_generated = lineart_main_try_generate_shadow(
-      depsgraph, scene, rb, lmd, &lc->shadow_data_pool, &shadow_veln, &shadow_eeln);
+  bool shadow_generated = lineart_main_try_generate_shadow(depsgraph,
+                                                           scene,
+                                                           rb,
+                                                           lmd,
+                                                           &lc->shadow_data_pool,
+                                                           &shadow_veln,
+                                                           &shadow_eeln,
+                                                           &lc->shadow_elns);
 
   /* Get view vector before loading geometries, because we detect feature lines there. */
   lineart_main_get_view_vector(rb);
 
-  lineart_main_load_geometries(
-      depsgraph, scene, use_camera, rb, lmd->calculation_flags & LRT_ALLOW_DUPLI_OBJECTS, false);
+  lineart_main_load_geometries(depsgraph,
+                               scene,
+                               use_camera,
+                               rb,
+                               lmd->calculation_flags & LRT_ALLOW_DUPLI_OBJECTS,
+                               false,
+                               &lc->shadow_elns);
 
   if (shadow_generated) {
     lineart_transform_and_add_shadow(rb, shadow_veln, shadow_eeln);

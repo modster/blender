@@ -87,6 +87,9 @@ typedef struct LineartElementLinkNode {
   void *object_ref;
   eLineArtElementNodeFlag flags;
 
+  /* For edge element link nodes, used for shadow edge matching. */
+  int obindex;
+
   /** Per object value, always set, if not enabled by #ObjectLineArt, then it's set to global. */
   float crease_threshold;
 } LineartElementLinkNode;
@@ -100,6 +103,11 @@ typedef struct LineartEdgeSegment {
 
   /* Used to filter line art occlusion edges */
   unsigned char material_mask_bits;
+
+  /* Only used to mark "lit/shade" for now, But reserverd bits for material info.
+   * TODO(Yiming): Transfer material masks from shadow results
+   * onto here so then we can even filter transparent shadows. */
+  unsigned char shadow_mask_bits;
 } LineartEdgeSegment;
 
 typedef struct LineartShadowSegmentContainer {
@@ -305,6 +313,11 @@ typedef struct LineartRenderBuffer {
    * calculation is finished. */
   LineartStaticMemPool *shadow_data_pool;
 
+  /* Storing shadow edge eln, array, and cuts for shadow information, so it's avaliable when line
+   * art runs the second time for occlusion. Either a reference to LineartCache::shadow_data_pool
+   * (shadow stage) or a reference to LineartRenderBuffer::render_data_pool (final stage). */
+  LineartStaticMemPool *edge_data_pool;
+
   /*  Render status */
   double view_vector[3];
   double view_vector_secondary[3]; /* For shadow. */
@@ -417,8 +430,10 @@ typedef struct LineartCache {
 
   /** A copy of rb->Chains after calculation is done, then we can destroy rb. */
   ListBase chains;
-  /** Shadow segments to be included into occlusion calculation in the second run of line art. */
-  ListBase shadow_edges;
+
+  /** Shadow-computed feature lines from original meshes to be matched with the second load of
+   * meshes thus providing lit/shade info in the second run of line art. */
+  ListBase shadow_elns;
 
   /** Cache only contains edge types specified in this variable. */
   uint16_t rb_edge_types;
@@ -472,8 +487,8 @@ typedef struct LineartRenderTaskInfo {
 #define LRT_OBINDEX_SHIFT 20
 #define LRT_OBINDEX_LOWER 0x0fffff /* Lower 20 bits. */
 #define LRT_EDGE_IDENTIFIER(obi, e) \
-  ((((obi->obindex << LRT_OBINDEX_SHIFT) | (e->v1->index & LRT_OBINDEX_LOWER)) << 32) | \
-   ((obi->obindex << LRT_OBINDEX_SHIFT) | (e->v2->index & LRT_OBINDEX_LOWER)))
+  (((uint64_t)((obi->obindex << 0) | (e->v1->index & LRT_OBINDEX_LOWER)) << 32) | \
+   ((obi->obindex << 0) | (e->v2->index & LRT_OBINDEX_LOWER)))
 
 typedef struct LineartObjectInfo {
   struct LineartObjectInfo *next;
@@ -515,6 +530,7 @@ typedef struct LineartObjectLoadTaskInfo {
   LineartObjectInfo *pending;
   /* Used to spread the load across several threads. This can not overflow. */
   uint64_t total_faces;
+  ListBase *shadow_elns;
 } LineartObjectLoadTaskInfo;
 
 /**
