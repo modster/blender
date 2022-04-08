@@ -9,7 +9,7 @@
 #include "NOD_derived_node_tree.hh"
 
 #include "VPC_scheduler.hh"
-#include "VPC_utils.hh"
+#include "VPC_utilities.hh"
 
 namespace blender::viewport_compositor {
 

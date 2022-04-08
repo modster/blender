@@ -20,6 +20,7 @@ set(SRC
   intern/context.cc
   intern/conversion_processor_operation.cc
   intern/domain.cc
+  intern/node_operation.cc
   intern/operation.cc
   intern/processor_operation.cc
   intern/realize_on_domain_processor_operation.cc
@@ -27,13 +28,14 @@ set(SRC
   intern/result.cc
   intern/scheduler.cc
   intern/texture_pool.cc
-  intern/utils.cc
+  intern/utilities.cc
 
   VPC_compositor_execute.hh
   VPC_context.hh
   VPC_conversion_processor_operation.hh
   VPC_domain.hh
   VPC_input_descriptor.hh
+  VPC_node_operation.hh
   VPC_operation.hh
   VPC_processor_operation.hh
   VPC_realize_on_domain_processor_operation.hh
@@ -41,7 +43,7 @@ set(SRC
   VPC_result.hh
   VPC_scheduler.hh
   VPC_texture_pool.hh
-  VPC_utils.hh
+  VPC_utilities.hh
 )
 
 set(LIB
