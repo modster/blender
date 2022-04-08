@@ -10,44 +10,92 @@ namespace blender::bke::pbvh::pixels {
 using namespace blender::bke::image;
 
 struct UVSeamExtenderRowPackage {
+  /** Amount of pixels to extend beyond the determined extension to reduce rendering artifacts. */
+  static const int ADDITIONAL_EXTEND_X = 1;
 
   PixelsPackage *package;
   TrianglePaintInput *triangle_paint_data;
   bool is_new;
+  int extend_xmin_len = 0;
+  int extend_xmax_len = 0;
 
   UVSeamExtenderRowPackage(PixelsPackage *package,
                            TrianglePaintInput *triangle_paint_data,
                            bool is_new)
       : package(package), triangle_paint_data(triangle_paint_data), is_new(is_new)
   {
+    init_extend_x_len();
   }
 
-  /**
-   * Check if any of the corners of the extended pixels is inside the triangle. In this case we
-   * should extend.
-   *
-   * This could be improved by using the triangle uv coordinates and using triangle intersection in
-   * UV space. Currently it can fail near the triangle vertices based on how the triangulation
-   * happens.
-   */
   bool should_extend_start() const
   {
-    BarycentricWeights weights = package->start_barycentric_coord.decode();
-    return (weights.is_inside_triangle() ||
-            (weights + triangle_paint_data->add_barycentric_coord_y).is_inside_triangle());
+    return extend_xmin_len != 0;
   }
 
   void extend_x_start()
   {
+    BLI_assert(extend_xmin_len != 0);
     package->num_pixels += 1;
     package->start_image_coordinate[0] -= 1;
     package->start_barycentric_coord -= float2(triangle_paint_data->add_barycentric_coord_x);
+    extend_xmin_len--;
   }
 
   bool should_extend_end() const
   {
+    return extend_xmax_len != 0;
+  }
+
+  void extend_x_end()
+  {
+    BLI_assert(extend_xmax_len != 0);
+    package->num_pixels += 1;
+    extend_xmax_len--;
+  }
+
+ private:
+  void init_extend_x_len()
+  {
+    if (!is_new) {
+      return;
+    }
+
+    init_extend_xmin_len();
+    init_extend_xmax_len();
+    BLI_assert(extend_xmin_len);
+    BLI_assert(extend_xmax_len);
+  }
+
+  void init_extend_xmin_len()
+  {
+    int result = 0;
+    while (should_extend_xmin(result)) {
+      result++;
+    }
+    extend_xmin_len = result + ADDITIONAL_EXTEND_X;
+  }
+
+  bool should_extend_xmin(int offset) const
+  {
     BarycentricWeights weights = package->start_barycentric_coord.decode();
-    weights += triangle_paint_data->add_barycentric_coord_x * package->num_pixels;
+    weights -= triangle_paint_data->add_barycentric_coord_x * offset;
+    return (weights.is_inside_triangle() ||
+            (weights + triangle_paint_data->add_barycentric_coord_y).is_inside_triangle());
+  }
+
+  void init_extend_xmax_len()
+  {
+    int result = 0;
+    while (should_extend_xmax(result)) {
+      result++;
+    }
+    extend_xmax_len = result + ADDITIONAL_EXTEND_X;
+  }
+
+  bool should_extend_xmax(int offset) const
+  {
+    BarycentricWeights weights = package->start_barycentric_coord.decode();
+    weights += triangle_paint_data->add_barycentric_coord_x * (package->num_pixels + offset);
     if (weights.is_inside_triangle()) {
       return true;
     }
@@ -56,11 +104,6 @@ struct UVSeamExtenderRowPackage {
       return true;
     }
     return false;
-  }
-
-  void extend_x_end()
-  {
-    package->num_pixels += 1;
   }
 };
 
@@ -88,7 +131,7 @@ class UVSeamExtenderRow : public Vector<UVSeamExtenderRowPackage> {
  private:
   void extend_x_start()
   {
-    int prev_package_x = 0;
+    int prev_package_x = -1;
     int index = 0;
 
     for (UVSeamExtenderRowPackage &package : *this) {
@@ -118,17 +161,15 @@ class UVSeamExtenderRow : public Vector<UVSeamExtenderRowPackage> {
           next_package_x = next_package.package->start_image_coordinate[0];
         }
         else {
-          next_package_x = image_buffer_width;
+          next_package_x = image_buffer_width + 1;
         }
-        int extension_len = 0;
-        while (package.should_extend_end() && extension_len < 3) {
-          if (package.package->start_image_coordinate[0] + package.package->num_pixels <
+        while (package.should_extend_end()) {
+          if (package.package->start_image_coordinate[0] + package.package->num_pixels >=
               next_package_x - 1) {
-            package.extend_x_end();
-            extension_len++;
-            continue;
+            /* No room left for extending */
+            break;
           }
-          break;
+          package.extend_x_end();
         }
       }
 
