@@ -38,24 +38,12 @@
 #include "MEM_guardedalloc.h"
 
 #include "VPC_compositor_execute.hh"
+#include "VPC_context.hh"
 #include "VPC_scheduler.hh"
 #include "VPC_texture_pool.hh"
 #include "VPC_utils.hh"
 
 namespace blender::viewport_compositor {
-
-/* --------------------------------------------------------------------
- * Context.
- */
-
-Context::Context(TexturePool &texture_pool) : texture_pool_(texture_pool)
-{
-}
-
-TexturePool &Context::texture_pool()
-{
-  return texture_pool_;
-}
 
 /* --------------------------------------------------------------------
  * Domain.
