@@ -116,6 +116,7 @@ typedef struct LineartShadowSegmentContainer {
   double fbc1[4], fbc2[4];
   double g1[3], g2[3];
   struct LineartEdge *e_ref;
+  struct LineartEdgeSegment *es_ref; /* Only for 3rd stage casting. */
   ListBase shadow_segments;
 } LineartShadowSegmentContainer;
 
@@ -169,7 +170,10 @@ typedef enum eLineArtVertFlags {
 typedef struct LineartEdge {
   struct LineartVert *v1, *v2;
 
+  /** These two variables are also used to specify original edge and segment during 3rd stage
+   * reprojection, So we can easily find out the line which results come from. */
   struct LineartTriangle *t1, *t2;
+
   ListBase segments;
   char min_occ;
 
@@ -369,7 +373,8 @@ typedef struct LineartRenderBuffer {
   bool use_shadow;
   bool use_contour_secondary; /* From viewing camera, during shadow calculation. */
 
-  char shadow_selection;
+  int shadow_selection; /* Needs to be numeric because it's not just on/off. */
+  bool shadow_enclose_shapes;
 
   bool fuzzy_intersections;
   bool fuzzy_everything;

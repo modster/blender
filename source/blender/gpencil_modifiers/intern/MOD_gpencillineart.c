@@ -366,7 +366,7 @@ static void edge_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(sub, ptr, "use_light_contour", 0, NULL, ICON_NONE);
   uiItemR(sub, ptr, "use_shadow", 0, IFACE_("Cast Shadow"), ICON_NONE);
-  uiItemR(sub, ptr, "shadow_region_filtering", 0, NULL, ICON_NONE);
+  uiItemR(sub, ptr, "shadow_region_filtering", 0, IFACE_("Regions"), ICON_NONE);
 
   uiItemR(layout, ptr, "use_overlap_edge_type_support", 0, IFACE_("Allow Overlap"), ICON_NONE);
 }
@@ -400,6 +400,8 @@ static void options_light_reference_draw(const bContext *UNUSED(C), Panel *panel
   uiLayout *col = uiLayoutColumn(remaining, true);
   uiItemR(col, ptr, "shadow_camera_near", 0, "Near", ICON_NONE);
   uiItemR(col, ptr, "shadow_camera_far", 0, "Far", ICON_NONE);
+
+  uiItemR(layout, ptr, "shadow_enclosed_shapes", 0, IFACE_("Eclosed Shapes"), ICON_NONE);
 }
 
 static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)

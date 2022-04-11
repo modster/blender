@@ -222,6 +222,7 @@ GpencilLineartLimitInfo BKE_gpencil_get_lineart_modifier_limits(const Object *ob
                               (lmd->use_multiple_levels ? lmd->level_end : lmd->level_start));
         info.edge_types |= lmd->edge_types;
         info.shadow_selection = MAX2(lmd->shadow_selection, info.shadow_selection);
+        is_first = false;
       }
     }
   }

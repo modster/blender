@@ -3444,6 +3444,13 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
                            "Select feature lines that comes from lit or shaded regions");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_dependency_update");
 
+  prop = RNA_def_property(srna, "shadow_enclosed_shapes", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_SHADOW_ENCLOSED_SHAPES);
+  RNA_def_property_ui_text(prop,
+                           "Shadow Enclosed Shapes",
+                           "Reproject visible lines again to get enclosed shadow shapes");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
   prop = RNA_def_property(srna, "use_multiple_levels", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_multiple_levels", 0);
   RNA_def_property_ui_text(

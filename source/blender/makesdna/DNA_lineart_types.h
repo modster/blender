@@ -39,6 +39,7 @@ typedef enum eLineartMainFlags {
   LRT_USE_IMAGE_BOUNDARY_TRIMMING = (1 << 20),
   LRT_USE_ORTHO_TOLERANCE = (1 << 21),
   LRT_CHAIN_PRESERVE_DETAILS = (1 << 22),
+  LRT_SHADOW_ENCLOSED_SHAPES = (1 << 23),
 } eLineartMainFlags;
 
 typedef enum eLineartEdgeFlag {
