@@ -2776,11 +2776,6 @@ static void sculpt_pbvh_update_pixels(SculptSession *ss, Object *ob)
     return;
   }
 
-  // If image is different than previous the PBVH should be tagged to fully rebuild the pixels.
-  // If any image tile image has a different resolution
-  // If uvmap changes.
-  // If other uvmap is selected.
-
   BKE_pbvh_build_pixels(ss->pbvh,
                         ss->pmap,
                         mesh->mpoly,
@@ -5104,6 +5099,15 @@ void SCULPT_flush_update_step(bContext *C, SculptUpdateType update_flags)
     multires_mark_as_modified(depsgraph, ob, MULTIRES_COORDS_MODIFIED);
   }
 
+  if ((update_flags & SCULPT_UPDATE_IMAGE) != 0) {
+    ED_region_tag_redraw(region);
+    if ((update_flags == SCULPT_UPDATE_IMAGE)) {
+      /* Early exit when only need to update the images. We don't want to tag any geometry updates
+       * that would rebuilt the PBVH. */
+      return;
+    }
+  }
+
   DEG_id_tag_update(&ob->id, ID_RECALC_SHADING);
 
   /* Only current viewport matters, slower update for all viewports will
@@ -5181,6 +5185,16 @@ void SCULPT_flush_update_done(const bContext *C, Object *ob, SculptUpdateType up
         if (region->regiontype == RGN_TYPE_WINDOW) {
           ED_region_tag_redraw(region);
         }
+      }
+    }
+
+    if (update_flags & SCULPT_UPDATE_IMAGE) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        SpaceLink *sl = area->spacedata.first;
+        if (sl->spacetype != SPACE_IMAGE) {
+          continue;
+        }
+        ED_area_tag_redraw_regiontype(area, RGN_TYPE_WINDOW);
       }
     }
   }
@@ -5325,7 +5339,12 @@ static void sculpt_stroke_update_step(bContext *C,
     SCULPT_flush_update_step(C, SCULPT_UPDATE_MASK);
   }
   else if (ELEM(brush->sculpt_tool, SCULPT_TOOL_PAINT, SCULPT_TOOL_SMEAR)) {
-    SCULPT_flush_update_step(C, SCULPT_UPDATE_COLOR);
+    if (SCULPT_use_image_paint_brush(sd, ob)) {
+      SCULPT_flush_update_step(C, SCULPT_UPDATE_IMAGE);
+    }
+    else {
+      SCULPT_flush_update_step(C, SCULPT_UPDATE_COLOR);
+    }
   }
   else {
     SCULPT_flush_update_step(C, SCULPT_UPDATE_COORDS);
@@ -5379,6 +5398,11 @@ static void sculpt_stroke_done(const bContext *C, struct PaintStroke *UNUSED(str
 
   if (brush->sculpt_tool == SCULPT_TOOL_MASK) {
     SCULPT_flush_update_done(C, ob, SCULPT_UPDATE_MASK);
+  }
+  else if (brush->sculpt_tool == SCULPT_TOOL_PAINT) {
+    if (SCULPT_use_image_paint_brush(sd, ob)) {
+      SCULPT_flush_update_done(C, ob, SCULPT_UPDATE_IMAGE);
+    }
   }
   else {
     SCULPT_flush_update_done(C, ob, SCULPT_UPDATE_COORDS);

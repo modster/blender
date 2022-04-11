@@ -371,6 +371,7 @@ static void update_pixels(PBVH *pbvh,
     return;
   }
   TIMEIT_START(update_pixels);
+  printf(" - updating %ld nodes\n", nodes_to_update.size());
 
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(ldata, CD_MLOOPUV));
   if (ldata_uv == nullptr) {
