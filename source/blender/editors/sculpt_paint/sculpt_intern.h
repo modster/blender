@@ -33,6 +33,7 @@ struct KeyBlock;
 struct Object;
 struct SculptUndoNode;
 struct bContext;
+struct PaintModeSettings;
 
 /* Updates */
 
@@ -1626,7 +1627,11 @@ void SCULPT_multiplane_scrape_preview_draw(uint gpuattr,
 void SCULPT_do_draw_face_sets_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode);
 
 /* Paint Brush. */
-void SCULPT_do_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode) ATTR_NONNULL();
+void SCULPT_do_paint_brush(const struct PaintModeSettings *paint_mode_settings,
+                           Sculpt *sd,
+                           Object *ob,
+                           PBVHNode **nodes,
+                           int totnode) ATTR_NONNULL();
 
 /**
  * @brief Get the image canvas for painting on the given object.
@@ -1638,12 +1643,17 @@ void SCULPT_do_paint_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode
  * image and image user. Returns false when the image isn't found. In the later case the r_image
  * and r_image_user would not be modified.
  */
-bool SCULPT_paint_image_canvas_get(struct Object *ob,
+bool SCULPT_paint_image_canvas_get(const struct PaintModeSettings *paint_mode_settings,
+                                   struct Object *ob,
                                    struct Image **r_image,
                                    struct ImageUser **r_image_user) ATTR_NONNULL();
-void SCULPT_do_paint_brush_image(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
+void SCULPT_do_paint_brush_image(const struct PaintModeSettings *paint_mode_settings,
+                                 Sculpt *sd,
+                                 Object *ob,
+                                 PBVHNode **nodes,
+                                 int totnode) ATTR_NONNULL();
+bool SCULPT_use_image_paint_brush(const struct PaintModeSettings *settings, Object *ob)
     ATTR_NONNULL();
-bool SCULPT_use_image_paint_brush(Sculpt *sd, Object *ob) ATTR_NONNULL();
 
 /* Smear Brush. */
 void SCULPT_do_smear_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode);

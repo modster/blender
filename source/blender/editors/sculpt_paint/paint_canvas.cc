@@ -148,22 +148,35 @@ eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
   return color_type;
 }
 
-Image *ED_paint_canvas_image_get(const struct PaintModeSettings *settings, struct Object *ob)
+bool ED_paint_canvas_image_get(const PaintModeSettings *settings,
+                               Object *ob,
+                               Image **r_image,
+                               ImageUser **r_image_user)
 {
+  *r_image = nullptr;
+  *r_image_user = nullptr;
+
   switch (settings->canvas_source) {
     case PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE:
-      return nullptr;
+      break;
+
     case PAINT_CANVAS_SOURCE_IMAGE:
-      return settings->canvas_image;
+      *r_image = settings->canvas_image;
+      /* TODO: Should we have an image user inside the paint mode settings? */
+      break;
+
     case PAINT_CANVAS_SOURCE_MATERIAL: {
       TexPaintSlot *slot = get_active_slot(ob);
       if (slot == nullptr) {
         break;
       }
-      return slot->ima;
+
+      *r_image = slot->ima;
+      *r_image_user = slot->image_user;
+      break;
     }
   }
-  return nullptr;
+  return *r_image != nullptr;
 }
 
 int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settings,

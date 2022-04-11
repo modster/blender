@@ -4,6 +4,7 @@
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
 
+#include "ED_paint.h"
 #include "ED_uvedit.h"
 
 #include "PIL_time_utildefines.h"
@@ -40,14 +41,12 @@ struct ImageData {
   {
   }
 
-  static bool init_active_image(Object *ob, ImageData *r_image_data)
+  static bool init_active_image(Object *ob,
+                                ImageData *r_image_data,
+                                const PaintModeSettings *paint_mode_settings)
   {
-    ED_object_get_active_image(
-        ob, ob->actcol, &r_image_data->image, &r_image_data->image_user, nullptr, nullptr);
-    if (r_image_data->image == nullptr) {
-      return false;
-    }
-    return true;
+    return ED_paint_canvas_image_get(
+        paint_mode_settings, ob, &r_image_data->image, &r_image_data->image_user);
   }
 };
 
@@ -390,12 +389,15 @@ extern "C" {
 
 using namespace blender::ed::sculpt_paint::paint::image;
 
-bool SCULPT_paint_image_canvas_get(Object *ob, Image **r_image, ImageUser **r_image_user)
+bool SCULPT_paint_image_canvas_get(const PaintModeSettings *paint_mode_settings,
+                                   Object *ob,
+                                   Image **r_image,
+                                   ImageUser **r_image_user)
 {
   BLI_assert(r_image);
   BLI_assert(r_image_user);
   ImageData image_data;
-  if (!ImageData::init_active_image(ob, &image_data)) {
+  if (!ImageData::init_active_image(ob, &image_data, paint_mode_settings)) {
     return false;
   }
 
@@ -404,7 +406,7 @@ bool SCULPT_paint_image_canvas_get(Object *ob, Image **r_image, ImageUser **r_im
   return true;
 }
 
-bool SCULPT_use_image_paint_brush(Sculpt *UNUSED(sd), Object *ob)
+bool SCULPT_use_image_paint_brush(const PaintModeSettings *settings, Object *ob)
 {
   if (!U.experimental.use_sculpt_texture_paint) {
     return false;
@@ -414,10 +416,14 @@ bool SCULPT_use_image_paint_brush(Sculpt *UNUSED(sd), Object *ob)
   }
   Image *image;
   ImageUser *image_user;
-  return SCULPT_paint_image_canvas_get(ob, &image, &image_user);
+  return ED_paint_canvas_image_get(settings, ob, &image, &image_user);
 }
 
-void SCULPT_do_paint_brush_image(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
+void SCULPT_do_paint_brush_image(const PaintModeSettings *paint_mode_settings,
+                                 Sculpt *sd,
+                                 Object *ob,
+                                 PBVHNode **nodes,
+                                 int totnode)
 {
   Brush *brush = BKE_paint_brush(&sd->paint);
 
@@ -429,7 +435,7 @@ void SCULPT_do_paint_brush_image(Sculpt *sd, Object *ob, PBVHNode **nodes, int t
   data.nodes = nodes;
   data.vertex_brush_tests = std::vector<bool>(mesh->totvert);
 
-  if (!ImageData::init_active_image(ob, &data.image_data)) {
+  if (!ImageData::init_active_image(ob, &data.image_data, paint_mode_settings)) {
     return;
   }
 
