@@ -298,14 +298,14 @@ void BKE_pbvh_pixels_fix_seams(PBVH &pbvh,
     ImageTileWrapper image_tile(tile_data);
 
     local_image_user.tile = image_tile.get_tile_number();
-    ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &local_image_user, NULL);
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &local_image_user, nullptr);
     if (image_buffer == nullptr) {
       continue;
     }
     context.image_buffer = image_buffer;
     UVSeamExtender extender(context, image_tile);
     extender.extend_x();
-    BKE_image_release_ibuf(&image, image_buffer, NULL);
+    BKE_image_release_ibuf(&image, image_buffer, nullptr);
   }
 }
 

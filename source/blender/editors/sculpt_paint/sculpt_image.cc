@@ -33,11 +33,9 @@ void ED_sculpt_pbvh_message_subscribe(const wmRegionMessageSubscribeParams *para
 {
   struct wmMsgBus *mbus = params->message_bus;
 
-  wmMsgSubscribeValue notify_msg = {
-      .owner = NULL,
-      .user_data = NULL,
-      .notify = sculpt_pbvh_do_msg_tag_rebuild_pixels,
-  };
+  wmMsgSubscribeValue notify_msg = {nullptr};
+  notify_msg.notify = sculpt_pbvh_do_msg_tag_rebuild_pixels;
+
   WM_msg_subscribe_rna_anon_prop(mbus, Object, active_material_index, &notify_msg);
   WM_msg_subscribe_rna_anon_prop(mbus, MeshUVLoopLayer, active, &notify_msg);
   WM_msg_subscribe_rna_anon_type(mbus, Image, &notify_msg);

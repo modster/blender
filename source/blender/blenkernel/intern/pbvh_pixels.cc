@@ -317,7 +317,7 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
   LISTBASE_FOREACH (ImageTile *, tile_data, &image->tiles) {
     image::ImageTileWrapper image_tile(tile_data);
     watertight.tile = image_tile.get_tile_number();
-    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &watertight, NULL);
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &watertight, nullptr);
     if (image_buffer == nullptr) {
       continue;
     }
@@ -353,7 +353,7 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
         }
       }
     }
-    BKE_image_release_ibuf(image, image_buffer, NULL);
+    BKE_image_release_ibuf(image, image_buffer, nullptr);
   }
   BKE_image_partial_update_mark_full_update(image);
 }
