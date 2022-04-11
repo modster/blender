@@ -245,7 +245,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   Pixel get_start_pixel(const TrianglePaintInput &triangle,
                         const PixelsPackage &encoded_pixels) const
   {
-    return init_pixel(triangle, encoded_pixels.start_barycentric_coord.decode());
+    return init_pixel(triangle, encoded_pixels.start_barycentric_coord);
   }
 
   /**
@@ -254,9 +254,8 @@ template<typename ImagePixelAccessor> class PaintingKernel {
                         const PixelsPackage &encoded_pixels,
                         const Pixel &start_pixel) const
   {
-    Pixel result = init_pixel(triangle,
-                              encoded_pixels.start_barycentric_coord.decode() +
-                                  triangle.add_barycentric_coord_x);
+    Pixel result = init_pixel(
+        triangle, encoded_pixels.start_barycentric_coord + triangle.add_barycentric_coord_x);
     return result - start_pixel;
   }
 

@@ -18,8 +18,8 @@ struct ExtendUVContext {
 };
 
 static bool intersect_uv_pixel(const ushort2 &pixel_coordinate,
-                        const ImBuf &image_buffer,
-                        const float2 triangle_uvs[3])
+                               const ImBuf &image_buffer,
+                               const float2 triangle_uvs[3])
 {
 
   float2 uv_bottom_left = float2(pixel_coordinate.x / float(image_buffer.x),
@@ -79,7 +79,7 @@ struct UVSeamExtenderRowPackage {
     BLI_assert(extend_xmin_len != 0);
     package->num_pixels += 1;
     package->start_image_coordinate[0] -= 1;
-    package->start_barycentric_coord -= float2(triangle_paint_data->add_barycentric_coord_x);
+    package->start_barycentric_coord -= triangle_paint_data->add_barycentric_coord_x;
     extend_xmin_len--;
   }
 

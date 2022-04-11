@@ -17,15 +17,13 @@
 
 namespace blender::bke::pbvh::pixels {
 
-/* TODO(jbakker): move encoders to blenlib. */
-class EncodedBarycentricWeights;
-
 /** Barycentric weights. */
 class BarycentricWeights {
  private:
   float3 weights;
 
  public:
+  explicit BarycentricWeights() noexcept = default;
   explicit BarycentricWeights(const float2 v1, const float2 v2, const float2 v3, const float2 co)
   {
     barycentric_weights_v2(v1, v2, v3, co, weights);
@@ -65,40 +63,6 @@ class BarycentricWeights {
   operator const float *() const
   {
     return weights;
-  }
-
-  friend class EncodedBarycentricWeights;
-};
-
-/**
- * Barycentric weights encoded into 2 floats.
- *
- * The third coordinate can be extracted as all 3 coordinates should sum up to 1.
- *
- * \code{.cc}
- * co[2] = 1.0 - co[0] - co[1]
- * \endcode
- */
-class EncodedBarycentricWeights {
- private:
-  float2 encoded;
-
- public:
-  EncodedBarycentricWeights &operator=(const BarycentricWeights decoded)
-  {
-    encoded = float2(decoded.weights.x, decoded.weights.y);
-    return *this;
-  }
-
-  const BarycentricWeights decode() const
-  {
-    return BarycentricWeights(float3(encoded.x, encoded.y, 1.0 - encoded.x - encoded.y));
-  }
-
-  EncodedBarycentricWeights &operator-=(const float2 &other)
-  {
-    encoded -= other;
-    return *this;
   }
 };
 
@@ -207,21 +171,17 @@ struct Triangles {
  * Encode multiple sequential pixels to reduce memory footprint.
  */
 struct PixelsPackage {
-  /** Barycentric coordinate of the first encoded pixel. */
-  EncodedBarycentricWeights start_barycentric_coord;
-  /** Image coordinate starting of the first encoded pixel. */
+  /** Barycentric coordinate of the first pixel. */
+  BarycentricWeights start_barycentric_coord;
+  /** Image coordinate starting of the first pixel. */
   ushort2 start_image_coordinate;
-  /** Number of sequetial pixels encoded in this package. */
+  /** Number of sequential pixels encoded in this package. */
   ushort num_pixels;
   /** Reference to the pbvh triangle index. */
   ushort triangle_index;
 };
 
-class PixelPackages : public Vector<PixelsPackage> {
- public:
-  /* Sort the packages to improve CPU cache utilization during painting. */
-  void sort();
-};
+using PixelPackages = Vector<PixelsPackage>;
 
 struct TileData {
   short tile_number;
