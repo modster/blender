@@ -14,6 +14,8 @@
 #include "BLI_math.h"
 #include "BLI_task.h"
 
+#include "PIL_time_utildefines.h"
+
 #include "BKE_image_wrappers.hh"
 
 #include "bmesh.h"
@@ -368,6 +370,7 @@ static void update_pixels(PBVH *pbvh,
   if (!find_nodes_to_update(pbvh, nodes_to_update, visited_polygons)) {
     return;
   }
+  TIMEIT_START(update_pixels);
 
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(ldata, CD_MLOOPUV));
   if (ldata_uv == nullptr) {
@@ -427,6 +430,7 @@ static void update_pixels(PBVH *pbvh,
            float(compressed_data_len) / num_pixels);
   }
 #endif
+  TIMEIT_END(update_pixels);
 }
 
 }  // namespace blender::bke::pbvh::pixels::extractor

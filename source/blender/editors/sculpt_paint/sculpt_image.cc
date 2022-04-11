@@ -10,9 +10,11 @@
 #include "WM_message.h"
 #include "WM_types.h"
 
+#include "ED_sculpt.h"
+
 extern "C" {
 
-static void sculpt_pbvh_do_msg_tag_rebuild_pixels(struct bContext *C,
+static void sculpt_pbvh_do_msg_tag_rebuild_pixels(bContext *C,
                                                   wmMsgSubscribeKey *UNUSED(msg_key),
                                                   wmMsgSubscribeValue *UNUSED(msg_val))
 {
@@ -27,7 +29,7 @@ static void sculpt_pbvh_do_msg_tag_rebuild_pixels(struct bContext *C,
   BKE_pbvh_mark_update_pixels(ss->pbvh);
 }
 
-void ED_sculpt_pbvh_message_subscribe(const struct wmRegionMessageSubscribeParams *params)
+void ED_sculpt_pbvh_message_subscribe(const wmRegionMessageSubscribeParams *params)
 {
   struct wmMsgBus *mbus = params->message_bus;
 
