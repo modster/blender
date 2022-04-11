@@ -21,6 +21,7 @@ set(SRC
   intern/conversion_processor_operation.cc
   intern/domain.cc
   intern/gpu_material_node.cc
+  intern/gpu_material_operation.cc
   intern/node_operation.cc
   intern/operation.cc
   intern/processor_operation.cc
@@ -36,6 +37,7 @@ set(SRC
   VPC_conversion_processor_operation.hh
   VPC_domain.hh
   VPC_gpu_material_node.hh
+  VPC_gpu_material_operation.hh
   VPC_input_descriptor.hh
   VPC_node_operation.hh
   VPC_operation.hh
