@@ -164,11 +164,9 @@ class CLIP_HT_tool_header(Header):
         clip = context.space_data.clip
         if clip:
             if tool_mode == 'TRACKING':
-                layout.popover(panel='CLIP_PT_track_settings')
                 settings = clip.tracking.settings
                 layout.prop(settings, "speed", text="")
 
-            layout.popover(panel='CLIP_PT_objects')
 
 
 class CLIP_HT_header(Header):
@@ -252,6 +250,8 @@ class CLIP_HT_header(Header):
                     layout.label(text="Solve error: %.2f px" %
                                  (r.average_error))
 
+                row = layout.row()
+                row.popover(panel='CLIP_PT_objects')
                 row = layout.row(align=True)
                 icon = 'LOCKED' if sc.lock_selection else 'UNLOCKED'
                 row.operator("clip.lock_selection_toggle", icon=icon, text="", depress=sc.lock_selection)
@@ -305,6 +305,8 @@ class CLIP_HT_header(Header):
             row = layout.row()
             row.template_ID(sc, "mask", new="mask.new")
             row.popover(panel='CLIP_PT_mask_display')
+            row = layout.row()
+            row.popover(panel='CLIP_PT_objects')
             row = layout.row(align=True)
             icon = 'LOCKED' if sc.lock_selection else 'UNLOCKED'
             row.operator("clip.lock_selection_toggle", icon=icon, text="", depress=sc.lock_selection)
