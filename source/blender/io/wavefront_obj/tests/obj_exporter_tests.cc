@@ -265,7 +265,7 @@ o abcdef
 o 012345678901234567890123456789abcd
 o 123
 curv 0.0 1.0
-parm 0.0
+parm u 0.0
 )";
   ASSERT_EQ(got_string, expected);
 }
