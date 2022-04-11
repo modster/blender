@@ -44,7 +44,7 @@ struct ImageData {
 
   static bool init_active_image(Object *ob,
                                 ImageData *r_image_data,
-                                const PaintModeSettings *paint_mode_settings)
+                                PaintModeSettings *paint_mode_settings)
   {
     return ED_paint_canvas_image_get(
         paint_mode_settings, ob, &r_image_data->image, &r_image_data->image_user);
@@ -392,7 +392,7 @@ extern "C" {
 
 using namespace blender::ed::sculpt_paint::paint::image;
 
-bool SCULPT_paint_image_canvas_get(const PaintModeSettings *paint_mode_settings,
+bool SCULPT_paint_image_canvas_get(PaintModeSettings *paint_mode_settings,
                                    Object *ob,
                                    Image **r_image,
                                    ImageUser **r_image_user)
@@ -409,7 +409,7 @@ bool SCULPT_paint_image_canvas_get(const PaintModeSettings *paint_mode_settings,
   return true;
 }
 
-bool SCULPT_use_image_paint_brush(const PaintModeSettings *settings, Object *ob)
+bool SCULPT_use_image_paint_brush(PaintModeSettings *settings, Object *ob)
 {
   if (!U.experimental.use_sculpt_texture_paint) {
     return false;
@@ -422,11 +422,8 @@ bool SCULPT_use_image_paint_brush(const PaintModeSettings *settings, Object *ob)
   return ED_paint_canvas_image_get(settings, ob, &image, &image_user);
 }
 
-void SCULPT_do_paint_brush_image(const PaintModeSettings *paint_mode_settings,
-                                 Sculpt *sd,
-                                 Object *ob,
-                                 PBVHNode **nodes,
-                                 int totnode)
+void SCULPT_do_paint_brush_image(
+    PaintModeSettings *paint_mode_settings, Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
 {
   Brush *brush = BKE_paint_brush(&sd->paint);
 

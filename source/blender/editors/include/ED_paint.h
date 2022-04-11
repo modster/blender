@@ -114,7 +114,7 @@ void ED_paintcurve_undo_push_end(struct bContext *C);
 void ED_paintcurve_undosys_type(struct UndoType *ut);
 
 /* paint_canvas.cc */
-bool ED_paint_canvas_image_get(const struct PaintModeSettings *paint_mode_settings,
+bool ED_paint_canvas_image_get(struct PaintModeSettings *paint_mode_settings,
                                struct Object *ob,
                                struct Image **r_image,
                                struct ImageUser **r_image_user);

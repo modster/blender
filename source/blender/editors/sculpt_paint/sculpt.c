@@ -2755,7 +2755,7 @@ static void update_brush_local_mat(Sculpt *sd, Object *ob)
 /** \name Texture painting
  * \{ */
 
-static bool sculpt_needs_pbvh_pixels(const PaintModeSettings *paint_mode_settings,
+static bool sculpt_needs_pbvh_pixels(PaintModeSettings *paint_mode_settings,
                                      const Brush *brush,
                                      Object *ob)
 {
@@ -2768,7 +2768,7 @@ static bool sculpt_needs_pbvh_pixels(const PaintModeSettings *paint_mode_setting
   return false;
 }
 
-static void sculpt_pbvh_update_pixels(const PaintModeSettings *paint_mode_settings,
+static void sculpt_pbvh_update_pixels(PaintModeSettings *paint_mode_settings,
                                       SculptSession *ss,
                                       Object *ob)
 {
@@ -5391,7 +5391,7 @@ static void sculpt_stroke_done(const bContext *C, struct PaintStroke *UNUSED(str
   Object *ob = CTX_data_active_object(C);
   SculptSession *ss = ob->sculpt;
   Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
-  const ToolSettings *tool_settings = CTX_data_tool_settings(C);
+  ToolSettings *tool_settings = CTX_data_tool_settings(C);
 
   /* Finished. */
   if (!ss->cache) {

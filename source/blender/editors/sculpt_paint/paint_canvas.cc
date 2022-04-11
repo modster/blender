@@ -148,7 +148,7 @@ eV3DShadingColorType ED_paint_shading_color_override(bContext *C,
   return color_type;
 }
 
-bool ED_paint_canvas_image_get(const PaintModeSettings *settings,
+bool ED_paint_canvas_image_get(PaintModeSettings *settings,
                                Object *ob,
                                Image **r_image,
                                ImageUser **r_image_user)
@@ -162,7 +162,7 @@ bool ED_paint_canvas_image_get(const PaintModeSettings *settings,
 
     case PAINT_CANVAS_SOURCE_IMAGE:
       *r_image = settings->canvas_image;
-      /* TODO: Should we have an image user inside the paint mode settings? */
+      *r_image_user = &settings->image_user;
       break;
 
     case PAINT_CANVAS_SOURCE_MATERIAL: {
