@@ -43,37 +43,43 @@ static void node_shader_init_vect_transform(bNodeTree *UNUSED(ntree), bNode *nod
   node->storage = vect;
 }
 
-static const char *get_gpufn_name_from_to(short from, short to)
+static const char *get_gpufn_name_from_to(short from, short to, bool is_direction)
 {
   switch (from) {
     case SHD_VECT_TRANSFORM_SPACE_OBJECT:
       switch (to) {
         case SHD_VECT_TRANSFORM_SPACE_OBJECT:
-          return NULL;
+          return nullptr;
         case SHD_VECT_TRANSFORM_SPACE_WORLD:
-          return "object_to_world";
+          return is_direction ? "direction_transform_object_to_world" :
+                                "point_transform_object_to_world";
         case SHD_VECT_TRANSFORM_SPACE_CAMERA:
-          return "object_to_view";
+          return is_direction ? "direction_transform_object_to_view" :
+                                "point_transform_object_to_view";
       }
       break;
     case SHD_VECT_TRANSFORM_SPACE_WORLD:
       switch (to) {
         case SHD_VECT_TRANSFORM_SPACE_WORLD:
-          return NULL;
+          return nullptr;
         case SHD_VECT_TRANSFORM_SPACE_CAMERA:
-          return "world_to_view";
+          return is_direction ? "direction_transform_world_to_view" :
+                                "point_transform_world_to_view";
         case SHD_VECT_TRANSFORM_SPACE_OBJECT:
-          return "world_to_object";
+          return is_direction ? "direction_transform_world_to_object" :
+                                "point_transform_world_to_object";
       }
       break;
     case SHD_VECT_TRANSFORM_SPACE_CAMERA:
       switch (to) {
         case SHD_VECT_TRANSFORM_SPACE_CAMERA:
-          return NULL;
+          return nullptr;
         case SHD_VECT_TRANSFORM_SPACE_WORLD:
-          return "view_to_world";
+          return is_direction ? "direction_transform_view_to_world" :
+                                "point_transform_view_to_world";
         case SHD_VECT_TRANSFORM_SPACE_OBJECT:
-          return "view_to_object";
+          return is_direction ? "direction_transform_view_to_object" :
+                                "point_transform_view_to_object";
       }
       break;
   }
@@ -97,11 +103,11 @@ static int gpu_shader_vect_transform(GPUMaterial *mat,
     inputlink = GPU_constant(in[0].vec);
   }
 
-  const char *xform = (nodeprop->type == SHD_VECT_TRANSFORM_TYPE_POINT) ? "point_transform_" :
-                                                                          "direction_transform_";
-  const char *fromto = get_gpufn_name_from_to(nodeprop->convert_from, nodeprop->convert_to);
+  const bool is_direction = (nodeprop->type != SHD_VECT_TRANSFORM_TYPE_POINT);
+  const char *func_name = get_gpufn_name_from_to(
+      nodeprop->convert_from, nodeprop->convert_to, is_direction);
 
-  if (fromto) {
+  if (func_name) {
     /* For cycles we have inverted Z */
     /* TODO: pass here the correct matrices */
     if (nodeprop->convert_from == SHD_VECT_TRANSFORM_SPACE_CAMERA &&
@@ -109,8 +115,6 @@ static int gpu_shader_vect_transform(GPUMaterial *mat,
       GPU_link(mat, "invert_z", inputlink, &inputlink);
     }
 
-    char func_name[48];
-    SNPRINTF(func_name, "%s%s", xform, fromto);
     GPU_link(mat, func_name, inputlink, &out[0].link);
 
     if (nodeprop->convert_to == SHD_VECT_TRANSFORM_SPACE_CAMERA &&
