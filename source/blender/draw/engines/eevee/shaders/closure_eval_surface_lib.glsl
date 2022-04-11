@@ -45,7 +45,7 @@ bool output_ssr(ClosureReflection reflection)
 }
 
 /* Single BSDFs. */
-CLOSURE_EVAL_FUNCTION_DECLARE_1(DiffuseBSDF, Diffuse);
+CLOSURE_EVAL_FUNCTION_DECLARE_1(DiffuseBSDF, Diffuse)
 Closure closure_eval(ClosureDiffuse diffuse)
 {
   /* Glue with the old system. */
@@ -63,7 +63,7 @@ Closure closure_eval(ClosureDiffuse diffuse)
   return closure;
 }
 
-CLOSURE_EVAL_FUNCTION_DECLARE_1(TranslucentBSDF, Translucent);
+CLOSURE_EVAL_FUNCTION_DECLARE_1(TranslucentBSDF, Translucent)
 Closure closure_eval(ClosureTranslucent translucent)
 {
   /* Glue with the old system. */
@@ -78,7 +78,7 @@ Closure closure_eval(ClosureTranslucent translucent)
   return closure;
 }
 
-CLOSURE_EVAL_FUNCTION_DECLARE_1(GlossyBSDF, Glossy);
+CLOSURE_EVAL_FUNCTION_DECLARE_1(GlossyBSDF, Glossy)
 Closure closure_eval(ClosureReflection reflection)
 {
   /* Glue with the old system. */
@@ -96,7 +96,7 @@ Closure closure_eval(ClosureReflection reflection)
   return closure;
 }
 
-CLOSURE_EVAL_FUNCTION_DECLARE_1(RefractionBSDF, Refraction);
+CLOSURE_EVAL_FUNCTION_DECLARE_1(RefractionBSDF, Refraction)
 Closure closure_eval(ClosureRefraction refraction)
 {
   /* Glue with the old system. */
@@ -129,7 +129,7 @@ Closure closure_eval(ClosureTransparency transparency)
 }
 
 /* Glass BSDF. */
-CLOSURE_EVAL_FUNCTION_DECLARE_2(GlassBSDF, Glossy, Refraction);
+CLOSURE_EVAL_FUNCTION_DECLARE_2(GlassBSDF, Glossy, Refraction)
 Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction)
 {
   /* Glue with the old system. */
@@ -152,7 +152,7 @@ Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction)
 }
 
 /* Dielectric BSDF */
-CLOSURE_EVAL_FUNCTION_DECLARE_2(DielectricBSDF, Diffuse, Glossy);
+CLOSURE_EVAL_FUNCTION_DECLARE_2(DielectricBSDF, Diffuse, Glossy)
 Closure closure_eval(ClosureDiffuse diffuse, ClosureReflection reflection)
 {
   /* Glue with the old system. */
@@ -176,7 +176,7 @@ Closure closure_eval(ClosureDiffuse diffuse, ClosureReflection reflection)
 }
 
 /* Specular BSDF */
-CLOSURE_EVAL_FUNCTION_DECLARE_3(SpecularBSDF, Diffuse, Glossy, Glossy);
+CLOSURE_EVAL_FUNCTION_DECLARE_3(SpecularBSDF, Diffuse, Glossy, Glossy)
 Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
                      ClosureReflection clearcoat)
@@ -205,7 +205,7 @@ Closure closure_eval(ClosureDiffuse diffuse,
 }
 
 /* Principled BSDF */
-CLOSURE_EVAL_FUNCTION_DECLARE_4(PrincipledBSDF, Diffuse, Glossy, Glossy, Refraction);
+CLOSURE_EVAL_FUNCTION_DECLARE_4(PrincipledBSDF, Diffuse, Glossy, Glossy, Refraction)
 Closure closure_eval(ClosureDiffuse diffuse,
                      ClosureReflection reflection,
                      ClosureReflection clearcoat,
@@ -238,7 +238,7 @@ Closure closure_eval(ClosureDiffuse diffuse,
   return closure;
 }
 
-CLOSURE_EVAL_FUNCTION_DECLARE_2(PrincipledBSDFMetalClearCoat, Glossy, Glossy);
+CLOSURE_EVAL_FUNCTION_DECLARE_2(PrincipledBSDFMetalClearCoat, Glossy, Glossy)
 Closure closure_eval(ClosureReflection reflection, ClosureReflection clearcoat)
 {
   /* Glue with the old system. */
