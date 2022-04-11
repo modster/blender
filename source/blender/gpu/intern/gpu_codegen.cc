@@ -234,6 +234,10 @@ class GPUCodegen {
     create_info = new GPUCodegenCreateInfo("codegen");
     output.create_info = reinterpret_cast<GPUShaderCreateInfo *>(
         static_cast<ShaderCreateInfo *>(create_info));
+
+    if (GPU_material_flag_get(mat_, GPU_MATFLAG_OBJECT_INFO)) {
+      create_info->additional_info("draw_object_infos");
+    }
   }
 
   ~GPUCodegen()
@@ -307,10 +311,6 @@ void GPUCodegen::generate_attribs()
   info.interface_generated = new StageInterfaceInfo("codegen_iface", "var_attrs");
   StageInterfaceInfo &iface = *info.interface_generated;
   info.vertex_out(iface);
-
-  if (GPU_material_flag_get(&mat, GPU_MATFLAG_OBJECT_INFO)) {
-    info.additional_info("draw_object_infos");
-  }
 
   /* Input declaration, loading / assignment to interface and geometry shader passthrough. */
   std::stringstream decl_ss, iface_ss, load_ss;
@@ -433,7 +433,7 @@ void GPUCodegen::generate_library()
   GPUCodegenCreateInfo &info = *create_info;
 
   void *value;
-  GSetIterState pop_state = {0};
+  GSetIterState pop_state = {};
   while (BLI_gset_pop(graph.used_libraries, &pop_state, &value)) {
     auto deps = gpu_shader_dependency_get_resolved_source((const char *)value);
     info.dependencies_generated.extend_non_duplicates(deps);

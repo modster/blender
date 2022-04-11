@@ -10,6 +10,7 @@ void node_object_info(float mat_index,
   color = ObjectColor;
   alpha = ObjectColor.a;
   object_index = ObjectInfo.x;
+  /* TODO(fclem): Put that inside the Material UBO. */
   material_index = mat_index;
   random = ObjectInfo.z;
 }
