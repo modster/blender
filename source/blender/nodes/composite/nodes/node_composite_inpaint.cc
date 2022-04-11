@@ -24,6 +24,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Inpaint/ ******************** */
@@ -41,6 +43,13 @@ static void node_composit_buts_inpaint(uiLayout *layout, bContext *UNUSED(C), Po
   uiItemR(layout, ptr, "distance", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_inpaint_cc
 
 void register_node_type_cmp_inpaint()
@@ -52,6 +61,7 @@ void register_node_type_cmp_inpaint()
   cmp_node_type_base(&ntype, CMP_NODE_INPAINT, "Inpaint", NODE_CLASS_OP_FILTER);
   ntype.declare = file_ns::cmp_node_inpaint_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_inpaint;
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

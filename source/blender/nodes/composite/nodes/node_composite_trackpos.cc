@@ -26,6 +26,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 namespace blender::nodes::node_composite_trackpos_cc {
@@ -92,6 +94,13 @@ static void node_composit_buts_trackpos(uiLayout *layout, bContext *C, PointerRN
   }
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_trackpos_cc
 
 void register_node_type_cmp_trackpos()
@@ -106,6 +115,7 @@ void register_node_type_cmp_trackpos()
   node_type_init(&ntype, file_ns::init);
   node_type_storage(
       &ntype, "NodeTrackPosData", node_free_standard_storage, node_copy_standard_storage);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

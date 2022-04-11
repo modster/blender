@@ -31,6 +31,7 @@ set(SRC
   intern/result.cc
   intern/scheduler.cc
   intern/texture_pool.cc
+  intern/unsupported_node_operation.cc
   intern/utilities.cc
 
   VPC_compiler.hh
@@ -49,6 +50,7 @@ set(SRC
   VPC_result.hh
   VPC_scheduler.hh
   VPC_texture_pool.hh
+  VPC_unsupported_node_operation.hh
   VPC_utilities.hh
 )
 

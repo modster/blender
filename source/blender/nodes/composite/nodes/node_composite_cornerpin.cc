@@ -21,6 +21,8 @@
  * \ingroup cmpnodes
  */
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 namespace blender::nodes::node_composite_cornerpin_cc {
@@ -48,6 +50,13 @@ static void cmp_node_cornerpin_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("Plane"));
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_cornerpin_cc
 
 void register_node_type_cmp_cornerpin()
@@ -58,6 +67,7 @@ void register_node_type_cmp_cornerpin()
 
   cmp_node_type_base(&ntype, CMP_NODE_CORNERPIN, "Corner Pin", NODE_CLASS_DISTORT);
   ntype.declare = file_ns::cmp_node_cornerpin_declare;
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

@@ -28,6 +28,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** SWITCH VIEW ******************** */
@@ -157,6 +159,13 @@ static void node_composit_buts_switch_view_ex(uiLayout *layout,
               nullptr);
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_switchview_cc
 
 void register_node_type_cmp_switch_view()
@@ -170,6 +179,7 @@ void register_node_type_cmp_switch_view()
   ntype.draw_buttons_ex = file_ns::node_composit_buts_switch_view_ex;
   ntype.initfunc_api = file_ns::init_switch_view;
   node_type_update(&ntype, file_ns::cmp_node_switch_view_update);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

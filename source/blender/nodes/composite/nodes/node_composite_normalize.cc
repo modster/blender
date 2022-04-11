@@ -21,6 +21,8 @@
  * \ingroup cmpnodes
  */
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** NORMALIZE single channel, useful for Z buffer ******************** */
@@ -33,6 +35,13 @@ static void cmp_node_normalize_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("Value"));
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_normalize_cc
 
 void register_node_type_cmp_normalize()
@@ -43,6 +52,7 @@ void register_node_type_cmp_normalize()
 
   cmp_node_type_base(&ntype, CMP_NODE_NORMALIZE, "Normalize", NODE_CLASS_OP_VECTOR);
   ntype.declare = file_ns::cmp_node_normalize_declare;
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

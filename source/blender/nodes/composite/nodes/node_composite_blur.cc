@@ -27,6 +27,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** BLUR ******************** */
@@ -88,6 +90,13 @@ static void node_composit_buts_blur(uiLayout *layout, bContext *UNUSED(C), Point
   uiItemR(col, ptr, "use_extended_bounds", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_blur_cc
 
 void register_node_type_cmp_blur()
@@ -103,6 +112,7 @@ void register_node_type_cmp_blur()
   node_type_init(&ntype, file_ns::node_composit_init_blur);
   node_type_storage(
       &ntype, "NodeBlurData", node_free_standard_storage, node_copy_standard_storage);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

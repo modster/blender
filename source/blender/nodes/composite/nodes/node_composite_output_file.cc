@@ -36,6 +36,8 @@
 
 #include "WM_api.h"
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 #include "intern/openexr/openexr_multi.h"
@@ -437,6 +439,13 @@ static void node_composit_buts_file_output_ex(uiLayout *layout, bContext *C, Poi
   }
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_output_file_cc
 
 void register_node_type_cmp_output_file()
@@ -453,6 +462,7 @@ void register_node_type_cmp_output_file()
   node_type_storage(
       &ntype, "NodeImageMultiFile", file_ns::free_output_file, file_ns::copy_output_file);
   node_type_update(&ntype, file_ns::update_output_file);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

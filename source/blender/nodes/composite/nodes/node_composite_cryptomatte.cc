@@ -307,6 +307,13 @@ static bool node_poll_cryptomatte(bNodeType *UNUSED(ntype),
   return false;
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_cryptomatte_cc
 
 void register_node_type_cmp_cryptomatte()
@@ -324,6 +331,8 @@ void register_node_type_cmp_cryptomatte()
   ntype.poll = file_ns::node_poll_cryptomatte;
   node_type_storage(
       &ntype, "NodeCryptomatte", file_ns::node_free_cryptomatte, file_ns::node_copy_cryptomatte);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
+
   nodeRegisterType(&ntype);
 }
 
@@ -387,6 +396,8 @@ void register_node_type_cmp_cryptomatte_legacy()
   node_type_init(&ntype, file_ns::node_init_cryptomatte_legacy);
   node_type_storage(
       &ntype, "NodeCryptomatte", file_ns::node_free_cryptomatte, file_ns::node_copy_cryptomatte);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
+
   nodeRegisterType(&ntype);
 }
 

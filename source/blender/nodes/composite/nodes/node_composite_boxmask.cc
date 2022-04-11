@@ -21,10 +21,10 @@
  * \ingroup cmpnodes
  */
 
-#include <cmath>
-
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "VPC_unsupported_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -66,32 +66,11 @@ static void node_composit_buts_boxmask(uiLayout *layout, bContext *UNUSED(C), Po
   uiItemR(layout, ptr, "mask_type", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
-static int node_composite_gpu_boxmask(GPUMaterial *mat,
-                                      bNode *node,
-                                      bNodeExecData *UNUSED(execdata),
-                                      GPUNodeStack *in,
-                                      GPUNodeStack *out)
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
 {
-  const NodeBoxMask *data = (NodeBoxMask *)node->storage;
-
-  const float mask_type = (float)node->custom1;
-  const float cos_angle = std::cos(data->rotation);
-  const float sin_angle = std::sin(data->rotation);
-  const float half_width = data->width / 2.0;
-  const float half_height = data->height / 2.0;
-
-  return GPU_stack_link(mat,
-                        node,
-                        "node_composite_box_mask",
-                        in,
-                        out,
-                        GPU_constant(&mask_type),
-                        GPU_uniform(&data->x),
-                        GPU_uniform(&data->y),
-                        GPU_uniform(&half_width),
-                        GPU_uniform(&half_height),
-                        GPU_uniform(&cos_angle),
-                        GPU_uniform(&sin_angle));
+  return new UnsupportedNodeOperation(context, node);
 }
 
 }  // namespace blender::nodes::node_composite_boxmask_cc
@@ -107,7 +86,7 @@ void register_node_type_cmp_boxmask()
   ntype.draw_buttons = file_ns::node_composit_buts_boxmask;
   node_type_init(&ntype, file_ns::node_composit_init_boxmask);
   node_type_storage(&ntype, "NodeBoxMask", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, file_ns::node_composite_gpu_boxmask);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

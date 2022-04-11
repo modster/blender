@@ -24,6 +24,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Double Edge Mask ******************** */
@@ -51,6 +53,13 @@ static void node_composit_buts_double_edge_mask(uiLayout *layout,
   uiItemR(col, ptr, "edge_mode", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_double_edge_mask_cc
 
 void register_node_type_cmp_doubleedgemask()
@@ -62,6 +71,7 @@ void register_node_type_cmp_doubleedgemask()
   cmp_node_type_base(&ntype, CMP_NODE_DOUBLEEDGEMASK, "Double Edge Mask", NODE_CLASS_MATTE);
   ntype.declare = file_ns::cmp_node_double_edge_mask_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_double_edge_mask;
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

@@ -21,6 +21,8 @@
  * \ingroup cmpnodes
  */
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Displace  ******************** */
@@ -40,6 +42,13 @@ static void cmp_node_displace_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Image"));
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_displace_cc
 
 void register_node_type_cmp_displace()
@@ -50,6 +59,7 @@ void register_node_type_cmp_displace()
 
   cmp_node_type_base(&ntype, CMP_NODE_DISPLACE, "Displace", NODE_CLASS_DISTORT);
   ntype.declare = file_ns::cmp_node_displace_declare;
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

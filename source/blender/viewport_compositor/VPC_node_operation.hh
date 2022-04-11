@@ -39,7 +39,10 @@ class NodeOperation : public Operation {
    * inputs. */
   NodeOperation(Context &context, DNode node);
 
-  /* Returns a reference to the node this operations represents. */
+  /* Returns a reference to the derived node that this operation represents. */
+  const DNode &node() const;
+
+  /* Returns a reference to the node that this operation represents. */
   const bNode &bnode() const;
 
  protected:
