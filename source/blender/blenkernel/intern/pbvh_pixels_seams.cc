@@ -17,7 +17,7 @@ struct ExtendUVContext {
   const MLoopUV *ldata_uv;
 };
 
-bool intersect_uv_pixel(const ushort2 &pixel_coordinate,
+static bool intersect_uv_pixel(const ushort2 &pixel_coordinate,
                         const ImBuf &image_buffer,
                         const float2 triangle_uvs[3])
 {
