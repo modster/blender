@@ -11,7 +11,6 @@
 
 #include "VPC_context.hh"
 #include "VPC_domain.hh"
-#include "VPC_input_descriptor.hh"
 #include "VPC_realize_on_domain_processor_operation.hh"
 #include "VPC_result.hh"
 

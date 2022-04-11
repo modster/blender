@@ -5,7 +5,6 @@
 
 #include "BLI_string_ref.hh"
 
-#include "VPC_input_descriptor.hh"
 #include "VPC_operation.hh"
 #include "VPC_result.hh"
 

@@ -7,7 +7,6 @@
 #include "MEM_guardedalloc.h"
 
 #include "VPC_context.hh"
-#include "VPC_input_descriptor.hh"
 #include "VPC_reduce_to_single_value_processor_operation.hh"
 #include "VPC_result.hh"
 

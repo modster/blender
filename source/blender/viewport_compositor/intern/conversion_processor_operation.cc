@@ -8,7 +8,6 @@
 
 #include "VPC_context.hh"
 #include "VPC_conversion_processor_operation.hh"
-#include "VPC_input_descriptor.hh"
 #include "VPC_result.hh"
 
 namespace blender::viewport_compositor {
