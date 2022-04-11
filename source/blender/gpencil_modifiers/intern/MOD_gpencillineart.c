@@ -91,6 +91,7 @@ static void generate_strokes_actual(
       lmd->intersection_mask,
       lmd->thickness,
       lmd->opacity,
+      lmd->shadow_selection,
       lmd->source_vertex_group,
       lmd->vgname,
       lmd->flags);
@@ -196,6 +197,7 @@ static void bakeModifier(Main *UNUSED(bmain),
      * modifiers in the stack. */
     lmd->edge_types_override = lmd->edge_types;
     lmd->level_end_override = lmd->level_end;
+    lmd->shadow_selection_override = lmd->shadow_selection;
 
     MOD_lineart_compute_feature_lines(
         depsgraph, lmd, &gpd->runtime.lineart_cache, (!(ob->dtx & OB_DRAW_IN_FRONT)));
@@ -363,7 +365,8 @@ static void edge_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetActive(sub, RNA_pointer_get(ptr, "light_contour_object").data != NULL);
 
   uiItemR(sub, ptr, "use_light_contour", 0, NULL, ICON_NONE);
-  uiItemR(sub, ptr, "use_shadow", 0, IFACE_("Casted Shadow"), ICON_NONE);
+  uiItemR(sub, ptr, "use_shadow", 0, IFACE_("Cast Shadow"), ICON_NONE);
+  uiItemR(sub, ptr, "shadow_region_filtering", 0, NULL, ICON_NONE);
 
   uiItemR(layout, ptr, "use_overlap_edge_type_support", 0, IFACE_("Allow Overlap"), ICON_NONE);
 }

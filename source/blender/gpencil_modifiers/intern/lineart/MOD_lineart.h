@@ -213,6 +213,7 @@ typedef struct LineartEdgeChain {
   int loop_id;
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
+  unsigned char shadow_mask_bits;
 
   struct Object *object_ref;
 } LineartEdgeChain;
@@ -228,6 +229,7 @@ typedef struct LineartEdgeChainItem {
   char occlusion;
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
+  unsigned char shadow_mask_bits;
   size_t index;
 } LineartEdgeChainItem;
 
@@ -367,7 +369,7 @@ typedef struct LineartRenderBuffer {
   bool use_shadow;
   bool use_contour_secondary; /* From viewing camera, during shadow calculation. */
 
-  bool needs_shadow_separation;
+  char shadow_selection;
 
   bool fuzzy_intersections;
   bool fuzzy_everything;
@@ -925,6 +927,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   unsigned char intersection_mask,
                                   short thickness,
                                   float opacity,
+                                  unsigned char shadow_selection,
                                   const char *source_vgname,
                                   const char *vgname,
                                   int modifier_flags);

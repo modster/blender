@@ -383,6 +383,7 @@ typedef struct GpencilLineartLimitInfo {
   char min_level;
   char max_level;
   short edge_types;
+  char shadow_selection;
 } GpencilLineartLimitInfo;
 
 GpencilLineartLimitInfo BKE_gpencil_get_lineart_modifier_limits(const struct Object *ob);

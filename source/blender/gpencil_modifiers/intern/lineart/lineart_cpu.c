@@ -269,6 +269,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
       ies = cut_start_before->prev ? cut_start_before->prev : NULL;
       ns->occlusion = ies ? ies->occlusion : 0;
       ns->material_mask_bits = ies->material_mask_bits;
+      ns->shadow_mask_bits = ies->shadow_mask_bits;
       BLI_insertlinkbefore(&e->segments, cut_start_before, ns);
     }
     /* Otherwise we already found a existing cutting point, no need to insert a new one. */
@@ -279,6 +280,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
     ies = e->segments.last;
     ns->occlusion = ies->occlusion;
     ns->material_mask_bits = ies->material_mask_bits;
+    ns->shadow_mask_bits = ies->shadow_mask_bits;
     BLI_addtail(&e->segments, ns);
   }
   if (cut_end_before) {
@@ -287,6 +289,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
       ies = cut_end_before->prev ? cut_end_before->prev : NULL;
       ns2->occlusion = ies ? ies->occlusion : 0;
       ns2->material_mask_bits = ies ? ies->material_mask_bits : 0;
+      ns2->shadow_mask_bits = ies ? ies->shadow_mask_bits : 0;
       BLI_insertlinkbefore(&e->segments, cut_end_before, ns2);
     }
   }
@@ -294,6 +297,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
     ies = e->segments.last;
     ns2->occlusion = ies->occlusion;
     ns2->material_mask_bits = ies->material_mask_bits;
+    ns2->shadow_mask_bits = ies->shadow_mask_bits;
     BLI_addtail(&e->segments, ns2);
   }
 
@@ -323,7 +327,8 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
     next_es = es->next;
 
     if (prev_es && prev_es->occlusion == es->occlusion &&
-        prev_es->material_mask_bits == es->material_mask_bits) {
+        prev_es->material_mask_bits == es->material_mask_bits &&
+        prev_es->shadow_mask_bits == es->shadow_mask_bits) {
       BLI_remlink(&e->segments, es);
       /* This puts the node back to the render buffer, if more cut happens, these unused nodes get
        * picked first. */
@@ -2143,21 +2148,25 @@ static LineartEdge *lineart_find_matching_edge(LineartElementLinkNode *shadow_el
   return NULL;
 }
 
+#define LRT_SHADOW_MASK_UNDEFINED 0
+#define LRT_SHADOW_MASK_LIT (1 << 0)
+#define LRT_SHADOW_MASK_SHADED (1 << 1)
+
 static void lineart_register_shadow_cuts(LineartRenderBuffer *rb,
                                          LineartEdge *e,
                                          LineartEdge *shadow_edge)
 {
   LISTBASE_FOREACH (LineartEdgeSegment *, es, &shadow_edge->segments) {
-    if (es->occlusion != 0) {
-      /* Convert to view space cutting points. */
-      double la1 = es->at;
-      double la2 = es->next ? es->next->at : 1.0f;
-      la1 = la1 * e->v2->fbcoord[3] /
-            (e->v1->fbcoord[3] - la1 * (e->v1->fbcoord[3] - e->v2->fbcoord[3]));
-      la2 = la2 * e->v2->fbcoord[3] /
-            (e->v1->fbcoord[3] - la2 * (e->v1->fbcoord[3] - e->v2->fbcoord[3]));
-      lineart_edge_cut(rb, e, la1, la2, 0, 10, es->occlusion != 0);
-    }
+    /* Convert to view space cutting points. */
+    double la1 = es->at;
+    double la2 = es->next ? es->next->at : 1.0f;
+    la1 = la1 * e->v2->fbcoord[3] /
+          (e->v1->fbcoord[3] - la1 * (e->v1->fbcoord[3] - e->v2->fbcoord[3]));
+    la2 = la2 * e->v2->fbcoord[3] /
+          (e->v1->fbcoord[3] - la2 * (e->v1->fbcoord[3] - e->v2->fbcoord[3]));
+    unsigned char shadow_bits = (es->occlusion != 0) ? LRT_SHADOW_MASK_SHADED :
+                                                       LRT_SHADOW_MASK_LIT;
+    lineart_edge_cut(rb, e, la1, la2, 0, 0, shadow_bits);
   }
 }
 
@@ -2506,6 +2515,9 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
       BLI_addtail(&la_edge->segments, la_seg);
 
       if (shadow_eln) {
+        /* TODO(Yiming): It's gonna be faster to do this operation after second stage occlusion if
+         * we only need visible segments to have shadow info, however that way we lose information
+         * on "shadow behind transparency window" type of region. */
         LineartEdge *shadow_e = lineart_find_matching_edge(shadow_eln,
                                                            (uint64_t)la_edge->from_shadow);
         if (shadow_e) {
@@ -4131,6 +4143,8 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
                            (lmd->light_contour_object != NULL));
   rb->use_shadow = ((edge_types & LRT_EDGE_FLAG_PROJECTED_SHADOW) != 0 &&
                     (lmd->light_contour_object != NULL));
+
+  rb->shadow_selection = lmd->shadow_selection_override;
 
   rb->use_back_face_culling = (lmd->calculation_flags & LRT_USE_BACK_FACE_CULLING) != 0;
 
@@ -5978,7 +5992,12 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   rb->shadow_data_pool = shadow_data_pool;
 
   /* See LineartRenderBuffer::edge_data_pool for explaination. */
-  rb->edge_data_pool = shadow_data_pool;
+  if (rb->shadow_selection) {
+    rb->edge_data_pool = shadow_data_pool;
+  }
+  else {
+    rb->edge_data_pool = &rb->render_data_pool;
+  }
 
   copy_v3_v3_db(rb->camera_pos_secondary, rb->camera_pos);
   copy_m4_m4(rb->cam_obmat_secondary, rb->cam_obmat);
@@ -6002,16 +6021,19 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   rb->tile_recursive_level = is_persp ? LRT_TILE_RECURSIVE_PERSPECTIVE : LRT_TILE_RECURSIVE_ORTHO;
 
   /* Contour and loose edge from light viewing direction will be casted as shadow, so only force
-   * them on. Other line types are enabled as-is if preserving lit/shaded information is required
-   * for those feature lines. */
-  // if (!rb->needs_shadow_separation) {
-  // rb->use_crease = rb->use_material = rb->use_edge_marks = rb->use_intersections =
-  //    rb->use_light_contour = false;
-  //}
+   * them on. If we need lit/shaded information for other line types, they are then enabled as-is
+   * so that cutting positions can also be calculated through shadow projection.
+   */
+  if (!rb->shadow_selection) {
+    rb->use_crease = rb->use_material = rb->use_edge_marks = rb->use_intersections =
+        rb->use_light_contour = false;
+  }
+  else {
+    rb->use_contour_secondary = true;
+    rb->allow_duplicated_types = true;
+  }
   rb->use_loose = true;
   rb->use_contour = true;
-  rb->use_contour_secondary = true;
-  rb->allow_duplicated_types = true;
 
   rb->max_occlusion_level = 0; /* No point getting see-through projections there. */
   rb->use_back_face_culling = false;
@@ -6062,7 +6084,9 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   lineart_shadow_cast(rb);
   bool any_generated = lineart_shadow_cast_generate_edges(rb, r_veln, r_eeln);
 
-  memcpy(r_calculated_edges_eln_list, &rb->line_buffer_pointers, sizeof(ListBase));
+  if (rb->shadow_selection) {
+    memcpy(r_calculated_edges_eln_list, &rb->line_buffer_pointers, sizeof(ListBase));
+  }
 
   lineart_destroy_render_data_keep_init(rb);
   MEM_freeN(rb);
@@ -6138,14 +6162,9 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   rb->_source_object = lmd->source_object;
 
   LineartElementLinkNode *shadow_veln, *shadow_eeln;
-  bool shadow_generated = lineart_main_try_generate_shadow(depsgraph,
-                                                           scene,
-                                                           rb,
-                                                           lmd,
-                                                           &lc->shadow_data_pool,
-                                                           &shadow_veln,
-                                                           &shadow_eeln,
-                                                           &lc->shadow_elns);
+  ListBase *shadow_elns = rb->shadow_selection ? &lc->shadow_elns : NULL;
+  bool shadow_generated = lineart_main_try_generate_shadow(
+      depsgraph, scene, rb, lmd, &lc->shadow_data_pool, &shadow_veln, &shadow_eeln, shadow_elns);
 
   /* Get view vector before loading geometries, because we detect feature lines there. */
   lineart_main_get_view_vector(rb);
@@ -6156,7 +6175,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
                                rb,
                                lmd->calculation_flags & LRT_ALLOW_DUPLI_OBJECTS,
                                false,
-                               &lc->shadow_elns);
+                               shadow_elns);
 
   if (shadow_generated) {
     lineart_transform_and_add_shadow(rb, shadow_veln, shadow_eeln);
@@ -6294,6 +6313,7 @@ static void lineart_gpencil_generate(LineartCache *cache,
                                      uchar intersection_mask,
                                      short thickness,
                                      float opacity,
+                                     uchar shaodow_selection,
                                      const char *source_vgname,
                                      const char *vgname,
                                      int modifier_flags)
@@ -6372,6 +6392,17 @@ static void lineart_gpencil_generate(LineartCache *cache,
       }
       else {
         if (!(ec->intersection_mask & intersection_mask)) {
+          continue;
+        }
+      }
+    }
+    if (shaodow_selection) {
+      if (ec->shadow_mask_bits != LRT_SHADOW_MASK_UNDEFINED) {
+        /* TODO(Yiming): Give a behaviour option for how to display undefined shadow info. */
+        if ((shaodow_selection == LRT_SHADOW_FILTER_LIT &&
+             ec->shadow_mask_bits != LRT_SHADOW_MASK_LIT) ||
+            (shaodow_selection == LRT_SHADOW_FILTER_SHADED &&
+             ec->shadow_mask_bits != LRT_SHADOW_MASK_SHADED)) {
           continue;
         }
       }
@@ -6467,6 +6498,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   uchar intersection_mask,
                                   short thickness,
                                   float opacity,
+                                  uchar shadow_selection,
                                   const char *source_vgname,
                                   const char *vgname,
                                   int modifier_flags)
@@ -6511,6 +6543,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                            intersection_mask,
                            thickness,
                            opacity,
+                           shadow_selection,
                            source_vgname,
                            vgname,
                            modifier_flags);

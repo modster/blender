@@ -132,6 +132,7 @@ static bool bake_strokes(Object *ob,
       lmd->intersection_mask,
       lmd->thickness,
       lmd->opacity,
+      lmd->shadow_selection,
       lmd->source_vertex_group,
       lmd->vgname,
       lmd->flags);

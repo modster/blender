@@ -3179,6 +3179,13 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem modifier_lineart_shadow_region_filtering[] = {
+      {LRT_SHADOW_FILTER_NONE, "NONE", 0, "None", ""},
+      {LRT_SHADOW_FILTER_LIT, "LIT", 0, "Lit", ""},
+      {LRT_SHADOW_FILTER_SHADED, "SHADED", 0, "Shaded", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "LineartGpencilModifier", "GpencilModifier");
   RNA_def_struct_ui_text(
       srna, "Line Art Modifier", "Generate line art strokes from selected source");
@@ -3428,6 +3435,14 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Use Shadow", "Project contour lines using a light shource object");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "shadow_region_filtering", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "shadow_selection");
+  RNA_def_property_enum_items(prop, modifier_lineart_shadow_region_filtering);
+  RNA_def_property_ui_text(prop,
+                           "Shadow Region Filtering",
+                           "Select feature lines that comes from lit or shaded regions");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_dependency_update");
 
   prop = RNA_def_property(srna, "use_multiple_levels", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_multiple_levels", 0);
