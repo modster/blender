@@ -47,7 +47,7 @@ static Array<float> accumulated_lengths_curve_domain(const bke::CurvesGeometry &
 
 /**
  * Return the length of each control point along each curve, starting at zero for the first point.
- * Importantly, this is different than the length at each evaluated point. The implemenation is
+ * Importantly, this is different than the length at each evaluated point. The implementation is
  * different for every curve type:
  *  - Catmull Rom Curves: Use the resolution to find the evaluated point for each control point.
  *  - Poly Curves: Copy the evaluated lengths, but we need to add a zero to the front of the array.
@@ -59,11 +59,10 @@ static Array<float> curve_length_point_domain(const bke::CurvesGeometry &curves)
 {
   curves.ensure_evaluated_lengths();
   const VArray<int8_t> types = curves.curve_types();
-  const VArray<int> resolution = curves.resolution();
+  const VArray<int> resolutions = curves.resolution();
   const VArray<bool> cyclic = curves.cyclic();
 
   Array<float> result(curves.points_num());
-  VArray<int> resolutions = curves.resolution();
 
   threading::parallel_for(curves.curves_range(), 128, [&](IndexRange range) {
     for (const int i_curve : range) {
@@ -75,8 +74,8 @@ static Array<float> curve_length_point_domain(const bke::CurvesGeometry &curves)
       switch (types[i_curve]) {
         case CURVE_TYPE_CATMULL_ROM: {
           const int resolution = resolutions[i_curve];
-          for (const int i : IndexRange(points.size()).drop_front(1).drop_back(1)) {
-            lengths[i] = evaluated_lengths[resolution * i - 1];
+          for (const int i : IndexRange(points.size()).drop_back(1)) {
+            lengths[i + 1] = evaluated_lengths[resolution * i - 1];
           }
           break;
         }
@@ -85,8 +84,8 @@ static Array<float> curve_length_point_domain(const bke::CurvesGeometry &curves)
           break;
         case CURVE_TYPE_BEZIER: {
           const Span<int> offsets = curves.bezier_evaluated_offsets_for_curve(i_curve);
-          for (const int i : IndexRange(points.size()).drop_front(1).drop_back(1)) {
-            lengths[i] = evaluated_lengths[offsets[i] - 1];
+          for (const int i : IndexRange(points.size()).drop_back(1)) {
+            lengths[i + 1] = evaluated_lengths[offsets[i] - 1];
           }
           break;
         }

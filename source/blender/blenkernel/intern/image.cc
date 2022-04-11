@@ -234,7 +234,6 @@ static void image_foreach_cache(ID *id,
   IDCacheKey key;
   key.id_session_uuid = id->session_uuid;
   key.offset_in_ID = offsetof(Image, cache);
-  key.cache_v = image->cache;
   function_callback(id, &key, (void **)&image->cache, 0, user_data);
 
   auto gputexture_offset = [image](int target, int eye, int resolution) {
@@ -253,19 +252,16 @@ static void image_foreach_cache(ID *id,
           continue;
         }
         key.offset_in_ID = gputexture_offset(a, eye, resolution);
-        key.cache_v = texture;
         function_callback(id, &key, (void **)&image->gputexture[a][eye][resolution], 0, user_data);
       }
     }
   }
 
   key.offset_in_ID = offsetof(Image, rr);
-  key.cache_v = image->rr;
   function_callback(id, &key, (void **)&image->rr, 0, user_data);
 
   LISTBASE_FOREACH (RenderSlot *, slot, &image->renderslots) {
     key.offset_in_ID = (size_t)BLI_ghashutil_strhash_p(slot->name);
-    key.cache_v = slot->render;
     function_callback(id, &key, (void **)&slot->render, 0, user_data);
   }
 }
@@ -3100,7 +3096,7 @@ void BKE_image_get_tile_label(Image *ima, ImageTile *tile, char *label, int len_
   }
 }
 
-bool BKE_image_get_tile_info(char *filepath, ListBase *tiles, int *tile_start, int *tile_range)
+bool BKE_image_get_tile_info(char *filepath, ListBase *tiles, int *r_tile_start, int *r_tile_range)
 {
   char filename[FILE_MAXFILE], dirname[FILE_MAXDIR];
   BLI_split_dirfile(filepath, dirname, filename, sizeof(dirname), sizeof(filename));
@@ -3142,8 +3138,8 @@ bool BKE_image_get_tile_info(char *filepath, ListBase *tiles, int *tile_start, i
   if (is_udim && min_udim <= IMA_UDIM_MAX) {
     BLI_join_dirfile(filepath, FILE_MAX, dirname, filename);
 
-    *tile_start = min_udim;
-    *tile_range = max_udim - min_udim + 1;
+    *r_tile_start = min_udim;
+    *r_tile_range = max_udim - min_udim + 1;
     return true;
   }
   return false;

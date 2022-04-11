@@ -367,6 +367,8 @@ typedef enum {
   DRW_STATE_PROGRAM_POINT_SIZE = (1u << 31),
 } DRWState;
 
+ENUM_OPERATORS(DRWState, DRW_STATE_PROGRAM_POINT_SIZE);
+
 #define DRW_STATE_DEFAULT \
   (DRW_STATE_WRITE_DEPTH | DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_LESS_EQUAL)
 #define DRW_STATE_BLEND_ENABLED \
@@ -634,10 +636,9 @@ void DRW_shgroup_uniform_float_copy(DRWShadingGroup *shgroup, const char *name, 
 void DRW_shgroup_uniform_vec2_copy(DRWShadingGroup *shgroup, const char *name, const float *value);
 void DRW_shgroup_uniform_vec3_copy(DRWShadingGroup *shgroup, const char *name, const float *value);
 void DRW_shgroup_uniform_vec4_copy(DRWShadingGroup *shgroup, const char *name, const float *value);
-void DRW_shgroup_uniform_vec4_array_copy(DRWShadingGroup *shgroup,
-                                         const char *name,
-                                         const float (*value)[4],
-                                         int arraysize);
+void DRW_shgroup_uniform_mat4_copy(DRWShadingGroup *shgroup,
+                                   const char *name,
+                                   const float (*value)[4]);
 void DRW_shgroup_vertex_buffer_ex(DRWShadingGroup *shgroup,
                                   const char *name,
                                   struct GPUVertBuf *vertex_buffer DRW_DEBUG_FILE_LINE_ARGS);

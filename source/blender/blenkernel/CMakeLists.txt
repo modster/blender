@@ -112,6 +112,7 @@ set(SRC
   intern/curve_deform.c
   intern/curve_eval.cc
   intern/curve_nurbs.cc
+  intern/curve_poly.cc
   intern/curve_to_mesh_convert.cc
   intern/curveprofile.cc
   intern/curves.cc
@@ -121,7 +122,6 @@ set(SRC
   intern/data_transfer.c
   intern/deform.c
   intern/displist.cc
-  intern/displist_tangent.c
   intern/dynamicpaint.c
   intern/editlattice.c
   intern/editmesh.c
@@ -240,6 +240,7 @@ set(SRC
   intern/particle_child.c
   intern/particle_distribute.c
   intern/particle_system.c
+  intern/pbvh.cc
   intern/pbvh.c
   intern/pbvh_bmesh.c
   intern/pointcache.c
@@ -357,7 +358,6 @@ set(SRC
   BKE_data_transfer.h
   BKE_deform.h
   BKE_displist.h
-  BKE_displist_tangent.h
   BKE_duplilist.h
   BKE_dynamicpaint.h
   BKE_editlattice.h
@@ -370,6 +370,7 @@ set(SRC
   BKE_fcurve_driver.h
   BKE_fluid.h
   BKE_freestyle.h
+  BKE_geometry_fields.hh
   BKE_geometry_set.h
   BKE_geometry_set.hh
   BKE_geometry_set_instances.hh

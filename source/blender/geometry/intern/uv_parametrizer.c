@@ -2119,7 +2119,7 @@ static void p_collapse_cost_vertex(PVert *vert, float *r_mincost, PEdge **r_mine
     enext = p_wheel_edge_next(e);
 
     if (enext == NULL) {
-      /* the other boundary edge, where we only have the pair halfedge */
+      /* The other boundary edge, where we only have the pair half-edge. */
       pair = e->next->next;
 
       if (p_collapse_allowed(NULL, pair)) {
@@ -4841,10 +4841,10 @@ void GEO_uv_parametrizer_pack(ParamHandle *handle,
   BLI_box_pack_2d(boxarray, phandle->ncharts - unpacked, &tot_width, &tot_height);
 
   if (tot_height > tot_width) {
-    scale = 1.0f / tot_height;
+    scale = tot_height != 0.0f ? (1.0f / tot_height) : 1.0f;
   }
   else {
-    scale = 1.0f / tot_width;
+    scale = tot_width != 0.0f ? (1.0f / tot_width) : 1.0f;
   }
 
   for (i = 0; i < phandle->ncharts - unpacked; i++) {
