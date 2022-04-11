@@ -1636,12 +1636,9 @@ void SCULPT_do_paint_brush(const struct PaintModeSettings *paint_mode_settings,
 /**
  * @brief Get the image canvas for painting on the given object.
  *
- * @note this is a temporary function. Would actually need to be replaced by logic provided by
- * {D14455}.
- *
  * @return #true if an image is found. The #r_image and #r_image_user fields are filled with the
  * image and image user. Returns false when the image isn't found. In the later case the r_image
- * and r_image_user would not be modified.
+ * and r_image_user are set to nullptr/NULL.
  */
 bool SCULPT_paint_image_canvas_get(const struct PaintModeSettings *paint_mode_settings,
                                    struct Object *ob,

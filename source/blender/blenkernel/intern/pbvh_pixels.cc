@@ -14,8 +14,6 @@
 #include "BLI_math.h"
 #include "BLI_task.h"
 
-#include "PIL_time_utildefines.h"
-
 #include "BKE_image_wrappers.hh"
 
 #include "bmesh.h"
@@ -33,7 +31,7 @@ constexpr bool USE_WATERTIGHT_SEAM_CHECK = true;
  * Keep track of visited polygons.
  *
  * Uses a std::vector<bool> to reduce memory requirements.
- * TODO(jbakker): Should be replaced by BLI bool vector when available.
+ * TODO(jbakker): Should be replaced by BLI bool vector when available {D14006}.
  */
 class VisitedPolygons : std::vector<bool> {
  public:
@@ -56,6 +54,17 @@ class VisitedPolygons : std::vector<bool> {
 /**
  * @brief Calculate the delta of two neighbour uv coordinates in the given image buffer.
  */
+static float3 calc_barycentric_delta(const float2 uvs[3],
+                                     const float2 start_uv,
+                                     const float2 end_uv)
+{
+
+  const BarycentricWeights start_barycentric(uvs[0], uvs[1], uvs[2], start_uv);
+  const BarycentricWeights end_barycentric(uvs[0], uvs[1], uvs[2], end_uv);
+  const float3 delta_barycentric = end_barycentric - start_barycentric;
+  return delta_barycentric;
+}
+
 static float3 calc_barycentric_delta_x(const ImBuf *image_buffer,
                                        const float2 uvs[3],
                                        const int x,
@@ -63,10 +72,7 @@ static float3 calc_barycentric_delta_x(const ImBuf *image_buffer,
 {
   const float2 start_uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
   const float2 end_uv(float(x + 1) / image_buffer->x, float(y) / image_buffer->y);
-  const BarycentricWeights start_barycentric(uvs[0], uvs[1], uvs[2], start_uv);
-  const BarycentricWeights end_barycentric(uvs[0], uvs[1], uvs[2], end_uv);
-  const float3 delta_barycentric = end_barycentric - start_barycentric;
-  return delta_barycentric;
+  return calc_barycentric_delta(uvs, start_uv, end_uv);
 }
 
 static float3 calc_barycentric_delta_y(const ImBuf *image_buffer,
@@ -76,10 +82,7 @@ static float3 calc_barycentric_delta_y(const ImBuf *image_buffer,
 {
   const float2 start_uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
   const float2 end_uv(float(x) / image_buffer->x, float(y + 1) / image_buffer->y);
-  const BarycentricWeights start_barycentric(uvs[0], uvs[1], uvs[2], start_uv);
-  const BarycentricWeights end_barycentric(uvs[0], uvs[1], uvs[2], end_uv);
-  const float3 delta_barycentric = end_barycentric - start_barycentric;
-  return delta_barycentric;
+  return calc_barycentric_delta(uvs, start_uv, end_uv);
 }
 
 static void extract_barycentric_pixels(TileData &tile_data,
@@ -232,7 +235,7 @@ static bool should_pixels_be_updated(PBVHNode *node)
 }
 
 /**
- * Does this the given node contains a list with owning polygons.
+ * Does the given node contains a list with polygons it owns.
  *
  * The owning polygons are stored per triangle inside the node.
  */
@@ -370,8 +373,6 @@ static void update_pixels(PBVH *pbvh,
   if (!find_nodes_to_update(pbvh, nodes_to_update, visited_polygons)) {
     return;
   }
-  TIMEIT_START(update_pixels);
-  printf(" - updating %ld nodes\n", nodes_to_update.size());
 
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(ldata, CD_MLOOPUV));
   if (ldata_uv == nullptr) {
@@ -431,7 +432,6 @@ static void update_pixels(PBVH *pbvh,
            float(compressed_data_len) / num_pixels);
   }
 #endif
-  TIMEIT_END(update_pixels);
 }
 
 }  // namespace blender::bke::pbvh::pixels::extractor

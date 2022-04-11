@@ -1,4 +1,5 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2022 Blender Foundation. All rights reserved. */
 
 #pragma once
 
@@ -103,20 +104,21 @@ struct TrianglePaintInput {
 };
 
 /**
- * Pixels of the same triangle share some data.
+ * Data shared between pixels that belong to the same triangle.
  *
- * Data is stored as a list of structs, grouped by usage to improve performance as it improves CPU
- * cache prefetching.
- *
+ * Data is stored as a list of structs, grouped by usage to improve performance (improves CPU
+ * cache prefetching).
  */
 struct Triangles {
-  /** Paint input per triangle. */
+  /** Data accessed by the inner loop of the painting brush. */
   Vector<TrianglePaintInput> paint_input;
-  /** Polygon index per triangle. */
+  /** Per triangle the index of the polygon it belongs to. */
   Vector<int> poly_indices;
   /**
    * Loop indices per triangle.
-   * NOTE: is only available during building the triangles.
+   *
+   * NOTE: is only available during building the triangles. Kept here as in the future we need
+   * the data to calculate normals.
    */
   Vector<EncodedLoopIndices> loop_indices;
 
@@ -168,7 +170,7 @@ struct Triangles {
 };
 
 /**
- * Encode multiple sequential pixels to reduce memory footprint.
+ * Encode sequential pixels to reduce memory footprint.
  */
 struct PixelsPackage {
   /** Barycentric coordinate of the first pixel. */

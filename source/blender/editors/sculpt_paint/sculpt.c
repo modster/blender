@@ -2757,9 +2757,9 @@ static void update_brush_local_mat(Sculpt *sd, Object *ob)
 
 static bool sculpt_needs_pbvh_pixels(const PaintModeSettings *paint_mode_settings,
                                      const Brush *brush,
-                                     Object *ob /*, const PaintModeSettings *settings*/)
+                                     Object *ob)
 {
-  if (brush->sculpt_tool == SCULPT_TOOL_PAINT /*&& U.experimental.use_sculpt_texture_paint*/) {
+  if (brush->sculpt_tool == SCULPT_TOOL_PAINT && U.experimental.use_sculpt_texture_paint) {
     Image *image;
     ImageUser *image_user;
     return SCULPT_paint_image_canvas_get(paint_mode_settings, ob, &image, &image_user);

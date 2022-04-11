@@ -246,7 +246,6 @@ void SCULPT_do_paint_brush(const PaintModeSettings *paint_mode_settings,
                            PBVHNode **nodes,
                            int totnode)
 {
-  /* TODO: Should be determined by the painting canvas. */
   if (SCULPT_use_image_paint_brush(paint_mode_settings, ob)) {
     SCULPT_do_paint_brush_image(paint_mode_settings, sd, ob, nodes, totnode);
     return;

@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2022 Blender Foundation. All rights reserved. */
+
 #include "DNA_image_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
@@ -6,8 +9,6 @@
 
 #include "ED_paint.h"
 #include "ED_uvedit.h"
-
-#include "PIL_time_utildefines.h"
 
 #include "BLI_math.h"
 #include "BLI_math_color_blend.h"
@@ -59,7 +60,7 @@ struct TexturePaintingUserData {
 };
 
 struct Pixel {
-  /** object local position of the pixel on the surface. */
+  /** Local position of the pixel on the surface. */
   float3 pos;
 
   Pixel &operator+=(const Pixel &other)
@@ -221,7 +222,6 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     }
 
     copy_v4_fl4(brush_color, brush->rgb[0], brush->rgb[1], brush->rgb[2], 1.0);
-    /* TODO: unsure. brush color is stored in float sRGB. */
     const char *from_colorspace = IMB_colormanagement_role_colorspace_name_get(
         COLOR_ROLE_COLOR_PICKING);
     ColormanageProcessor *cm_processor = IMB_colormanagement_colorspace_processor_new(
@@ -240,7 +240,9 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     brush_test_fn = SCULPT_brush_test_init_with_falloff_shape(ss, &test, brush->falloff_shape);
   }
 
-  /** Extract the staring pixel from the given encoded_pixels belonging to the triangle. */
+  /**
+   * Extract the staring pixel from the given encoded_pixels belonging to the triangle.
+   */
   Pixel get_start_pixel(const TrianglePaintInput &triangle,
                         const PixelsPackage &encoded_pixels) const
   {
@@ -248,7 +250,8 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   }
 
   /**
-   * Extract the delta pixel that will be used to advance a Pixel instance to the next pixel. */
+   * Extract the delta pixel that will be used to advance a Pixel instance to the next pixel.
+   */
   Pixel get_delta_pixel(const TrianglePaintInput &triangle,
                         const PixelsPackage &encoded_pixels,
                         const Pixel &start_pixel) const
@@ -439,8 +442,6 @@ void SCULPT_do_paint_brush_image(const PaintModeSettings *paint_mode_settings,
     return;
   }
 
-  TIMEIT_START(texture_painting);
-
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, totnode);
   BLI_task_parallel_range(0, totnode, &data, do_vertex_brush_test, &settings);
@@ -449,7 +450,5 @@ void SCULPT_do_paint_brush_image(const PaintModeSettings *paint_mode_settings,
   TaskParallelSettings settings_flush;
   BKE_pbvh_parallel_range_settings(&settings_flush, false, totnode);
   BLI_task_parallel_range(0, totnode, &data, do_mark_dirty_regions, &settings_flush);
-
-  TIMEIT_END(texture_painting);
 }
 }
