@@ -26,7 +26,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -70,7 +70,7 @@ class BrightContrastGPUMaterialNode : public GPUMaterialNode {
     const float use_premultiply = get_use_premultiply();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_bright_contrast",
                    inputs,
                    outputs,
@@ -79,7 +79,7 @@ class BrightContrastGPUMaterialNode : public GPUMaterialNode {
 
   bool get_use_premultiply()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 };
 

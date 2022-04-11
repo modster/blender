@@ -25,7 +25,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -88,7 +88,7 @@ class HueCorrectGPUMaterialNode : public GPUMaterialNode {
     BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_hue_correct",
                    inputs,
                    outputs,
@@ -100,7 +100,7 @@ class HueCorrectGPUMaterialNode : public GPUMaterialNode {
 
   CurveMapping *get_curve_mapping()
   {
-    return static_cast<CurveMapping *>(node().storage);
+    return static_cast<CurveMapping *>(bnode().storage);
   }
 };
 

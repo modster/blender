@@ -40,7 +40,7 @@ class NodeOperation : public Operation {
   NodeOperation(Context &context, DNode node);
 
   /* Returns a reference to the node this operations represents. */
-  const bNode &node() const;
+  const bNode &bnode() const;
 
  protected:
   /* Returns true if the output identified by the given identifier is needed and should be

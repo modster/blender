@@ -26,7 +26,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -79,7 +79,7 @@ class AlphaOverGPUMaterialNode : public GPUMaterialNode {
     const float premultiply_factor = get_premultiply_factor();
     if (premultiply_factor != 0.0f) {
       GPU_stack_link(material,
-                     &node(),
+                     &bnode(),
                      "node_composite_alpha_over_mixed",
                      inputs,
                      outputs,
@@ -88,21 +88,21 @@ class AlphaOverGPUMaterialNode : public GPUMaterialNode {
     }
 
     if (get_use_premultiply()) {
-      GPU_stack_link(material, &node(), "node_composite_alpha_over_key", inputs, outputs);
+      GPU_stack_link(material, &bnode(), "node_composite_alpha_over_key", inputs, outputs);
       return;
     }
 
-    GPU_stack_link(material, &node(), "node_composite_alpha_over_premultiply", inputs, outputs);
+    GPU_stack_link(material, &bnode(), "node_composite_alpha_over_premultiply", inputs, outputs);
   }
 
   bool get_use_premultiply()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 
   float get_premultiply_factor()
   {
-    return ((NodeTwoFloats *)node().storage)->x;
+    return ((NodeTwoFloats *)bnode().storage)->x;
   }
 };
 

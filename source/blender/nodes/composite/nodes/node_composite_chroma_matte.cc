@@ -28,7 +28,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -91,7 +91,7 @@ class ChromaMatteGPUMaterialNode : public GPUMaterialNode {
     const float falloff = get_falloff();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_chroma_matte",
                    inputs,
                    outputs,
@@ -102,7 +102,7 @@ class ChromaMatteGPUMaterialNode : public GPUMaterialNode {
 
   NodeChroma *get_node_chroma()
   {
-    return static_cast<NodeChroma *>(node().storage);
+    return static_cast<NodeChroma *>(bnode().storage);
   }
 
   float get_acceptance()

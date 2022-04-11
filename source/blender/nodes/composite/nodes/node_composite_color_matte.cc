@@ -26,7 +26,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -90,7 +90,7 @@ class ColorMatteGPUMaterialNode : public GPUMaterialNode {
     const float value_epsilon = get_value_epsilon();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_color_matte",
                    inputs,
                    outputs,
@@ -101,7 +101,7 @@ class ColorMatteGPUMaterialNode : public GPUMaterialNode {
 
   NodeChroma *get_node_chroma()
   {
-    return static_cast<NodeChroma *>(node().storage);
+    return static_cast<NodeChroma *>(bnode().storage);
   }
 
   float get_hue_epsilon()

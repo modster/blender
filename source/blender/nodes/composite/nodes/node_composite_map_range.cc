@@ -26,7 +26,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -86,7 +86,7 @@ class MapRangeGPUMaterialNode : public GPUMaterialNode {
     const float should_clamp = get_should_clamp();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_map_range",
                    inputs,
                    outputs,
@@ -95,7 +95,7 @@ class MapRangeGPUMaterialNode : public GPUMaterialNode {
 
   bool get_should_clamp()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 };
 

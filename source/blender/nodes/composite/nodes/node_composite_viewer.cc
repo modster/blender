@@ -29,9 +29,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_state.h"
 #include "GPU_texture.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 

@@ -23,7 +23,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -55,7 +55,7 @@ class NormalGPUMaterialNode : public GPUMaterialNode {
     GPUNodeStack *outputs = get_outputs_array();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_normal",
                    inputs,
                    outputs,

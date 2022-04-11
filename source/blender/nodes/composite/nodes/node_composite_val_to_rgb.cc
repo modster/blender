@@ -29,7 +29,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -75,7 +75,7 @@ class ColorRampGPUMaterialNode : public GPUMaterialNode {
           mul_bias[0] = 1.0f / (color_band->data[1].pos - color_band->data[0].pos);
           mul_bias[1] = -mul_bias[0] * color_band->data[0].pos;
           GPU_stack_link(material,
-                         &node(),
+                         &bnode(),
                          "valtorgb_opti_linear",
                          inputs,
                          outputs,
@@ -86,7 +86,7 @@ class ColorRampGPUMaterialNode : public GPUMaterialNode {
         case COLBAND_INTERP_CONSTANT:
           mul_bias[1] = max_ff(color_band->data[0].pos, color_band->data[1].pos);
           GPU_stack_link(material,
-                         &node(),
+                         &bnode(),
                          "valtorgb_opti_constant",
                          inputs,
                          outputs,
@@ -98,7 +98,7 @@ class ColorRampGPUMaterialNode : public GPUMaterialNode {
           mul_bias[0] = 1.0f / (color_band->data[1].pos - color_band->data[0].pos);
           mul_bias[1] = -mul_bias[0] * color_band->data[0].pos;
           GPU_stack_link(material,
-                         &node(),
+                         &bnode(),
                          "valtorgb_opti_ease",
                          inputs,
                          outputs,
@@ -119,16 +119,16 @@ class ColorRampGPUMaterialNode : public GPUMaterialNode {
 
     if (color_band->ipotype == COLBAND_INTERP_CONSTANT) {
       GPU_stack_link(
-          material, &node(), "valtorgb_nearest", inputs, outputs, tex, GPU_constant(&layer));
+          material, &bnode(), "valtorgb_nearest", inputs, outputs, tex, GPU_constant(&layer));
       return;
     }
 
-    GPU_stack_link(material, &node(), "valtorgb", inputs, outputs, tex, GPU_constant(&layer));
+    GPU_stack_link(material, &bnode(), "valtorgb", inputs, outputs, tex, GPU_constant(&layer));
   }
 
   struct ColorBand *get_color_band()
   {
-    return static_cast<struct ColorBand *>(node().storage);
+    return static_cast<struct ColorBand *>(bnode().storage);
   }
 };
 
@@ -182,7 +182,7 @@ class RGBToBWGPUMaterialNode : public GPUMaterialNode {
     IMB_colormanagement_get_luminance_coefficients(luminance_coefficients);
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "color_to_luminance",
                    inputs,
                    outputs,

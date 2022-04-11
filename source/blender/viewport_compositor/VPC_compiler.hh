@@ -3,41 +3,20 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-
-#include "BLI_map.hh"
-#include "BLI_math_vec_types.hh"
-#include "BLI_transformation_2d.hh"
 #include "BLI_vector.hh"
-#include "BLI_vector_set.hh"
 
 #include "DNA_node_types.h"
-#include "DNA_scene_types.h"
-
-#include "GPU_material.h"
-#include "GPU_shader.h"
-#include "GPU_texture.h"
 
 #include "NOD_derived_node_tree.hh"
 
 #include "VPC_context.hh"
-#include "VPC_domain.hh"
-#include "VPC_gpu_material_node.hh"
 #include "VPC_gpu_material_operation.hh"
 #include "VPC_node_operation.hh"
 #include "VPC_operation.hh"
-#include "VPC_result.hh"
-#include "VPC_scheduler.hh"
-#include "VPC_texture_pool.hh"
 
 namespace blender::viewport_compositor {
 
 using namespace nodes::derived_node_tree_types;
-
-/* --------------------------------------------------------------------
- * GPU Material Compile Group
- */
 
 /* A class that represents a sequence of scheduled nodes that can be compiled together into a
  * single GPUMaterialOperation. The compiler keeps a single instance of this class when compiling
@@ -53,7 +32,7 @@ using namespace nodes::derived_node_tree_types;
 class GPUMaterialCompileGroup {
  private:
   /* The contiguous subset of the execution node schedule that is part of this group. */
-  Schedule sub_schedule_;
+  SubSchedule sub_schedule_;
 
  public:
   /* Add the given node to the GPU material compile group. */
@@ -77,7 +56,7 @@ class GPUMaterialCompileGroup {
   void reset();
 
   /* Returns the contiguous subset of the execution node schedule that is part of this group. */
-  Schedule &get_sub_schedule();
+  SubSchedule &get_sub_schedule();
 };
 
 /* --------------------------------------------------------------------
@@ -161,27 +140,6 @@ class Compiler {
    * appropriate operation, find the result corresponding to the given output, and return a
    * reference to it. */
   Result &get_output_socket_result(DOutputSocket output);
-};
-
-/* --------------------------------------------------------------------
- * Evaluator.
- */
-
-/* The main class of the viewport compositor. The evaluator compiles the compositor node tree into
- * a stream of operations that are then executed to compute the output of the compositor. */
-class Evaluator {
- private:
-  /* The compiler instance used to compile the compositor node tree. */
-  Compiler compiler_;
-
- public:
-  Evaluator(Context &context, bNodeTree *node_tree);
-
-  /* Compile the compositor node tree into an operations stream. */
-  void compile();
-
-  /* Evaluate the compiled operations stream. */
-  void evaluate();
 };
 
 }  // namespace blender::viewport_compositor

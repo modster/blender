@@ -31,7 +31,7 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -119,12 +119,12 @@ class ViewerOperation : public NodeOperation {
    * 1 -> Split Vertical. */
   int get_split_axis()
   {
-    return node().custom2;
+    return bnode().custom2;
   }
 
   float get_split_ratio()
   {
-    return node().custom1 / 100.0f;
+    return bnode().custom1 / 100.0f;
   }
 };
 

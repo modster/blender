@@ -45,7 +45,7 @@ NodeOperation::NodeOperation(Context &context, DNode node) : Operation(context),
   populate_results_for_unlinked_inputs();
 }
 
-const bNode &NodeOperation::node() const
+const bNode &NodeOperation::bnode() const
 {
   return *node_->bnode();
 }

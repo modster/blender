@@ -28,7 +28,7 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -92,7 +92,7 @@ class FilterOperation : public NodeOperation {
 
   int get_filter_method()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 
   void get_filter_kernel(float kernel[3][3])

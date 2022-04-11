@@ -27,7 +27,7 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -94,7 +94,7 @@ class TranslateOperation : public NodeOperation {
 
   NodeTranslateData &get_node_translate()
   {
-    return *static_cast<NodeTranslateData *>(node().storage);
+    return *static_cast<NodeTranslateData *>(bnode().storage);
   }
 
   bool get_use_relative()

@@ -38,7 +38,7 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -263,7 +263,7 @@ class MovieClipOperation : public NodeOperation {
   GPUTexture *get_movie_clip_texture()
   {
     MovieClip *movie_clip = get_movie_clip();
-    MovieClipUser *movie_clip_user = static_cast<MovieClipUser *>(node().storage);
+    MovieClipUser *movie_clip_user = static_cast<MovieClipUser *>(bnode().storage);
     BKE_movieclip_user_set_frame(movie_clip_user, context().get_scene()->r.cfra);
     return BKE_movieclip_get_gpu_texture(movie_clip, movie_clip_user);
   }
@@ -276,7 +276,7 @@ class MovieClipOperation : public NodeOperation {
 
   MovieClip *get_movie_clip()
   {
-    return (MovieClip *)node().id;
+    return (MovieClip *)bnode().id;
   }
 };
 

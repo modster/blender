@@ -1,53 +1,18 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright 2022 Blender Foundation. All rights reserved. */
 
-#include <limits>
-#include <memory>
-#include <string>
-
-#include "BLI_assert.h"
-#include "BLI_hash.hh"
-#include "BLI_listbase.h"
-#include "BLI_map.hh"
-#include "BLI_math_vec_types.hh"
-#include "BLI_math_vector.h"
-#include "BLI_stack.hh"
-#include "BLI_transformation_2d.hh"
-#include "BLI_utildefines.h"
-#include "BLI_vector.hh"
 #include "BLI_vector_set.hh"
 
-#include "BKE_node.h"
-
 #include "DNA_node_types.h"
-#include "DNA_scene_types.h"
-
-#include "GPU_compute.h"
-#include "GPU_material.h"
-#include "GPU_shader.h"
-#include "GPU_texture.h"
-#include "GPU_uniform_buffer.h"
-
-#include "gpu_shader_create_info.hh"
-
-#include "IMB_colormanagement.h"
 
 #include "NOD_derived_node_tree.hh"
-#include "NOD_node_declaration.hh"
 
-#include "MEM_guardedalloc.h"
-
-#include "VPC_compositor_execute.hh"
+#include "VPC_compiler.hh"
 #include "VPC_context.hh"
-#include "VPC_domain.hh"
 #include "VPC_gpu_material_node.hh"
-#include "VPC_gpu_material_operation.hh"
-#include "VPC_input_descriptor.hh"
 #include "VPC_node_operation.hh"
 #include "VPC_operation.hh"
-#include "VPC_result.hh"
 #include "VPC_scheduler.hh"
-#include "VPC_texture_pool.hh"
 #include "VPC_utilities.hh"
 
 namespace blender::viewport_compositor {
@@ -235,26 +200,6 @@ Result &Compiler::get_output_socket_result(DOutputSocket output)
    * that operation using the retrieved identifier. */
   GPUMaterialOperation *operation = gpu_material_operations_.lookup(output.node());
   return operation->get_result(operation->get_output_identifier_from_output_socket(output));
-}
-
-/* --------------------------------------------------------------------
- * Evaluator.
- */
-
-Evaluator::Evaluator(Context &context, bNodeTree *node_tree) : compiler_(context, node_tree)
-{
-}
-
-void Evaluator::compile()
-{
-  compiler_.compile();
-}
-
-void Evaluator::evaluate()
-{
-  for (Operation *operation : compiler_.operations_stream()) {
-    operation->evaluate();
-  }
 }
 
 }  // namespace blender::viewport_compositor

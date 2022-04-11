@@ -28,7 +28,7 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -96,7 +96,7 @@ class TransformOperation : public NodeOperation {
 
   Interpolation get_interpolation()
   {
-    switch (node().custom1) {
+    switch (bnode().custom1) {
       case 0:
         return Interpolation::Nearest;
       case 1:

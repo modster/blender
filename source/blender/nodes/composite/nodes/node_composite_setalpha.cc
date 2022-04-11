@@ -26,7 +26,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -73,16 +73,16 @@ class SetAlphaGPUMaterialNode : public GPUMaterialNode {
     const NodeSetAlpha *node_set_alpha = get_node_set_alpha();
 
     if (node_set_alpha->mode == CMP_NODE_SETALPHA_MODE_APPLY) {
-      GPU_stack_link(material, &node(), "node_composite_set_alpha_apply", inputs, outputs);
+      GPU_stack_link(material, &bnode(), "node_composite_set_alpha_apply", inputs, outputs);
       return;
     }
 
-    GPU_stack_link(material, &node(), "node_composite_set_alpha_replace", inputs, outputs);
+    GPU_stack_link(material, &bnode(), "node_composite_set_alpha_replace", inputs, outputs);
   }
 
   NodeSetAlpha *get_node_set_alpha()
   {
-    return static_cast<NodeSetAlpha *>(node().storage);
+    return static_cast<NodeSetAlpha *>(bnode().storage);
   }
 };
 

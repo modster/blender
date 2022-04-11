@@ -33,7 +33,7 @@ GPUNodeStack *GPUMaterialNode::get_outputs_array()
   return outputs_.data();
 }
 
-bNode &GPUMaterialNode::node() const
+bNode &GPUMaterialNode::bnode() const
 {
   return *node_->bnode();
 }

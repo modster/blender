@@ -28,7 +28,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -89,7 +89,7 @@ class MapValueGPUMaterialNode : public GPUMaterialNode {
     const float use_max = get_use_max();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_map_value",
                    inputs,
                    outputs,
@@ -103,7 +103,7 @@ class MapValueGPUMaterialNode : public GPUMaterialNode {
 
   TexMapping *get_texture_mapping()
   {
-    return static_cast<TexMapping *>(node().storage);
+    return static_cast<TexMapping *>(bnode().storage);
   }
 
   bool get_use_min()

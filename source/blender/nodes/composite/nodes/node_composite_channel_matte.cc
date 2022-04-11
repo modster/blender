@@ -28,7 +28,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -120,7 +120,7 @@ class ChannelMatteGPUMaterialNode : public GPUMaterialNode {
     const float min_limit = get_min_limit();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_channel_matte",
                    inputs,
                    outputs,
@@ -137,18 +137,18 @@ class ChannelMatteGPUMaterialNode : public GPUMaterialNode {
    * 4 -> CMP_NODE_CHANNEL_MATTE_CS_YCC */
   int get_color_space()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 
   /* Get the index of the channel used to generate the matte. */
   int get_matte_channel()
   {
-    return node().custom2 - 1;
+    return bnode().custom2 - 1;
   }
 
   NodeChroma *get_node_chroma()
   {
-    return static_cast<NodeChroma *>(node().storage);
+    return static_cast<NodeChroma *>(bnode().storage);
   }
 
   /* Get the index of the channel used to compute the limit value. */

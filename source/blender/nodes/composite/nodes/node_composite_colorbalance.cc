@@ -28,7 +28,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -181,7 +181,7 @@ class ColorBalanceGPUMaterialNode : public GPUMaterialNode {
 
     if (get_color_balance_method() == 0) {
       GPU_stack_link(material,
-                     &node(),
+                     &bnode(),
                      "node_composite_color_balance_lgg",
                      inputs,
                      outputs,
@@ -192,7 +192,7 @@ class ColorBalanceGPUMaterialNode : public GPUMaterialNode {
     }
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_color_balance_asc_cdl",
                    inputs,
                    outputs,
@@ -207,12 +207,12 @@ class ColorBalanceGPUMaterialNode : public GPUMaterialNode {
    * 1 -> ASC-CDL. */
   int get_color_balance_method()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 
   NodeColorBalance *get_node_color_balance()
   {
-    return static_cast<NodeColorBalance *>(node().storage);
+    return static_cast<NodeColorBalance *>(bnode().storage);
   }
 };
 

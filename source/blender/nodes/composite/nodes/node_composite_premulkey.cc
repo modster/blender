@@ -26,7 +26,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -59,18 +59,18 @@ class AlphaConvertGPUMaterialNode : public GPUMaterialNode {
     GPUNodeStack *outputs = get_outputs_array();
 
     if (get_mode() == 0) {
-      GPU_stack_link(material, &node(), "color_alpha_premultiply", inputs, outputs);
+      GPU_stack_link(material, &bnode(), "color_alpha_premultiply", inputs, outputs);
       return;
     }
 
-    GPU_stack_link(material, &node(), "color_alpha_unpremultiply", inputs, outputs);
+    GPU_stack_link(material, &bnode(), "color_alpha_unpremultiply", inputs, outputs);
   }
 
   /* 0 -> Premultiply Alpha.
    * 1 -> Unpremultiply Alpha. */
   int get_mode()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 };
 

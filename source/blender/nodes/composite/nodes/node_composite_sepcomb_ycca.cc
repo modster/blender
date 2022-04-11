@@ -25,7 +25,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -60,12 +60,12 @@ class SeparateYCCAGPUMaterialNode : public GPUMaterialNode {
     GPUNodeStack *inputs = get_inputs_array();
     GPUNodeStack *outputs = get_outputs_array();
 
-    GPU_stack_link(material, &node(), get_shader_function_name(), inputs, outputs);
+    GPU_stack_link(material, &bnode(), get_shader_function_name(), inputs, outputs);
   }
 
   int get_mode()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 
   const char *get_shader_function_name()
@@ -146,12 +146,12 @@ class CombineYCCAGPUMaterialNode : public GPUMaterialNode {
     GPUNodeStack *inputs = get_inputs_array();
     GPUNodeStack *outputs = get_outputs_array();
 
-    GPU_stack_link(material, &node(), get_shader_function_name(), inputs, outputs);
+    GPU_stack_link(material, &bnode(), get_shader_function_name(), inputs, outputs);
   }
 
   int get_mode()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 
   const char *get_shader_function_name()

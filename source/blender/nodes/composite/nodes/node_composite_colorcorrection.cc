@@ -28,7 +28,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -313,7 +313,7 @@ class ColorCorrectionGPUMaterialNode : public GPUMaterialNode {
     const NodeColorCorrection *node_color_correction = get_node_color_correction();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_color_correction",
                    inputs,
                    outputs,
@@ -346,13 +346,13 @@ class ColorCorrectionGPUMaterialNode : public GPUMaterialNode {
   void get_enabled_channels(float enabled_channels[3])
   {
     for (int i = 0; i < 3; i++) {
-      enabled_channels[i] = (node().custom1 & (1 << i)) ? 1.0f : 0.0f;
+      enabled_channels[i] = (bnode().custom1 & (1 << i)) ? 1.0f : 0.0f;
     }
   }
 
   NodeColorCorrection *get_node_color_correction()
   {
-    return static_cast<NodeColorCorrection *>(node().storage);
+    return static_cast<NodeColorCorrection *>(bnode().storage);
   }
 };
 

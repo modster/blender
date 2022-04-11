@@ -17,7 +17,7 @@
  * \ingroup cmpnodes
  */
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 

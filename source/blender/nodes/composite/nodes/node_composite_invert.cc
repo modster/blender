@@ -26,7 +26,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -77,7 +77,7 @@ class InvertGPUMaterialNode : public GPUMaterialNode {
     const float do_alpha = get_do_alpha();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_invert",
                    inputs,
                    outputs,
@@ -87,12 +87,12 @@ class InvertGPUMaterialNode : public GPUMaterialNode {
 
   bool get_do_rgb()
   {
-    return node().custom1 & CMP_CHAN_RGB;
+    return bnode().custom1 & CMP_CHAN_RGB;
   }
 
   bool get_do_alpha()
   {
-    return node().custom1 & CMP_CHAN_A;
+    return bnode().custom1 & CMP_CHAN_A;
   }
 };
 

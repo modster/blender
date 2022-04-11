@@ -26,7 +26,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -88,7 +88,7 @@ class DistanceMatteGPUMaterialNode : public GPUMaterialNode {
 
     if (get_color_space() == 1) {
       GPU_stack_link(material,
-                     &node(),
+                     &bnode(),
                      "node_composite_distance_matte_rgba",
                      inputs,
                      outputs,
@@ -98,7 +98,7 @@ class DistanceMatteGPUMaterialNode : public GPUMaterialNode {
     }
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_distance_matte_ycca",
                    inputs,
                    outputs,
@@ -108,7 +108,7 @@ class DistanceMatteGPUMaterialNode : public GPUMaterialNode {
 
   NodeChroma *get_node_chroma()
   {
-    return static_cast<NodeChroma *>(node().storage);
+    return static_cast<NodeChroma *>(bnode().storage);
   }
 
   /* 0 -> YCCA

@@ -23,7 +23,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "NOD_math_functions.hh"
 
@@ -64,7 +64,7 @@ class MathGPUMaterialNode : public GPUMaterialNode {
     GPUNodeStack *inputs = get_inputs_array();
     GPUNodeStack *outputs = get_outputs_array();
 
-    GPU_stack_link(material, &node(), get_shader_function_name(), inputs, outputs);
+    GPU_stack_link(material, &bnode(), get_shader_function_name(), inputs, outputs);
 
     if (!get_should_clamp()) {
       return;
@@ -82,7 +82,7 @@ class MathGPUMaterialNode : public GPUMaterialNode {
 
   int get_mode()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 
   const char *get_shader_function_name()
@@ -92,7 +92,7 @@ class MathGPUMaterialNode : public GPUMaterialNode {
 
   bool get_should_clamp()
   {
-    return node().custom2 & SHD_MATH_CLAMP;
+    return bnode().custom2 & SHD_MATH_CLAMP;
   }
 };
 

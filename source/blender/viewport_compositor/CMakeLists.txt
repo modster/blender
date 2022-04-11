@@ -16,10 +16,11 @@ set(INC
 
 
 set(SRC
-  intern/compositor_execute.cc
+  intern/compiler.cc
   intern/context.cc
   intern/conversion_processor_operation.cc
   intern/domain.cc
+  intern/evaluator.cc
   intern/gpu_material_node.cc
   intern/gpu_material_operation.cc
   intern/node_operation.cc
@@ -32,10 +33,11 @@ set(SRC
   intern/texture_pool.cc
   intern/utilities.cc
 
-  VPC_compositor_execute.hh
+  VPC_compiler.hh
   VPC_context.hh
   VPC_conversion_processor_operation.hh
   VPC_domain.hh
+  VPC_evaluator.hh
   VPC_gpu_material_node.hh
   VPC_gpu_material_operation.hh
   VPC_input_descriptor.hh

@@ -51,7 +51,7 @@ class GPUMaterialNode {
 
  protected:
   /* Returns a reference to the node this operations represents. */
-  bNode &node() const;
+  bNode &bnode() const;
 
  private:
   /* Populate the inputs of the node. The input link is set to nullptr and is expected to be

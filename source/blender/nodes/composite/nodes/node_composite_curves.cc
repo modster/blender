@@ -30,7 +30,8 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -70,17 +71,17 @@ class TimeCurveOperation : public NodeOperation {
 
   CurveMapping *get_curve_mapping()
   {
-    return static_cast<CurveMapping *>(node().storage);
+    return static_cast<CurveMapping *>(bnode().storage);
   }
 
   int get_start_time()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 
   int get_end_time()
   {
-    return node().custom2;
+    return bnode().custom2;
   }
 
   float compute_normalized_time()
@@ -176,7 +177,7 @@ class VectorCurvesGPUMaterialNode : public GPUMaterialNode {
     BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "curves_vector",
                    inputs,
                    outputs,
@@ -190,7 +191,7 @@ class VectorCurvesGPUMaterialNode : public GPUMaterialNode {
 
   CurveMapping *get_curve_mapping()
   {
-    return static_cast<CurveMapping *>(node().storage);
+    return static_cast<CurveMapping *>(bnode().storage);
   }
 };
 
@@ -273,7 +274,7 @@ class RGBCurvesGPUMaterialNode : public GPUMaterialNode {
 
     if (curve_mapping->tone == CURVE_TONE_FILMLIKE) {
       GPU_stack_link(material,
-                     &node(),
+                     &bnode(),
                      "curves_film_like",
                      inputs,
                      outputs,
@@ -291,7 +292,7 @@ class RGBCurvesGPUMaterialNode : public GPUMaterialNode {
         BKE_curvemapping_is_map_identity(curve_mapping, 1) &&
         BKE_curvemapping_is_map_identity(curve_mapping, 2)) {
       GPU_stack_link(material,
-                     &node(),
+                     &bnode(),
                      "curves_combined_only",
                      inputs,
                      outputs,
@@ -305,7 +306,7 @@ class RGBCurvesGPUMaterialNode : public GPUMaterialNode {
     }
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "curves_combined_rgb",
                    inputs,
                    outputs,
@@ -319,7 +320,7 @@ class RGBCurvesGPUMaterialNode : public GPUMaterialNode {
 
   CurveMapping *get_curve_mapping()
   {
-    return static_cast<CurveMapping *>(node().storage);
+    return static_cast<CurveMapping *>(bnode().storage);
   }
 };
 

@@ -23,7 +23,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -53,7 +53,7 @@ class SeparateHSVAGPUMaterialNode : public GPUMaterialNode {
     GPUNodeStack *inputs = get_inputs_array();
     GPUNodeStack *outputs = get_outputs_array();
 
-    GPU_stack_link(material, &node(), "node_composite_separate_hsva", inputs, outputs);
+    GPU_stack_link(material, &bnode(), "node_composite_separate_hsva", inputs, outputs);
   }
 };
 
@@ -105,7 +105,7 @@ class CombineHSVAGPUMaterialNode : public GPUMaterialNode {
     GPUNodeStack *inputs = get_inputs_array();
     GPUNodeStack *outputs = get_outputs_array();
 
-    GPU_stack_link(material, &node(), "node_composite_combine_hsva", inputs, outputs);
+    GPU_stack_link(material, &bnode(), "node_composite_combine_hsva", inputs, outputs);
   }
 };
 

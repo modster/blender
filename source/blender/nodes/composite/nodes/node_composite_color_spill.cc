@@ -28,7 +28,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -126,7 +126,7 @@ class ColorSpillGPUMaterialNode : public GPUMaterialNode {
     const float limit_scale = get_limit_scale();
 
     GPU_stack_link(material,
-                   &node(),
+                   &bnode(),
                    "node_composite_color_spill",
                    inputs,
                    outputs,
@@ -139,7 +139,7 @@ class ColorSpillGPUMaterialNode : public GPUMaterialNode {
   /* Get the index of the channel used for spilling. */
   int get_spill_channel()
   {
-    return node().custom1 - 1;
+    return bnode().custom1 - 1;
   }
 
   /* Get limiting algorithm.
@@ -147,12 +147,12 @@ class ColorSpillGPUMaterialNode : public GPUMaterialNode {
    * 1 -> Average. */
   int get_limiting_algorithm()
   {
-    return node().custom2;
+    return bnode().custom2;
   }
 
   NodeColorspill *get_node_color_spill()
   {
-    return static_cast<NodeColorspill *>(node().storage);
+    return static_cast<NodeColorspill *>(bnode().storage);
   }
 
   void get_spill_scale(float spill_scale[3])

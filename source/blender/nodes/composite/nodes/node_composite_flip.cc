@@ -30,7 +30,7 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -104,7 +104,7 @@ class FlipOperation : public NodeOperation {
    * 2 -> Flip along both x and y. */
   int get_flip_mode()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 };
 

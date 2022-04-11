@@ -49,7 +49,7 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 /* **************** IMAGE (and RenderResult, multilayer image) ******************** */
 
@@ -507,8 +507,8 @@ class ImageOperation : public NodeOperation {
 
   GPUTexture *get_image_texture()
   {
-    Image *image = (Image *)node().id;
-    ImageUser *image_user = (ImageUser *)node().storage;
+    Image *image = (Image *)bnode().id;
+    ImageUser *image_user = (ImageUser *)bnode().storage;
     return BKE_image_get_gpu_texture(image, image_user, nullptr);
   }
 };
@@ -689,7 +689,7 @@ class RenderLayerOperation : public NodeOperation {
 
   void execute() override
   {
-    const int view_layer = node().custom1;
+    const int view_layer = bnode().custom1;
     GPUTexture *pass_texture = context().get_pass_texture(view_layer, SCE_PASS_COMBINED);
     const int width = GPU_texture_width(pass_texture);
     const int height = GPU_texture_height(pass_texture);

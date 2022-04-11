@@ -21,7 +21,7 @@
  * \ingroup cmpnodes
  */
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -45,7 +45,7 @@ class ValueOperation : public NodeOperation {
     Result &result = get_result("Value");
     result.allocate_single_value();
 
-    const bNodeSocket *socket = static_cast<bNodeSocket *>(node().outputs.first);
+    const bNodeSocket *socket = static_cast<bNodeSocket *>(bnode().outputs.first);
     float value = static_cast<bNodeSocketValueFloat *>(socket->default_value)->value;
 
     result.set_float_value(value);

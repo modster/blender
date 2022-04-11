@@ -35,7 +35,7 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -172,17 +172,17 @@ class CropOperation : public NodeOperation {
    * outside of the cropping bounds will be set to a zero alpha value. */
   bool get_is_image_crop()
   {
-    return node().custom1;
+    return bnode().custom1;
   }
 
   bool get_is_relative()
   {
-    return node().custom2;
+    return bnode().custom2;
   }
 
   NodeTwoXYs &get_node_two_xys()
   {
-    return *static_cast<NodeTwoXYs *>(node().storage);
+    return *static_cast<NodeTwoXYs *>(bnode().storage);
   }
 
   /* Returns true if the operation does nothing and the input can be passed through. */

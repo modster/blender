@@ -25,7 +25,7 @@
 
 #include "DNA_node_types.h"
 
-#include "VPC_compositor_execute.hh"
+#include "VPC_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -49,7 +49,7 @@ class RGBOperation : public NodeOperation {
     Result &result = get_result("RGBA");
     result.allocate_single_value();
 
-    const bNodeSocket *socket = static_cast<bNodeSocket *>(node().outputs.first);
+    const bNodeSocket *socket = static_cast<bNodeSocket *>(bnode().outputs.first);
     float4 color = float4(static_cast<bNodeSocketValueRGBA *>(socket->default_value)->value);
 
     result.set_color_value(color);
