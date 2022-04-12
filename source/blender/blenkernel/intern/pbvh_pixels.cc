@@ -395,17 +395,16 @@ void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &i
   NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);
   if (node_data->flags.dirty) {
     ImageUser local_image_user = image_user;
-    void *image_lock;
     LISTBASE_FOREACH (ImageTile *, tile, &image.tiles) {
       image::ImageTileWrapper image_tile(tile);
       local_image_user.tile = image_tile.get_tile_number();
-      ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &local_image_user, &image_lock);
+      ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &local_image_user, nullptr);
       if (image_buffer == nullptr) {
         continue;
       }
 
       node_data->mark_region(image, image_tile, *image_buffer);
-      BKE_image_release_ibuf(&image, image_buffer, image_lock);
+      BKE_image_release_ibuf(&image, image_buffer, nullptr);
     }
     node_data->flags.dirty = false;
   }

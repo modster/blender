@@ -311,8 +311,6 @@ static void do_paint_pixels(void *__restrict userdata,
   PaintingKernel<ImageBufferFloat4> kernel_float4(ss, brush, thread_id, mvert);
   PaintingKernel<ImageBufferByte4> kernel_byte4(ss, brush, thread_id, mvert);
 
-  /* TODO: should we lock? */
-  void *image_lock;
   ImageUser image_user = *data->image_data.image_user;
   bool pixels_updated = false;
   LISTBASE_FOREACH (ImageTile *, tile, &data->image_data.image->tiles) {
@@ -324,7 +322,7 @@ static void do_paint_pixels(void *__restrict userdata,
       continue;
     }
 
-    ImBuf *image_buffer = BKE_image_acquire_ibuf(data->image_data.image, &image_user, &image_lock);
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(data->image_data.image, &image_user, nullptr);
     if (image_buffer == nullptr) {
       continue;
     }
@@ -346,7 +344,7 @@ static void do_paint_pixels(void *__restrict userdata,
       }
     }
 
-    BKE_image_release_ibuf(data->image_data.image, image_buffer, image_lock);
+    BKE_image_release_ibuf(data->image_data.image, image_buffer, nullptr);
 
     pixels_updated |= tile_data->flags.dirty;
   }
