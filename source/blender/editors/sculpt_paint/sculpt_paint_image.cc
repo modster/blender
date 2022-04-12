@@ -17,6 +17,7 @@
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
 
+#include "BKE_brush.h"
 #include "BKE_image_wrappers.hh"
 #include "BKE_material.h"
 #include "BKE_pbvh.h"
@@ -156,18 +157,14 @@ template<typename ImageBuffer> class PaintingKernel {
     init_brush_test();
   }
 
-  bool paint(const Triangles &triangles, const PackedPixelRow &encoded_pixels, ImBuf *image_buffer)
+  bool paint(const Triangles &triangles, const PackedPixelRow &pixel_row, ImBuf *image_buffer)
   {
-    if (image_buffer != last_used_image_buffer_ptr) {
-      last_used_image_buffer_ptr = image_buffer;
-      init_brush_color(image_buffer);
-    }
-    image_accessor.set_image_position(image_buffer, encoded_pixels.start_image_coordinate);
-    const TrianglePaintInput triangle = triangles.get_paint_input(encoded_pixels.triangle_index);
-    float3 pixel_pos = get_start_pixel_pos(triangle, encoded_pixels);
-    const float3 delta_pixel_pos = get_delta_pixel_pos(triangle, encoded_pixels, pixel_pos);
+    image_accessor.set_image_position(image_buffer, pixel_row.start_image_coordinate);
+    const TrianglePaintInput triangle = triangles.get_paint_input(pixel_row.triangle_index);
+    float3 pixel_pos = get_start_pixel_pos(triangle, pixel_row);
+    const float3 delta_pixel_pos = get_delta_pixel_pos(triangle, pixel_row, pixel_pos);
     bool pixels_painted = false;
-    for (int x = 0; x < encoded_pixels.num_pixels; x++) {
+    for (int x = 0; x < pixel_row.num_pixels; x++) {
       if (!brush_test_fn(&test, pixel_pos)) {
         pixel_pos += delta_pixel_pos;
         image_accessor.next_pixel();
@@ -194,16 +191,17 @@ template<typename ImageBuffer> class PaintingKernel {
     return pixels_painted;
   }
 
- private:
   void init_brush_color(ImBuf *image_buffer)
   {
-    /* TODO: use StringRefNull. */
     const char *to_colorspace = image_accessor.get_colorspace_name(image_buffer);
     if (last_used_color_space == to_colorspace) {
       return;
     }
+    copy_v3_v3(brush_color,
+               ss->cache->invert ? BKE_brush_secondary_color_get(ss->scene, brush) :
+                                   BKE_brush_color_get(ss->scene, brush));
+    brush_color[3] = 1.0f;
 
-    copy_v4_fl4(brush_color, brush->rgb[0], brush->rgb[1], brush->rgb[2], 1.0);
     const char *from_colorspace = IMB_colormanagement_role_colorspace_name_get(
         COLOR_ROLE_COLOR_PICKING);
     ColormanageProcessor *cm_processor = IMB_colormanagement_colorspace_processor_new(
@@ -213,6 +211,7 @@ template<typename ImageBuffer> class PaintingKernel {
     last_used_color_space = to_colorspace;
   }
 
+ private:
   void init_brush_strength()
   {
     brush_strength = ss->cache->bstrength;
@@ -323,6 +322,13 @@ static void do_paint_pixels(void *__restrict userdata,
         ImBuf *image_buffer = BKE_image_acquire_ibuf(data->image_data.image, &image_user, nullptr);
         if (image_buffer == nullptr) {
           continue;
+        }
+
+        if (image_buffer->rect_float != nullptr) {
+          kernel_float4.init_brush_color(image_buffer);
+        }
+        else {
+          kernel_float4.init_brush_color(image_buffer);
         }
 
         for (const PackedPixelRow &pixel_row : tile_data.pixel_rows) {
