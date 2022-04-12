@@ -161,10 +161,16 @@ struct UDIMTilePixels {
     BLI_rcti_init_minmax(&dirty_region);
   }
 
-  void mark_region(Image &image, const image::ImageTileWrapper &image_tile, ImBuf &image_buffer)
+  void mark_dirty(const PackedPixelRow &pixel_row)
   {
-    BKE_image_partial_update_mark_region(
-        &image, image_tile.image_tile, &image_buffer, &dirty_region);
+    int2 start_image_coord(pixel_row.start_image_coordinate.x, pixel_row.start_image_coordinate.y);
+    BLI_rcti_do_minmax_v(&dirty_region, start_image_coord);
+    BLI_rcti_do_minmax_v(&dirty_region, start_image_coord + int2(pixel_row.num_pixels + 1, 0));
+    flags.dirty = true;
+  }
+
+  void clear_dirty()
+  {
     BLI_rcti_init_minmax(&dirty_region);
     flags.dirty = false;
   }
@@ -200,8 +206,10 @@ struct NodeData {
   void mark_region(Image &image, const image::ImageTileWrapper &image_tile, ImBuf &image_buffer)
   {
     UDIMTilePixels *tile = find_tile_data(image_tile);
-    if (tile) {
-      tile->mark_region(image, image_tile, image_buffer);
+    if (tile && tile->flags.dirty) {
+      BKE_image_partial_update_mark_region(
+          &image, image_tile.image_tile, &image_buffer, &tile->dirty_region);
+      tile->clear_dirty();
     }
   }
 
@@ -219,7 +227,8 @@ struct NodeData {
 };
 
 Triangles &BKE_pbvh_pixels_triangles_get(PBVHNode &node);
-UDIMTilePixels *BKE_pbvh_pixels_tile_data_get(PBVHNode &node, const image::ImageTileWrapper &image_tile);
+UDIMTilePixels *BKE_pbvh_pixels_tile_data_get(PBVHNode &node,
+                                              const image::ImageTileWrapper &image_tile);
 void BKE_pbvh_pixels_mark_dirty(PBVHNode &node);
 void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &image_user);
 /** Extend pixels to fix uv seams for the given nodes. */

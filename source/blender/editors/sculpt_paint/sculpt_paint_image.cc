@@ -358,12 +358,7 @@ static void do_paint_pixels(void *__restrict userdata,
       }
 
       if (pixels_painted) {
-        int2 start_image_coord(pixel_row.start_image_coordinate.x,
-                               pixel_row.start_image_coordinate.y);
-        BLI_rcti_do_minmax_v(&tile_data->dirty_region, start_image_coord);
-        BLI_rcti_do_minmax_v(&tile_data->dirty_region,
-                             start_image_coord + int2(pixel_row.num_pixels + 1, 0));
-        tile_data->flags.dirty = true;
+        tile_data->mark_dirty(pixel_row);
       }
     }
 
