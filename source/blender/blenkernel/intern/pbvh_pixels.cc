@@ -86,7 +86,7 @@ static float3 calc_barycentric_delta_y(const ImBuf *image_buffer,
   return calc_barycentric_delta(uvs, start_uv, end_uv);
 }
 
-static void extract_barycentric_pixels(TileData &tile_data,
+static void extract_barycentric_pixels(UDIMTilePixels &tile_data,
                                        const ImBuf *image_buffer,
                                        const int triangle_index,
                                        const float2 uvs[3],
@@ -182,7 +182,7 @@ static void do_encode_pixels(void *__restrict userdata,
     }
 
     float2 tile_offset = float2(image_tile.get_tile_offset());
-    TileData tile_data;
+    UDIMTilePixels tile_data;
 
     Triangles &triangles = node_data->triangles;
     for (int triangle_index = 0; triangle_index < triangles.size(); triangle_index++) {
@@ -328,7 +328,7 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
         continue;
       }
       NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
-      TileData *tile_node_data = node_data->find_tile_data(image_tile);
+      UDIMTilePixels *tile_node_data = node_data->find_tile_data(image_tile);
       if (tile_node_data == nullptr) {
         continue;
       }
@@ -420,7 +420,7 @@ static void update_pixels(PBVH *pbvh,
       }
       NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
       compressed_data_len += node_data->triangles.mem_size();
-      for (const TileData &tile_data : node_data->tiles) {
+      for (const UDIMTilePixels &tile_data : node_data->tiles) {
         compressed_data_len += tile_data.encoded_pixels.size() * sizeof(PackedPixelRow);
         for (const PackedPixelRow &encoded_pixels : tile_data.encoded_pixels) {
           num_pixels += encoded_pixels.num_pixels;
@@ -446,7 +446,7 @@ Triangles &BKE_pbvh_pixels_triangles_get(PBVHNode &node)
   return node_data->triangles;
 }
 
-TileData *BKE_pbvh_pixels_tile_data_get(PBVHNode &node, const image::ImageTileWrapper &image_tile)
+UDIMTilePixels *BKE_pbvh_pixels_tile_data_get(PBVHNode &node, const image::ImageTileWrapper &image_tile)
 {
   BLI_assert(node.pixels.node_data != nullptr);
   NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);

@@ -258,14 +258,14 @@ class UVSeamExtender {
   void init(ExtendUVContext &context, PBVHNode &node, const ImageTileWrapper &image_tile)
   {
     NodeData &node_data = *static_cast<NodeData *>(node.pixels.node_data);
-    TileData *tile_node_data = node_data.find_tile_data(image_tile);
+    UDIMTilePixels *tile_node_data = node_data.find_tile_data(image_tile);
     if (tile_node_data == nullptr) {
       return;
     }
     init(context, node, node_data, *tile_node_data);
   }
 
-  void init(ExtendUVContext &context, PBVHNode &node, NodeData &node_data, TileData &tile_data)
+  void init(ExtendUVContext &context, PBVHNode &node, NodeData &node_data, UDIMTilePixels &tile_data)
   {
     for (PackedPixelRow &pixel_row : tile_data.pixel_rows) {
       UVSeamExtenderRowPackage row_package(

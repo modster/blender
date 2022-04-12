@@ -139,8 +139,13 @@ struct PackedPixelRow {
   ushort triangle_index;
 };
 
-struct TileData {
+/**
+ * Node pixel data containing the pixels for a single UDIM tile.
+ */
+struct UDIMTilePixels {
+  /** UDIM Tile number. */
   short tile_number;
+
   struct {
     bool dirty : 1;
   } flags;
@@ -150,7 +155,7 @@ struct TileData {
 
   Vector<PackedPixelRow> pixel_rows;
 
-  TileData()
+  UDIMTilePixels()
   {
     flags.dirty = false;
     BLI_rcti_init_minmax(&dirty_region);
@@ -172,7 +177,7 @@ struct NodeData {
 
   rctf uv_region;
 
-  Vector<TileData> tiles;
+  Vector<UDIMTilePixels> tiles;
   Triangles triangles;
 
   NodeData()
@@ -182,9 +187,9 @@ struct NodeData {
 
   void init_pixels_rasterization(Object *ob, PBVHNode *node, ImBuf *image_buffer);
 
-  TileData *find_tile_data(const image::ImageTileWrapper &image_tile)
+  UDIMTilePixels *find_tile_data(const image::ImageTileWrapper &image_tile)
   {
-    for (TileData &tile : tiles) {
+    for (UDIMTilePixels &tile : tiles) {
       if (tile.tile_number == image_tile.get_tile_number()) {
         return &tile;
       }
@@ -194,7 +199,7 @@ struct NodeData {
 
   void mark_region(Image &image, const image::ImageTileWrapper &image_tile, ImBuf &image_buffer)
   {
-    TileData *tile = find_tile_data(image_tile);
+    UDIMTilePixels *tile = find_tile_data(image_tile);
     if (tile) {
       tile->mark_region(image, image_tile, image_buffer);
     }
@@ -214,7 +219,7 @@ struct NodeData {
 };
 
 Triangles &BKE_pbvh_pixels_triangles_get(PBVHNode &node);
-TileData *BKE_pbvh_pixels_tile_data_get(PBVHNode &node, const image::ImageTileWrapper &image_tile);
+UDIMTilePixels *BKE_pbvh_pixels_tile_data_get(PBVHNode &node, const image::ImageTileWrapper &image_tile);
 void BKE_pbvh_pixels_mark_dirty(PBVHNode &node);
 void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &image_user);
 /** Extend pixels to fix uv seams for the given nodes. */

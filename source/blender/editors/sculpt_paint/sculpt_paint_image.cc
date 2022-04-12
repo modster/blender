@@ -334,7 +334,7 @@ static void do_paint_pixels(void *__restrict userdata,
   LISTBASE_FOREACH (ImageTile *, tile, &data->image_data.image->tiles) {
     ImageTileWrapper image_tile(tile);
     image_user.tile = image_tile.get_tile_number();
-    TileData *tile_data = BKE_pbvh_pixels_tile_data_get(*node, image_tile);
+    UDIMTilePixels *tile_data = BKE_pbvh_pixels_tile_data_get(*node, image_tile);
     if (tile_data == nullptr) {
       /* This node doesn't paint on this tile. */
       continue;
