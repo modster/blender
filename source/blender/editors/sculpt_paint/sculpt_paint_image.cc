@@ -70,7 +70,7 @@ class ImageBufferFloat4 {
     pixel_offset = int(image_pixel_position.y) * image_buffer->x + int(image_pixel_position.x);
   }
 
-  void goto_next_pixel()
+  void next_pixel()
   {
     pixel_offset += 1;
   }
@@ -80,7 +80,7 @@ class ImageBufferFloat4 {
     return &image_buffer->rect_float[pixel_offset * 4];
   }
 
-  void store_pixel(ImBuf *image_buffer, const float4 pixel_data) const
+  void write_pixel(ImBuf *image_buffer, const float4 pixel_data) const
   {
     copy_v4_v4(&image_buffer->rect_float[pixel_offset * 4], pixel_data);
   }
@@ -102,7 +102,7 @@ class ImageBufferByte4 {
     pixel_offset = int(image_pixel_position.y) * image_buffer->x + int(image_pixel_position.x);
   }
 
-  void goto_next_pixel()
+  void next_pixel()
   {
     pixel_offset += 1;
   }
@@ -116,7 +116,7 @@ class ImageBufferByte4 {
     return result;
   }
 
-  void store_pixel(ImBuf *image_buffer, const float4 pixel_data) const
+  void write_pixel(ImBuf *image_buffer, const float4 pixel_data) const
   {
     rgba_float_to_uchar(
         static_cast<uchar *>(static_cast<void *>(&image_buffer->rect[pixel_offset])), pixel_data);
@@ -128,8 +128,8 @@ class ImageBufferByte4 {
   }
 };
 
-template<typename ImagePixelAccessor> class PaintingKernel {
-  ImagePixelAccessor image_accessor;
+template<typename ImageBuffer> class PaintingKernel {
+  ImageBuffer image_accessor;
 
   SculptSession *ss;
   const Brush *brush;
@@ -170,7 +170,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     for (int x = 0; x < encoded_pixels.num_pixels; x++) {
       if (!brush_test_fn(&test, pixel_pos)) {
         pixel_pos += delta_pixel_pos;
-        image_accessor.goto_next_pixel();
+        image_accessor.next_pixel();
         continue;
       }
 
@@ -185,10 +185,10 @@ template<typename ImagePixelAccessor> class PaintingKernel {
       blend_color_mix_float(buffer_color, color, paint_color);
       buffer_color *= brush->alpha;
       IMB_blend_color_float(color, color, buffer_color, static_cast<IMB_BlendMode>(brush->blend));
-      image_accessor.store_pixel(image_buffer, color);
+      image_accessor.write_pixel(image_buffer, color);
       pixels_painted = true;
 
-      image_accessor.goto_next_pixel();
+      image_accessor.next_pixel();
       pixel_pos += delta_pixel_pos;
     }
     return pixels_painted;
@@ -244,7 +244,8 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     return result - start_pixel;
   }
 
-  float3 init_pixel_pos(const TrianglePaintInput &triangle, const float3 &barycentric_weights) const
+  float3 init_pixel_pos(const TrianglePaintInput &triangle,
+                        const float3 &barycentric_weights) const
   {
     const int3 &vert_indices = triangle.vert_indices;
     float3 result;
