@@ -102,18 +102,14 @@ static void extract_barycentric_pixels(UDIMTilePixels &tile_data,
   }
 }
 
-static void init_triangles(
-    PBVH *pbvh, PBVHNode *node, NodeData *node_data, const MPoly *mpoly, const MLoop *mloop)
+static void init_triangles(PBVH *pbvh, PBVHNode *node, NodeData *node_data, const MLoop *mloop)
 {
   for (int i = 0; i < node->totprim; i++) {
     const MLoopTri *lt = &pbvh->looptri[node->prim_indices[i]];
-    const MPoly *p = &mpoly[lt->poly];
-    for (int l = 0; l < p->totloop - 2; l++) {
-      node_data->triangles.append(
-          int3(mloop[lt->tri[0]].v, mloop[lt->tri[1]].v, mloop[lt->tri[2]].v),
-          int3(lt->tri[0], lt->tri[1], lt->tri[2]),
-          lt->poly);
-    }
+    node_data->triangles.append(
+        int3(mloop[lt->tri[0]].v, mloop[lt->tri[1]].v, mloop[lt->tri[2]].v),
+        int3(lt->tri[0], lt->tri[1], lt->tri[2]),
+        lt->poly);
   }
 }
 
@@ -295,7 +291,6 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
 }
 
 static void update_pixels(PBVH *pbvh,
-                          const struct MPoly *mpoly,
                           const struct MLoop *mloop,
                           struct CustomData *ldata,
                           struct Image *image,
@@ -314,7 +309,7 @@ static void update_pixels(PBVH *pbvh,
 
   for (PBVHNode *node : nodes_to_update) {
     NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
-    init_triangles(pbvh, node, node_data, mpoly, mloop);
+    init_triangles(pbvh, node, node_data, mloop);
   }
 
   EncodePixelsUserData user_data;
@@ -401,13 +396,12 @@ extern "C" {
 using namespace blender::bke::pbvh::pixels;
 
 void BKE_pbvh_build_pixels(PBVH *pbvh,
-                           const struct MPoly *mpoly,
                            const struct MLoop *mloop,
                            struct CustomData *ldata,
                            struct Image *image,
                            struct ImageUser *image_user)
 {
-  update_pixels(pbvh, mpoly, mloop, ldata, image, image_user);
+  update_pixels(pbvh, mloop, ldata, image, image_user);
 }
 
 void pbvh_pixels_free(PBVHNode *node)

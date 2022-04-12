@@ -143,7 +143,6 @@ void BKE_pbvh_build_bmesh(PBVH *pbvh,
                           int cd_face_node_offset);
 
 void BKE_pbvh_build_pixels(PBVH *pbvh,
-                           const struct MPoly *mpoly,
                            const struct MLoop *mloop,
                            struct CustomData *ldata,
                            struct Image *image,
