@@ -57,7 +57,6 @@ struct TexturePaintingUserData {
   Brush *brush;
   PBVHNode **nodes;
   ImageData image_data;
-  std::vector<bool> vertex_brush_tests;
 };
 
 /** Reading and writing to image buffer with 4 float channels. */
@@ -257,29 +256,6 @@ template<typename ImageBuffer> class PaintingKernel {
   }
 };
 
-/* Test which vertices pass the brush test and store them in the vertex_brush_tests array. */
-static void do_vertex_brush_test(void *__restrict userdata,
-                                 const int n,
-                                 const TaskParallelTLS *__restrict UNUSED(tls))
-{
-  TexturePaintingUserData *data = static_cast<TexturePaintingUserData *>(userdata);
-  const Object *ob = data->ob;
-  SculptSession *ss = ob->sculpt;
-  const Brush *brush = data->brush;
-  SculptBrushTest test;
-  SculptBrushTestFn sculpt_brush_test_sq_fn = SCULPT_brush_test_init_with_falloff_shape(
-      ss, &test, brush->falloff_shape);
-  PBVHNode *node = data->nodes[n];
-
-  PBVHVertexIter vd;
-  BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
-    if (sculpt_brush_test_sq_fn(&test, vd.co)) {
-      data->vertex_brush_tests[vd.index] = true;
-    }
-  }
-  BKE_pbvh_vertex_iter_end;
-}
-
 static void do_paint_pixels(void *__restrict userdata,
                             const int n,
                             const TaskParallelTLS *__restrict tls)
@@ -291,20 +267,6 @@ static void do_paint_pixels(void *__restrict userdata,
   PBVHNode *node = data->nodes[n];
 
   NodeData &node_data = BKE_pbvh_pixels_node_data_get(*node);
-
-  /* Propagate vertex brush test to triangle. This should be extended with brush overlapping edges
-   * and faces only. */
-  /* TODO(jbakker) move to user data. to reduce reallocation. */
-  std::vector<bool> triangle_brush_test_results(node_data.triangles.size());
-
-  for (int triangle_index = 0; triangle_index < node_data.triangles.size(); triangle_index++) {
-    TrianglePaintInput &triangle = node_data.triangles.get_paint_input(triangle_index);
-    int3 &vert_indices = triangle.vert_indices;
-    for (int i = 0; i < 3; i++) {
-      triangle_brush_test_results[triangle_index] = triangle_brush_test_results[triangle_index] ||
-                                                    data->vertex_brush_tests[vert_indices[i]];
-    }
-  }
 
   const int thread_id = BLI_task_parallel_thread_id(tls);
   MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
@@ -332,9 +294,6 @@ static void do_paint_pixels(void *__restrict userdata,
         }
 
         for (const PackedPixelRow &pixel_row : tile_data.pixel_rows) {
-          if (!triangle_brush_test_results[pixel_row.triangle_index]) {
-            continue;
-          }
           bool pixels_painted = false;
           if (image_buffer->rect_float != nullptr) {
             pixels_painted = kernel_float4.paint(node_data.triangles, pixel_row, image_buffer);
@@ -408,13 +367,10 @@ void SCULPT_do_paint_brush_image(
 {
   Brush *brush = BKE_paint_brush(&sd->paint);
 
-  Mesh *mesh = (Mesh *)ob->data;
-
   TexturePaintingUserData data = {nullptr};
   data.ob = ob;
   data.brush = brush;
   data.nodes = nodes;
-  data.vertex_brush_tests = std::vector<bool>(mesh->totvert);
 
   if (!ImageData::init_active_image(ob, &data.image_data, paint_mode_settings)) {
     return;
@@ -422,7 +378,6 @@ void SCULPT_do_paint_brush_image(
 
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, totnode);
-  BLI_task_parallel_range(0, totnode, &data, do_vertex_brush_test, &settings);
   BLI_task_parallel_range(0, totnode, &data, do_paint_pixels, &settings);
 
   TaskParallelSettings settings_flush;
