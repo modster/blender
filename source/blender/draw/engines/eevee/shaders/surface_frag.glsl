@@ -68,6 +68,14 @@ void main()
   attrib_load();
 #endif
 
+  out_ssr_color = vec3(0.0);
+  out_ssr_roughness = 0.0;
+  out_ssr_N = g_data.N;
+
+  out_sss_radiance = vec3(0.0);
+  out_sss_radius = 0.0;
+  out_sss_color = vec3(0.0);
+
   Closure cl = nodetree_exec();
 
   float holdout = saturate(1.0 - cl.holdout);
