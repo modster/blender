@@ -18,55 +18,6 @@
 
 namespace blender::bke::pbvh::pixels {
 
-/** Barycentric weights. */
-class BarycentricWeights {
- private:
-  float3 weights;
-
- public:
-  explicit BarycentricWeights() noexcept = default;
-  explicit BarycentricWeights(const float2 v1, const float2 v2, const float2 v3, const float2 co)
-  {
-    barycentric_weights_v2(v1, v2, v3, co, weights);
-  }
-
-  explicit BarycentricWeights(const float3 weights) : weights(weights)
-  {
-  }
-
-  const bool is_inside_triangle() const
-  {
-    return barycentric_inside_triangle_v2(weights);
-  }
-
-  float3 operator-(const BarycentricWeights &rhs) const
-  {
-    return weights - rhs.weights;
-  }
-
-  BarycentricWeights operator+(const float3 &rhs) const
-  {
-    return BarycentricWeights(weights + rhs);
-  }
-
-  BarycentricWeights &operator-=(const float3 &rhs)
-  {
-    weights -= rhs;
-    return *this;
-  }
-
-  BarycentricWeights &operator+=(const float3 &rhs)
-  {
-    weights += rhs;
-    return *this;
-  }
-
-  operator const float *() const
-  {
-    return weights;
-  }
-};
-
 /**
  * Loop incides. Only stores 2 indices, the third one is always `loop_indices[1] + 1`.
  * Second could be delta encoded with the first loop index.
@@ -174,7 +125,7 @@ struct Triangles {
  */
 struct PixelsPackage {
   /** Barycentric coordinate of the first pixel. */
-  BarycentricWeights start_barycentric_coord;
+  float3 start_barycentric_coord;
   /** Image coordinate starting of the first pixel. */
   ushort2 start_image_coordinate;
   /** Number of sequential pixels encoded in this package. */

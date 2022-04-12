@@ -59,10 +59,11 @@ static float3 calc_barycentric_delta(const float2 uvs[3],
                                      const float2 end_uv)
 {
 
-  const BarycentricWeights start_barycentric(uvs[0], uvs[1], uvs[2], start_uv);
-  const BarycentricWeights end_barycentric(uvs[0], uvs[1], uvs[2], end_uv);
-  const float3 delta_barycentric = end_barycentric - start_barycentric;
-  return delta_barycentric;
+  float3 start_barycentric;
+  barycentric_weights_v2(uvs[0], uvs[1], uvs[2], start_uv, start_barycentric);
+  float3 end_barycentric;
+  barycentric_weights_v2(uvs[0], uvs[1], uvs[2], end_uv, end_barycentric);
+  return end_barycentric - start_barycentric;
 }
 
 static float3 calc_barycentric_delta_x(const ImBuf *image_buffer,
@@ -103,12 +104,14 @@ static void extract_barycentric_pixels(TileData &tile_data,
 
     for (x = minx; x < maxx; x++) {
       float2 uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
-      const BarycentricWeights barycentric(uvs[0], uvs[1], uvs[2], uv);
-      const bool is_inside = barycentric.is_inside_triangle();
+      float3 barycentric_weights;
+      barycentric_weights_v2(uvs[0], uvs[1], uvs[2], uv, barycentric_weights);
+
+      const bool is_inside = barycentric_inside_triangle_v2(barycentric_weights);
       if (!start_detected && is_inside) {
         start_detected = true;
         package.start_image_coordinate = ushort2(x, y);
-        package.start_barycentric_coord = barycentric;
+        package.start_barycentric_coord = barycentric_weights;
       }
       else if (start_detected && !is_inside) {
         break;
