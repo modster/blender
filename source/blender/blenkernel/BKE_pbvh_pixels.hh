@@ -34,21 +34,12 @@ struct EncodedLoopIndices {
   }
 };
 
-struct Triangle {
-  int3 loop_indices;
-  int3 vert_indices;
-  int poly_index;
-  float3 add_barycentric_coord_x;
-};
-
 struct TrianglePaintInput {
   int3 vert_indices;
   float3 add_barycentric_coord_x;
   float3 add_barycentric_coord_y;
 
-  TrianglePaintInput(const Triangle &triangle)
-      : vert_indices(triangle.vert_indices),
-        add_barycentric_coord_x(triangle.add_barycentric_coord_x)
+  TrianglePaintInput(const int3 vert_indices) : vert_indices(vert_indices)
   {
   }
 };
@@ -73,11 +64,11 @@ struct Triangles {
   Vector<EncodedLoopIndices> loop_indices;
 
  public:
-  void append(const Triangle &triangle)
+  void append(const int3 vert_indices, const EncodedLoopIndices loop_indices, const int poly_index)
   {
-    paint_input.append(TrianglePaintInput(triangle));
-    loop_indices.append(triangle.loop_indices);
-    poly_indices.append(triangle.poly_index);
+    this->paint_input.append(TrianglePaintInput(vert_indices));
+    this->loop_indices.append(loop_indices);
+    this->poly_indices.append(poly_index);
   }
 
   int3 get_loop_indices(const int index) const

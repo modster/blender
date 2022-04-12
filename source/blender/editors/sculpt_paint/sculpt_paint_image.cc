@@ -261,7 +261,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     return result - start_pixel;
   }
 
-  Pixel init_pixel(const TrianglePaintInput &triangle, const BarycentricWeights &weights) const
+  Pixel init_pixel(const TrianglePaintInput &triangle, const float3 &barycentric_weights) const
   {
     const int3 &vert_indices = triangle.vert_indices;
     Pixel result;
@@ -269,7 +269,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
                      mvert[vert_indices[0]].co,
                      mvert[vert_indices[1]].co,
                      mvert[vert_indices[2]].co,
-                     weights);
+                     barycentric_weights);
     return result;
   }
 };

@@ -147,11 +147,9 @@ static void init_triangles(PBVH *pbvh,
       const MPoly *p = &mpoly[poly_index];
       const MLoop *loopstart = &mloop[p->loopstart];
       for (int l = 0; l < p->totloop - 2; l++) {
-        Triangle triangle;
-        triangle.loop_indices = int3(p->loopstart, p->loopstart + l + 1, p->loopstart + l + 2);
-        triangle.vert_indices = int3(loopstart[0].v, loopstart[l + 1].v, loopstart[l + 2].v);
-        triangle.poly_index = poly_index;
-        node_data->triangles.append(triangle);
+        node_data->triangles.append(int3(loopstart[0].v, loopstart[l + 1].v, loopstart[l + 2].v),
+                                    int3(p->loopstart, p->loopstart + l + 1, p->loopstart + l + 2),
+                                    poly_index);
       }
     }
   }
