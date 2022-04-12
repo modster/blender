@@ -28,7 +28,7 @@ constexpr bool USE_WATERTIGHT_CHECK = false;
 constexpr bool USE_WATERTIGHT_SEAM_CHECK = true;
 
 /**
- * @brief Calculate the delta of two neighbour uv coordinates in the given image buffer.
+ * Calculate the delta of two neighbour uv coordinates in the given image buffer.
  */
 static float3 calc_barycentric_delta(const float2 uvs[3],
                                      const float2 start_uv,
