@@ -19,8 +19,7 @@
 namespace blender::bke::pbvh::pixels {
 
 /**
- * Loop incides. Only stores 2 indices, the third one is always `loop_indices[1] + 1`.
- * Second could be delta encoded with the first loop index.
+ * Loop indices. Only stores 2 indices, the third one is always `loop_indices[1] + 1`.
  */
 struct EncodedLoopIndices {
   int2 encoded;
