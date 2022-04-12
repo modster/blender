@@ -20,7 +20,7 @@
 #include "BKE_image_wrappers.hh"
 #include "BKE_material.h"
 #include "BKE_pbvh.h"
-#include "BKE_pbvh.hh"
+#include "BKE_pbvh_pixels.hh"
 
 #include "bmesh.h"
 

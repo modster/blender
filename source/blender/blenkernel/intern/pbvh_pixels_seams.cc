@@ -2,7 +2,7 @@
  * Copyright 2022 Blender Foundation. All rights reserved. */
 
 #include "BKE_pbvh.h"
-#include "BKE_pbvh.hh"
+#include "BKE_pbvh_pixels.hh"
 
 #include "pbvh_intern.h"
 
