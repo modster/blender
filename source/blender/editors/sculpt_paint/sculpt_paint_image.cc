@@ -59,24 +59,6 @@ struct TexturePaintingUserData {
   std::vector<bool> vertex_brush_tests;
 };
 
-struct Pixel {
-  /** Local position of the pixel on the surface. */
-  float3 pos;
-
-  Pixel &operator+=(const Pixel &other)
-  {
-    pos += other.pos;
-    return *this;
-  }
-
-  Pixel operator-(const Pixel &other) const
-  {
-    Pixel result;
-    result.pos = pos - other.pos;
-    return result;
-  }
-};
-
 /** Reading and writing to image buffer with 4 float channels. */
 class ImageBufferFloat4 {
  private:
@@ -182,12 +164,12 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     }
     image_accessor.set_image_position(image_buffer, encoded_pixels.start_image_coordinate);
     const TrianglePaintInput triangle = triangles.get_paint_input(encoded_pixels.triangle_index);
-    Pixel pixel = get_start_pixel(triangle, encoded_pixels);
-    const Pixel add_pixel = get_delta_pixel(triangle, encoded_pixels, pixel);
+    float3 pixel_pos = get_start_pixel_pos(triangle, encoded_pixels);
+    const float3 delta_pixel_pos = get_delta_pixel_pos(triangle, encoded_pixels, pixel_pos);
     bool pixels_painted = false;
     for (int x = 0; x < encoded_pixels.num_pixels; x++) {
-      if (!brush_test_fn(&test, pixel.pos)) {
-        pixel += add_pixel;
+      if (!brush_test_fn(&test, pixel_pos)) {
+        pixel_pos += delta_pixel_pos;
         image_accessor.goto_next_pixel();
         continue;
       }
@@ -197,7 +179,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
       const float3 face_normal(0.0f, 0.0f, 0.0f);
       const float mask = 0.0f;
       const float falloff_strength = SCULPT_brush_strength_factor(
-          ss, brush, pixel.pos, sqrtf(test.dist), normal, face_normal, mask, 0, thread_id);
+          ss, brush, pixel_pos, sqrtf(test.dist), normal, face_normal, mask, 0, thread_id);
       float4 paint_color = brush_color * falloff_strength * brush_strength;
       float4 buffer_color;
       blend_color_mix_float(buffer_color, color, paint_color);
@@ -207,7 +189,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
       pixels_painted = true;
 
       image_accessor.goto_next_pixel();
-      pixel += add_pixel;
+      pixel_pos += delta_pixel_pos;
     }
     return pixels_painted;
   }
@@ -241,31 +223,32 @@ template<typename ImagePixelAccessor> class PaintingKernel {
   }
 
   /**
-   * Extract the staring pixel from the given encoded_pixels belonging to the triangle.
+   * Extract the starting pixel position from the given encoded_pixels belonging to the triangle.
    */
-  Pixel get_start_pixel(const TrianglePaintInput &triangle,
-                        const PackedPixelRow &encoded_pixels) const
+  float3 get_start_pixel_pos(const TrianglePaintInput &triangle,
+                             const PackedPixelRow &encoded_pixels) const
   {
-    return init_pixel(triangle, encoded_pixels.start_barycentric_coord);
+    return init_pixel_pos(triangle, encoded_pixels.start_barycentric_coord);
   }
 
   /**
-   * Extract the delta pixel that will be used to advance a Pixel instance to the next pixel.
+   * Extract the delta pixel position that will be used to advance a Pixel instance to the next
+   * pixel.
    */
-  Pixel get_delta_pixel(const TrianglePaintInput &triangle,
-                        const PackedPixelRow &encoded_pixels,
-                        const Pixel &start_pixel) const
+  float3 get_delta_pixel_pos(const TrianglePaintInput &triangle,
+                             const PackedPixelRow &encoded_pixels,
+                             const float3 &start_pixel) const
   {
-    Pixel result = init_pixel(
+    float3 result = init_pixel_pos(
         triangle, encoded_pixels.start_barycentric_coord + triangle.delta_barycentric_coord_u);
     return result - start_pixel;
   }
 
-  Pixel init_pixel(const TrianglePaintInput &triangle, const float3 &barycentric_weights) const
+  float3 init_pixel_pos(const TrianglePaintInput &triangle, const float3 &barycentric_weights) const
   {
     const int3 &vert_indices = triangle.vert_indices;
-    Pixel result;
-    interp_v3_v3v3v3(result.pos,
+    float3 result;
+    interp_v3_v3v3v3(result,
                      mvert[vert_indices[0]].co,
                      mvert[vert_indices[1]].co,
                      mvert[vert_indices[2]].co,
