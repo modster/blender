@@ -140,7 +140,7 @@ typedef struct LineartEdge {
   char min_occ;
 
   /** Also for line type determination on chaining. */
-  unsigned char flags;
+  short flags;
   unsigned char intersection_mask;
 
   /**
@@ -179,7 +179,7 @@ typedef struct LineartEdgeChainItem {
   /** For restoring position to 3d space. */
   float gpos[3];
   float normal[3];
-  unsigned char line_type;
+  short line_type;
   char occlusion;
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
