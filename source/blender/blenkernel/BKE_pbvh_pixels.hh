@@ -223,7 +223,6 @@ struct NodeData {
 };
 
 NodeData &BKE_pbvh_pixels_node_data_get(PBVHNode &node);
-void BKE_pbvh_pixels_mark_dirty(PBVHNode &node);
 void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &image_user);
 /** Extend pixels to fix uv seams for the given nodes. */
 void BKE_pbvh_pixels_fix_seams(PBVH &pbvh,

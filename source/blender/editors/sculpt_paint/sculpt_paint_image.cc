@@ -349,9 +349,7 @@ static void do_paint_pixels(void *__restrict userdata,
     }
   }
 
-  if (pixels_updated) {
-    BKE_pbvh_pixels_mark_dirty(*node);
-  }
+  node_data.flags.dirty |= pixels_updated;
 }
 
 static void do_mark_dirty_regions(void *__restrict userdata,

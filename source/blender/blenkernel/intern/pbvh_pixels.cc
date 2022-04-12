@@ -374,13 +374,6 @@ NodeData &BKE_pbvh_pixels_node_data_get(PBVHNode &node)
   return *node_data;
 }
 
-void BKE_pbvh_pixels_mark_dirty(PBVHNode &node)
-{
-  BLI_assert(node.pixels.node_data != nullptr);
-  NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);
-  node_data->flags.dirty |= true;
-}
-
 void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &image_user)
 {
   BLI_assert(node.pixels.node_data != nullptr);
