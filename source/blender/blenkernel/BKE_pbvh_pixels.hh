@@ -18,22 +18,6 @@
 
 namespace blender::bke::pbvh::pixels {
 
-/**
- * Loop indices. Only stores 2 indices, the third one is always `loop_indices[1] + 1`.
- */
-struct EncodedLoopIndices {
-  int2 encoded;
-
-  EncodedLoopIndices(const int3 decoded) : encoded(decoded.x, decoded.y)
-  {
-  }
-
-  int3 decode() const
-  {
-    return int3(encoded.x, encoded.y, encoded.y + 1);
-  }
-};
-
 struct TrianglePaintInput {
   int3 vert_indices;
   /**
@@ -68,32 +52,11 @@ struct TrianglePaintInput {
 struct Triangles {
   /** Data accessed by the inner loop of the painting brush. */
   Vector<TrianglePaintInput> paint_input;
-  /** Per triangle the index of the polygon it belongs to. */
-  Vector<int> poly_indices;
-  /**
-   * Loop indices per triangle.
-   *
-   * NOTE: is only available during building the triangles. Kept here as in the future we need
-   * the data to calculate normals.
-   */
-  Vector<EncodedLoopIndices> loop_indices;
 
  public:
-  void append(const int3 vert_indices, const EncodedLoopIndices loop_indices, const int poly_index)
+  void append(const int3 vert_indices)
   {
     this->paint_input.append(TrianglePaintInput(vert_indices));
-    this->loop_indices.append(loop_indices);
-    this->poly_indices.append(poly_index);
-  }
-
-  int3 get_loop_indices(const int index) const
-  {
-    return loop_indices[index].decode();
-  }
-
-  int get_poly_index(const int index)
-  {
-    return poly_indices[index];
   }
 
   TrianglePaintInput &get_paint_input(const int index)
@@ -109,8 +72,6 @@ struct Triangles {
   void clear()
   {
     paint_input.clear();
-    loop_indices.clear();
-    poly_indices.clear();
   }
 
   uint64_t size() const
@@ -120,8 +81,7 @@ struct Triangles {
 
   uint64_t mem_size() const
   {
-    return loop_indices.size() * sizeof(EncodedLoopIndices) +
-           paint_input.size() * sizeof(TrianglePaintInput) + poly_indices.size() * sizeof(int);
+    return paint_input.size() * sizeof(TrianglePaintInput);
   }
 };
 

@@ -107,15 +107,14 @@ static void init_triangles(PBVH *pbvh, PBVHNode *node, NodeData *node_data, cons
   for (int i = 0; i < node->totprim; i++) {
     const MLoopTri *lt = &pbvh->looptri[node->prim_indices[i]];
     node_data->triangles.append(
-        int3(mloop[lt->tri[0]].v, mloop[lt->tri[1]].v, mloop[lt->tri[2]].v),
-        int3(lt->tri[0], lt->tri[1], lt->tri[2]),
-        lt->poly);
+        int3(mloop[lt->tri[0]].v, mloop[lt->tri[1]].v, mloop[lt->tri[2]].v));
   }
 }
 
 struct EncodePixelsUserData {
   Image *image;
   ImageUser *image_user;
+  PBVH *pbvh;
   Vector<PBVHNode *> *nodes;
   MLoopUV *ldata_uv;
 };
@@ -127,7 +126,7 @@ static void do_encode_pixels(void *__restrict userdata,
   EncodePixelsUserData *data = static_cast<EncodePixelsUserData *>(userdata);
   Image *image = data->image;
   ImageUser image_user = *data->image_user;
-
+  PBVH *pbvh = data->pbvh;
   PBVHNode *node = (*data->nodes)[n];
   NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
   LISTBASE_FOREACH (ImageTile *, tile, &data->image->tiles) {
@@ -143,11 +142,11 @@ static void do_encode_pixels(void *__restrict userdata,
 
     Triangles &triangles = node_data->triangles;
     for (int triangle_index = 0; triangle_index < triangles.size(); triangle_index++) {
-      int3 loop_indices = triangles.get_loop_indices(triangle_index);
+      const MLoopTri *lt = &pbvh->looptri[node->prim_indices[triangle_index]];
       float2 uvs[3] = {
-          float2(data->ldata_uv[loop_indices[0]].uv) - tile_offset,
-          float2(data->ldata_uv[loop_indices[1]].uv) - tile_offset,
-          float2(data->ldata_uv[loop_indices[2]].uv) - tile_offset,
+          float2(data->ldata_uv[lt->tri[0]].uv) - tile_offset,
+          float2(data->ldata_uv[lt->tri[1]].uv) - tile_offset,
+          float2(data->ldata_uv[lt->tri[2]].uv) - tile_offset,
       };
 
       const float minv = clamp_f(min_fff(uvs[0].y, uvs[1].y, uvs[2].y), 0.0f, 1.0f);
@@ -313,6 +312,7 @@ static void update_pixels(PBVH *pbvh,
   }
 
   EncodePixelsUserData user_data;
+  user_data.pbvh = pbvh;
   user_data.image = image;
   user_data.image_user = image_user;
   user_data.ldata_uv = ldata_uv;

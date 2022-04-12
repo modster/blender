@@ -265,15 +265,19 @@ class UVSeamExtender {
     init(context, node, node_data, *tile_node_data);
   }
 
-  void init(ExtendUVContext &context, PBVHNode &node, NodeData &node_data, UDIMTilePixels &tile_data)
+  void init(ExtendUVContext &context,
+            PBVHNode &node,
+            NodeData &node_data,
+            UDIMTilePixels &tile_data)
   {
     for (PackedPixelRow &pixel_row : tile_data.pixel_rows) {
+      const MLoopTri *mt = &context.pbvh->looptri[pixel_row.triangle_index];
       UVSeamExtenderRowPackage row_package(
           context,
           &pixel_row,
           &node_data.triangles.get_paint_input(pixel_row.triangle_index),
           (node.flag & PBVH_RebuildPixels) != 0,
-          node_data.triangles.get_loop_indices(pixel_row.triangle_index));
+          int3(mt->tri[0], mt->tri[1], mt->tri[2]));
       append(row_package);
     }
   }
