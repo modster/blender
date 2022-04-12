@@ -2782,11 +2782,9 @@ static void sculpt_pbvh_update_pixels(PaintModeSettings *paint_mode_settings,
   }
 
   BKE_pbvh_build_pixels(ss->pbvh,
-                        ss->pmap,
                         mesh->mpoly,
                         mesh->mloop,
                         &mesh->ldata,
-                        mesh->totpoly,
                         image,
                         image_user);
 }

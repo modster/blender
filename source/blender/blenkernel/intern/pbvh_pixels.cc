@@ -102,36 +102,19 @@ static void extract_barycentric_pixels(UDIMTilePixels &tile_data,
   }
 }
 
-static void init_triangles(PBVH *pbvh,
-                           PBVHNode *node,
-                           NodeData *node_data,
-                           const MeshElemMap *pmap,
-                           const MPoly *mpoly,
-                           const MLoop *mloop,
-                           std::vector<bool> &visited_polygons)
+static void init_triangles(
+    PBVH *pbvh, PBVHNode *node, NodeData *node_data, const MPoly *mpoly, const MLoop *mloop)
 {
-  PBVHVertexIter vd;
-
-  BKE_pbvh_vertex_iter_begin (pbvh, node, vd, PBVH_ITER_UNIQUE) {
-    const MeshElemMap *vert_map = &pmap[vd.index];
-    for (int j = 0; j < pmap[vd.index].count; j++) {
-      const int poly_index = vert_map->indices[j];
-
-      if (visited_polygons[poly_index]) {
-        continue;
-      }
-      visited_polygons[poly_index] = true;
-
-      const MPoly *p = &mpoly[poly_index];
-      const MLoop *loopstart = &mloop[p->loopstart];
-      for (int l = 0; l < p->totloop - 2; l++) {
-        node_data->triangles.append(int3(loopstart[0].v, loopstart[l + 1].v, loopstart[l + 2].v),
-                                    int3(p->loopstart, p->loopstart + l + 1, p->loopstart + l + 2),
-                                    poly_index);
-      }
+  for (int i = 0; i < node->totprim; i++) {
+    const MLoopTri *lt = &pbvh->looptri[node->prim_indices[i]];
+    const MPoly *p = &mpoly[lt->poly];
+    for (int l = 0; l < p->totloop - 2; l++) {
+      node_data->triangles.append(
+          int3(mloop[lt->tri[0]].v, mloop[lt->tri[1]].v, mloop[lt->tri[2]].v),
+          int3(lt->tri[0], lt->tri[1], lt->tri[2]),
+          lt->poly);
     }
   }
-  BKE_pbvh_vertex_iter_end;
 }
 
 struct EncodePixelsUserData {
@@ -213,23 +196,6 @@ static bool should_pixels_be_updated(PBVHNode *node)
   return true;
 }
 
-/**
- * Does the given node contains a list with polygons it owns.
- *
- * The owning polygons are stored per triangle inside the node.
- */
-static bool contains_polygons(PBVHNode *node)
-{
-  if ((node->flag & PBVH_Leaf) == 0) {
-    return false;
-  }
-  NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
-  if (node_data == nullptr) {
-    return false;
-  }
-  return true;
-}
-
 static int64_t count_nodes_to_update(PBVH *pbvh)
 {
   int64_t result = 0;
@@ -251,9 +217,7 @@ static int64_t count_nodes_to_update(PBVH *pbvh)
  *
  * returns if there were any nodes found (true).
  */
-static bool find_nodes_to_update(PBVH *pbvh,
-                                 Vector<PBVHNode *> &r_nodes_to_update,
-                                 std::vector<bool> &r_visited_polygons)
+static bool find_nodes_to_update(PBVH *pbvh, Vector<PBVHNode *> &r_nodes_to_update)
 {
   int64_t nodes_to_update_len = count_nodes_to_update(pbvh);
   if (nodes_to_update_len == 0) {
@@ -264,26 +228,19 @@ static bool find_nodes_to_update(PBVH *pbvh,
 
   for (int n = 0; n < pbvh->totnode; n++) {
     PBVHNode *node = &pbvh->nodes[n];
-    if (should_pixels_be_updated(node)) {
-      r_nodes_to_update.append(node);
-      node->flag = static_cast<PBVHNodeFlags>(node->flag | PBVH_RebuildPixels);
-
-      if (node->pixels.node_data == nullptr) {
-        NodeData *node_data = MEM_new<NodeData>(__func__);
-        node->pixels.node_data = node_data;
-      }
-      else {
-        NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
-        node_data->clear_data();
-      }
+    if (!should_pixels_be_updated(node)) {
+      continue;
     }
-    else if (contains_polygons(node)) {
-      /* Mark polygons that are owned by other leafs, so they don't be added to new other PBVH_Leaf
-       * nodes. */
-      Triangles &triangles = BKE_pbvh_pixels_triangles_get(*node);
-      for (int &poly_index : triangles.poly_indices) {
-        r_visited_polygons[poly_index] = true;
-      }
+    r_nodes_to_update.append(node);
+    node->flag = static_cast<PBVHNodeFlags>(node->flag | PBVH_RebuildPixels);
+
+    if (node->pixels.node_data == nullptr) {
+      NodeData *node_data = MEM_new<NodeData>(__func__);
+      node->pixels.node_data = node_data;
+    }
+    else {
+      NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
+      node_data->clear_data();
     }
   }
 
@@ -338,18 +295,15 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
 }
 
 static void update_pixels(PBVH *pbvh,
-                          const MeshElemMap *pmap,
                           const struct MPoly *mpoly,
                           const struct MLoop *mloop,
                           struct CustomData *ldata,
-                          int tot_poly,
                           struct Image *image,
                           struct ImageUser *image_user)
 {
   Vector<PBVHNode *> nodes_to_update;
-  std::vector<bool> visited_polygons(tot_poly);
 
-  if (!find_nodes_to_update(pbvh, nodes_to_update, visited_polygons)) {
+  if (!find_nodes_to_update(pbvh, nodes_to_update)) {
     return;
   }
 
@@ -360,7 +314,7 @@ static void update_pixels(PBVH *pbvh,
 
   for (PBVHNode *node : nodes_to_update) {
     NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
-    init_triangles(pbvh, node, node_data, pmap, mpoly, mloop, visited_polygons);
+    init_triangles(pbvh, node, node_data, mpoly, mloop);
   }
 
   EncodePixelsUserData user_data;
@@ -463,15 +417,13 @@ extern "C" {
 using namespace blender::bke::pbvh::pixels;
 
 void BKE_pbvh_build_pixels(PBVH *pbvh,
-                           const struct MeshElemMap *pmap,
                            const struct MPoly *mpoly,
                            const struct MLoop *mloop,
                            struct CustomData *ldata,
-                           int tot_poly,
                            struct Image *image,
                            struct ImageUser *image_user)
 {
-  update_pixels(pbvh, pmap, mpoly, mloop, ldata, tot_poly, image, image_user);
+  update_pixels(pbvh, mpoly, mloop, ldata, image, image_user);
 }
 
 void pbvh_pixels_free(PBVHNode *node)
