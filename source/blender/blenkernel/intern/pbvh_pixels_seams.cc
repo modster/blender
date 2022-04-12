@@ -9,7 +9,6 @@
 #include "BLI_math_geom.h"
 
 namespace blender::bke::pbvh::pixels {
-using namespace blender::bke::image;
 
 struct ExtendUVContext {
   PBVH *pbvh;
@@ -227,7 +226,7 @@ class UVSeamExtender {
   int image_buffer_width_;
 
  public:
-  explicit UVSeamExtender(ExtendUVContext &context, const ImageTileWrapper &image_tile)
+  explicit UVSeamExtender(ExtendUVContext &context, const image::ImageTileWrapper &image_tile)
       : image_buffer_width_(context.image_buffer->x)
   {
     rows.resize(context.image_buffer->y);
@@ -244,7 +243,7 @@ class UVSeamExtender {
   }
 
  private:
-  void init(ExtendUVContext &context, const ImageTileWrapper &image_tile)
+  void init(ExtendUVContext &context, const image::ImageTileWrapper &image_tile)
   {
     for (int n = 0; n < context.pbvh->totnode; n++) {
       PBVHNode &node = context.pbvh->nodes[n];
@@ -255,7 +254,7 @@ class UVSeamExtender {
     }
   }
 
-  void init(ExtendUVContext &context, PBVHNode &node, const ImageTileWrapper &image_tile)
+  void init(ExtendUVContext &context, PBVHNode &node, const image::ImageTileWrapper &image_tile)
   {
     NodeData &node_data = *static_cast<NodeData *>(node.pixels.node_data);
     UDIMTilePixels *tile_node_data = node_data.find_tile_data(image_tile);
@@ -300,7 +299,7 @@ void BKE_pbvh_pixels_fix_seams(PBVH &pbvh,
 
   ImageUser local_image_user = image_user;
   LISTBASE_FOREACH (ImageTile *, tile_data, &image.tiles) {
-    ImageTileWrapper image_tile(tile_data);
+    image::ImageTileWrapper image_tile(tile_data);
 
     local_image_user.tile = image_tile.get_tile_number();
     ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &local_image_user, nullptr);
