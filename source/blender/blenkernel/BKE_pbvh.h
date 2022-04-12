@@ -78,7 +78,7 @@ typedef enum {
 
   PBVH_UpdateTopology = 1 << 13,
   PBVH_UpdateColor = 1 << 14,
-  PBVH_UpdatePixels = 1 << 15,
+  PBVH_RebuildPixels = 1 << 15,
 
 } PBVHNodeFlags;
 

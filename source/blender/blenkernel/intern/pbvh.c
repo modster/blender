@@ -1789,7 +1789,7 @@ void BKE_pbvh_mark_update_pixels(PBVH *pbvh)
   for (int n = 0; n < pbvh->totnode; n++) {
     PBVHNode *node = &pbvh->nodes[n];
     if (node->flag & PBVH_Leaf) {
-      node->flag |= PBVH_UpdatePixels;
+      node->flag |= PBVH_RebuildPixels;
     }
   }
 }

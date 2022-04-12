@@ -271,7 +271,7 @@ class UVSeamExtender {
           context,
           &package,
           &node_data.triangles.get_paint_input(package.triangle_index),
-          (node.flag & PBVH_UpdatePixels) != 0,
+          (node.flag & PBVH_RebuildPixels) != 0,
           node_data.triangles.get_loop_indices(package.triangle_index));
       append(row_package);
     }

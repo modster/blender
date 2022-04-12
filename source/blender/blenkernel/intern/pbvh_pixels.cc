@@ -224,7 +224,7 @@ static bool should_pixels_be_updated(PBVHNode *node)
   if ((node->flag & PBVH_Leaf) == 0) {
     return false;
   }
-  if ((node->flag & PBVH_UpdatePixels) != 0) {
+  if ((node->flag & PBVH_RebuildPixels) != 0) {
     return true;
   }
   NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
@@ -287,7 +287,7 @@ static bool find_nodes_to_update(PBVH *pbvh,
     PBVHNode *node = &pbvh->nodes[n];
     if (should_pixels_be_updated(node)) {
       r_nodes_to_update.append(node);
-      node->flag = static_cast<PBVHNodeFlags>(node->flag | PBVH_UpdatePixels);
+      node->flag = static_cast<PBVHNodeFlags>(node->flag | PBVH_RebuildPixels);
 
       if (node->pixels.node_data == nullptr) {
         NodeData *node_data = MEM_new<NodeData>(__func__);
@@ -403,7 +403,7 @@ static void update_pixels(PBVH *pbvh,
 
   /* Clear the UpdatePixels flag. */
   for (PBVHNode *node : nodes_to_update) {
-    node->flag = static_cast<PBVHNodeFlags>(node->flag & ~PBVH_UpdatePixels);
+    node->flag = static_cast<PBVHNodeFlags>(node->flag & ~PBVH_RebuildPixels);
   }
 
 //#define DO_PRINT_STATISTICS
