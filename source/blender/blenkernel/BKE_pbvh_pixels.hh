@@ -222,9 +222,7 @@ struct NodeData {
   }
 };
 
-Triangles &BKE_pbvh_pixels_triangles_get(PBVHNode &node);
-UDIMTilePixels *BKE_pbvh_pixels_tile_data_get(PBVHNode &node,
-                                              const image::ImageTileWrapper &image_tile);
+NodeData &BKE_pbvh_pixels_node_data_get(PBVHNode &node);
 void BKE_pbvh_pixels_mark_dirty(PBVHNode &node);
 void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &image_user);
 /** Extend pixels to fix uv seams for the given nodes. */

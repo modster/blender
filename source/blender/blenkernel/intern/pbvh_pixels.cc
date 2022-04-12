@@ -367,19 +367,11 @@ static void update_pixels(PBVH *pbvh,
 #endif
 }
 
-Triangles &BKE_pbvh_pixels_triangles_get(PBVHNode &node)
+NodeData &BKE_pbvh_pixels_node_data_get(PBVHNode &node)
 {
   BLI_assert(node.pixels.node_data != nullptr);
   NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);
-  return node_data->triangles;
-}
-
-UDIMTilePixels *BKE_pbvh_pixels_tile_data_get(PBVHNode &node,
-                                              const image::ImageTileWrapper &image_tile)
-{
-  BLI_assert(node.pixels.node_data != nullptr);
-  NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);
-  return node_data->find_tile_data(image_tile);
+  return *node_data;
 }
 
 void BKE_pbvh_pixels_mark_dirty(PBVHNode &node)

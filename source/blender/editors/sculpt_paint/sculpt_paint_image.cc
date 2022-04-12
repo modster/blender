@@ -291,14 +291,15 @@ static void do_paint_pixels(void *__restrict userdata,
   const Brush *brush = data->brush;
   PBVHNode *node = data->nodes[n];
 
-  Triangles &triangles = BKE_pbvh_pixels_triangles_get(*node);
+  NodeData &node_data = BKE_pbvh_pixels_node_data_get(*node);
+
   /* Propagate vertex brush test to triangle. This should be extended with brush overlapping edges
    * and faces only. */
   /* TODO(jbakker) move to user data. to reduce reallocation. */
-  std::vector<bool> triangle_brush_test_results(triangles.size());
+  std::vector<bool> triangle_brush_test_results(node_data.triangles.size());
 
-  for (int triangle_index = 0; triangle_index < triangles.size(); triangle_index++) {
-    TrianglePaintInput &triangle = triangles.get_paint_input(triangle_index);
+  for (int triangle_index = 0; triangle_index < node_data.triangles.size(); triangle_index++) {
+    TrianglePaintInput &triangle = node_data.triangles.get_paint_input(triangle_index);
     int3 &vert_indices = triangle.vert_indices;
     for (int i = 0; i < 3; i++) {
       triangle_brush_test_results[triangle_index] = triangle_brush_test_results[triangle_index] ||
@@ -313,40 +314,39 @@ static void do_paint_pixels(void *__restrict userdata,
 
   ImageUser image_user = *data->image_data.image_user;
   bool pixels_updated = false;
-  LISTBASE_FOREACH (ImageTile *, tile, &data->image_data.image->tiles) {
-    ImageTileWrapper image_tile(tile);
-    image_user.tile = image_tile.get_tile_number();
-    UDIMTilePixels *tile_data = BKE_pbvh_pixels_tile_data_get(*node, image_tile);
-    if (tile_data == nullptr) {
-      /* This node doesn't paint on this tile. */
-      continue;
+  for (UDIMTilePixels &tile_data : node_data.tiles) {
+    LISTBASE_FOREACH (ImageTile *, tile, &data->image_data.image->tiles) {
+      ImageTileWrapper image_tile(tile);
+      if (image_tile.get_tile_number() == tile_data.tile_number) {
+        image_user.tile = image_tile.get_tile_number();
+
+        ImBuf *image_buffer = BKE_image_acquire_ibuf(data->image_data.image, &image_user, nullptr);
+        if (image_buffer == nullptr) {
+          continue;
+        }
+
+        for (const PackedPixelRow &pixel_row : tile_data.pixel_rows) {
+          if (!triangle_brush_test_results[pixel_row.triangle_index]) {
+            continue;
+          }
+          bool pixels_painted = false;
+          if (image_buffer->rect_float != nullptr) {
+            pixels_painted = kernel_float4.paint(node_data.triangles, pixel_row, image_buffer);
+          }
+          else {
+            pixels_painted = kernel_byte4.paint(node_data.triangles, pixel_row, image_buffer);
+          }
+
+          if (pixels_painted) {
+            tile_data.mark_dirty(pixel_row);
+          }
+        }
+
+        BKE_image_release_ibuf(data->image_data.image, image_buffer, nullptr);
+        pixels_updated |= tile_data.flags.dirty;
+      }
+      break;
     }
-
-    ImBuf *image_buffer = BKE_image_acquire_ibuf(data->image_data.image, &image_user, nullptr);
-    if (image_buffer == nullptr) {
-      continue;
-    }
-
-    for (const PackedPixelRow &pixel_row : tile_data->pixel_rows) {
-      if (!triangle_brush_test_results[pixel_row.triangle_index]) {
-        continue;
-      }
-      bool pixels_painted = false;
-      if (image_buffer->rect_float != nullptr) {
-        pixels_painted = kernel_float4.paint(triangles, pixel_row, image_buffer);
-      }
-      else {
-        pixels_painted = kernel_byte4.paint(triangles, pixel_row, image_buffer);
-      }
-
-      if (pixels_painted) {
-        tile_data->mark_dirty(pixel_row);
-      }
-    }
-
-    BKE_image_release_ibuf(data->image_data.image, image_buffer, nullptr);
-
-    pixels_updated |= tile_data->flags.dirty;
   }
 
   if (pixels_updated) {
