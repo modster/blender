@@ -75,6 +75,10 @@ void EEVEE_material_bind_resources(DRWShadingGroup *shgrp,
   bool use_refract = GPU_material_flag_get(gpumat, GPU_MATFLAG_REFRACT);
   bool use_ao = GPU_material_flag_get(gpumat, GPU_MATFLAG_AO);
 
+#ifdef __APPLE__
+  /* NOTE: Some implementation do not optimize out the unused samplers. */
+  use_diffuse = use_glossy = use_refract = use_ao = true;
+#endif
   LightCache *lcache = vedata->stl->g_data->light_cache;
   EEVEE_EffectsInfo *effects = vedata->stl->effects;
   EEVEE_PrivateData *pd = vedata->stl->g_data;
