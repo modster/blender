@@ -20,6 +20,8 @@ vec3 finalScattering;
 vec3 finalTransmittance;
 #else
 
+flat in int slice;
+
 layout(location = 0) out vec3 finalScattering;
 layout(location = 1) out vec3 finalTransmittance;
 #endif
