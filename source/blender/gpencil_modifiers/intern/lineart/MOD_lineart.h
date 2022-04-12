@@ -116,6 +116,7 @@ typedef struct LineartShadowSegmentContainer {
   double fbc1[4], fbc2[4];
   double g1[3], g2[3];
   struct LineartEdge *e_ref;
+  struct LineartEdge *e_ref_light_contour;
   struct LineartEdgeSegment *es_ref; /* Only for 3rd stage casting. */
   ListBase shadow_segments;
 } LineartShadowSegmentContainer;

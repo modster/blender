@@ -326,7 +326,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
     es->material_mask_bits |= material_mask_bits;
     /* Currently only register lit/shade, see LineartEdgeSegment::shadow_mask_bits for details. */
     if (shadow_bits == LRT_SHADOW_MASK_ENCLOSED_SHAPE) {
-      if (es->shadow_mask_bits == LRT_SHADOW_MASK_LIT) {
+      if (es->shadow_mask_bits == LRT_SHADOW_MASK_LIT || e->flags & LRT_EDGE_FLAG_LIGHT_CONTOUR) {
         es->shadow_mask_bits = LRT_SHADOW_MASK_INHIBITED;
       }
       else if (es->shadow_mask_bits == LRT_SHADOW_MASK_SHADED) {
@@ -2040,6 +2040,8 @@ static void lineart_load_tri_task(void *__restrict userdata,
 
   tri->intersection_mask = ob_info->override_intersection_mask;
 
+  tri->target_reference = (ob_info->obindex | (i & LRT_OBINDEX_LOWER));
+
   double gn[3];
   float no[3];
   normal_tri_v3(no, me->mvert[v1].co, me->mvert[v2].co, me->mvert[v3].co);
@@ -3208,7 +3210,8 @@ static bool lineart_edge_from_triangle(const LineartTriangle *tri,
                                        bool allow_overlapping_edges)
 {
   /* Normally we just determine from the pointer address. */
-  if (e->t1 == tri || e->t2 == tri) {
+  if (e->t1 && e->t1->target_reference == tri->target_reference ||
+      (e->t2 && e->t2->target_reference == tri->target_reference)) {
     return true;
   }
   /* If allows overlapping, then we compare the vertex coordinates one by one to determine if one
@@ -5404,8 +5407,39 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb,
   LRT_ITER_ALL_LINES_BEGIN
   {
     /* Only contour and loose edges can actually cast shadows. */
-    if (!(e->flags & (LRT_EDGE_FLAG_CONTOUR | LRT_EDGE_FLAG_LOOSE))) {
+    if (!(e->flags &
+          (LRT_EDGE_FLAG_CONTOUR | LRT_EDGE_FLAG_LOOSE | LRT_EDGE_FLAG_LIGHT_CONTOUR))) {
       continue;
+    }
+    if (e->flags == LRT_EDGE_FLAG_LIGHT_CONTOUR) {
+      /* Only reproject light contours that also doubles as a view contour. */
+      LineartEdge *orig_e = (LineartEdge *)e->t1;
+      if (!orig_e->t2) {
+        e->flags |= LRT_EDGE_FLAG_CONTOUR;
+      }
+      else {
+        double vv[3];
+        double *view_vector = vv;
+        double dot_1 = 0, dot_2 = 0;
+        double result;
+
+        if (rb->cam_is_persp) {
+          sub_v3_v3v3_db(view_vector, orig_e->v1->gloc, rb->camera_pos);
+        }
+        else {
+          view_vector = rb->view_vector;
+        }
+
+        dot_1 = dot_v3v3_db(view_vector, orig_e->t1->gn);
+        dot_2 = dot_v3v3_db(view_vector, orig_e->t2->gn);
+
+        if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+          e->flags |= LRT_EDGE_FLAG_CONTOUR;
+        }
+      }
+      if (!(e->flags & LRT_EDGE_FLAG_CONTOUR)) {
+        continue;
+      }
     }
     LISTBASE_FOREACH (LineartEdgeSegment *, es, &e->segments) {
       DISCARD_NONSENSE_SEGMENTS
@@ -5457,7 +5491,16 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb,
       BLI_addtail(&ssc[i].shadow_segments, &ss[i * 2]);
       BLI_addtail(&ssc[i].shadow_segments, &ss[i * 2 + 1]);
 
-      ssc[i].e_ref = e;
+      if (e->flags & LRT_EDGE_FLAG_LIGHT_CONTOUR) {
+        ssc[i].e_ref = e->t1;
+        ssc[i].e_ref_light_contour = e;
+        /* Restore original edge flag. */
+        e->flags &= (~LRT_EDGE_FLAG_CONTOUR);
+      }
+      else {
+        ssc[i].e_ref = e;
+      }
+
       ssc[i].es_ref = es;
       BLI_addtail(&rb->shadow_containers, &ssc[i]);
 
@@ -5960,7 +6003,8 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
       e->v1 = v1;
       e->v2 = v2;
       e->t1 = (LineartTriangle *)ssc->e_ref; /* See LineartEdge::t1 for usage. */
-      e->t2 = (LineartTriangle *)ssc->es_ref;
+      e->t2 = (LineartTriangle *)(ssc->e_ref_light_contour ? ssc->e_ref_light_contour :
+                                                             ssc->e_ref);
       e->target_reference = ss->target_reference;
       e->flags = (LRT_EDGE_FLAG_PROJECTED_SHADOW |
                   ((ss->flag & LRT_SHADOW_FACING_LIGHT) ? LRT_EDGE_FLAG_SHADOW_FACING_LIGHT : 0));
@@ -5977,8 +6021,7 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
       //}
       e->v1 = v1;
       e->v2 = v2;
-      e->t1 = (LineartTriangle *)ssc->e_ref;
-      e->t2 = (LineartTriangle *)ssc->es_ref;
+      e->t1 = e->t2 = (LineartTriangle *)ssc->e_ref;
       e->flags = LRT_EDGE_FLAG_LIGHT_CONTOUR;
       i++;
     }
@@ -6003,8 +6046,7 @@ __attribute__((optimize("O0"))) static void lineart_shadow_register_enclosed_sha
         continue;
       }
       double next_at = es->next ? ((LineartEdgeSegment *)es->next)->at : 1.0f;
-      LineartEdge *orig_e = (LineartEdge *)e->t1;
-      LineartEdgeSegment *orig_es = (LineartEdge *)e->t2;
+      LineartEdge *orig_e = (LineartEdge *)e->t2;
 
       /* Shadow view space to global. */
       double ga1 = e->v1->fbcoord[3] * es->at /
