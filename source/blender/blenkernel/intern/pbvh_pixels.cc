@@ -97,9 +97,9 @@ static void extract_barycentric_pixels(TileData &tile_data,
 {
   for (int y = miny; y < maxy; y++) {
     bool start_detected = false;
-    PixelsPackage package;
-    package.triangle_index = triangle_index;
-    package.num_pixels = 0;
+    PackedPixelRow pixel_row;
+    pixel_row.triangle_index = triangle_index;
+    pixel_row.num_pixels = 0;
     int x;
 
     for (x = minx; x < maxx; x++) {
@@ -110,8 +110,8 @@ static void extract_barycentric_pixels(TileData &tile_data,
       const bool is_inside = barycentric_inside_triangle_v2(barycentric_weights);
       if (!start_detected && is_inside) {
         start_detected = true;
-        package.start_image_coordinate = ushort2(x, y);
-        package.start_barycentric_coord = barycentric_weights;
+        pixel_row.start_image_coordinate = ushort2(x, y);
+        pixel_row.start_barycentric_coord = barycentric_weights;
       }
       else if (start_detected && !is_inside) {
         break;
@@ -121,8 +121,8 @@ static void extract_barycentric_pixels(TileData &tile_data,
     if (!start_detected) {
       continue;
     }
-    package.num_pixels = x - package.start_image_coordinate.x;
-    tile_data.packages.append(package);
+    pixel_row.num_pixels = x - pixel_row.start_image_coordinate.x;
+    tile_data.pixel_rows.append(pixel_row);
   }
 }
 
@@ -203,15 +203,15 @@ static void do_encode_pixels(void *__restrict userdata,
       const int maxx = min_ii(ceil(maxu * image_buffer->x), image_buffer->x);
 
       TrianglePaintInput &triangle = triangles.get_paint_input(triangle_index);
-      triangle.add_barycentric_coord_x = calc_barycentric_delta_x(image_buffer, uvs, minx, miny);
-      triangle.add_barycentric_coord_y = calc_barycentric_delta_y(image_buffer, uvs, minx, miny);
+      triangle.delta_barycentric_coord_u = calc_barycentric_delta_x(image_buffer, uvs, minx, miny);
+      triangle.delta_barycentric_coord_v = calc_barycentric_delta_y(image_buffer, uvs, minx, miny);
       extract_barycentric_pixels(
           tile_data, image_buffer, triangle_index, uvs, minx, miny, maxx, maxy);
     }
 
     BKE_image_release_ibuf(image, image_buffer, nullptr);
 
-    if (tile_data.packages.is_empty()) {
+    if (tile_data.pixel_rows.is_empty()) {
       continue;
     }
 
@@ -333,10 +333,10 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
         continue;
       }
 
-      for (PixelsPackage &encoded_pixels : tile_node_data->packages) {
-        int pixel_offset = encoded_pixels.start_image_coordinate.y * image_buffer->x +
-                           encoded_pixels.start_image_coordinate.x;
-        for (int x = 0; x < encoded_pixels.num_pixels; x++) {
+      for (PackedPixelRow &pixel_row : tile_node_data->pixel_rows) {
+        int pixel_offset = pixel_row.start_image_coordinate.y * image_buffer->x +
+                           pixel_row.start_image_coordinate.x;
+        for (int x = 0; x < pixel_row.num_pixels; x++) {
           if (image_buffer->rect_float) {
             if (USE_WATERTIGHT_SEAM_CHECK) {
               image_buffer->rect_float[pixel_offset * 4] += 0.5;
@@ -421,8 +421,8 @@ static void update_pixels(PBVH *pbvh,
       NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
       compressed_data_len += node_data->triangles.mem_size();
       for (const TileData &tile_data : node_data->tiles) {
-        compressed_data_len += tile_data.encoded_pixels.size() * sizeof(PixelsPackage);
-        for (const PixelsPackage &encoded_pixels : tile_data.encoded_pixels) {
+        compressed_data_len += tile_data.encoded_pixels.size() * sizeof(PackedPixelRow);
+        for (const PackedPixelRow &encoded_pixels : tile_data.encoded_pixels) {
           num_pixels += encoded_pixels.num_pixels;
         }
       }

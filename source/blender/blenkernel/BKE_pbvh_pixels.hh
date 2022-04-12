@@ -36,10 +36,25 @@ struct EncodedLoopIndices {
 
 struct TrianglePaintInput {
   int3 vert_indices;
-  float3 add_barycentric_coord_x;
-  float3 add_barycentric_coord_y;
+  /**
+   * Delta barycentric coordinates between 2 neighbouring UV's in the U direction.
+   *
+   * Only the first two coordinates are stored. The third should be recalculated
+   */
+  float3 delta_barycentric_coord_u;
+  /** Delta barycentric coordinates between 2 neighbouring UV's in the V direction. */
+  float3 delta_barycentric_coord_v;
 
-  TrianglePaintInput(const int3 vert_indices) : vert_indices(vert_indices)
+  /**
+   * Initially only the vert indices are known.
+   *
+   * delta_barycentric_coord_u/v are initialized in a later stage as it requires image tile
+   * dimensions.
+   */
+  TrianglePaintInput(const int3 vert_indices)
+      : vert_indices(vert_indices),
+        delta_barycentric_coord_u(0.0f, 0.0f, 0.0f),
+        delta_barycentric_coord_v(0.0f, 0.0f, 0.0f)
   {
   }
 };
@@ -113,7 +128,7 @@ struct Triangles {
 /**
  * Encode sequential pixels to reduce memory footprint.
  */
-struct PixelsPackage {
+struct PackedPixelRow {
   /** Barycentric coordinate of the first pixel. */
   float3 start_barycentric_coord;
   /** Image coordinate starting of the first pixel. */
@@ -124,8 +139,6 @@ struct PixelsPackage {
   ushort triangle_index;
 };
 
-using PixelPackages = Vector<PixelsPackage>;
-
 struct TileData {
   short tile_number;
   struct {
@@ -135,7 +148,7 @@ struct TileData {
   /* Dirty region of the tile in image space. */
   rcti dirty_region;
 
-  PixelPackages packages;
+  Vector<PackedPixelRow> pixel_rows;
 
   TileData()
   {

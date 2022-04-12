@@ -53,18 +53,18 @@ struct UVSeamExtenderRowPackage {
   /** Amount of pixels to extend beyond the determined extension to reduce rendering artifacts. */
   static const int ADDITIONAL_EXTEND_X = 1;
 
-  PixelsPackage *package;
+  PackedPixelRow *pixel_row;
   TrianglePaintInput *triangle_paint_data;
   bool is_new;
   int extend_xmin_len = 0;
   int extend_xmax_len = 0;
 
   UVSeamExtenderRowPackage(ExtendUVContext &context,
-                           PixelsPackage *package,
+                           PackedPixelRow *pixel_row,
                            TrianglePaintInput *triangle_paint_data,
                            bool is_new,
                            const int3 &loop_indices)
-      : package(package), triangle_paint_data(triangle_paint_data), is_new(is_new)
+      : pixel_row(pixel_row), triangle_paint_data(triangle_paint_data), is_new(is_new)
   {
     init_extend_x_len(context, loop_indices);
   }
@@ -77,9 +77,9 @@ struct UVSeamExtenderRowPackage {
   void extend_x_start()
   {
     BLI_assert(extend_xmin_len != 0);
-    package->num_pixels += 1;
-    package->start_image_coordinate[0] -= 1;
-    package->start_barycentric_coord -= triangle_paint_data->add_barycentric_coord_x;
+    pixel_row->num_pixels += 1;
+    pixel_row->start_image_coordinate[0] -= 1;
+    pixel_row->start_barycentric_coord -= triangle_paint_data->delta_barycentric_coord_u;
     extend_xmin_len--;
   }
 
@@ -91,7 +91,7 @@ struct UVSeamExtenderRowPackage {
   void extend_x_end()
   {
     BLI_assert(extend_xmax_len != 0);
-    package->num_pixels += 1;
+    pixel_row->num_pixels += 1;
     extend_xmax_len--;
   }
 
@@ -127,7 +127,7 @@ struct UVSeamExtenderRowPackage {
                           const float2 triangle_uvs[3]) const
   {
     uint16_t pixel_offset = offset + 1;
-    ushort2 pixel = package->start_image_coordinate - ushort2(pixel_offset, 0);
+    ushort2 pixel = pixel_row->start_image_coordinate - ushort2(pixel_offset, 0);
     return intersect_uv_pixel(pixel, image_buffer, triangle_uvs);
   }
 
@@ -145,7 +145,7 @@ struct UVSeamExtenderRowPackage {
                           const float2 triangle_uvs[3]) const
   {
     uint16_t pixel_offset = offset + 1;
-    ushort2 pixel = package->start_image_coordinate + ushort2(pixel_offset, 0);
+    ushort2 pixel = pixel_row->start_image_coordinate + ushort2(pixel_offset, 0);
     return intersect_uv_pixel(pixel, image_buffer, triangle_uvs);
   }
 };
@@ -165,7 +165,7 @@ class UVSeamExtenderRow : public Vector<UVSeamExtenderRowPackage> {
   {
     std::sort(
         begin(), end(), [](const UVSeamExtenderRowPackage &a, const UVSeamExtenderRowPackage &b) {
-          return a.package->start_image_coordinate[0] < b.package->start_image_coordinate[0];
+          return a.pixel_row->start_image_coordinate[0] < b.pixel_row->start_image_coordinate[0];
         });
     extend_x_start();
     extend_x_end(image_buffer_width);
@@ -180,7 +180,7 @@ class UVSeamExtenderRow : public Vector<UVSeamExtenderRowPackage> {
     for (UVSeamExtenderRowPackage &package : *this) {
       if (package.is_new) {
         while (package.should_extend_start()) {
-          if (package.package->start_image_coordinate[0] - 1 <= prev_package_x) {
+          if (package.pixel_row->start_image_coordinate[0] - 1 <= prev_package_x) {
             /* No room left for extending. */
             break;
           }
@@ -188,7 +188,8 @@ class UVSeamExtenderRow : public Vector<UVSeamExtenderRowPackage> {
         }
       }
 
-      prev_package_x = package.package->start_image_coordinate[0] + package.package->num_pixels;
+      prev_package_x = package.pixel_row->start_image_coordinate[0] +
+                       package.pixel_row->num_pixels;
       index++;
     }
   }
@@ -201,13 +202,13 @@ class UVSeamExtenderRow : public Vector<UVSeamExtenderRowPackage> {
         int next_package_x;
         if (index < size() - 1) {
           const UVSeamExtenderRowPackage &next_package = (*this)[index + 1];
-          next_package_x = next_package.package->start_image_coordinate[0];
+          next_package_x = next_package.pixel_row->start_image_coordinate[0];
         }
         else {
           next_package_x = image_buffer_width + 1;
         }
         while (package.should_extend_end()) {
-          if (package.package->start_image_coordinate[0] + package.package->num_pixels >=
+          if (package.pixel_row->start_image_coordinate[0] + package.pixel_row->num_pixels >=
               next_package_x - 1) {
             /* No room left for extending */
             break;
@@ -266,20 +267,20 @@ class UVSeamExtender {
 
   void init(ExtendUVContext &context, PBVHNode &node, NodeData &node_data, TileData &tile_data)
   {
-    for (PixelsPackage &package : tile_data.packages) {
+    for (PackedPixelRow &pixel_row : tile_data.pixel_rows) {
       UVSeamExtenderRowPackage row_package(
           context,
-          &package,
-          &node_data.triangles.get_paint_input(package.triangle_index),
+          &pixel_row,
+          &node_data.triangles.get_paint_input(pixel_row.triangle_index),
           (node.flag & PBVH_RebuildPixels) != 0,
-          node_data.triangles.get_loop_indices(package.triangle_index));
+          node_data.triangles.get_loop_indices(pixel_row.triangle_index));
       append(row_package);
     }
   }
 
   void append(UVSeamExtenderRowPackage &package)
   {
-    rows[package.package->start_image_coordinate[1]].append(package);
+    rows[package.pixel_row->start_image_coordinate[1]].append(package);
   }
 };
 

@@ -174,7 +174,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
     init_brush_test();
   }
 
-  bool paint(const Triangles &triangles, const PixelsPackage &encoded_pixels, ImBuf *image_buffer)
+  bool paint(const Triangles &triangles, const PackedPixelRow &encoded_pixels, ImBuf *image_buffer)
   {
     if (image_buffer != last_used_image_buffer_ptr) {
       last_used_image_buffer_ptr = image_buffer;
@@ -244,7 +244,7 @@ template<typename ImagePixelAccessor> class PaintingKernel {
    * Extract the staring pixel from the given encoded_pixels belonging to the triangle.
    */
   Pixel get_start_pixel(const TrianglePaintInput &triangle,
-                        const PixelsPackage &encoded_pixels) const
+                        const PackedPixelRow &encoded_pixels) const
   {
     return init_pixel(triangle, encoded_pixels.start_barycentric_coord);
   }
@@ -253,11 +253,11 @@ template<typename ImagePixelAccessor> class PaintingKernel {
    * Extract the delta pixel that will be used to advance a Pixel instance to the next pixel.
    */
   Pixel get_delta_pixel(const TrianglePaintInput &triangle,
-                        const PixelsPackage &encoded_pixels,
+                        const PackedPixelRow &encoded_pixels,
                         const Pixel &start_pixel) const
   {
     Pixel result = init_pixel(
-        triangle, encoded_pixels.start_barycentric_coord + triangle.add_barycentric_coord_x);
+        triangle, encoded_pixels.start_barycentric_coord + triangle.delta_barycentric_coord_u);
     return result - start_pixel;
   }
 
@@ -345,24 +345,24 @@ static void do_paint_pixels(void *__restrict userdata,
       continue;
     }
 
-    for (const PixelsPackage &encoded_pixels : tile_data->packages) {
-      if (!triangle_brush_test_results[encoded_pixels.triangle_index]) {
+    for (const PackedPixelRow &pixel_row : tile_data->pixel_rows) {
+      if (!triangle_brush_test_results[pixel_row.triangle_index]) {
         continue;
       }
       bool pixels_painted = false;
       if (image_buffer->rect_float != nullptr) {
-        pixels_painted = kernel_float4.paint(triangles, encoded_pixels, image_buffer);
+        pixels_painted = kernel_float4.paint(triangles, pixel_row, image_buffer);
       }
       else {
-        pixels_painted = kernel_byte4.paint(triangles, encoded_pixels, image_buffer);
+        pixels_painted = kernel_byte4.paint(triangles, pixel_row, image_buffer);
       }
 
       if (pixels_painted) {
-        int2 start_image_coord(encoded_pixels.start_image_coordinate.x,
-                               encoded_pixels.start_image_coordinate.y);
+        int2 start_image_coord(pixel_row.start_image_coordinate.x,
+                               pixel_row.start_image_coordinate.y);
         BLI_rcti_do_minmax_v(&tile_data->dirty_region, start_image_coord);
         BLI_rcti_do_minmax_v(&tile_data->dirty_region,
-                             start_image_coord + int2(encoded_pixels.num_pixels + 1, 0));
+                             start_image_coord + int2(pixel_row.num_pixels + 1, 0));
         tile_data->flags.dirty = true;
       }
     }
