@@ -20,7 +20,7 @@
 
 #include "pbvh_intern.h"
 
-namespace blender::bke::pbvh::pixels::extractor {
+namespace blender::bke::pbvh::pixels {
 
 /** Durind debugging this check could be enabled. It will write to each image pixel that is covered
  * by the pbvh. */
@@ -435,10 +435,6 @@ static void update_pixels(PBVH *pbvh,
 #endif
 }
 
-}  // namespace blender::bke::pbvh::pixels::extractor
-
-namespace blender::bke::pbvh::pixels {
-
 Triangles &BKE_pbvh_pixels_triangles_get(PBVHNode &node)
 {
   BLI_assert(node.pixels.node_data != nullptr);
@@ -446,7 +442,8 @@ Triangles &BKE_pbvh_pixels_triangles_get(PBVHNode &node)
   return node_data->triangles;
 }
 
-UDIMTilePixels *BKE_pbvh_pixels_tile_data_get(PBVHNode &node, const image::ImageTileWrapper &image_tile)
+UDIMTilePixels *BKE_pbvh_pixels_tile_data_get(PBVHNode &node,
+                                              const image::ImageTileWrapper &image_tile)
 {
   BLI_assert(node.pixels.node_data != nullptr);
   NodeData *node_data = static_cast<NodeData *>(node.pixels.node_data);
@@ -485,7 +482,6 @@ void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &i
 }  // namespace blender::bke::pbvh::pixels
 
 extern "C" {
-using namespace blender::bke::pbvh::pixels::extractor;
 using namespace blender::bke::pbvh::pixels;
 
 void BKE_pbvh_build_pixels(PBVH *pbvh,
