@@ -247,8 +247,8 @@ class CLIP_HT_header(Header):
             if sc.view == 'CLIP':
                 r = active_object.reconstruction
                 if r.is_valid and sc.view == 'CLIP':
-                    layout.label(text="Solve error: %.2f px" %
-                                 (r.average_error))
+                    layout.label(text="%s Solve error: %.2f px" %
+                                 (active_object.name, r.average_error))
 
                 row = layout.row()
                 row.popover(panel='CLIP_PT_objects')
