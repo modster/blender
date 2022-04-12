@@ -184,30 +184,30 @@ void direction_transform_world_to_object(vec3 vin, out vec3 vout)
 
 void point_transform_object_to_world(vec3 vin, out vec3 vout)
 {
-  vout = point_object_to_view(vin);
+  vout = point_object_to_world(vin);
 }
 
 void point_transform_object_to_view(vec3 vin, out vec3 vout)
 {
-  vout = point_object_to_world(vin);
+  vout = point_object_to_view(vin);
 }
 
 void point_transform_view_to_world(vec3 vin, out vec3 vout)
 {
-  vout = point_view_to_object(vin);
+  vout = point_view_to_world(vin);
 }
 
 void point_transform_view_to_object(vec3 vin, out vec3 vout)
 {
-  vout = point_view_to_world(vin);
+  vout = point_view_to_object(vin);
 }
 
 void point_transform_world_to_view(vec3 vin, out vec3 vout)
 {
-  vout = point_world_to_object(vin);
+  vout = point_world_to_view(vin);
 }
 
 void point_transform_world_to_object(vec3 vin, out vec3 vout)
 {
-  vout = point_world_to_view(vin);
+  vout = point_world_to_object(vin);
 }
