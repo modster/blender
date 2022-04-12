@@ -58,14 +58,14 @@ vec3 displacement_bump()
 
 void main()
 {
-#if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
-  attrib_load();
-#endif
-
   g_data = init_globals();
 
 #ifdef EEVEE_DISPLACEMENT_BUMP
   g_data.N = displacement_bump();
+#endif
+
+#if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
+  attrib_load();
 #endif
 
   Closure cl = nodetree_exec();

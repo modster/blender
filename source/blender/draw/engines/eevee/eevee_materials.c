@@ -377,6 +377,12 @@ void EEVEE_materials_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
     DRW_shgroup_uniform_block(grp, "light_block", sldata->light_ubo);
     DRW_shgroup_uniform_block(grp, "shadow_block", sldata->shadow_ubo);
     DRW_shgroup_uniform_block_ref(grp, "renderpass_block", &stl->g_data->renderpass_ubo);
+    DRW_shgroup_uniform_texture(grp, "utilTex", e_data.util_tex);
+    DRW_shgroup_uniform_texture_ref(grp, "shadowCubeTexture", &sldata->shadow_cube_pool);
+    DRW_shgroup_uniform_texture_ref(grp, "shadowCascadeTexture", &sldata->shadow_cascade_pool);
+    DRW_shgroup_uniform_texture_ref(grp, "probePlanars", &vedata->txl->planar_pool);
+    DRW_shgroup_uniform_texture_ref(grp, "probeCubes", &stl->g_data->light_cache->cube_tx.tex);
+    DRW_shgroup_uniform_texture_ref(grp, "irradianceGrid", &stl->g_data->light_cache->grid_tx.tex);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
   }
 
