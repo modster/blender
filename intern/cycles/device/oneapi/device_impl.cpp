@@ -221,7 +221,7 @@ void OneapiDevice::mem_alloc(device_memory &mem)
 void OneapiDevice::mem_copy_to(device_memory &mem)
 {
   if (mem.name) {
-    VLOG(2) << "OneapiDevice::mem_copy_to: \"" << mem.name << "\", "
+    VLOG(4) << "OneapiDevice::mem_copy_to: \"" << mem.name << "\", "
             << string_human_readable_number(mem.memory_size()).c_str() << " bytes. ("
             << string_human_readable_size(mem.memory_size()).c_str() << ")";
   }
@@ -252,7 +252,7 @@ void OneapiDevice::mem_copy_from(device_memory &mem, size_t y, size_t w, size_t 
     const size_t offset = elem * y * w;
 
     if (mem.name) {
-      VLOG(2) << "OneapiDevice::mem_copy_from: \"" << mem.name << "\" object of "
+      VLOG(4) << "OneapiDevice::mem_copy_from: \"" << mem.name << "\" object of "
               << string_human_readable_number(mem.memory_size()).c_str() << " bytes. ("
               << string_human_readable_size(mem.memory_size()).c_str() << ") from offset "
               << offset << " data " << size << " bytes";
@@ -276,7 +276,7 @@ void OneapiDevice::mem_copy_from(device_memory &mem, size_t y, size_t w, size_t 
 void OneapiDevice::mem_zero(device_memory &mem)
 {
   if (mem.name) {
-    VLOG(2) << "OneapiDevice::mem_zero: \"" << mem.name << "\", "
+    VLOG(4) << "OneapiDevice::mem_zero: \"" << mem.name << "\", "
             << string_human_readable_number(mem.memory_size()).c_str() << " bytes. ("
             << string_human_readable_size(mem.memory_size()).c_str() << ")\n";
   }
@@ -327,7 +327,7 @@ void OneapiDevice::const_copy_to(const char *name, void *host, size_t size)
 {
   assert(name);
 
-  VLOG(2) << "OneapiDevice::const_copy_to \"" << name << "\" object "
+  VLOG(4) << "OneapiDevice::const_copy_to \"" << name << "\" object "
           << string_human_readable_number(size).c_str() << " bytes. ("
           << string_human_readable_size(size).c_str() << ")";
 
