@@ -28,30 +28,6 @@ constexpr bool USE_WATERTIGHT_CHECK = false;
 constexpr bool USE_WATERTIGHT_SEAM_CHECK = true;
 
 /**
- * Keep track of visited polygons.
- *
- * Uses a std::vector<bool> to reduce memory requirements.
- * TODO(jbakker): Should be replaced by BLI bool vector when available {D14006}.
- */
-class VisitedPolygons : std::vector<bool> {
- public:
-  VisitedPolygons(int64_t polygon_len) : std::vector<bool>(polygon_len)
-  {
-  }
-
-  /**
-   * Check of the given poly_index has already been visited.
-   * Marks the given polygon as visited and return the previous visited state.
-   */
-  bool tag_visited(const int poly_index)
-  {
-    bool visited = (*this)[poly_index];
-    (*this)[poly_index] = true;
-    return visited;
-  }
-};
-
-/**
  * @brief Calculate the delta of two neighbour uv coordinates in the given image buffer.
  */
 static float3 calc_barycentric_delta(const float2 uvs[3],
@@ -132,7 +108,7 @@ static void init_triangles(PBVH *pbvh,
                            const MeshElemMap *pmap,
                            const MPoly *mpoly,
                            const MLoop *mloop,
-                           VisitedPolygons &visited_polygons)
+                           std::vector<bool> &visited_polygons)
 {
   PBVHVertexIter vd;
 
@@ -140,9 +116,11 @@ static void init_triangles(PBVH *pbvh,
     const MeshElemMap *vert_map = &pmap[vd.index];
     for (int j = 0; j < pmap[vd.index].count; j++) {
       const int poly_index = vert_map->indices[j];
-      if (visited_polygons.tag_visited(poly_index)) {
+
+      if (visited_polygons[poly_index]) {
         continue;
       }
+      visited_polygons[poly_index] = true;
 
       const MPoly *p = &mpoly[poly_index];
       const MLoop *loopstart = &mloop[p->loopstart];
@@ -275,7 +253,7 @@ static int64_t count_nodes_to_update(PBVH *pbvh)
  */
 static bool find_nodes_to_update(PBVH *pbvh,
                                  Vector<PBVHNode *> &r_nodes_to_update,
-                                 VisitedPolygons &r_visited_polygons)
+                                 std::vector<bool> &r_visited_polygons)
 {
   int64_t nodes_to_update_len = count_nodes_to_update(pbvh);
   if (nodes_to_update_len == 0) {
@@ -304,7 +282,7 @@ static bool find_nodes_to_update(PBVH *pbvh,
        * nodes. */
       Triangles &triangles = BKE_pbvh_pixels_triangles_get(*node);
       for (int &poly_index : triangles.poly_indices) {
-        r_visited_polygons.tag_visited(poly_index);
+        r_visited_polygons[poly_index] = true;
       }
     }
   }
@@ -369,7 +347,7 @@ static void update_pixels(PBVH *pbvh,
                           struct ImageUser *image_user)
 {
   Vector<PBVHNode *> nodes_to_update;
-  VisitedPolygons visited_polygons(tot_poly);
+  std::vector<bool> visited_polygons(tot_poly);
 
   if (!find_nodes_to_update(pbvh, nodes_to_update, visited_polygons)) {
     return;
