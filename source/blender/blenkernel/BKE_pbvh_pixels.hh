@@ -181,8 +181,6 @@ struct NodeData {
     bool dirty : 1;
   } flags;
 
-  rctf uv_region;
-
   Vector<UDIMTilePixels> tiles;
   Triangles triangles;
 
@@ -190,8 +188,6 @@ struct NodeData {
   {
     flags.dirty = false;
   }
-
-  void init_pixels_rasterization(Object *ob, PBVHNode *node, ImBuf *image_buffer);
 
   UDIMTilePixels *find_tile_data(const image::ImageTileWrapper &image_tile)
   {
