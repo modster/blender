@@ -16,8 +16,9 @@ void main()
   PASS_RESOURCE_ID
 
   gl_Position = vec4(pos, 1.0, 1.0);
-  viewPosition = vec3(pos, -1.0);
-  worldPosition = point_view_to_world(viewPosition);
-  viewNormal = normalize(-viewPosition);
-  worldNormal = normal_view_to_world(viewNormal);
+  viewPosition = project_point(ProjectionMatrixInverse, vec3(pos, 0.0));
+  worldPosition = project_point(ViewProjectionMatrixInverse, vec3(pos, 0.0));
+  /* Not usable. */
+  viewNormal = vec3(0.0);
+  worldNormal = vec3(0.0);
 }

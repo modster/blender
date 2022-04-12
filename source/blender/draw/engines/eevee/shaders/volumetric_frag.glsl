@@ -44,6 +44,32 @@ GlobalData init_globals(void)
   surf.ray_length = distance(surf.P, cameraPos);
   return surf;
 }
+
+vec3 coordinate_camera(vec3 P)
+{
+  vec3 vP;
+  vP = transform_point(ViewMatrix, P);
+  vP.z = -vP.z;
+  return vP;
+}
+
+vec3 coordinate_screen(vec3 P)
+{
+  vec3 window = vec3(0.0);
+  window.xy = project_point(ViewProjectionMatrix, P).xy * 0.5 + 0.5;
+  window.xy = window.xy * CameraTexCoFactors.xy + CameraTexCoFactors.zw;
+  return window;
+}
+
+vec3 coordinate_reflect(vec3 P, vec3 N)
+{
+  return vec3(0.0);
+}
+
+vec3 coordinate_incoming(vec3 P)
+{
+  return cameraVec(P);
+}
 #endif
 
 void main()

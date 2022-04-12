@@ -10,7 +10,7 @@ void node_geometry(vec3 orco,
                    out float random_per_island)
 {
   /* handle perspective/orthographic */
-  incoming = cameraVec(g_data.P);
+  incoming = coordinate_incoming(g_data.P);
   position = g_data.P;
   normal = g_data.N;
   true_normal = g_data.Ng;

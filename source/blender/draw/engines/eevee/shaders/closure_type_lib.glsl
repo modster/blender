@@ -29,6 +29,10 @@ struct Closure {
 /* Prototype */
 Closure nodetree_exec();
 vec4 closure_to_rgba(Closure);
+vec3 coordinate_camera(vec3 P);
+vec3 coordinate_screen(vec3 P);
+vec3 coordinate_reflect(vec3 P, vec3 N);
+vec3 coordinate_incoming(vec3 P);
 
 /* Single BSDFs. */
 Closure closure_eval(ClosureDiffuse diffuse);

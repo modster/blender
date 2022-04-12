@@ -125,7 +125,7 @@ void main()
 /* Only supported attrib for world/background shaders. */
 vec3 attr_load_orco(vec4 orco)
 {
-  return -g_data.N;
+  return g_data.P;
 }
 /* Unsupported. */
 vec4 attr_load_tangent(vec4 tangent)

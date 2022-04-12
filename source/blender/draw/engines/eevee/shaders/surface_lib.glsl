@@ -1,5 +1,7 @@
 /** This describe the entire interface of the shader. */
 
+#pragma BLENDER_REQUIRE(common_math_lib.glsl)
+
 #define SURFACE_INTERFACE \
   vec3 worldPosition; \
   vec3 viewPosition; \
@@ -93,9 +95,17 @@ vec3 barycentric_distances_get()
 GlobalData init_globals(void)
 {
   GlobalData surf;
+
+#  if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
+  surf.P = -cameraVec(worldPosition);
+  surf.N = surf.Ng = -surf.P;
+  surf.ray_length = 0.0;
+#  else
   surf.P = worldPosition;
   surf.N = safe_normalize(worldNormal);
   surf.Ng = safe_normalize(cross(dFdx(surf.P), dFdy(surf.P)));
+  surf.ray_length = distance(surf.P, cameraPos);
+#  endif
   surf.barycentric_coords = vec2(0.0);
   surf.barycentric_dists = vec3(0.0);
   if (!FrontFacing) {
@@ -127,12 +137,57 @@ GlobalData init_globals(void)
 #  endif
   surf.ray_type = rayType;
   surf.ray_depth = 0.0;
-  surf.ray_length = distance(surf.P, cameraPos);
-
-#  if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
-  surf.N = surf.Ng = surf.P = -cameraVec(g_data.P);
-  surf.ray_length = 0.0;
-#  endif
   return surf;
 }
 #endif
+
+vec3 coordinate_camera(vec3 P)
+{
+  vec3 vP;
+#if defined(PROBE_CAPTURE)
+  /* Unsupported. It would make the probe camera-dependent. */
+  vP = P;
+#elif defined(WORLD_BACKGROUND)
+  vP = transform_direction(ViewMatrix, P);
+#else
+  vP = transform_point(ViewMatrix, P);
+#endif
+  vP.z = -vP.z;
+  return vP;
+}
+
+vec3 coordinate_screen(vec3 P)
+{
+  vec3 window = vec3(0.0);
+#if defined(PROBE_CAPTURE)
+  /* Unsupported. It would make the probe camera-dependent. */
+  window.xy = vec2(0.5);
+
+#elif defined(WORLD_BACKGROUND)
+  window.xy = project_point(ProjectionMatrix, viewPosition).xy * 0.5 + 0.5;
+  window.xy = window.xy * CameraTexCoFactors.xy + CameraTexCoFactors.zw;
+
+#else /* MESH */
+  window.xy = project_point(ViewProjectionMatrix, P).xy * 0.5 + 0.5;
+  window.xy = window.xy * CameraTexCoFactors.xy + CameraTexCoFactors.zw;
+#endif
+  return window;
+}
+
+vec3 coordinate_reflect(vec3 P, vec3 N)
+{
+#if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
+  return N;
+#else
+  return -reflect(cameraVec(P), N);
+#endif
+}
+
+vec3 coordinate_incoming(vec3 P)
+{
+#if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
+  return -P;
+#else
+  return cameraVec(P);
+#endif
+}
