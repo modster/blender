@@ -9,9 +9,12 @@
 
 #include "BKE_context.h"
 #include "BKE_customdata.h"
+#include "BKE_image.h"
 #include "BKE_material.h"
 #include "BKE_paint.h"
 #include "BKE_pbvh.h"
+
+#include "IMB_imbuf_types.h"
 
 #include "DEG_depsgraph.h"
 
@@ -214,5 +217,30 @@ int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settin
     }
   }
   return -1;
+}
+
+char *ED_paint_canvas_key_get(struct PaintModeSettings *settings, struct Object *ob)
+{
+  std::stringstream ss;
+  int active_uv_map_layer_index = ED_paint_canvas_uvmap_layer_index_get(settings, ob);
+  ss << "UV_MAP:" << active_uv_map_layer_index;
+
+  Image *image;
+  ImageUser *image_user;
+  if (ED_paint_canvas_image_get(settings, ob, &image, &image_user)) {
+    ImageUser tile_user = *image_user;
+    LISTBASE_FOREACH (ImageTile *, image_tile, &image->tiles) {
+      tile_user.tile = image_tile->tile_number;
+      ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &tile_user, nullptr);
+      if (!image_buffer) {
+        continue;
+      }
+      ss << ",TILE_" << image_tile->tile_number;
+      ss << "(" << image_buffer->x << "," << image_buffer->y << ")";
+      BKE_image_release_ibuf(image, image_buffer, nullptr);
+    }
+  }
+
+  return BLI_strdup(ss.str().c_str());
 }
 }

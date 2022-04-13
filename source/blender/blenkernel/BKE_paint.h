@@ -649,6 +649,11 @@ typedef struct SculptSession {
    */
   bool sticky_shading_color;
 
+  /**
+   * Last used painting canvas key.
+   */
+  char *last_paint_canvas_key;
+
 } SculptSession;
 
 void BKE_sculptsession_free(struct Object *ob);

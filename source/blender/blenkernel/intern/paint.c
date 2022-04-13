@@ -59,6 +59,9 @@
 
 #include "RNA_enum_types.h"
 
+/* TODO(jbakker) Bad include/call. Move paint_canvas to BKE_paint but in master directly. */
+#include "../../editors/include/ED_paint.h"
+
 #include "BLO_read_write.h"
 
 #include "bmesh.h"
@@ -1511,6 +1514,8 @@ void BKE_sculptsession_free(Object *ob)
 
     BKE_sculptsession_free_vwpaint_data(ob->sculpt);
 
+    MEM_SAFE_FREE(ss->last_paint_canvas_key);
+
     MEM_freeN(ss);
 
     ob->sculpt = NULL;
@@ -1768,6 +1773,24 @@ static void sculpt_update_object(Depsgraph *depsgraph,
           MEM_freeN(vertCos);
         }
       }
+    }
+  }
+
+  /*
+   * We should rebuild the PBVH_pixels when painting canvas changes.
+   *
+   * The relevant changes are stored/encoded in the paint canvas key.
+   * These include the active uv map, and resolutions.
+   */
+  if (U.experimental.use_sculpt_texture_paint && ss->pbvh) {
+    char *paint_canvas_key = ED_paint_canvas_key_get(&scene->toolsettings->paint_mode, ob);
+    if (ss->last_paint_canvas_key == NULL || !STREQ(paint_canvas_key, ss->last_paint_canvas_key)) {
+      MEM_SAFE_FREE(ss->last_paint_canvas_key);
+      ss->last_paint_canvas_key = paint_canvas_key;
+      BKE_pbvh_mark_rebuild_pixels(ss->pbvh);
+    }
+    else {
+      MEM_freeN(paint_canvas_key);
     }
   }
 
