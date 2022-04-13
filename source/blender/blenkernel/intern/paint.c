@@ -42,6 +42,7 @@
 #include "BKE_key.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
+#include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_runtime.h"
@@ -1769,6 +1770,12 @@ static void sculpt_update_object(Depsgraph *depsgraph,
       }
     }
   }
+
+  /* We could be more precise when we have access to the active tool. */
+  const bool use_paint_slots = (ob->mode & OB_MODE_SCULPT) != 0;
+  if (use_paint_slots) {
+    BKE_texpaint_slots_refresh_object(scene, ob);
+  }
 }
 
 void BKE_sculpt_update_object_before_eval(Object *ob)
@@ -1836,7 +1843,7 @@ void BKE_sculpt_color_layer_create_if_needed(struct Object *object)
 
   CustomData_add_layer(&orig_me->vdata, CD_PROP_COLOR, CD_DEFAULT, NULL, orig_me->totvert);
   CustomDataLayer *layer = orig_me->vdata.layers +
-                        CustomData_get_layer_index(&orig_me->vdata, CD_PROP_COLOR);
+                           CustomData_get_layer_index(&orig_me->vdata, CD_PROP_COLOR);
 
   BKE_mesh_update_customdata_pointers(orig_me, true);
 

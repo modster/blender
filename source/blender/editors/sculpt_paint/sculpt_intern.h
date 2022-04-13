@@ -201,13 +201,11 @@ struct SculptRakeData {
   float follow_co[3];
 };
 
-/*
-Generic thread data.  The size of this struct
-has gotten a little out of hand; normally we would
-split it up, but it might be better to see if we can't
-eliminate it altogether after moving to C++ (where
-we'll be able to use lambdas).
-*/
+/**
+ * Generic thread data. The size of this struct has gotten a little out of hand;
+ * normally we would split it up, but it might be better to see if we can't eliminate it
+ * altogether after moving to C++ (where we'll be able to use lambdas).
+ */
 typedef struct SculptThreadedTaskData {
   struct bContext *C;
   struct Sculpt *sd;
@@ -441,6 +439,9 @@ typedef struct FilterCache {
 
   /* Auto-masking. */
   AutomaskingCache *automasking;
+
+  /* Pre-smoothed colors used by sharpening. Colors are HSL. */
+  float (*pre_smoothed_color)[4];
 } FilterCache;
 
 /**

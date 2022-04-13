@@ -796,6 +796,8 @@ struct ShaderCreateInfo {
   /* WARNING: Recursive. */
   void finalize();
 
+  std::string check_error() const;
+
   /** Error detection that some backend compilers do not complain about. */
   void validate(const ShaderCreateInfo &other_info);
 

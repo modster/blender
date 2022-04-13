@@ -93,7 +93,7 @@ static CustomData *attribute_customdata_find(ID *id, CustomDataLayer *layer)
   for (AttributeDomain domain = 0; domain < ATTR_DOMAIN_NUM; domain++) {
     CustomData *customdata = info[domain].customdata;
     if (customdata &&
-        ARRAY_HAS_ITEM(layer, (CustomDataLayer const *)customdata->layers, customdata->totlayer)) {
+        ARRAY_HAS_ITEM((CustomDataLayer *)layer, customdata->layers, customdata->totlayer)) {
       return customdata;
     }
   }
@@ -292,14 +292,15 @@ int BKE_id_attributes_length(const ID *id, AttributeDomainMask domain_mask, Cust
   return length;
 }
 
-AttributeDomain BKE_id_attribute_domain(ID *id, const CustomDataLayer *layer)
+AttributeDomain BKE_id_attribute_domain(const ID *id, const CustomDataLayer *layer)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
   get_domains(id, info);
 
   for (AttributeDomain domain = 0; domain < ATTR_DOMAIN_NUM; domain++) {
     CustomData *customdata = info[domain].customdata;
-    if (customdata && ARRAY_HAS_ITEM(layer, customdata->layers, customdata->totlayer)) {
+    if (customdata &&
+        ARRAY_HAS_ITEM((CustomDataLayer *)layer, customdata->layers, customdata->totlayer)) {
       return domain;
     }
   }
@@ -315,7 +316,8 @@ int BKE_id_attribute_data_length(ID *id, CustomDataLayer *layer)
 
   for (AttributeDomain domain = 0; domain < ATTR_DOMAIN_NUM; domain++) {
     CustomData *customdata = info[domain].customdata;
-    if (customdata && ARRAY_HAS_ITEM(layer, customdata->layers, customdata->totlayer)) {
+    if (customdata &&
+        ARRAY_HAS_ITEM((CustomDataLayer *)layer, customdata->layers, customdata->totlayer)) {
       return info[domain].length;
     }
   }
@@ -449,7 +451,7 @@ CustomDataLayer *BKE_id_attribute_from_index(ID *id,
 
     for (int i = 0; i < customdata->totlayer; i++) {
       if (!(layer_mask & CD_TYPE_AS_MASK(customdata->layers[i].type)) ||
-          (CD_TYPE_AS_MASK(customdata->layers[i].type) & CD_FLAG_TEMPORARY)) {
+          (customdata->layers[i].flag & CD_FLAG_TEMPORARY)) {
         continue;
       }
 
@@ -502,7 +504,7 @@ int BKE_id_attribute_to_index(const struct ID *id,
       CustomDataLayer *layer_iter = cdata->layers + j;
 
       if (!(CD_TYPE_AS_MASK(layer_iter->type) & layer_mask) ||
-          (CD_TYPE_AS_MASK(layer_iter->type) & CD_FLAG_TEMPORARY)) {
+          (layer_iter->flag & CD_FLAG_TEMPORARY)) {
         continue;
       }
 
@@ -539,8 +541,7 @@ CustomDataLayer *BKE_id_attribute_subset_active_get(const ID *id,
     for (int j = 0; j < cdata->totlayer; j++) {
       CustomDataLayer *layer = cdata->layers + j;
 
-      if (!(CD_TYPE_AS_MASK(layer->type) & mask) ||
-          (CD_TYPE_AS_MASK(layer->type) & CD_FLAG_TEMPORARY)) {
+      if (!(CD_TYPE_AS_MASK(layer->type) & mask) || (layer->flag & CD_FLAG_TEMPORARY)) {
         continue;
       }
 
@@ -579,8 +580,7 @@ void BKE_id_attribute_subset_active_set(ID *id,
     for (int j = 0; j < cdata->totlayer; j++) {
       CustomDataLayer *layer_iter = cdata->layers + j;
 
-      if (!(CD_TYPE_AS_MASK(layer_iter->type) & mask) ||
-          (CD_TYPE_AS_MASK(layer_iter->type) & CD_FLAG_TEMPORARY)) {
+      if (!(CD_TYPE_AS_MASK(layer_iter->type) & mask) || (layer_iter->flag & CD_FLAG_TEMPORARY)) {
         continue;
       }
 
@@ -613,6 +613,21 @@ void BKE_id_attributes_render_color_set(ID *id, CustomDataLayer *active_layer)
 {
   BKE_id_attribute_subset_active_set(
       id, active_layer, CD_FLAG_COLOR_RENDER, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
+}
+
+CustomDataLayer *BKE_id_attributes_color_find(const ID *id, const char *name)
+{
+  CustomDataLayer *layer = BKE_id_attribute_find(id, name, CD_PROP_COLOR, ATTR_DOMAIN_POINT);
+  if (layer == NULL) {
+    layer = BKE_id_attribute_find(id, name, CD_PROP_COLOR, ATTR_DOMAIN_CORNER);
+  }
+  if (layer == NULL) {
+    layer = BKE_id_attribute_find(id, name, CD_MLOOPCOL, ATTR_DOMAIN_POINT);
+  }
+  if (layer == NULL) {
+    layer = BKE_id_attribute_find(id, name, CD_MLOOPCOL, ATTR_DOMAIN_CORNER);
+  }
+  return layer;
 }
 
 void BKE_id_attribute_copy_domains_temp(short id_type,
