@@ -654,10 +654,6 @@ class CLIP_PT_cleanup(CLIP_PT_tracking_panel, Panel):
         settings = clip.tracking.settings
 
         col = layout.column()
-        col.prop(settings, "clean_frames", text="Frames")
-        col.prop(settings, "clean_error", text="Error")
-        col.prop(settings, "clean_action", text="Type")
-        col.separator()
         col.operator("clip.clean_tracks")
         col.operator("clip.filter_tracks")
 
@@ -1724,6 +1720,10 @@ class CLIP_MT_tracking_context_menu(Menu):
 
             layout.operator("clip.join_tracks")
             layout.operator("clip.average_tracks")
+
+            layout.separator()
+            layout.operator("clip.filter_tracks")
+            layout.operator("clip.clean_tracks")
 
             layout.separator()
 
