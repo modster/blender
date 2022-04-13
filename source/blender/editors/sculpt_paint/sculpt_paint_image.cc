@@ -47,7 +47,7 @@ struct ImageData {
                                 ImageData *r_image_data,
                                 PaintModeSettings *paint_mode_settings)
   {
-    return ED_paint_canvas_image_get(
+    return BKE_paint_canvas_image_get(
         paint_mode_settings, ob, &r_image_data->image, &r_image_data->image_user);
   }
 };
@@ -394,7 +394,7 @@ bool SCULPT_use_image_paint_brush(PaintModeSettings *settings, Object *ob)
   }
   Image *image;
   ImageUser *image_user;
-  return ED_paint_canvas_image_get(settings, ob, &image, &image_user);
+  return BKE_paint_canvas_image_get(settings, ob, &image, &image_user);
 }
 
 void SCULPT_do_paint_brush_image(

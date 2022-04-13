@@ -114,18 +114,6 @@ void ED_paintcurve_undo_push_end(struct bContext *C);
 void ED_paintcurve_undosys_type(struct UndoType *ut);
 
 /* paint_canvas.cc */
-bool ED_paint_canvas_image_get(struct PaintModeSettings *paint_mode_settings,
-                               struct Object *ob,
-                               struct Image **r_image,
-                               struct ImageUser **r_image_user);
-int ED_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settings,
-                                          struct Object *ob);
-/**
- * Create a key that can be used to compare with previous ones to identify changes.
- * The resulting 'string' is owned by the caller.
- */
-char *ED_paint_canvas_key_get(struct PaintModeSettings *settings, struct Object *ob);
-
 /** Color type of an object can be overridden in sculpt/paint mode. */
 eV3DShadingColorType ED_paint_shading_color_override(struct bContext *C,
                                                      const struct PaintModeSettings *settings,
