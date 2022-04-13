@@ -1404,11 +1404,10 @@ static void view3d_main_region_message_subscribe(const wmRegionMessageSubscribeP
         break;
 
       case OB_MODE_SCULPT:
-        ED_sculpt_pbvh_message_subscribe(params);
         WM_msg_subscribe_rna_anon_prop(
             mbus, WorkSpace, tools, &msg_sub_value_workbench_view_update);
         break;
-        
+
       default:
         break;
     }
