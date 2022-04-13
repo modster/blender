@@ -29,7 +29,9 @@ Closure closure_eval(ClosureRefraction refraction)
 }
 Closure closure_eval(ClosureEmission emission)
 {
-  return CLOSURE_DEFAULT;
+  Closure closure = CLOSURE_DEFAULT;
+  closure.emission = emission.emission;
+  return closure;
 }
 Closure closure_eval(ClosureTransparency transparency)
 {
