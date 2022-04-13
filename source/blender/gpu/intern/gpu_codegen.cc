@@ -321,7 +321,6 @@ void GPUCodegen::generate_attribs()
     /* NOTE: Replicate changes to mesh_render_data_create() in draw_cache_impl_mesh.c */
     if (attr->type == CD_ORCO) {
       /* OPTI: orco is computed from local positions, but only if no modifier is present. */
-      info.additional_info("draw_object_infos");
       STRNCPY(info.name_buffer->attr_names[slot], "orco");
     }
     else {
@@ -412,7 +411,7 @@ void GPUCodegen::generate_resources()
     }
     ss << "};\n\n";
 
-    info.uniform_buf(0, "NodeTree", "node_tree", Frequency::BATCH);
+    info.uniform_buf(0, "NodeTree", GPU_UBO_BLOCK_NAME, Frequency::BATCH);
   }
 
   if (!BLI_listbase_is_empty(&graph.uniform_attrs.list)) {
@@ -422,7 +421,9 @@ void GPUCodegen::generate_resources()
     }
     ss << "};\n\n";
 
-    info.uniform_buf(0, "UniformAttrs", "unf_attrs[DRW_RESOURCE_CHUNK_LEN]", Frequency::BATCH);
+    /* TODO(fclem): Use the macro for length. Currently not working for EEVEE. */
+    /* DRW_RESOURCE_CHUNK_LEN = 512 */
+    info.uniform_buf(0, "UniformAttrs", GPU_ATTRIBUTE_UBO_BLOCK_NAME "[512]", Frequency::BATCH);
   }
 
   info.typedef_source_generated = ss.str();
