@@ -14,8 +14,7 @@
 #include "DNA_object_types.h"
 
 #include "BLI_math_geom.h"
-#include "BLI_task.h"
-#include "BLI_threads.h"
+#include "BLI_task.hh"
 
 #include "BKE_bvhutils.h"
 #include "BKE_lib_id.h"
@@ -35,12 +34,12 @@
  */
 static void mesh_runtime_init_mutexes(Mesh *mesh)
 {
-  mesh->runtime.eval_mutex = MEM_mallocN(sizeof(ThreadMutex), "mesh runtime eval_mutex");
-  BLI_mutex_init(mesh->runtime.eval_mutex);
-  mesh->runtime.normals_mutex = MEM_mallocN(sizeof(ThreadMutex), "mesh runtime normals_mutex");
-  BLI_mutex_init(mesh->runtime.normals_mutex);
-  mesh->runtime.render_mutex = MEM_mallocN(sizeof(ThreadMutex), "mesh runtime render_mutex");
-  BLI_mutex_init(mesh->runtime.render_mutex);
+  mesh->runtime.eval_mutex = MEM_new<ThreadMutex>("mesh runtime eval_mutex");
+  BLI_mutex_init(static_cast<ThreadMutex *>(mesh->runtime.eval_mutex));
+  mesh->runtime.normals_mutex = MEM_new<ThreadMutex>("mesh runtime normals_mutex");
+  BLI_mutex_init(static_cast<ThreadMutex *>(mesh->runtime.normals_mutex));
+  mesh->runtime.render_mutex = MEM_new<ThreadMutex>("mesh runtime render_mutex");
+  BLI_mutex_init(static_cast<ThreadMutex *>(mesh->runtime.render_mutex));
 }
 
 /**
@@ -49,17 +48,17 @@ static void mesh_runtime_init_mutexes(Mesh *mesh)
 static void mesh_runtime_free_mutexes(Mesh *mesh)
 {
   if (mesh->runtime.eval_mutex != NULL) {
-    BLI_mutex_end(mesh->runtime.eval_mutex);
+    BLI_mutex_end(static_cast<ThreadMutex *>(mesh->runtime.eval_mutex));
     MEM_freeN(mesh->runtime.eval_mutex);
     mesh->runtime.eval_mutex = NULL;
   }
   if (mesh->runtime.normals_mutex != NULL) {
-    BLI_mutex_end(mesh->runtime.normals_mutex);
+    BLI_mutex_end(static_cast<ThreadMutex *>(mesh->runtime.normals_mutex));
     MEM_freeN(mesh->runtime.normals_mutex);
     mesh->runtime.normals_mutex = NULL;
   }
   if (mesh->runtime.render_mutex != NULL) {
-    BLI_mutex_end(mesh->runtime.render_mutex);
+    BLI_mutex_end(static_cast<ThreadMutex *>(mesh->runtime.render_mutex));
     MEM_freeN(mesh->runtime.render_mutex);
     mesh->runtime.render_mutex = NULL;
   }
@@ -134,8 +133,8 @@ static void mesh_ensure_looptri_data(Mesh *mesh)
 
   if (totpoly) {
     if (mesh->runtime.looptris.array_wip == NULL) {
-      mesh->runtime.looptris.array_wip = MEM_malloc_arrayN(
-          looptris_len, sizeof(*mesh->runtime.looptris.array_wip), __func__);
+      mesh->runtime.looptris.array_wip = static_cast<MLoopTri *>(
+          MEM_malloc_arrayN(looptris_len, sizeof(*mesh->runtime.looptris.array_wip), __func__));
       mesh->runtime.looptris.len_alloc = looptris_len;
     }
 
@@ -170,12 +169,6 @@ int BKE_mesh_runtime_looptri_len(const Mesh *mesh)
   return looptri_len;
 }
 
-static void mesh_runtime_looptri_recalc_isolated(void *userdata)
-{
-  Mesh *mesh = userdata;
-  BKE_mesh_runtime_looptri_recalc(mesh);
-}
-
 const MLoopTri *BKE_mesh_runtime_looptri_ensure(const Mesh *mesh)
 {
   ThreadMutex *mesh_eval_mutex = (ThreadMutex *)mesh->runtime.eval_mutex;
@@ -188,7 +181,8 @@ const MLoopTri *BKE_mesh_runtime_looptri_ensure(const Mesh *mesh)
   }
   else {
     /* Must isolate multithreaded tasks while holding a mutex lock. */
-    BLI_task_isolate(mesh_runtime_looptri_recalc_isolated, (void *)mesh);
+    blender::threading::isolate_task(
+        [&]() { BKE_mesh_runtime_looptri_recalc(const_cast<Mesh *>(mesh)); });
     looptri = mesh->runtime.looptris.array;
   }
 
@@ -215,7 +209,7 @@ bool BKE_mesh_runtime_ensure_edit_data(struct Mesh *mesh)
     return false;
   }
 
-  mesh->runtime.edit_data = MEM_callocN(sizeof(EditMeshData), "EditMeshData");
+  mesh->runtime.edit_data = MEM_cnew<EditMeshData>(__func__);
   return true;
 }
 
