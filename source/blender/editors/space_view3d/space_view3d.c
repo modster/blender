@@ -46,7 +46,6 @@
 #include "ED_outliner.h"
 #include "ED_render.h"
 #include "ED_screen.h"
-#include "ED_sculpt.h"
 #include "ED_space_api.h"
 #include "ED_transform.h"
 #include "ED_undo.h"
@@ -1407,7 +1406,6 @@ static void view3d_main_region_message_subscribe(const wmRegionMessageSubscribeP
         WM_msg_subscribe_rna_anon_prop(
             mbus, WorkSpace, tools, &msg_sub_value_workbench_view_update);
         break;
-
       default:
         break;
     }
