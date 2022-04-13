@@ -16,7 +16,7 @@ set(INC
 
 
 set(SRC
-  intern/compiler.cc
+  intern/compile_state.cc
   intern/context.cc
   intern/conversion_processor_operation.cc
   intern/domain.cc
@@ -34,13 +34,14 @@ set(SRC
   intern/unsupported_node_operation.cc
   intern/utilities.cc
 
-  VPC_compiler.hh
+  VPC_compile_state.hh
   VPC_context.hh
   VPC_conversion_processor_operation.hh
   VPC_domain.hh
   VPC_evaluator.hh
   VPC_gpu_material_node.hh
   VPC_gpu_material_operation.hh
+  VPC_input_descriptor.hh
   VPC_node_operation.hh
   VPC_operation.hh
   VPC_processor_operation.hh

@@ -83,7 +83,7 @@ static void populate_gpu_node_stack(DSocket socket, GPUNodeStack &stack)
   if (socket->is_input()) {
     /* Get the origin socket connected to the input if any. */
     const DInputSocket input{socket.context(), &socket->as_input()};
-    DSocket origin = get_node_input_origin_socket(input);
+    DSocket origin = get_input_origin_socket(input);
     /* The input is linked if the origin socket is not null and is an output socket. Had it been an
      * input socket, then it is an unlinked input of a group input node. */
     stack.hasinput = origin->is_output();

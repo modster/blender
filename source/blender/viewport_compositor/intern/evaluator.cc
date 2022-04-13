@@ -3,25 +3,157 @@
 
 #include "DNA_node_types.h"
 
+#include "NOD_derived_node_tree.hh"
+
+#include "VPC_compile_state.hh"
 #include "VPC_context.hh"
 #include "VPC_evaluator.hh"
+#include "VPC_gpu_material_operation.hh"
+#include "VPC_node_operation.hh"
 #include "VPC_operation.hh"
+#include "VPC_result.hh"
+#include "VPC_scheduler.hh"
+#include "VPC_utilities.hh"
 
 namespace blender::viewport_compositor {
 
-Evaluator::Evaluator(Context &context, bNodeTree *node_tree) : compiler_(context, node_tree)
-{
-}
+using namespace nodes::derived_node_tree_types;
 
-void Evaluator::compile()
+Evaluator::Evaluator(Context &context, bNodeTree &node_tree)
+    : context_(context), node_tree_(node_tree)
 {
-  compiler_.compile();
 }
 
 void Evaluator::evaluate()
 {
-  for (Operation *operation : compiler_.operations_stream()) {
+  /* The node tree is not compiled yet, so compile and evaluate the node tree. */
+  if (!is_compiled_) {
+    compile_and_evaluate();
+    return;
+  }
+
+  /* The node tree is already compiled, so just go over the operations stream and evaluate the
+   * operations in order. */
+  for (const std::unique_ptr<Operation> &operation : operations_stream_) {
     operation->evaluate();
+  }
+}
+
+void Evaluator::reset()
+{
+  /* Reset evaluator state. */
+  operations_stream_.clear();
+  derived_node_tree_.reset();
+  node_tree_reference_map_.clear();
+
+  /* Mark the node tree as in need to be compiled. */
+  is_compiled_ = false;
+}
+
+void Evaluator::compile_and_evaluate()
+{
+  /* Construct and initialize a derived node tree from the compositor node tree. */
+  derived_node_tree_.reset(new DerivedNodeTree(node_tree_, node_tree_reference_map_));
+
+  /* Compute the node execution schedule. */
+  const Schedule schedule = compute_schedule(*derived_node_tree_);
+
+  /* Declare a compile state to use for tracking the state of the compilation. */
+  CompileState compile_state;
+
+  /* Go over the nodes in the schedule, compiling them into either node operations or GPU material
+   * operations. */
+  for (const DNode &node : schedule) {
+    /* Ask the compile state if now would be a good time to compile the GPU material compile group
+     * given the current node, and if it is, compile and evaluate it. */
+    if (compile_state.should_compile_gpu_material_compile_group(node)) {
+      compile_and_evaluate_gpu_material_compile_group(compile_state);
+    }
+
+    /* If the node is a GPU material node, then add it to the GPU material compile group. */
+    if (is_gpu_material_node(node)) {
+      compile_state.add_node_to_gpu_material_compile_group(node);
+    }
+    else {
+      /* Otherwise, compile and evaluate the node into a node operation. */
+      compile_and_evaluate_node(node, compile_state);
+    }
+  }
+
+  /* Mark the node tree as compiled. */
+  is_compiled_ = true;
+}
+
+void Evaluator::compile_and_evaluate_node(DNode node, CompileState &compile_state)
+{
+  /* Get an instance of the node's compositor operation and add it to the operations stream. */
+  NodeOperation *operation = node->typeinfo()->get_compositor_operation(context_, node);
+  operations_stream_.append(std::unique_ptr<Operation>(operation));
+
+  /* Map the node to the compiled operation. */
+  compile_state.map_node_to_node_operation(node, operation);
+
+  /* Map the inputs of the operation to the results of the outputs they are linked to. */
+  map_node_operation_inputs_to_their_results(node, operation, compile_state);
+
+  /* Evaluate the operation. */
+  operation->evaluate();
+}
+
+void Evaluator::map_node_operation_inputs_to_their_results(DNode node,
+                                                           NodeOperation *operation,
+                                                           CompileState &compile_state)
+{
+  for (const InputSocketRef *input_ref : node->inputs()) {
+    const DInputSocket input{node.context(), input_ref};
+
+    /* Get the output linked to the input. If it is null, that means the input is unlinked.
+     * Unlinked inputs are mapped internally to internal results, so skip this here. */
+    const DOutputSocket output = get_output_linked_to_input(input);
+    if (!output) {
+      continue;
+    }
+
+    /* Map the input to the result we got from the output. */
+    Result &result = compile_state.get_result_from_output_socket(output);
+    operation->map_input_to_result(input->identifier(), &result);
+  }
+}
+
+void Evaluator::compile_and_evaluate_gpu_material_compile_group(CompileState &compile_state)
+{
+  /* Compile the GPU material compile group into a GPU Material Operation and add it to the
+   * operations stream. */
+  SubSchedule &sub_schedule = compile_state.get_gpu_material_compile_group_sub_schedule();
+  GPUMaterialOperation *operation = new GPUMaterialOperation(context_, sub_schedule);
+  operations_stream_.append(std::unique_ptr<Operation>(operation));
+
+  /* Map each of the nodes in the sub-schedule to the compiled operation. */
+  for (DNode node : sub_schedule) {
+    compile_state.map_node_to_gpu_material_operation(node, operation);
+  }
+
+  /* Map the inputs of the operation to the results of the outputs they are linked to. */
+  map_gpu_material_operation_inputs_to_their_results(operation, compile_state);
+
+  /* Evaluate the operation. */
+  operation->evaluate();
+
+  /* Clear the GPU material compile group to ready it for tracking the next GPU material. */
+  compile_state.reset_gpu_material_compile_group();
+}
+
+void Evaluator::map_gpu_material_operation_inputs_to_their_results(GPUMaterialOperation *operation,
+                                                                   CompileState &compile_state)
+{
+  InputIdentifierToOutputSocketMap &map = operation->get_input_identifier_to_output_socket_map();
+
+  /* For each input of the operation, retrieve the result of the output linked to it, and map the
+   * result to the input. */
+  for (const InputIdentifierToOutputSocketMap::Item &item : map.items()) {
+    /* Map the input to the result we got from the output. */
+    Result &result = compile_state.get_result_from_output_socket(item.value);
+    operation->map_input_to_result(item.key, &result);
   }
 }
 

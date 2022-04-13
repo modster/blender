@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright 2022 Blender Foundation. All rights reserved. */
 
+#include "VPC_input_descriptor.hh"
 #include "VPC_operation.hh"
 #include "VPC_processor_operation.hh"
 #include "VPC_result.hh"

@@ -10,6 +10,7 @@
 #include "VPC_context.hh"
 #include "VPC_conversion_processor_operation.hh"
 #include "VPC_domain.hh"
+#include "VPC_input_descriptor.hh"
 #include "VPC_operation.hh"
 #include "VPC_processor_operation.hh"
 #include "VPC_realize_on_domain_processor_operation.hh"
@@ -56,11 +57,13 @@ void Operation::map_input_to_result(StringRef identifier, Result *result)
 
 Domain Operation::compute_domain()
 {
-  /* In case no domain input was found, likely because all inputs are single values, then return an
-   * identity domain. */
+  /* Default to an identity domain in case no domain input was found, most likely because all
+   * inputs are single values. */
   Domain operation_domain = Domain::identity();
   int current_domain_priority = std::numeric_limits<int>::max();
 
+  /* Go over the inputs and find the domain of the non single value input with the highest domain
+   * priority. */
   for (StringRef identifier : input_descriptors_.keys()) {
     const Result &result = get_input(identifier);
     const InputDescriptor &descriptor = get_input_descriptor(identifier);

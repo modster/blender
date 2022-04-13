@@ -102,24 +102,21 @@ static NeededBuffers compute_number_of_needed_buffers(DNode output_node)
     for (const InputSocketRef *input_ref : node->inputs()) {
       const DInputSocket input{node.context(), input_ref};
 
-      /* Get the origin socket of this input, which will be an output socket if the input is linked
-       * to an output. */
-      DSocket origin = get_node_input_origin_socket(input);
-
-      /* If the origin socket is an input, that means the input is unlinked and has no dependency
-       * node. */
-      if (origin->is_input()) {
+      /* Get the output linked to the input. If it is null, that means the input is unlinked and
+       * has no dependency node. */
+      const DOutputSocket output = get_output_linked_to_input(input);
+      if (!output) {
         continue;
       }
 
       /* The node dependency was already computed before, so skip it. */
-      if (needed_buffers.contains(origin.node())) {
+      if (needed_buffers.contains(output.node())) {
         continue;
       }
 
-      /* The origin node needs to be computed, push the node dependency to the node stack and
+      /* The output node needs to be computed, push the node dependency to the node stack and
        * indicate that it was pushed. */
-      node_stack.push(origin.node());
+      node_stack.push(output.node());
       any_of_the_node_dependencies_were_pushed = true;
     }
 
@@ -139,13 +136,10 @@ static NeededBuffers compute_number_of_needed_buffers(DNode output_node)
     for (const InputSocketRef *input_ref : node->inputs()) {
       const DInputSocket input{node.context(), input_ref};
 
-      /* Get the origin socket of this input, which will be an output socket if the input is linked
-       * to an output. */
-      DSocket origin = get_node_input_origin_socket(input);
-
-      /* If the origin socket is an input, that means the input is unlinked. Unlinked inputs do not
-       * take a buffer, so skip those inputs. */
-      if (origin->is_input()) {
+      /* Get the output linked to the input. If it is null, that means the input is unlinked.
+       * Unlinked inputs do not take a buffer, so skip those inputs. */
+      const DOutputSocket output = get_output_linked_to_input(input);
+      if (!output) {
         continue;
       }
 
@@ -156,9 +150,9 @@ static NeededBuffers compute_number_of_needed_buffers(DNode output_node)
       /* If the number of buffers needed by the node dependency is more than the total number of
        * buffers needed by the dependencies, then update the latter to be the former. This is
        * computing the "d" in the aformentioned equation "max(n + m, d)". */
-      const int buffers_needed_by_origin = needed_buffers.lookup(origin.node());
-      if (buffers_needed_by_origin > buffers_needed_by_dependencies) {
-        buffers_needed_by_dependencies = buffers_needed_by_origin;
+      const int buffers_needed_by_dependency = needed_buffers.lookup(output.node());
+      if (buffers_needed_by_dependency > buffers_needed_by_dependencies) {
+        buffers_needed_by_dependencies = buffers_needed_by_dependency;
       }
     }
 
@@ -229,53 +223,51 @@ Schedule compute_schedule(DerivedNodeTree &tree)
      * that the node with the lowest number of needed buffers comes first. Note that we actually
      * want the node with the highest number of needed buffers to be schedule first, but since
      * those are pushed to the traversal stack, we need to push them in reverse order. */
-    Vector<DNode> sorted_origin_nodes;
+    Vector<DNode> sorted_dependency_nodes;
     for (const InputSocketRef *input_ref : node->inputs()) {
       const DInputSocket input{node.context(), input_ref};
 
-      /* Get the origin socket of this input, which will be an output socket if the input is linked
-       * to an output. */
-      DSocket origin = get_node_input_origin_socket(input);
-
-      /* If the origin socket is an input, that means the input is unlinked and has no dependency
-       * node, so skip it. */
-      if (origin->is_input()) {
+      /* Get the output linked to the input. If it is null, that means the input is unlinked and
+       * has no dependency node, so skip it. */
+      const DOutputSocket output = get_output_linked_to_input(input);
+      if (!output) {
         continue;
       }
 
-      /* The origin node was added before, so skip it. The number of origin nodes is very small,
-       * typically less than 3, so a linear search is okay. */
-      if (sorted_origin_nodes.contains(origin.node())) {
+      /* The dependency node was added before, so skip it. The number of dependency nodes is very
+       * small, typically less than 3, so a linear search is okay. */
+      if (sorted_dependency_nodes.contains(output.node())) {
         continue;
       }
 
-      /* The origin node was already schedule, so skip it. */
-      if (schedule.contains(origin.node())) {
+      /* The dependency node was already schedule, so skip it. */
+      if (schedule.contains(output.node())) {
         continue;
       }
 
-      /* Sort in ascending order on insertion, the number of origin nodes is very small, typically
-       * less than 3, so insertion sort is okay. */
+      /* Sort in ascending order on insertion, the number of dependency nodes is very small,
+       * typically less than 3, so insertion sort is okay. */
       int insertion_position = 0;
-      for (int i = 0; i < sorted_origin_nodes.size(); i++) {
-        if (needed_buffers.lookup(origin.node()) > needed_buffers.lookup(sorted_origin_nodes[i])) {
+      for (int i = 0; i < sorted_dependency_nodes.size(); i++) {
+        if (needed_buffers.lookup(output.node()) >
+            needed_buffers.lookup(sorted_dependency_nodes[i])) {
           insertion_position++;
         }
         else {
           break;
         }
       }
-      sorted_origin_nodes.insert(insertion_position, origin.node());
+      sorted_dependency_nodes.insert(insertion_position, output.node());
     }
 
-    /* Push the sorted origin nodes to the node stack in order. */
-    for (const DNode &origin_node : sorted_origin_nodes) {
-      node_stack.push(origin_node);
+    /* Push the sorted dependency nodes to the node stack in order. */
+    for (const DNode &dependency_node : sorted_dependency_nodes) {
+      node_stack.push(dependency_node);
     }
 
-    /* If there are no sorted origin nodes, that means they were all already scheduled or that none
-     * exists in the first place, so we can pop and schedule the node now. */
-    if (sorted_origin_nodes.is_empty()) {
+    /* If there are no sorted dependency nodes, that means they were all already scheduled or that
+     * none exists in the first place, so we can pop and schedule the node now. */
+    if (sorted_dependency_nodes.is_empty()) {
       /* The node might have already been scheduled, so we don't use add_new here and simply don't
        * add it if it was already scheduled. */
       schedule.add(node_stack.pop());

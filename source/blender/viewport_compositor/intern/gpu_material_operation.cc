@@ -140,18 +140,12 @@ void GPUMaterialOperation::link_material_node_inputs(DNode node, GPUMaterial *ma
   for (const InputSocketRef *input_ref : node->inputs()) {
     const DInputSocket input{node.context(), input_ref};
 
-    /* Get the origin socket of this input, which will be an output socket if the input is linked
-     * to an output. */
-    DSocket origin = get_node_input_origin_socket(input);
-
-    /* If the origin socket is an input, that means the input is unlinked. Unlinked inputs will be
-     * linked by the node compile method, so skip here. */
-    if (origin->is_input()) {
+    /* Get the output linked to the input. If it is null, that means the input is unlinked.
+     * Unlinked inputs are linked by the node compile method, so skip this here. */
+    const DOutputSocket output = get_output_linked_to_input(input);
+    if (!output) {
       continue;
     }
-
-    /* Now that we know the origin is an output, construct a derived output from it. */
-    const DOutputSocket output{origin.context(), &origin->as_output()};
 
     /* If the origin node is part of the GPU material, then just map the output stack link to the
      * input stack link. */
@@ -212,16 +206,9 @@ void GPUMaterialOperation::declare_material_input_if_needed(DInputSocket input,
   /* Map the output socket to the input texture link that was created for it. */
   output_socket_to_input_link_map_.add(output, input_texture_link);
 
-  /* Construct an input descriptor from the socket declaration. */
-  InputDescriptor input_descriptor;
-  input_descriptor.type = get_node_socket_result_type(input.socket_ref());
-  const nodes::SocketDeclarationPtr &socket_declaration =
-      input.node()->declaration()->inputs()[input->index()];
-  input_descriptor.domain_priority = socket_declaration->compositor_domain_priority();
-  input_descriptor.expects_single_value = socket_declaration->compositor_expects_single_value();
-
   /* Declare the input descriptor. */
   StringRef identifier = GPU_material_get_link_texture(input_texture_link)->sampler_name;
+  const InputDescriptor input_descriptor = input_descriptor_from_input_socket(input.socket_ref());
   declare_input_descriptor(identifier, input_descriptor);
 
   /* Map the operation input to the output socket it is linked to. */
