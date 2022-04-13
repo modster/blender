@@ -3,6 +3,7 @@
 #pragma BLENDER_REQUIRE(closure_eval_glossy_lib.glsl)
 #pragma BLENDER_REQUIRE(closure_eval_refraction_lib.glsl)
 #pragma BLENDER_REQUIRE(closure_eval_translucent_lib.glsl)
+#pragma BLENDER_REQUIRE(renderpass_lib.glsl)
 
 #ifdef USE_SHADER_TO_RGBA
 bool do_sss = false;
@@ -23,6 +24,9 @@ vec3 out_ssr_N;
 bool output_sss(ClosureDiffuse diffuse, ClosureOutputDiffuse diffuse_out)
 {
   if (diffuse.sss_id == 0u || !do_sss || !sssToggle || outputSssId == 0) {
+    return false;
+  }
+  if (renderPassSSSColor) {
     return false;
   }
   out_sss_radiance = diffuse_out.radiance;
@@ -116,7 +120,7 @@ Closure closure_eval(ClosureRefraction refraction)
 Closure closure_eval(ClosureEmission emission)
 {
   Closure closure = CLOSURE_DEFAULT;
-  closure.radiance += emission.emission * emission.weight;
+  closure.radiance += render_pass_emission_mask(emission.emission) * emission.weight;
   return closure;
 }
 
