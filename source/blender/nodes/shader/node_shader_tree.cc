@@ -1007,6 +1007,12 @@ static void ntree_shader_pruned_unused(bNodeTree *ntree, bNode *output_node)
 
   nodeChainIterBackwards(ntree, output_node, ntree_branch_node_tag, nullptr, 0);
 
+  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+    if (node->type == SH_NODE_OUTPUT_AOV) {
+      nodeChainIterBackwards(ntree, node, ntree_branch_node_tag, nullptr, 0);
+    }
+  }
+
   LISTBASE_FOREACH_MUTABLE (bNode *, node, &ntree->nodes) {
     if (node->tmp_flag == 0) {
       ntreeFreeLocalNode(ntree, node);

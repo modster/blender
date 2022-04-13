@@ -29,6 +29,7 @@ struct Closure {
 /* Prototype */
 Closure nodetree_exec();
 vec4 closure_to_rgba(Closure);
+void output_aov(vec4 color, float value, uint hash);
 vec3 coordinate_camera(vec3 P);
 vec3 coordinate_screen(vec3 P);
 vec3 coordinate_reflect(vec3 P, vec3 N);

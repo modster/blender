@@ -122,6 +122,15 @@ void main()
   outRadiance.rgb *= alpha_div;
   ssrData.rgb *= alpha_div;
   sssAlbedo.rgb *= alpha_div;
+
+  if (renderPassAOV) {
+    if (aov_is_valid) {
+      outRadiance = vec4(out_aov, 1.0);
+    }
+    else {
+      outRadiance = vec4(0.0);
+    }
+  }
 #endif
 
 #ifdef LOOKDEV

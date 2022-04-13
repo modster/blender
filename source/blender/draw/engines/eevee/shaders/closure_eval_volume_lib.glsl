@@ -1,14 +1,8 @@
 
-bool do_sss = true;
-bool do_ssr = true;
-
-vec3 out_sss_radiance;
-vec3 out_sss_color;
-float out_sss_radius;
-
-float out_ssr_roughness;
-vec3 out_ssr_color;
-vec3 out_ssr_N;
+void output_aov(vec4 color, float value, uint hash)
+{
+  /* Unsupported. */
+}
 
 /* Surface BSDFs. */
 Closure closure_eval(ClosureDiffuse diffuse)

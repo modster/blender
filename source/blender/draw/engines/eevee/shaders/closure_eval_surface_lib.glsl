@@ -21,6 +21,9 @@ float out_ssr_roughness;
 vec3 out_ssr_color;
 vec3 out_ssr_N;
 
+bool aov_is_valid = false;
+vec3 out_aov;
+
 bool output_sss(ClosureDiffuse diffuse, ClosureOutputDiffuse diffuse_out)
 {
   if (diffuse.sss_id == 0u || !do_sss || !sssToggle || outputSssId == 0) {
@@ -46,6 +49,22 @@ bool output_ssr(ClosureReflection reflection)
   out_ssr_N = reflection.N;
   do_ssr = false;
   return true;
+}
+
+void output_aov(vec4 color, float value, uint hash)
+{
+  /* Keep in sync with `render_pass_aov_hash` and `EEVEE_renderpasses_aov_hash`. */
+  hash <<= 1u;
+
+  if (renderPassAOV && !aov_is_valid && hash == render_pass_aov_hash()) {
+    aov_is_valid = true;
+    if (render_pass_aov_is_color()) {
+      out_aov = color.rgb;
+    }
+    else {
+      out_aov = vec3(value);
+    }
+  }
 }
 
 /* Single BSDFs. */

@@ -565,7 +565,7 @@ void GPUCodegen::generate_graphs()
 {
   set_unique_ids();
 
-  output.surface = graph_serialize(GPU_NODE_TAG_SURFACE, graph.outlink_surface);
+  output.surface = graph_serialize(GPU_NODE_TAG_SURFACE | GPU_NODE_TAG_AOV, graph.outlink_surface);
   output.volume = graph_serialize(GPU_NODE_TAG_VOLUME, graph.outlink_volume);
   output.displacement = graph_serialize(GPU_NODE_TAG_DISPLACEMENT, graph.outlink_displacement);
   output.thickness = graph_serialize(GPU_NODE_TAG_THICKNESS, graph.outlink_thickness);

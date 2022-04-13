@@ -65,6 +65,8 @@ typedef enum {
   GPU_NODE_TAG_FUNCTION = (1 << 5),
 } eGPUNodeTag;
 
+ENUM_OPERATORS(eGPUNodeTag, GPU_NODE_TAG_FUNCTION)
+
 struct GPUNode {
   struct GPUNode *next, *prev;
 
