@@ -479,6 +479,11 @@ GPUNodeLink *GPU_attribute(GPUMaterial *mat, const CustomDataType type, const ch
   GPUNodeGraph *graph = gpu_material_node_graph(mat);
   GPUMaterialAttribute *attr = gpu_node_graph_add_attribute(graph, type, name);
 
+  if (type == CD_ORCO) {
+    /* OPTI: orco might be computed from local positions and needs object infos. */
+    GPU_material_flag_set(mat, GPU_MATFLAG_OBJECT_INFO);
+  }
+
   /* Dummy fallback if out of slots. */
   if (attr == NULL) {
     static const float zero_data[GPU_MAX_CONSTANT_DATA] = {0.0f};
