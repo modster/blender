@@ -123,8 +123,6 @@ static void curve_free_data(ID *id)
   MEM_SAFE_FREE(curve->str);
   MEM_SAFE_FREE(curve->strinfo);
   MEM_SAFE_FREE(curve->tb);
-
-  delete curve->curve_eval;
 }
 
 static void curve_foreach_id(ID *id, LibraryForeachIDData *data)
@@ -3184,7 +3182,7 @@ static void calchandleNurb_intern(BezTriple *bezt,
     len *= 2.5614f;
 
     if (len != 0.0f) {
-      /* only for fcurves */
+      /* Only for F-curves. */
       bool leftviolate = false, rightviolate = false;
 
       if (!is_fcurve || fcurve_smoothing == FCURVE_SMOOTH_NONE) {

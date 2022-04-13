@@ -65,6 +65,9 @@ void ShaderCreateInfo::finalize()
     if (info.early_fragment_test_) {
       early_fragment_test_ = true;
     }
+    if (info.depth_write_ != DepthWrite::ANY) {
+      depth_write_ = info.depth_write_;
+    }
 
     validate(info);
 
@@ -102,8 +105,6 @@ void ShaderCreateInfo::finalize()
       assert_no_overlap(compute_source_.is_empty(), "Compute source already existing");
       compute_source_ = info.compute_source_;
     }
-
-    do_static_compilation_ = do_static_compilation_ || info.do_static_compilation_;
   }
 
   if (auto_resource_location_) {
@@ -133,6 +134,34 @@ void ShaderCreateInfo::finalize()
       set_resource_slot(res);
     }
   }
+}
+
+std::string ShaderCreateInfo::check_error() const
+{
+  std::string error;
+
+  /* At least a vertex shader and a fragment shader are required, or only a compute shader. */
+  if (this->compute_source_.is_empty()) {
+    if (this->vertex_source_.is_empty()) {
+      error += "Missing vertex shader in " + this->name_ + ".\n";
+    }
+    if (this->fragment_source_.is_empty()) {
+      error += "Missing fragment shader in " + this->name_ + ".\n";
+    }
+  }
+  else {
+    if (!this->vertex_source_.is_empty()) {
+      error += "Compute shader has vertex_source_ shader attached in" + this->name_ + ".\n";
+    }
+    if (!this->geometry_source_.is_empty()) {
+      error += "Compute shader has geometry_source_ shader attached in" + this->name_ + ".\n";
+    }
+    if (!this->fragment_source_.is_empty()) {
+      error += "Compute shader has fragment_source_ shader attached in" + this->name_ + ".\n";
+    }
+  }
+
+  return error;
 }
 
 void ShaderCreateInfo::validate(const ShaderCreateInfo &other_info)

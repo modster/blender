@@ -930,6 +930,19 @@ typedef struct ImagePaintSettings {
 } ImagePaintSettings;
 
 /* ------------------------------------------- */
+/* Paint mode settings */
+
+typedef struct PaintModeSettings {
+  /** Source to select canvas from to paint on (ePaintCanvasSource) */
+  char canvas_source;
+  char _pad[7];
+
+  /** Selected image when canvas_source=PAINT_CANVAS_SOURCE_IMAGE. */
+  Image *canvas_image;
+
+} PaintModeSettings;
+
+/* ------------------------------------------- */
 /* Particle Edit */
 
 /** Settings for a Particle Editing Brush. */
@@ -1113,7 +1126,7 @@ typedef struct GP_Sculpt_Settings {
   /** Threshold for intersections */
   float isect_threshold;
   char _pad[4];
-  /** Multiframe edit falloff effect by frame. */
+  /** Multi-frame edit falloff effect by frame. */
   struct CurveMapping *cur_falloff;
   /** Curve used for primitive tools. */
   struct CurveMapping *cur_primitive;
@@ -1461,6 +1474,9 @@ typedef struct ToolSettings {
 
   /* Image Paint (8 bytes aligned please!) */
   struct ImagePaintSettings imapaint;
+
+  /** Settings for paint mode. */
+  struct PaintModeSettings paint_mode;
 
   /* Particle Editing */
   struct ParticleEditSettings particle;
@@ -2017,7 +2033,10 @@ extern const char *RE_engine_id_CYCLES;
    ((v3d == NULL) || (((1 << (base)->object->type) & (v3d)->object_type_exclude_select) == 0)) && \
    (((base)->flag & BASE_SELECTABLE) != 0))
 #define BASE_SELECTED(v3d, base) (BASE_VISIBLE(v3d, base) && (((base)->flag & BASE_SELECTED) != 0))
-#define BASE_EDITABLE(v3d, base) (BASE_VISIBLE(v3d, base) && !ID_IS_LINKED((base)->object))
+#define BASE_EDITABLE(v3d, base) \
+  (BASE_VISIBLE(v3d, base) && !ID_IS_LINKED((base)->object) && \
+   (!ID_IS_OVERRIDE_LIBRARY_REAL((base)->object) || \
+    ((base)->object->id.override_library->flag & IDOVERRIDE_LIBRARY_FLAG_SYSTEM_DEFINED) == 0))
 #define BASE_SELECTED_EDITABLE(v3d, base) \
   (BASE_EDITABLE(v3d, base) && (((base)->flag & BASE_SELECTED) != 0))
 
@@ -2166,6 +2185,7 @@ enum {
 };
 
 /* object_vgroup.c */
+
 /** #ToolSettings.vgroupsubset */
 typedef enum eVGroupSelect {
   WT_VGROUP_ALL = 0,
@@ -2274,11 +2294,21 @@ typedef enum eSculptFlags {
   SCULPT_HIDE_FACE_SETS = (1 << 17),
 } eSculptFlags;
 
+/** PaintModeSettings.mode */
+typedef enum ePaintCanvasSource {
+  /** Paint on the active node of the active material slot. */
+  PAINT_CANVAS_SOURCE_MATERIAL = 0,
+  /** Paint on a selected image. */
+  PAINT_CANVAS_SOURCE_IMAGE = 1,
+  /** Paint on the active color attribute (vertex color) layer. */
+  PAINT_CANVAS_SOURCE_COLOR_ATTRIBUTE = 2,
+} ePaintCanvasSource;
+
 /** #ImagePaintSettings.mode */
-typedef enum eImagePaintMode {
-  IMAGEPAINT_MODE_MATERIAL = 0, /* detect texture paint slots from the material */
-  IMAGEPAINT_MODE_IMAGE = 1,    /* select texture paint image directly */
-} eImagePaintMode;
+/* Defines to let old texture painting use the new enum. */
+/* TODO(jbakker): rename usages. */
+#define IMAGEPAINT_MODE_MATERIAL PAINT_CANVAS_SOURCE_MATERIAL
+#define IMAGEPAINT_MODE_IMAGE PAINT_CANVAS_SOURCE_IMAGE
 
 /** #ImagePaintSettings.interp */
 enum {
@@ -2443,11 +2473,11 @@ typedef enum eGPencil_Guide_Reference {
 /* UnitSettings */
 
 #define USER_UNIT_ADAPTIVE 0xFF
-/* UnitSettings.system */
+/** #UnitSettings.system */
 #define USER_UNIT_NONE 0
 #define USER_UNIT_METRIC 1
 #define USER_UNIT_IMPERIAL 2
-/* UnitSettings.flag */
+/** #UnitSettings.flag */
 #define USER_UNIT_OPT_SPLIT 1
 #define USER_UNIT_ROT_RADIANS 2
 

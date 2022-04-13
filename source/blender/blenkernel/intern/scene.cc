@@ -139,7 +139,7 @@ static void scene_init_data(ID *id)
 
   scene->toolsettings->autokey_mode = (uchar)U.autokey_mode;
 
-  /* grease pencil multiframe falloff curve */
+  /* Grease pencil multi-frame falloff curve. */
   scene->toolsettings->gp_sculpt.cur_falloff = BKE_curvemapping_add(1, 0.0f, 0.0f, 1.0f, 1.0f);
   CurveMapping *gp_falloff_curve = scene->toolsettings->gp_sculpt.cur_falloff;
   BKE_curvemapping_init(gp_falloff_curve);
@@ -321,6 +321,8 @@ static void scene_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int
                                       &scene_src->ed->seqbase,
                                       SEQ_DUPE_ALL,
                                       flag_subdata);
+    BLI_duplicatelist(&scene_dst->ed->channels, &scene_src->ed->channels);
+    scene_dst->ed->displayed_channels = &scene_dst->ed->channels;
   }
 
   if ((flag & LIB_ID_COPY_NO_PREVIEW) == 0) {
@@ -423,7 +425,7 @@ static void scene_free_data(ID *id)
     scene->display.shading.prop = nullptr;
   }
 
-  /* These are freed on doversion. */
+  /* These are freed on `do_versions`. */
   BLI_assert(scene->layer_properties == nullptr);
 }
 
@@ -857,7 +859,6 @@ static void scene_foreach_cache(ID *id,
   IDCacheKey key{};
   key.id_session_uuid = id->session_uuid;
   key.offset_in_ID = offsetof(Scene, eevee.light_cache_data);
-  key.cache_v = scene->eevee.light_cache_data;
 
   function_callback(id,
                     &key,
@@ -967,7 +968,7 @@ static void scene_blend_write(BlendWriter *writer, ID *id, const void *id_addres
   if (tos->gp_interpolate.custom_ipo) {
     BKE_curvemapping_blend_write(writer, tos->gp_interpolate.custom_ipo);
   }
-  /* write grease-pencil multiframe falloff curve to file */
+  /* write grease-pencil multi-frame falloff curve to file */
   if (tos->gp_sculpt.cur_falloff) {
     BKE_curvemapping_blend_write(writer, tos->gp_sculpt.cur_falloff);
   }
@@ -990,6 +991,9 @@ static void scene_blend_write(BlendWriter *writer, ID *id, const void *id_addres
     BLO_write_struct(writer, Editing, ed);
 
     SEQ_blend_write(writer, &ed->seqbase);
+    LISTBASE_FOREACH (SeqTimelineChannel *, channel, &ed->channels) {
+      BLO_write_struct(writer, SeqTimelineChannel, channel);
+    }
     /* new; meta stack too, even when its nasty restore code */
     LISTBASE_FOREACH (MetaStack *, ms, &ed->metastack) {
       BLO_write_struct(writer, MetaStack, ms);
@@ -1058,7 +1062,7 @@ static void scene_blend_write(BlendWriter *writer, ID *id, const void *id_addres
     BKE_collection_blend_write_nolib(writer, sce->master_collection);
   }
 
-  /* Eevee Lightcache */
+  /* Eevee Light-cache */
   if (sce->eevee.light_cache_data && !BLO_write_is_undo(writer)) {
     BLO_write_struct(writer, LightCache, sce->eevee.light_cache_data);
     EEVEE_lightcache_blend_write(writer, sce->eevee.light_cache_data);
@@ -1066,7 +1070,7 @@ static void scene_blend_write(BlendWriter *writer, ID *id, const void *id_addres
 
   BKE_screen_view3d_shading_blend_write(writer, &sce->display.shading);
 
-  /* Freed on doversion. */
+  /* Freed on `do_versions()`. */
   BLI_assert(sce->layer_properties == nullptr);
 }
 
@@ -1147,23 +1151,23 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
     sce->toolsettings->particle.object = nullptr;
     sce->toolsettings->gp_sculpt.paintcursor = nullptr;
 
-    /* relink grease pencil interpolation curves */
+    /* Relink grease pencil interpolation curves. */
     BLO_read_data_address(reader, &sce->toolsettings->gp_interpolate.custom_ipo);
     if (sce->toolsettings->gp_interpolate.custom_ipo) {
       BKE_curvemapping_blend_read(reader, sce->toolsettings->gp_interpolate.custom_ipo);
     }
-    /* relink grease pencil multiframe falloff curve */
+    /* Relink grease pencil multi-frame falloff curve. */
     BLO_read_data_address(reader, &sce->toolsettings->gp_sculpt.cur_falloff);
     if (sce->toolsettings->gp_sculpt.cur_falloff) {
       BKE_curvemapping_blend_read(reader, sce->toolsettings->gp_sculpt.cur_falloff);
     }
-    /* relink grease pencil primitive curve */
+    /* Relink grease pencil primitive curve. */
     BLO_read_data_address(reader, &sce->toolsettings->gp_sculpt.cur_primitive);
     if (sce->toolsettings->gp_sculpt.cur_primitive) {
       BKE_curvemapping_blend_read(reader, sce->toolsettings->gp_sculpt.cur_primitive);
     }
 
-    /* Relink toolsettings curve profile */
+    /* Relink toolsettings curve profile. */
     BLO_read_data_address(reader, &sce->toolsettings->custom_bevel_profile_preset);
     if (sce->toolsettings->custom_bevel_profile_preset) {
       BKE_curveprofile_blend_read(reader, sce->toolsettings->custom_bevel_profile_preset);
@@ -1174,6 +1178,7 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
 
   if (sce->ed) {
     ListBase *old_seqbasep = &sce->ed->seqbase;
+    ListBase *old_displayed_channels = &sce->ed->channels;
 
     BLO_read_data_address(reader, &sce->ed);
     Editing *ed = sce->ed;
@@ -1188,32 +1193,53 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
 
     /* Read in sequence member data. */
     SEQ_blend_read(reader, &ed->seqbase);
+    BLO_read_list(reader, &ed->channels);
 
     /* link metastack, slight abuse of structs here,
      * have to restore pointer to internal part in struct */
     {
       Sequence temp;
-      void *poin;
-      intptr_t offset;
+      void *seqbase_poin;
+      void *channels_poin;
+      intptr_t seqbase_offset;
+      intptr_t channels_offset;
 
-      offset = ((intptr_t) & (temp.seqbase)) - ((intptr_t)&temp);
+      seqbase_offset = ((intptr_t) & (temp.seqbase)) - ((intptr_t)&temp);
+      channels_offset = ((intptr_t) & (temp.channels)) - ((intptr_t)&temp);
 
-      /* root pointer */
+      /* seqbase root pointer */
       if (ed->seqbasep == old_seqbasep) {
         ed->seqbasep = &ed->seqbase;
       }
       else {
-        poin = POINTER_OFFSET(ed->seqbasep, -offset);
+        seqbase_poin = POINTER_OFFSET(ed->seqbasep, -seqbase_offset);
 
-        poin = BLO_read_get_new_data_address(reader, poin);
+        seqbase_poin = BLO_read_get_new_data_address(reader, seqbase_poin);
 
-        if (poin) {
-          ed->seqbasep = (ListBase *)POINTER_OFFSET(poin, offset);
+        if (seqbase_poin) {
+          ed->seqbasep = (ListBase *)POINTER_OFFSET(seqbase_poin, seqbase_offset);
         }
         else {
           ed->seqbasep = &ed->seqbase;
         }
       }
+
+      /* Active channels root pointer. */
+      if (ed->displayed_channels == old_displayed_channels || ed->displayed_channels == nullptr) {
+        ed->displayed_channels = &ed->channels;
+      }
+      else {
+        channels_poin = POINTER_OFFSET(ed->displayed_channels, -channels_offset);
+        channels_poin = BLO_read_get_new_data_address(reader, channels_poin);
+
+        if (channels_poin) {
+          ed->displayed_channels = (ListBase *)POINTER_OFFSET(channels_poin, channels_offset);
+        }
+        else {
+          ed->displayed_channels = &ed->channels;
+        }
+      }
+
       /* stack */
       BLO_read_list(reader, &(ed->metastack));
 
@@ -1224,13 +1250,28 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
           ms->oldbasep = &ed->seqbase;
         }
         else {
-          poin = POINTER_OFFSET(ms->oldbasep, -offset);
-          poin = BLO_read_get_new_data_address(reader, poin);
-          if (poin) {
-            ms->oldbasep = (ListBase *)POINTER_OFFSET(poin, offset);
+          seqbase_poin = POINTER_OFFSET(ms->oldbasep, -seqbase_offset);
+          seqbase_poin = BLO_read_get_new_data_address(reader, seqbase_poin);
+          if (seqbase_poin) {
+            ms->oldbasep = (ListBase *)POINTER_OFFSET(seqbase_poin, seqbase_offset);
           }
           else {
             ms->oldbasep = &ed->seqbase;
+          }
+        }
+
+        if (ms->old_channels == old_displayed_channels || ms->old_channels == nullptr) {
+          ms->old_channels = &ed->channels;
+        }
+        else {
+          channels_poin = POINTER_OFFSET(ms->old_channels, -channels_offset);
+          channels_poin = BLO_read_get_new_data_address(reader, channels_poin);
+
+          if (channels_poin) {
+            ms->old_channels = (ListBase *)POINTER_OFFSET(channels_poin, channels_offset);
+          }
+          else {
+            ms->old_channels = &ed->channels;
           }
         }
       }
@@ -1729,7 +1770,7 @@ ToolSettings *BKE_toolsettings_copy(ToolSettings *toolsettings, const int flag)
 
   /* duplicate Grease Pencil interpolation curve */
   ts->gp_interpolate.custom_ipo = BKE_curvemapping_copy(ts->gp_interpolate.custom_ipo);
-  /* Duplicate Grease Pencil multiframe falloff. */
+  /* Duplicate Grease Pencil multi-frame falloff. */
   ts->gp_sculpt.cur_falloff = BKE_curvemapping_copy(ts->gp_sculpt.cur_falloff);
   ts->gp_sculpt.cur_primitive = BKE_curvemapping_copy(ts->gp_sculpt.cur_primitive);
 
@@ -1786,7 +1827,7 @@ void BKE_toolsettings_free(ToolSettings *toolsettings)
   if (toolsettings->gp_interpolate.custom_ipo) {
     BKE_curvemapping_free(toolsettings->gp_interpolate.custom_ipo);
   }
-  /* free Grease Pencil multiframe falloff curve */
+  /* free Grease Pencil multi-frame falloff curve */
   if (toolsettings->gp_sculpt.cur_falloff) {
     BKE_curvemapping_free(toolsettings->gp_sculpt.cur_falloff);
   }
@@ -2030,7 +2071,7 @@ void BKE_scene_set_background(Main *bmain, Scene *scene)
   /* check for cyclic sets, for reading old files but also for definite security (py?) */
   BKE_scene_validate_setscene(bmain, scene);
 
-  /* deselect objects (for dataselect) */
+  /* Deselect objects (for data select). */
   LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
     ob->flag &= ~SELECT;
   }
@@ -2625,7 +2666,7 @@ void BKE_scene_graph_update_for_newframe_ex(Depsgraph *depsgraph, const bool cle
     BKE_sound_set_cfra(scene->r.cfra);
     DEG_graph_relations_update(depsgraph);
     /* Update all objects: drivers, matrices, #DispList, etc. flags set
-     * by depgraph or manual, no layer check here, gets correct flushed.
+     * by depsgraph or manual, no layer check here, gets correct flushed.
      *
      * NOTE: Only update for new frame on first iteration. Second iteration is for ensuring user
      * edits from callback are properly taken into account. Doing a time update on those would
