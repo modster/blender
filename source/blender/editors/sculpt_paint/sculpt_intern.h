@@ -47,6 +47,7 @@ typedef enum SculptUpdateType {
   SCULPT_UPDATE_VISIBILITY = 1 << 2,
   SCULPT_UPDATE_COLOR = 1 << 3,
   SCULPT_UPDATE_IMAGE = 1 << 4,
+  SCULPT_FREE_BRUSH_TEST = 1 << 5,
 } SculptUpdateType;
 
 typedef struct SculptCursorGeometryInfo {

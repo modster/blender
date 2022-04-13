@@ -256,6 +256,36 @@ template<typename ImageBuffer> class PaintingKernel {
   }
 };
 
+static void update_triangle_brush_test(SculptSession *ss, Triangles &triangles, const MVert *mvert)
+{
+  triangles.init_brush_test();
+  SculptBrushTest test;
+  SCULPT_brush_test_init(ss, &test);
+  float3 brush_min_bounds(test.location[0] - test.radius,
+                          test.location[1] - test.radius,
+                          test.location[2] - test.radius);
+  float3 brush_max_bounds(test.location[0] + test.radius,
+                          test.location[1] + test.radius,
+                          test.location[2] + test.radius);
+  for (int triangle_index = 0; triangle_index < triangles.size(); triangle_index++) {
+    TrianglePaintInput &triangle = triangles.get_paint_input(triangle_index);
+
+    float3 triangle_min_bounds(mvert[triangle.vert_indices[0]].co);
+    float3 triangle_max_bounds(triangle_min_bounds);
+    for (int i = 1; i < 3; i++) {
+      const float3 &pos = mvert[triangle.vert_indices[i]].co;
+      triangle_min_bounds.x = min_ff(triangle_min_bounds.x, pos.x);
+      triangle_min_bounds.y = min_ff(triangle_min_bounds.y, pos.y);
+      triangle_min_bounds.z = min_ff(triangle_min_bounds.z, pos.z);
+      triangle_max_bounds.x = max_ff(triangle_max_bounds.x, pos.x);
+      triangle_max_bounds.y = max_ff(triangle_max_bounds.y, pos.y);
+      triangle_max_bounds.z = max_ff(triangle_max_bounds.z, pos.z);
+    }
+    triangles.brush_test[triangle_index] = isect_aabb_aabb_v3(
+        brush_min_bounds, brush_max_bounds, triangle_min_bounds, triangle_max_bounds);
+  }
+}
+
 static void do_paint_pixels(void *__restrict userdata,
                             const int n,
                             const TaskParallelTLS *__restrict tls)
@@ -267,9 +297,11 @@ static void do_paint_pixels(void *__restrict userdata,
   PBVHNode *node = data->nodes[n];
 
   NodeData &node_data = BKE_pbvh_pixels_node_data_get(*node);
-
   const int thread_id = BLI_task_parallel_thread_id(tls);
   MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
+
+  update_triangle_brush_test(ss, node_data.triangles, mvert);
+
   PaintingKernel<ImageBufferFloat4> kernel_float4(ss, brush, thread_id, mvert);
   PaintingKernel<ImageBufferByte4> kernel_byte4(ss, brush, thread_id, mvert);
 
@@ -294,6 +326,9 @@ static void do_paint_pixels(void *__restrict userdata,
         }
 
         for (const PackedPixelRow &pixel_row : tile_data.pixel_rows) {
+          if (!node_data.triangles.brush_test[pixel_row.triangle_index]) {
+            continue;
+          }
           bool pixels_painted = false;
           if (image_buffer->rect_float != nullptr) {
             pixels_painted = kernel_float4.paint(node_data.triangles, pixel_row, image_buffer);

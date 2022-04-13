@@ -5214,6 +5214,10 @@ void SCULPT_flush_update_done(const bContext *C, Object *ob, SculptUpdateType up
     }
   }
 
+  if (update_flags & SCULPT_FREE_BRUSH_TEST) {
+    BKE_pbvh_pixels_free_brush_test(ss->pbvh);
+  }
+
   if (update_flags & SCULPT_UPDATE_COORDS) {
     BKE_pbvh_update_bounds(ss->pbvh, PBVH_UpdateOriginalBB);
 
@@ -5420,7 +5424,7 @@ static void sculpt_stroke_done(const bContext *C, struct PaintStroke *UNUSED(str
   }
   else if (brush->sculpt_tool == SCULPT_TOOL_PAINT) {
     if (SCULPT_use_image_paint_brush(&tool_settings->paint_mode, ob)) {
-      SCULPT_flush_update_done(C, ob, SCULPT_UPDATE_IMAGE);
+      SCULPT_flush_update_done(C, ob, SCULPT_UPDATE_IMAGE | SCULPT_FREE_BRUSH_TEST);
     }
   }
   else {

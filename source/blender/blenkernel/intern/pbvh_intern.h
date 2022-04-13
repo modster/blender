@@ -258,6 +258,7 @@ void pbvh_bmesh_normals_update(PBVHNode **nodes, int totnode);
 
 /* pbvh_pixels.hh */
 void pbvh_pixels_free(PBVHNode *node);
+void pbvh_pixels_free_brush_test(PBVHNode *node);
 
 #ifdef __cplusplus
 }

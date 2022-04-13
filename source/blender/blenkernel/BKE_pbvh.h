@@ -308,6 +308,7 @@ void BKE_pbvh_node_fully_unmasked_set(PBVHNode *node, int fully_masked);
 bool BKE_pbvh_node_fully_unmasked_get(PBVHNode *node);
 
 void BKE_pbvh_mark_update_pixels(PBVH *pbvh);
+void BKE_pbvh_pixels_free_brush_test(PBVH *pbvh);
 void BKE_pbvh_vert_mark_update(PBVH *pbvh, int index);
 
 void BKE_pbvh_node_get_grids(PBVH *pbvh,
