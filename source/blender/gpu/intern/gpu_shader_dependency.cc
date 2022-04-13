@@ -10,7 +10,6 @@
 
 #include <iomanip>
 #include <iostream>
-#include <regex>
 #include <sstream>
 
 #include "BLI_ghash.h"
@@ -106,14 +105,14 @@ struct GPUSource {
     }
   };
 
-  bool is_in_comment(const StringRef &input, int64_t offset)
+  static bool is_in_comment(const StringRef &input, int64_t offset)
   {
     return (input.rfind("/*", offset) > input.rfind("*/", offset)) ||
            (input.rfind("//", offset) > input.rfind("\n", offset));
   }
 
   template<bool check_whole_word = true, bool reversed = false, typename T>
-  int64_t find_str(const StringRef &input, const T keyword, int64_t offset = 0)
+  static int64_t find_str(const StringRef &input, const T keyword, int64_t offset = 0)
   {
     while (true) {
       if constexpr (reversed) {
@@ -289,58 +288,109 @@ struct GPUSource {
 
   void material_functions_parse(GPUFunctionDictionnary *g_functions)
   {
-    const std::string input = source;
+    const StringRefNull input = source;
 
-    /* TODO(@fclem): Ignore the comments. */
-    const std::regex function_regex(
-        /* Return type. */
-        "(void|[iu]?vec[234]|float|u?int|Closure)"
-        /* Separator. */
-        "[ ]+"
-        /* Function name. */
-        "([\\w]+)"
-        /* Separator. */
-        "[ ]*"
-        /* Argument list. */
-        "\\(([\\w\\s\\n,]*)\\)");
-    const std::regex arg_regex(
-        /* Qualifier. */
-        "(in|out|inout)?"
-        /* Separator. */
-        "[\\s]*"
-        /* Type. */
-        "(void|[iu]?vec[234]|mat4|float|u?int|Closure|sampler[123]D(?:Array)?)"
-        /* Separator. */
-        "[\\s]+"
-        /* Name. */
-        "([\\w]+)"
-        /* Separator. */
-        "[\\s]*,?");
+    const char whitespace_chars[] = " \n\t";
 
-    std::smatch func_match;
-    std::string::const_iterator search_start(input.cbegin());
-    while (std::regex_search(search_start, input.cend(), func_match, function_regex)) {
-      search_start = func_match.suffix().first;
+    auto function_parse = [&](const StringRef &input,
+                              int64_t &cursor,
+                              StringRef &out_return_type,
+                              StringRef &out_name,
+                              StringRef &out_args) -> bool {
+      cursor = find_keyword(input, "void ", cursor + 1);
+      if (cursor == -1) {
+        return false;
+      }
+      int64_t arg_start = find_token(input, '(', cursor);
+      if (arg_start == -1) {
+        return false;
+      }
+      int64_t arg_end = find_token(input, ')', arg_start);
+      if (arg_end == -1) {
+        return false;
+      }
+      int64_t body_start = find_token(input, '{', arg_end);
+      int64_t next_semicolon = find_token(input, ';', arg_end);
+      if (body_start != -1 && next_semicolon != -1 && body_start > next_semicolon) {
+        /* Assert no prototypes but could also just skip them. */
+        BLI_assert_msg(false, "No prototypes allowed in node GLSL libraries.");
+      }
+      int64_t name_start = input.find_first_not_of(whitespace_chars, input.find(' ', cursor));
+      if (name_start == -1) {
+        return false;
+      }
+      int64_t name_end = input.find_last_not_of(whitespace_chars, arg_start);
+      if (name_end == -1) {
+        return false;
+      }
+      /* Only support void type for now. */
+      out_return_type = "void";
+      out_name = input.substr(name_start, name_end - name_start);
+      out_args = input.substr(arg_start + 1, arg_end - (arg_start + 1));
+      return true;
+    };
 
-      std::string func_return_type = func_match[1].str();
-      std::string func_name = func_match[2].str();
-      std::string func_args = func_match[3].str();
+    auto keyword_parse = [&](const StringRef &str, int64_t &cursor) -> const StringRef {
+      int64_t keyword_start = str.find_first_not_of(whitespace_chars, cursor);
+      if (keyword_start == -1) {
+        /* No keyword found. */
+        return str.substr(0, 0);
+      }
+      int64_t keyword_end = str.find_first_of(whitespace_chars, keyword_start);
+      if (keyword_end == -1) {
+        /* Last keyword. */
+        keyword_end = str.size();
+      }
+      cursor = keyword_end + 1;
+      return str.substr(keyword_start, keyword_end - keyword_start);
+    };
 
+    auto arg_parse = [&](const StringRef &str,
+                         int64_t &cursor,
+                         StringRef &out_qualifier,
+                         StringRef &out_type,
+                         StringRef &out_name) -> bool {
+      int64_t arg_start = cursor + 1;
+      if (arg_start >= str.size()) {
+        return false;
+      }
+      cursor = find_token(str, ',', arg_start);
+      if (cursor == -1) {
+        /* Last argument. */
+        cursor = str.size();
+      }
+      const StringRef arg = str.substr(arg_start, cursor - arg_start);
+
+      int64_t keyword_cursor = 0;
+      out_qualifier = keyword_parse(arg, keyword_cursor);
+      out_type = keyword_parse(arg, keyword_cursor);
+      out_name = keyword_parse(arg, keyword_cursor);
+      if (out_name.is_empty()) {
+        /* No qualifier case. */
+        out_name = out_type;
+        out_type = out_qualifier;
+        out_qualifier = arg.substr(0, 0);
+      }
+      return true;
+    };
+
+    int64_t cursor = -1;
+    StringRef func_return_type, func_name, func_args;
+    while (function_parse(input, cursor, func_return_type, func_name, func_args)) {
       GPUFunction *func = MEM_new<GPUFunction>(__func__);
-
-      STRNCPY(func->name, func_name.c_str());
+      func_name.copy(func->name, sizeof(func->name));
       func->source = reinterpret_cast<void *>(this);
 
       bool insert = g_functions->add(func->name, func);
 
-      /* NOTE: We allow overloading non void function, but only if the function comes from the same
-       * file. Otherwise the dependency system breaks. */
+      /* NOTE: We allow overloading non void function, but only if the function comes from the
+       * same file. Otherwise the dependency system breaks. */
       if (!insert) {
         GPUSource *other_source = reinterpret_cast<GPUSource *>(
             g_functions->lookup(func_name)->source);
         if (other_source != this) {
           print_error(input,
-                      source.find(func_match[0].str()),
+                      source.find(func_name),
                       "Function redefinition or overload in two different files ...");
           print_error(
               input, other_source->source.find(func_name), "... previous definition was here");
@@ -357,20 +407,16 @@ struct GPUSource {
       }
 
       func->totparam = 0;
-      std::smatch args_match;
-      std::string::const_iterator args_search_start(func_args.cbegin());
-      while (std::regex_search(args_search_start, func_args.cend(), args_match, arg_regex)) {
-        args_search_start = args_match.suffix().first;
-        std::string arg_qualifier = args_match[1].str();
-        std::string arg_type = args_match[2].str();
-        std::string arg_name = args_match[3].str();
+      int64_t args_cursor = -1;
+      StringRef arg_qualifier, arg_type, arg_name;
+      while (arg_parse(func_args, args_cursor, arg_qualifier, arg_type, arg_name)) {
 
         if (func->totparam >= ARRAY_SIZE(func->paramtype)) {
           print_error(input, source.find(func_name), "Too much parameter in function");
           break;
         }
 
-        auto parse_qualifier = [](std::string &qualifier) -> GPUFunctionQual {
+        auto parse_qualifier = [](StringRef &qualifier) -> GPUFunctionQual {
           if (qualifier == "out") {
             return FUNCTION_QUAL_OUT;
           }
@@ -382,7 +428,7 @@ struct GPUSource {
           }
         };
 
-        auto parse_type = [](std::string &type) -> eGPUType {
+        auto parse_type = [](StringRef &type) -> eGPUType {
           if (type == "float") {
             return GPU_FLOAT;
           }
@@ -446,50 +492,16 @@ struct GPUSource {
   int init_dependencies(const GPUSourceDictionnary &dict,
                         const GPUFunctionDictionnary &g_functions)
   {
-    if (dependencies_init) {
+    if (this->dependencies_init) {
       return 0;
     }
-    dependencies_init = true;
+    this->dependencies_init = true;
     int64_t pos = -1;
-
-    const bool is_material_library = this->is_from_material_library();
-
-    const std::regex function_regex("([\\w]+)[ ]*\\(");
-    const std::string input = source;
-    std::string::const_iterator search_start(input.cbegin());
-
-    if (is_material_library && (pos = source.find("pragma BLENDER_REQUIRE(")) != -1) {
-      /* NOTE(@fclem): This is design choice. This is to make sure the engine has total control to
-       * what gets pulled by the codegen. */
-      print_error(source, pos, "Shader node files should not use BLENDER_REQUIRE");
-    }
 
     while (true) {
       GPUSource *dependency_source = nullptr;
 
-      if (is_material_library) {
-
-        std::smatch func_match;
-        if (std::regex_search(search_start, input.cend(), func_match, function_regex)) {
-          search_start = func_match.suffix().first;
-          std::string func_name = func_match[1].str();
-          GPUFunction *fun = g_functions.lookup_default(func_name, nullptr);
-
-          /* Function might not in the function list. This is the case for builtin functions or
-           * functions implemented by the engines. */
-          if (fun == nullptr) {
-            continue;
-          }
-          dependency_source = reinterpret_cast<GPUSource *>(fun->source);
-          if (dependency_source == this) {
-            continue;
-          }
-        }
-        else {
-          return 0;
-        }
-      }
-      else {
+      {
         pos = source.find("pragma BLENDER_REQUIRE(", pos + 1);
         if (pos == -1) {
           return 0;
@@ -517,7 +529,7 @@ struct GPUSource {
         dependencies.append_non_duplicates(dep);
       }
       dependencies.append_non_duplicates(dependency_source);
-    };
+    }
     return 0;
   }
 

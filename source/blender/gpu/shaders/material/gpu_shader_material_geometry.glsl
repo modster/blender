@@ -1,3 +1,5 @@
+#pragma BLENDER_REQUIRE(gpu_shader_material_tangent.glsl)
+
 void node_geometry(vec3 orco,
                    out vec3 position,
                    out vec3 normal,
