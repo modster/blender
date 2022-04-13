@@ -58,7 +58,6 @@
 #include "BKE_subdiv_ccg.h"
 #include "BKE_subsurf.h"
 
-#include "NOD_shader.h"
 #include "NOD_texture.h"
 
 #include "DEG_depsgraph.h"
