@@ -344,8 +344,8 @@ static void do_paint_pixels(void *__restrict userdata,
 
         BKE_image_release_ibuf(data->image_data.image, image_buffer, nullptr);
         pixels_updated |= tile_data.flags.dirty;
+        break;
       }
-      break;
     }
   }
 
