@@ -9,6 +9,7 @@
 
 #pragma BLENDER_REQUIRE(surface_lib.glsl)
 #pragma BLENDER_REQUIRE(volumetric_lib.glsl)
+#pragma BLENDER_REQUIRE(renderpass_lib.glsl)
 
 #ifdef USE_ALPHA_BLEND
 /* Use dual source blending to be able to make a whole range of effects. */
@@ -24,6 +25,8 @@ layout(location = 4) out float sssRadius;
 layout(location = 5) out vec3 sssAlbedo;
 
 #endif
+
+uniform float backgroundAlpha;
 
 #ifdef EEVEE_DISPLACEMENT_BUMP
 
@@ -77,6 +80,13 @@ void main()
   out_sss_color = vec3(0.0);
 
   Closure cl = nodetree_exec();
+
+#ifdef WORLD_BACKGROUND
+  if (!renderPassEnvironment) {
+    cl.holdout += 1.0 - backgroundAlpha;
+    cl.radiance *= backgroundAlpha;
+  }
+#endif
 
   float holdout = saturate(1.0 - cl.holdout);
   float transmit = saturate(avg(cl.transmittance));
