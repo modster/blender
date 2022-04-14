@@ -321,7 +321,7 @@ static PyObject *pygpu_interface_info__tp_new(PyTypeObject *UNUSED(type),
   StageInterfaceInfo *interface = new StageInterfaceInfo(name, "");
   GPUStageInterfaceInfo *interface_info = reinterpret_cast<GPUStageInterfaceInfo *>(interface);
 
-  auto self = BPyGPUStageInterfaceInfo_CreatePyObject(interface_info);
+  auto *self = BPyGPUStageInterfaceInfo_CreatePyObject(interface_info);
 
 #ifdef USE_GPU_PY_REFERENCES
   PyObject *py_name = PyTuple_GET_ITEM(args, 0);
@@ -483,7 +483,16 @@ static PyObject *pygpu_shader_info_fragment_out(BPyGPUShaderCreateInfo *self,
   struct PyC_StringEnum blend_type = {pygpu_dualblend_items, (int)DualBlend::NONE};
 
   static const char *_keywords[] = {"slot", "type", "name", "blend", nullptr};
-  static _PyArg_Parser _parser = {"iO&s|$O&:fragment_out", _keywords, 0};
+  static _PyArg_Parser _parser = {
+      "i"  /* `slot` */
+      "O&" /* `type` */
+      "s"  /* `name` */
+      "|$" /* Optional keyword only arguments. */
+      "O&" /* `blend` */
+      ":fragment_out",
+      _keywords,
+      nullptr,
+  };
   if (!_PyArg_ParseTupleAndKeywordsFast(args,
                                         kwds,
                                         &_parser,
@@ -577,7 +586,17 @@ static PyObject *pygpu_shader_info_image(BPyGPUShaderCreateInfo *self,
   Qualifier qualifier = Qualifier::NO_RESTRICT;
 
   static const char *_keywords[] = {"slot", "format", "type", "name", "qualifiers", nullptr};
-  static _PyArg_Parser _parser = {"iO&O&s|$O:image", _keywords, 0};
+  static _PyArg_Parser _parser = {
+      "i"  /* `slot` */
+      "O&" /* `format` */
+      "O&" /* `type` */
+      "s"  /* `name` */
+      "|$" /* Optional keyword only arguments. */
+      "O"  /* `qualifiers` */
+      ":image",
+      _keywords,
+      nullptr,
+  };
   if (!_PyArg_ParseTupleAndKeywordsFast(args,
                                         kwds,
                                         &_parser,
@@ -733,7 +752,15 @@ static PyObject *pygpu_shader_info_push_constant(BPyGPUShaderCreateInfo *self,
   int array_size = 0;
 
   static const char *_keywords[] = {"type", "name", "size", nullptr};
-  static _PyArg_Parser _parser = {"O&s|I:push_constant", _keywords, 0};
+  static _PyArg_Parser _parser = {
+      "O&" /* `type` */
+      "s"  /* `name` */
+      "|"  /* Optional arguments. */
+      "I"  /* `size` */
+      ":push_constant",
+      _keywords,
+      nullptr,
+  };
   if (!_PyArg_ParseTupleAndKeywordsFast(
           args, kwds, &_parser, PyC_ParseStringEnum, &pygpu_type, &name, &array_size)) {
     return nullptr;

@@ -86,7 +86,11 @@ void main()
   volumeOrco = (volumeObjectToTexture * vec4(volumeOrco, 1.0)).xyz;
 
   if (any(lessThan(volumeOrco, vec3(0.0))) || any(greaterThan(volumeOrco, vec3(1.0)))) {
+    /* Note: Discard is not an explicit return in Metal prior to versions 2.3.
+     * adding return after discard ensures consistent behaviour and avoids GPU
+     * side-effects where control flow continues with undefined values. */
     discard;
+    return;
   }
 #endif
 
