@@ -13,11 +13,11 @@ namespace blender::viewport_compositor {
 /* A processor operation is an operation that takes exactly one input and computes exactly one
  * output. */
 class ProcessorOperation : public Operation {
- public:
+ private:
   /* The identifier of the output. This is constant for all operations. */
-  static const StringRef output_identifier;
+  static const StringRef output_identifier_;
   /* The identifier of the input. This is constant for all operations. */
-  static const StringRef input_identifier;
+  static const StringRef input_identifier_;
 
  public:
   using Operation::Operation;

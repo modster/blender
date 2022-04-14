@@ -9,6 +9,7 @@
 #include "VPC_context.hh"
 #include "VPC_evaluator.hh"
 #include "VPC_gpu_material_operation.hh"
+#include "VPC_input_single_value_operation.hh"
 #include "VPC_node_operation.hh"
 #include "VPC_operation.hh"
 #include "VPC_result.hh"
@@ -86,15 +87,18 @@ void Evaluator::compile_and_evaluate()
 
 void Evaluator::compile_and_evaluate_node(DNode node, CompileState &compile_state)
 {
-  /* Get an instance of the node's compositor operation and add it to the operations stream. */
+  /* Get an instance of the node's compositor operation. */
   NodeOperation *operation = node->typeinfo()->get_compositor_operation(context_, node);
-  operations_stream_.append(std::unique_ptr<Operation>(operation));
 
   /* Map the node to the compiled operation. */
   compile_state.map_node_to_node_operation(node, operation);
 
   /* Map the inputs of the operation to the results of the outputs they are linked to. */
   map_node_operation_inputs_to_their_results(node, operation, compile_state);
+
+  /* Add the operation to the operations stream. This has to be done after input mapping because
+   * the method may add Input Single Value Operations to the operations stream. */
+  operations_stream_.append(std::unique_ptr<Operation>(operation));
 
   /* Evaluate the operation. */
   operation->evaluate();
@@ -107,26 +111,35 @@ void Evaluator::map_node_operation_inputs_to_their_results(DNode node,
   for (const InputSocketRef *input_ref : node->inputs()) {
     const DInputSocket input{node.context(), input_ref};
 
-    /* Get the output linked to the input. If it is null, that means the input is unlinked.
-     * Unlinked inputs are mapped internally to internal results, so skip this here. */
+    /* Get the output linked to the input. */
     const DOutputSocket output = get_output_linked_to_input(input);
-    if (!output) {
+
+    /* The output is not null, which means the input is linked. So map the input to the result we
+     * get from the output. */
+    if (output) {
+      Result &result = compile_state.get_result_from_output_socket(output);
+      operation->map_input_to_result(input->identifier(), &result);
       continue;
     }
 
-    /* Map the input to the result we got from the output. */
-    Result &result = compile_state.get_result_from_output_socket(output);
-    operation->map_input_to_result(input->identifier(), &result);
+    /* Otherwise, the output is null, which means the input is unlinked. So map the input to the
+     * result of a newly created Input Single Value Operation. */
+    InputSingleValueOperation *input_operation = new InputSingleValueOperation(context_, input);
+    operation->map_input_to_result(input->identifier(), &input_operation->get_result());
+
+    /* Add the input operation to the operations stream. */
+    operations_stream_.append(std::unique_ptr<InputSingleValueOperation>(input_operation));
+
+    /* Evaluate the input operation. */
+    input_operation->evaluate();
   }
 }
 
 void Evaluator::compile_and_evaluate_gpu_material_compile_group(CompileState &compile_state)
 {
-  /* Compile the GPU material compile group into a GPU Material Operation and add it to the
-   * operations stream. */
+  /* Compile the GPU material compile group into a GPU Material Operation. */
   SubSchedule &sub_schedule = compile_state.get_gpu_material_compile_group_sub_schedule();
   GPUMaterialOperation *operation = new GPUMaterialOperation(context_, sub_schedule);
-  operations_stream_.append(std::unique_ptr<Operation>(operation));
 
   /* Map each of the nodes in the sub-schedule to the compiled operation. */
   for (DNode node : sub_schedule) {
@@ -135,6 +148,9 @@ void Evaluator::compile_and_evaluate_gpu_material_compile_group(CompileState &co
 
   /* Map the inputs of the operation to the results of the outputs they are linked to. */
   map_gpu_material_operation_inputs_to_their_results(operation, compile_state);
+
+  /* Add the operation to the operations stream. */
+  operations_stream_.append(std::unique_ptr<Operation>(operation));
 
   /* Evaluate the operation. */
   operation->evaluate();

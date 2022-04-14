@@ -27,16 +27,10 @@ class NodeOperation : public Operation {
  private:
   /* The node that this operation represents. */
   DNode node_;
-  /* A vector storing unique pointers to the results mapped to unlinked inputs. */
-  Vector<std::unique_ptr<Result>> unlinked_inputs_results_;
-  /* A mapping between each unlinked input in the node identified by its identifier and its
-   * corresponding input socket. */
-  Map<StringRef, DInputSocket> unlinked_inputs_sockets_;
 
  public:
-  /* Initialize members by the given arguments, populate the output results based on the node
-   * outputs, populate the input types maps based on the node inputs, and add results for unlinked
-   * inputs. */
+  /* Populate the output results based on the node outputs and populate the input descriptors based
+   * on the node inputs. */
   NodeOperation(Context &context, DNode node);
 
   /* Returns a reference to the derived node that this operation represents. */
@@ -49,15 +43,6 @@ class NodeOperation : public Operation {
   /* Returns true if the output identified by the given identifier is needed and should be
    * computed, otherwise returns false. */
   bool is_output_needed(StringRef identifier) const;
-
-  /* Set the values of the results for unlinked inputs. */
-  void pre_execute() override;
-
- private:
-  /* For each unlinked input in the node, construct a new result of an appropriate type, add it to
-   * the unlinked_inputs_results_ vector, map the input to it, and map the input to its
-   * corresponding input socket through the unlinked_inputs_sockets_ map. */
-  void populate_results_for_unlinked_inputs();
 };
 
 }  // namespace blender::viewport_compositor

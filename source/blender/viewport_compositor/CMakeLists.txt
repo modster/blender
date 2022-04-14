@@ -23,6 +23,7 @@ set(SRC
   intern/evaluator.cc
   intern/gpu_material_node.cc
   intern/gpu_material_operation.cc
+  intern/input_single_value_operation.cc
   intern/node_operation.cc
   intern/operation.cc
   intern/processor_operation.cc
@@ -42,6 +43,7 @@ set(SRC
   VPC_gpu_material_node.hh
   VPC_gpu_material_operation.hh
   VPC_input_descriptor.hh
+  VPC_input_single_value_operation.hh
   VPC_node_operation.hh
   VPC_operation.hh
   VPC_processor_operation.hh

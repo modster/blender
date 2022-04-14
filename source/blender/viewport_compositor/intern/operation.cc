@@ -35,8 +35,6 @@ Operation::~Operation()
 
 void Operation::evaluate()
 {
-  pre_execute();
-
   evaluate_input_processors();
 
   execute();
@@ -82,10 +80,6 @@ Domain Operation::compute_domain()
   }
 
   return operation_domain;
-}
-
-void Operation::pre_execute()
-{
 }
 
 void Operation::evaluate_input_processors()

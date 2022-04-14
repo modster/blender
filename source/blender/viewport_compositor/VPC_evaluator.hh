@@ -139,19 +139,23 @@ class Evaluator {
   void compile_and_evaluate();
 
   /* Compile the given node into a node operation, map each input to the result of the output
-   * linked to it, update the compile state, and evaluate the operation. */
+   * linked to it, update the compile state, add the newly created operation to the operations
+   * stream, and evaluate the operation. */
   void compile_and_evaluate_node(DNode node, CompileState &compile_state);
 
   /* Map each input of the node operation to the result of the output linked to it. Unlinked inputs
-   * are left unmapped as they will be mapped internally to internal results in the node operation
-   * before execution. */
+   * are mapped to the result of a newly created Input Single Value Operation, which is added to
+   * the operations stream and evaluated. Since this method might add operations to the operations
+   * stream, the actual node operation should only be added to the stream once this method is
+   * called. */
   void map_node_operation_inputs_to_their_results(DNode node,
                                                   NodeOperation *operation,
                                                   CompileState &compile_state);
 
   /* Compile the GPU material compile group into a GPU material operation, map each input of the
-   * operation to the result of the output linked to it, update the compile state, evaluate the
-   * operation, and finally reset the GPU material compile group. */
+   * operation to the result of the output linked to it, update the compile state, add the newly
+   * created operation to the operations stream, evaluate the operation, and finally reset the GPU
+   * material compile group. */
   void compile_and_evaluate_gpu_material_compile_group(CompileState &compile_state);
 
   /* Map each input of the GPU material operation to the result of the output linked to it. */

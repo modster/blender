@@ -8,17 +8,17 @@
 
 namespace blender::viewport_compositor {
 
-const StringRef ProcessorOperation::input_identifier = StringRef("Input");
-const StringRef ProcessorOperation::output_identifier = StringRef("Output");
+const StringRef ProcessorOperation::input_identifier_ = StringRef("Input");
+const StringRef ProcessorOperation::output_identifier_ = StringRef("Output");
 
 Result &ProcessorOperation::get_result()
 {
-  return Operation::get_result(output_identifier);
+  return Operation::get_result(output_identifier_);
 }
 
 void ProcessorOperation::map_input_to_result(Result *result)
 {
-  Operation::map_input_to_result(input_identifier, result);
+  Operation::map_input_to_result(input_identifier_, result);
 }
 
 void ProcessorOperation::evaluate_input_processors()
@@ -27,27 +27,27 @@ void ProcessorOperation::evaluate_input_processors()
 
 Result &ProcessorOperation::get_input()
 {
-  return Operation::get_input(input_identifier);
+  return Operation::get_input(input_identifier_);
 }
 
 void ProcessorOperation::switch_result_mapped_to_input(Result *result)
 {
-  Operation::switch_result_mapped_to_input(input_identifier, result);
+  Operation::switch_result_mapped_to_input(input_identifier_, result);
 }
 
 void ProcessorOperation::populate_result(Result result)
 {
-  Operation::populate_result(output_identifier, result);
+  Operation::populate_result(output_identifier_, result);
 }
 
 void ProcessorOperation::declare_input_descriptor(InputDescriptor descriptor)
 {
-  Operation::declare_input_descriptor(input_identifier, descriptor);
+  Operation::declare_input_descriptor(input_identifier_, descriptor);
 }
 
 InputDescriptor &ProcessorOperation::get_input_descriptor()
 {
-  return Operation::get_input_descriptor(input_identifier);
+  return Operation::get_input_descriptor(input_identifier_);
 }
 
 }  // namespace blender::viewport_compositor
