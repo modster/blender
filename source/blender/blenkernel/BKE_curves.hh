@@ -76,6 +76,11 @@ class CurvesGeometryRuntime {
   mutable Vector<float3> evaluated_position_cache;
   mutable std::mutex position_cache_mutex;
   mutable bool position_cache_dirty = true;
+  /**
+   * The evaluated positions result, using a separate span in case all curves are poly curves,
+   * in which case a separate array of evaluated positions is unnecessary.
+   */
+  mutable Span<float3> evaluated_positions_span;
 
   /**
    * Cache of lengths along each evaluated curve for for each evaluated point. If a curve is
@@ -377,6 +382,7 @@ namespace curves {
  */
 inline int curve_segment_size(const int points_num, const bool cyclic)
 {
+  BLI_assert(points_num > 0);
   return cyclic ? points_num : points_num - 1;
 }
 
@@ -681,8 +687,7 @@ inline IndexRange CurvesGeometry::lengths_range_for_curve(const int curve_index,
   BLI_assert(cyclic == this->cyclic()[curve_index]);
   const IndexRange points = this->evaluated_points_for_curve(curve_index);
   const int start = points.start() + curve_index;
-  const int size = curves::curve_segment_size(points.size(), cyclic);
-  return {start, size};
+  return {start, points.is_empty() ? 0 : curves::curve_segment_size(points.size(), cyclic)};
 }
 
 inline Span<float> CurvesGeometry::evaluated_lengths_for_curve(const int curve_index,
