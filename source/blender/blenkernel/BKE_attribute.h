@@ -65,7 +65,7 @@ struct CustomDataLayer *BKE_id_attribute_find(const struct ID *id,
                                               int type,
                                               AttributeDomain domain);
 
-AttributeDomain BKE_id_attribute_domain(struct ID *id, const struct CustomDataLayer *layer);
+AttributeDomain BKE_id_attribute_domain(const struct ID *id, const struct CustomDataLayer *layer);
 int BKE_id_attribute_data_length(struct ID *id, struct CustomDataLayer *layer);
 bool BKE_id_attribute_required(struct ID *id, struct CustomDataLayer *layer);
 bool BKE_id_attribute_rename(struct ID *id,
@@ -122,6 +122,7 @@ struct CustomDataLayer *BKE_id_attributes_active_color_get(const struct ID *id);
 void BKE_id_attributes_active_color_set(struct ID *id, struct CustomDataLayer *active_layer);
 struct CustomDataLayer *BKE_id_attributes_render_color_get(const struct ID *id);
 void BKE_id_attributes_render_color_set(struct ID *id, struct CustomDataLayer *active_layer);
+struct CustomDataLayer *BKE_id_attributes_color_find(const struct ID *id, const char *name);
 
 bool BKE_id_attribute_calc_unique_name(struct ID *id, const char *name, char *outname);
 

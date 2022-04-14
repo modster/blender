@@ -27,6 +27,8 @@
 #include "DNA_modifier_types.h"
 #include "DNA_node_types.h"
 
+#include "ED_paint.h"
+
 #include "workbench_engine.h"
 #include "workbench_private.h"
 
@@ -94,8 +96,6 @@ static void workbench_cache_sculpt_populate(WORKBENCH_PrivateData *wpd,
                                             eV3DShadingColorType color_type)
 {
   const bool use_single_drawcall = !ELEM(color_type, V3D_SHADING_MATERIAL_COLOR);
-  BLI_assert(color_type != V3D_SHADING_TEXTURE_COLOR);
-
   if (use_single_drawcall) {
     DRWShadingGroup *grp = workbench_material_setup(wpd, ob, 0, color_type, NULL);
     DRW_shgroup_call_sculpt(grp, ob, false, false);
@@ -324,6 +324,16 @@ static eV3DShadingColorType workbench_color_type_get(WORKBENCH_PrivateData *wpd,
     color_type = V3D_SHADING_MATERIAL_COLOR;
   }
 
+  if (is_sculpt_pbvh) {
+    /* Bad call C is required to access the tool system that is context aware. Cast to non-const
+     * due to current API. */
+    bContext *C = (bContext *)DRW_context_state_get()->evil_C;
+    if (C != NULL) {
+      color_type = ED_paint_shading_color_override(
+          C, &wpd->scene->toolsettings->paint_mode, ob, color_type);
+    }
+  }
+
   if (r_draw_shadow) {
     *r_draw_shadow = (ob->dtx & OB_DRAW_NO_SHADOW_CAST) == 0 && SHADOW_ENABLED(wpd);
     /* Currently unsupported in sculpt mode. We could revert to the slow
@@ -415,7 +425,8 @@ void workbench_cache_populate(void *ved, Object *ob)
   }
   else if (ob->type == OB_CURVES) {
     int color_type = workbench_color_type_get(wpd, ob, NULL, NULL, NULL);
-    workbench_cache_hair_populate(wpd, ob, NULL, NULL, color_type, false, CURVES_MATERIAL_NR);
+    DRWShadingGroup *grp = workbench_material_hair_setup(wpd, ob, CURVES_MATERIAL_NR, color_type);
+    DRW_shgroup_curves_create_sub(ob, grp, NULL);
   }
   else if (ob->type == OB_VOLUME) {
     if (wpd->shading.type != OB_WIRE) {

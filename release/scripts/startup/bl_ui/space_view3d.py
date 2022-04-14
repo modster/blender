@@ -108,7 +108,7 @@ class VIEW3D_HT_tool_header(Header):
         elif tool_mode == 'SCULPT_GPENCIL':
             if is_valid_context:
                 brush = context.tool_settings.gpencil_sculpt_paint.brush
-                tool = brush.gpencil_tool
+                tool = brush.gpencil_sculpt_tool
                 if tool in {'SMOOTH', 'RANDOMIZE'}:
                     layout.popover("VIEW3D_PT_tools_grease_pencil_sculpt_options")
                 layout.popover("VIEW3D_PT_tools_grease_pencil_sculpt_appearance")
@@ -3147,6 +3147,7 @@ class VIEW3D_MT_sculpt_curves(Menu):
         layout = self.layout
 
         layout.operator("curves.snap_curves_to_surface")
+        layout.operator("curves.convert_to_particle_system", text="Convert to Particle System")
 
 
 class VIEW3D_MT_mask(Menu):
@@ -6761,8 +6762,10 @@ class VIEW3D_PT_snapping(Panel):
             col.prop(tool_settings, "use_snap_backface_culling")
 
             if obj:
-                if object_mode == 'EDIT':
-                    col.prop(tool_settings, "use_snap_self")
+                if object_mode == 'EDIT' and obj.type not in {'LATTICE', 'META', 'FONT'}:
+                    sub = col.column()
+                    sub.active = not (tool_settings.use_proportional_edit and obj.type == 'MESH')
+                    sub.prop(tool_settings, "use_snap_self")
                 if object_mode in {'OBJECT', 'POSE', 'EDIT', 'WEIGHT_PAINT'}:
                     col.prop(tool_settings, "use_snap_align_rotation")
 

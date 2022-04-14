@@ -189,18 +189,17 @@ static HandleType handle_type_from_dna_bezt(const eBezTriple_Handle dna_handle_t
   return BEZIER_HANDLE_AUTO;
 }
 
-static Spline::NormalCalculationMode normal_mode_from_dna_curve(const int twist_mode)
+static NormalMode normal_mode_from_dna_curve(const int twist_mode)
 {
   switch (twist_mode) {
     case CU_TWIST_Z_UP:
-      return Spline::NormalCalculationMode::ZUp;
-    case CU_TWIST_MINIMUM:
-      return Spline::NormalCalculationMode::Minimum;
     case CU_TWIST_TANGENT:
-      return Spline::NormalCalculationMode::Tangent;
+      return NORMAL_MODE_Z_UP;
+    case CU_TWIST_MINIMUM:
+      return NORMAL_MODE_MINIMUM_TWIST;
   }
   BLI_assert_unreachable();
-  return Spline::NormalCalculationMode::Minimum;
+  return NORMAL_MODE_MINIMUM_TWIST;
 }
 
 static KnotsMode knots_mode_from_dna_nurb(const short flag)
@@ -333,8 +332,7 @@ std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &dna_curve,
 
   /* Normal mode is stored separately in each spline to facilitate combining
    * splines from multiple curve objects, where the value may be different. */
-  const Spline::NormalCalculationMode normal_mode = normal_mode_from_dna_curve(
-      dna_curve.twist_mode);
+  const NormalMode normal_mode = normal_mode_from_dna_curve(dna_curve.twist_mode);
   for (SplinePtr &spline : curve->splines()) {
     spline->normal_mode = normal_mode;
   }
@@ -383,11 +381,12 @@ std::unique_ptr<CurveEval> curves_to_curve_eval(const Curves &curves)
       curves.geometry);
 
   VArray<int> resolution = geometry.resolution();
+  VArray<int8_t> normal_mode = geometry.normal_mode();
 
   VArray_Span<float> nurbs_weights{
       src_component.attribute_get_for_read<float>("nurbs_weight", ATTR_DOMAIN_POINT, 0.0f)};
-  VArray_Span<int> nurbs_orders{
-      src_component.attribute_get_for_read<int>("nurbs_order", ATTR_DOMAIN_CURVE, 4)};
+  VArray_Span<int8_t> nurbs_orders{
+      src_component.attribute_get_for_read<int8_t>("nurbs_order", ATTR_DOMAIN_CURVE, 4)};
   VArray_Span<int8_t> nurbs_knots_modes{
       src_component.attribute_get_for_read<int8_t>("knots_mode", ATTR_DOMAIN_CURVE, 0)};
 
@@ -438,6 +437,7 @@ std::unique_ptr<CurveEval> curves_to_curve_eval(const Curves &curves)
     spline->positions().fill(float3(0));
     spline->tilts().fill(0.0f);
     spline->radii().fill(1.0f);
+    spline->normal_mode = static_cast<NormalMode>(normal_mode[curve_index]);
     curve_eval->add_spline(std::move(spline));
   }
 
@@ -450,6 +450,7 @@ std::unique_ptr<CurveEval> curves_to_curve_eval(const Curves &curves)
                                      dst_component,
                                      {"curve_type",
                                       "resolution",
+                                      "normal_mode",
                                       "nurbs_weight",
                                       "nurbs_order",
                                       "knots_mode",
@@ -470,6 +471,8 @@ Curves *curve_eval_to_curves(const CurveEval &curve_eval)
   geometry.offsets_for_write().copy_from(curve_eval.control_point_offsets());
   MutableSpan<int8_t> curve_types = geometry.curve_types_for_write();
 
+  OutputAttribute_Typed<int8_t> normal_mode =
+      dst_component.attribute_try_get_for_output_only<int8_t>("normal_mode", ATTR_DOMAIN_CURVE);
   OutputAttribute_Typed<float> nurbs_weight;
   OutputAttribute_Typed<int> nurbs_order;
   OutputAttribute_Typed<int8_t> nurbs_knots_mode;
@@ -493,7 +496,7 @@ Curves *curve_eval_to_curves(const CurveEval &curve_eval)
   for (const int curve_index : curve_eval.splines().index_range()) {
     const Spline &spline = *curve_eval.splines()[curve_index];
     curve_types[curve_index] = curve_eval.splines()[curve_index]->type();
-
+    normal_mode.as_span()[curve_index] = curve_eval.splines()[curve_index]->normal_mode;
     const IndexRange point_range = geometry.points_for_curve(curve_index);
 
     switch (spline.type()) {
@@ -519,6 +522,7 @@ Curves *curve_eval_to_curves(const CurveEval &curve_eval)
     }
   }
 
+  normal_mode.save();
   nurbs_weight.save();
   nurbs_order.save();
   nurbs_knots_mode.save();

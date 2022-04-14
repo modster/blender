@@ -1174,8 +1174,15 @@ class CYCLES_OBJECT_PT_lightgroup(CyclesButtonsPanel, Panel):
 
         view_layer = context.view_layer
 
-        col = layout.column(align=True)
-        col.prop_search(ob, "lightgroup", view_layer, "lightgroups", text="Light Group")
+        row = layout.row(align=True)
+        row.use_property_decorate = False
+
+        sub = row.column(align=True)
+        sub.prop_search(ob, "lightgroup", view_layer, "lightgroups", text="Light Group", results_are_suggestions=True)
+
+        sub = row.column(align=True)
+        sub.active = bool(ob.lightgroup) and not any(lg.name == ob.lightgroup for lg in view_layer.lightgroups)
+        sub.operator("scene.view_layer_add_lightgroup", icon='ADD', text="").name = ob.lightgroup
 
 
 class CYCLES_OBJECT_PT_visibility(CyclesButtonsPanel, Panel):
@@ -1435,8 +1442,15 @@ class CYCLES_WORLD_PT_surface(CyclesButtonsPanel, Panel):
         if not panel_node_draw(layout, world, 'OUTPUT_WORLD', 'Surface'):
             layout.prop(world, "color")
 
-        col = layout.column(align=True)
-        col.prop_search(world, "lightgroup", view_layer, "lightgroups", text="Light Group")
+        row = layout.row(align=True)
+        row.use_property_decorate = False
+
+        sub = row.column(align=True)
+        sub.prop_search(world, "lightgroup", view_layer, "lightgroups", text="Light Group", results_are_suggestions=True)
+
+        sub = row.column(align=True)
+        sub.active = bool(world.lightgroup) and not any(lg.name == world.lightgroup for lg in view_layer.lightgroups)
+        sub.operator("scene.view_layer_add_lightgroup", icon='ADD', text="").name = world.lightgroup
 
 
 class CYCLES_WORLD_PT_volume(CyclesButtonsPanel, Panel):
@@ -1902,13 +1916,20 @@ class CYCLES_RENDER_PT_bake_output_margin(CyclesButtonsPanel, Panel):
         cbk = scene.render.bake
         rd = scene.render
 
-        if rd.use_bake_multires:
-            layout.prop(rd, "bake_margin_type", text="Type")
-            layout.prop(rd, "bake_margin", text="Size")
+        if (cscene.bake_type == 'NORMAL' and cbk.normal_space == 'TANGENT') or cscene.bake_type == 'UV':
+            if rd.use_bake_multires:
+                layout.prop(rd, "bake_margin", text="Size")
+            else:
+                if cbk.target == 'IMAGE_TEXTURES':
+                    layout.prop(cbk, "margin", text="Size")
         else:
-            if cbk.target == 'IMAGE_TEXTURES':
-                layout.prop(cbk, "margin_type", text="Type")
-                layout.prop(cbk, "margin", text="Size")
+            if rd.use_bake_multires:
+                layout.prop(rd, "bake_margin_type", text="Type")
+                layout.prop(rd, "bake_margin", text="Size")
+            else:
+                if cbk.target == 'IMAGE_TEXTURES':
+                    layout.prop(cbk, "margin_type", text="Type")
+                    layout.prop(cbk, "margin", text="Size")
 
 
 

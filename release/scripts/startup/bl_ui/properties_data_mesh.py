@@ -565,7 +565,7 @@ class DATA_PT_mesh_attributes(MeshButtonsPanel, Panel):
         layout.label(text="Name collisions: " + ", ".join(set(colliding_names)), icon='ERROR')
 
 
-class MESH_UL_color_attributes(UIList):
+class ColorAttributesListBase():
     display_domain_names = {
         'POINT': "Vertex",
         'EDGE': "Edge",
@@ -588,6 +588,8 @@ class MESH_UL_color_attributes(UIList):
 
         return ret, idxs
 
+
+class MESH_UL_color_attributes(UIList, ColorAttributesListBase):
     def draw_item(self, _context, layout, data, attribute, _icon, _active_data, _active_propname, _index):
         data_type = attribute.bl_rna.properties['data_type'].enum_items[attribute.data_type]
 
@@ -597,20 +599,27 @@ class MESH_UL_color_attributes(UIList):
         split.emboss = 'NONE'
         split.prop(attribute, "name", text="")
 
-        active_render = _index == data.color_attributes.render_color_index
-
-        props = split.operator(
-            "geometry.color_attribute_render_set",
-            text="",
-            icon='RESTRICT_RENDER_OFF' if active_render else 'RESTRICT_RENDER_ON',
-        )
-
-        props.name = attribute.name
-
         sub = split.row()
         sub.alignment = 'RIGHT'
         sub.active = False
         sub.label(text="%s ▶ %s" % (domain_name, data_type.name))
+
+        active_render = _index == data.color_attributes.render_color_index
+        
+        row = layout.row()
+        row.emboss = 'NONE'
+        prop = row.operator(
+            "geometry.color_attribute_render_set",
+            text="",
+            icon='RESTRICT_RENDER_OFF' if active_render else 'RESTRICT_RENDER_ON',
+        )
+        prop.name = attribute.name
+
+
+class MESH_UL_color_attributes_selector(UIList, ColorAttributesListBase):
+    def draw_item(self, _context, layout, data, attribute, _icon, _active_data, _active_propname, _index):
+        layout.emboss = 'NONE'
+        layout.prop(attribute, "name", text="", icon='COLOR')
 
 
 class DATA_PT_vertex_colors(DATA_PT_mesh_attributes, Panel):
@@ -663,6 +672,7 @@ classes = (
     DATA_PT_customdata,
     DATA_PT_custom_props_mesh,
     MESH_UL_color_attributes,
+    MESH_UL_color_attributes_selector,
 )
 
 if __name__ == "__main__":  # only for live edit.
