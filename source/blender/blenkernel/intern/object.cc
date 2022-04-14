@@ -1897,6 +1897,8 @@ bool BKE_object_is_in_editmode(const Object *ob)
     case OB_GPENCIL:
       /* Grease Pencil object has no edit mode data. */
       return GPENCIL_EDIT_MODE((bGPdata *)ob->data);
+    case OB_CURVES:
+      return ob->mode == OB_MODE_EDIT;
     default:
       return false;
   }
@@ -1907,7 +1909,7 @@ bool BKE_object_is_in_editmode_vgroup(const Object *ob)
   return (OB_TYPE_SUPPORT_VGROUP(ob->type) && BKE_object_is_in_editmode(ob));
 }
 
-bool BKE_object_data_is_in_editmode(const ID *id)
+bool BKE_object_data_is_in_editmode(const Object *ob, const ID *id)
 {
   const short type = GS(id->name);
   BLI_assert(OB_DATA_SUPPORT_EDITMODE(type));
@@ -1923,6 +1925,11 @@ bool BKE_object_data_is_in_editmode(const ID *id)
       return ((const Lattice *)id)->editlatt != nullptr;
     case ID_AR:
       return ((const bArmature *)id)->edbo != nullptr;
+    case ID_CV:
+      if (ob) {
+        return BKE_object_is_in_editmode(ob);
+      }
+      return false;
     default:
       BLI_assert_unreachable();
       return false;
@@ -1969,6 +1976,10 @@ char *BKE_object_data_editmode_flush_ptr_get(struct ID *id)
     case ID_AR: {
       bArmature *arm = (bArmature *)id;
       return &arm->needs_flush_to_id;
+    }
+    case ID_CV: {
+      /* Curves have no edit mode data. */
+      return nullptr;
     }
     default:
       BLI_assert_unreachable();
@@ -3076,12 +3087,12 @@ void BKE_object_matrix_local_get(struct Object *ob, float r_mat[4][4])
 static bool ob_parcurve(Object *ob, Object *par, float r_mat[4][4])
 {
   Curve *cu = (Curve *)par->data;
-  float vec[4], dir[3], quat[4], radius, ctime;
+  float vec[4], quat[4], radius, ctime;
 
   /* NOTE: Curve cache is supposed to be evaluated here already, however there
    * are cases where we can not guarantee that. This includes, for example,
    * dependency cycles. We can't correct anything from here, since that would
-   * cause a threading conflicts.
+   * cause threading conflicts.
    *
    * TODO(sergey): Some of the legit looking cases like T56619 need to be
    * looked into, and maybe curve cache (and other dependencies) are to be
@@ -3114,7 +3125,7 @@ static bool ob_parcurve(Object *ob, Object *par, float r_mat[4][4])
 
   /* vec: 4 items! */
   if (BKE_where_on_path(
-          par, ctime, vec, dir, (cu->flag & CU_FOLLOW) ? quat : nullptr, &radius, nullptr)) {
+          par, ctime, vec, nullptr, (cu->flag & CU_FOLLOW) ? quat : nullptr, &radius, nullptr)) {
     if (cu->flag & CU_FOLLOW) {
       quat_apply_track(quat, ob->trackflag, ob->upflag);
       normalize_qt(quat);

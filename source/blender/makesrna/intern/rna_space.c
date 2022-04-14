@@ -424,7 +424,7 @@ static const EnumPropertyItem rna_enum_shading_color_type_items[] = {
     {V3D_SHADING_SINGLE_COLOR, "SINGLE", 0, "Single", "Show scene in a single color"},
     {V3D_SHADING_OBJECT_COLOR, "OBJECT", 0, "Object", "Show object color"},
     {V3D_SHADING_RANDOM_COLOR, "RANDOM", 0, "Random", "Show random object color"},
-    {V3D_SHADING_VERTEX_COLOR, "VERTEX", 0, "Vertex", "Show active vertex color"},
+    {V3D_SHADING_VERTEX_COLOR, "VERTEX", 0, "Color", "Show active color attribute"},
     {V3D_SHADING_TEXTURE_COLOR, "TEXTURE", 0, "Texture", "Show texture"},
     {0, NULL, 0, NULL, NULL},
 };
@@ -3497,7 +3497,7 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Display Faces", "Display faces over the image");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
 
-  prop = RNA_def_property(srna, "tile_grid_shape", PROP_INT, PROP_NONE);
+  prop = RNA_def_property(srna, "tile_grid_shape", PROP_INT, PROP_XYZ);
   RNA_def_property_int_sdna(prop, NULL, "tile_grid_shape");
   RNA_def_property_array(prop, 2);
   RNA_def_property_int_default(prop, 1);
@@ -5264,6 +5264,11 @@ static void rna_def_space_image_overlay(BlenderRNA *brna)
   prop = RNA_def_property(srna, "show_overlays", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "overlay.flag", SI_OVERLAY_SHOW_OVERLAYS);
   RNA_def_property_ui_text(prop, "Show Overlays", "Display overlays like UV Maps and Metadata");
+
+  prop = RNA_def_property(srna, "show_grid_background", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "overlay.flag", SI_OVERLAY_SHOW_GRID_BACKGROUND);
+  RNA_def_property_ui_text(prop, "Display Background", "Show the grid background and borders");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
 }
 
 static void rna_def_space_image(BlenderRNA *brna)

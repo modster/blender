@@ -2041,10 +2041,10 @@ void OBJECT_OT_speaker_add(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Add Hair Curves Operator
+/** \name Add Curves Operator
  * \{ */
 
-static bool object_hair_curves_add_poll(bContext *C)
+static bool object_curves_add_poll(bContext *C)
 {
   if (!U.experimental.use_new_curves_type) {
     return false;
@@ -2052,7 +2052,7 @@ static bool object_hair_curves_add_poll(bContext *C)
   return ED_operator_objectmode(C);
 }
 
-static int object_hair_curves_add_exec(bContext *C, wmOperator *op)
+static int object_curves_random_add_exec(bContext *C, wmOperator *op)
 {
   using namespace blender;
 
@@ -2072,18 +2072,55 @@ static int object_hair_curves_add_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-void OBJECT_OT_hair_curves_add(wmOperatorType *ot)
+void OBJECT_OT_curves_random_add(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Add Hair Curves";
-  ot->description = "Add a hair curves object to the scene";
-  ot->idname = "OBJECT_OT_hair_curves_add";
+  ot->name = "Add Random Curves";
+  ot->description = "Add a curves object with random curves to the scene";
+  ot->idname = "OBJECT_OT_curves_random_add";
 
   /* api callbacks */
-  ot->exec = object_hair_curves_add_exec;
-  ot->poll = object_hair_curves_add_poll;
+  ot->exec = object_curves_random_add_exec;
+  ot->poll = object_curves_add_poll;
 
   /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  ED_object_add_generic_props(ot, false);
+}
+
+static int object_curves_empty_hair_add_exec(bContext *C, wmOperator *op)
+{
+  ushort local_view_bits;
+  float loc[3], rot[3];
+  if (!ED_object_add_generic_get_opts(
+          C, op, 'Z', loc, rot, nullptr, nullptr, &local_view_bits, nullptr)) {
+    return OPERATOR_CANCELLED;
+  }
+
+  Object *surface_ob = CTX_data_active_object(C);
+
+  Object *object = ED_object_add_type(C, OB_CURVES, nullptr, loc, rot, false, local_view_bits);
+  object->dtx |= OB_DRAWBOUNDOX; /* TODO: remove once there is actual drawing. */
+
+  if (surface_ob != nullptr && surface_ob->type == OB_MESH) {
+    Curves *curves_id = static_cast<Curves *>(object->data);
+    curves_id->surface = surface_ob;
+    id_us_plus(&surface_ob->id);
+  }
+
+  return OPERATOR_FINISHED;
+}
+
+void OBJECT_OT_curves_empty_hair_add(wmOperatorType *ot)
+{
+  ot->name = "Add Empty Curves";
+  ot->description = "Add an empty curve object to the scene with the selected mesh as surface";
+  ot->idname = "OBJECT_OT_curves_empty_hair_add";
+
+  ot->exec = object_curves_empty_hair_add_exec;
+  ot->poll = object_curves_add_poll;
+
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   ED_object_add_generic_props(ot, false);
@@ -3561,6 +3598,7 @@ static int duplicate_exec(bContext *C, wmOperator *op)
   ViewLayer *view_layer = CTX_data_view_layer(C);
   const bool linked = RNA_boolean_get(op->ptr, "linked");
   const eDupli_ID_Flags dupflag = (linked) ? (eDupli_ID_Flags)0 : (eDupli_ID_Flags)U.dupflag;
+  bool changed = false;
 
   /* We need to handle that here ourselves, because we may duplicate several objects, in which case
    * we also want to remap pointers between those... */
@@ -3579,6 +3617,7 @@ static int duplicate_exec(bContext *C, wmOperator *op)
      * the list is made in advance */
     ED_object_base_select(base, BA_DESELECT);
     ED_object_base_select(basen, BA_SELECT);
+    changed = true;
 
     if (basen == nullptr) {
       continue;
@@ -3594,6 +3633,10 @@ static int duplicate_exec(bContext *C, wmOperator *op)
     }
   }
   CTX_DATA_END;
+
+  if (!changed) {
+    return OPERATOR_CANCELLED;
+  }
 
   /* Note that this will also clear newid pointers and tags. */
   copy_object_set_idnew(C);

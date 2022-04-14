@@ -1167,10 +1167,14 @@ typedef struct EnvelopeGpencilModifierData {
   float thickness;
   /** Strength multiplier for the new strokes. */
   float strength;
+  /** Number of points to skip over. */
+  int skip;
   /** Custom index for passes. */
   int layer_pass;
   /* Length of the envelope effect. */
   int spread;
+
+  char _pad[4];
 } EnvelopeGpencilModifierData;
 
 typedef enum eEnvelopeGpencil_Flag {
