@@ -113,9 +113,18 @@ GlobalData init_globals(void)
   }
 #  ifdef HAIR_SHADER
   /* Shade as a cylinder. */
-  float cos_theta = hairThickTime / hairThickness;
+  vec3 B = normalize(cross(worldNormal, hairTangent));
+  float cos_theta;
+  if (hairThicknessRes == 1) {
+    /* Random cosine normal distribution on the hair surface. */
+    cos_theta = texelfetch_noise_tex(gl_FragCoord.xy).x * 2.0 - 1.0;
+  }
+  else {
+    /* Shade as a cylinder. */
+    cos_theta = hairThickTime / hairThickness;
+  }
   float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
-  surf.N = normalize(worldNormal * sin_theta + hairTangent * cos_theta);
+  surf.N = safe_normalize(worldNormal * sin_theta + B * cos_theta);
   surf.T = hairTangent;
   surf.is_strand = true;
   surf.hair_time = hairTime;
