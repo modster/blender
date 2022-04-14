@@ -1,6 +1,5 @@
 #pragma BLENDER_REQUIRE(gpu_shader_material_blackbody.glsl)
 
-
 void node_volume_principled(vec4 color,
                             float density,
                             float anisotropy,
@@ -27,7 +26,9 @@ void node_volume_principled(vec4 color,
 
   if (density > 1e-5) {
     density = max(density * density_attribute, 0.0);
+  }
 
+  if (density > 1e-5) {
     /* Compute scattering and absorption coefficients. */
     vec3 scatter_color = color.rgb * color_attribute.rgb;
 
@@ -68,7 +69,7 @@ void node_volume_principled(vec4 color,
 
   ClosureVolumeAbsorption volume_absorption_data;
   volume_absorption_data.weight = weight;
-  volume_absorption_data.absorption = absorption_coeff * density;
+  volume_absorption_data.absorption = absorption_coeff;
 
   ClosureEmission emission_data;
   emission_data.weight = weight;
