@@ -88,6 +88,8 @@ Closure closure_eval(ClosureEmission emission);
 Closure closure_eval(ClosureTransparency transparency);
 Closure closure_eval(ClosureVolumeScatter volume_scatter);
 Closure closure_eval(ClosureVolumeAbsorption volume_absorption);
+Closure closure_eval(ClosureHair hair);
+
 /* Glass BSDF. */
 Closure closure_eval(ClosureReflection reflection, ClosureRefraction refraction);
 /* Dielectric BSDF. */

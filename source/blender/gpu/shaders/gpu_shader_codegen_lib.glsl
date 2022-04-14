@@ -154,6 +154,14 @@ struct ClosureRefraction {
   float ior;
 };
 
+struct ClosureHair {
+  float weight;
+  vec3 color;
+  float offset;
+  vec2 roughness;
+  vec3 T;
+};
+
 struct ClosureVolumeScatter {
   float weight;
   vec3 scattering;

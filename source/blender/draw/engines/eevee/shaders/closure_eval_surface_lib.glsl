@@ -298,6 +298,12 @@ Closure closure_eval(ClosureVolumeScatter volume_scatter,
   return CLOSURE_DEFAULT;
 }
 
+/* Not implemented yet. */
+Closure closure_eval(ClosureHair hair)
+{
+  return CLOSURE_DEFAULT;
+}
+
 vec4 closure_to_rgba(Closure closure)
 {
   return vec4(closure.radiance, 1.0 - saturate(avg(closure.transmittance)));

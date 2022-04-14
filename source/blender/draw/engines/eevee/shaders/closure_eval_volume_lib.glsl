@@ -56,6 +56,10 @@ Closure closure_eval(ClosureReflection reflection, ClosureReflection clearcoat)
 {
   return CLOSURE_DEFAULT;
 }
+Closure closure_eval(ClosureHair hair)
+{
+  return CLOSURE_DEFAULT;
+}
 
 Closure closure_eval(ClosureVolumeScatter volume_scatter)
 {
