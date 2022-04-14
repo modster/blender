@@ -127,7 +127,7 @@ vec3 attr_load_orco(vec4 orco)
 
 vec4 attr_load_tangent(vec4 tangent)
 {
-  tangent.xyz = safe_normalize(normal_object_to_world(tangent.xyz));
+  tangent.xyz = normal_object_to_world(tangent.xyz);
   return tangent;
 }
 
