@@ -17,13 +17,13 @@ void node_bsdf_glass(vec4 color,
   float btdf = (do_multiscatter != 0.0) ? 1.0 : split_sum.x;
 
   ClosureReflection reflection_data;
-  reflection_data.weight = fresnel;
+  reflection_data.weight = fresnel * weight;
   reflection_data.color = color.rgb;
   reflection_data.N = N;
   reflection_data.roughness = roughness;
 
   ClosureRefraction refraction_data;
-  refraction_data.weight = 1.0 - fresnel;
+  refraction_data.weight = (1.0 - fresnel) * weight;
   refraction_data.color = color.rgb * btdf;
   refraction_data.N = N;
   refraction_data.roughness = roughness;
