@@ -9,16 +9,34 @@ GPU_SHADER_CREATE_INFO(compositor_convert_shared)
     .typedef_source("gpu_shader_compositor_type_conversion.glsl")
     .compute_source("compositor_convert.glsl");
 
-GPU_SHADER_CREATE_INFO(compositor_convert_color_to_float)
+GPU_SHADER_CREATE_INFO(compositor_convert_float_to_vector)
     .additional_info("compositor_convert_shared")
-    .image(0, GPU_R16F, Qualifier::WRITE, ImageType::FLOAT_2D, "output_image")
-    .define("CONVERT_EXPRESSION", "vec4(float_from_vec4(texel))")
+    .image(0, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "output_image")
+    .define("CONVERT_EXPRESSION", "vec4(vec3_from_float(texel.x), 0.0)")
     .do_static_compilation(true);
 
 GPU_SHADER_CREATE_INFO(compositor_convert_float_to_color)
     .additional_info("compositor_convert_shared")
     .image(0, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "output_image")
     .define("CONVERT_EXPRESSION", "vec4_from_float(texel.x)")
+    .do_static_compilation(true);
+
+GPU_SHADER_CREATE_INFO(compositor_convert_color_to_float)
+    .additional_info("compositor_convert_shared")
+    .image(0, GPU_R16F, Qualifier::WRITE, ImageType::FLOAT_2D, "output_image")
+    .define("CONVERT_EXPRESSION", "vec4(float_from_vec4(texel))")
+    .do_static_compilation(true);
+
+GPU_SHADER_CREATE_INFO(compositor_convert_color_to_vector)
+    .additional_info("compositor_convert_shared")
+    .image(0, GPU_RGBA16F, Qualifier::WRITE, ImageType::FLOAT_2D, "output_image")
+    .define("CONVERT_EXPRESSION", "vec4(vec3_from_vec4(texel), 0.0)")
+    .do_static_compilation(true);
+
+GPU_SHADER_CREATE_INFO(compositor_convert_vector_to_float)
+    .additional_info("compositor_convert_shared")
+    .image(0, GPU_R16F, Qualifier::WRITE, ImageType::FLOAT_2D, "output_image")
+    .define("CONVERT_EXPRESSION", "vec4(float_from_vec3(texel.xyz))")
     .do_static_compilation(true);
 
 GPU_SHADER_CREATE_INFO(compositor_convert_vector_to_color)

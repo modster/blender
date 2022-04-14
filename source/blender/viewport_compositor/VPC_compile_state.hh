@@ -51,7 +51,7 @@ using namespace nodes::derived_node_tree_types;
  * Second, it stores the GPU material compile group as well as its domain. One should first go over
  * the discussion in VPC_evaluator.hh for a high level description of the mechanism of the compile
  * group. The one important detail in this class is the should_compile_gpu_material_compile_group
- * method, which implements the criteria of whether the compile group should be compiled taking the
+ * method, which implements the criteria of whether the compile group should be compiled given the
  * node currently being processed as an argument. Those criteria are described as follows. If the
  * compile group is empty as is the case when processing nodes 1, 2, and 3, then it plainly
  * shouldn't be compiled. If the given node is not a GPU material node, then it can't be added to

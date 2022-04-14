@@ -32,7 +32,7 @@ class ProcessorOperation : public Operation {
 
  protected:
   /* Processor operations don't need input processors, so override with an empty implementation. */
-  void evaluate_input_processors() override;
+  void add_and_evaluate_input_processors() override;
 
   /* Get a reference to the input result of the processor, this essentially calls the super
    * get_result with the input identifier of the processor. */

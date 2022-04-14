@@ -13,8 +13,9 @@
 
 namespace blender::viewport_compositor {
 
-const char *ConversionProcessorOperation::shader_input_sampler_name = "input_sampler";
-const char *ConversionProcessorOperation::shader_output_image_name = "output_image";
+/* -------------------------------------------------------------------------------------------------
+ *  Convert Processor Operation.
+ */
 
 void ConversionProcessorOperation::execute()
 {
@@ -32,8 +33,8 @@ void ConversionProcessorOperation::execute()
   GPUShader *shader = get_conversion_shader();
   GPU_shader_bind(shader);
 
-  input.bind_as_texture(shader, shader_input_sampler_name);
-  result.bind_as_image(shader, shader_output_image_name);
+  input.bind_as_texture(shader, "input_sampler");
+  result.bind_as_image(shader, "output_image");
 
   const int2 size = result.domain().size;
   GPU_compute_dispatch(shader, size.x / 16 + 1, size.y / 16 + 1, 1);
@@ -44,7 +45,38 @@ void ConversionProcessorOperation::execute()
   GPU_shader_free(shader);
 }
 
-/* --------------------------------------------------------------------
+ProcessorOperation *ConversionProcessorOperation::construct_if_needed(
+    Context &context, const Result &input_result, const InputDescriptor &input_descriptor)
+{
+  ResultType result_type = input_result.type();
+  ResultType expected_type = input_descriptor.type;
+
+  /* If the result type differs from the expected type, return an instance of an appropriate
+   * conversion processor. Otherwise, return a null pointer. */
+  if (result_type == ResultType::Float && expected_type == ResultType::Vector) {
+    return new ConvertFloatToVectorProcessorOperation(context);
+  }
+  else if (result_type == ResultType::Float && expected_type == ResultType::Color) {
+    return new ConvertFloatToColorProcessorOperation(context);
+  }
+  else if (result_type == ResultType::Color && expected_type == ResultType::Float) {
+    return new ConvertColorToFloatProcessorOperation(context);
+  }
+  else if (result_type == ResultType::Color && expected_type == ResultType::Vector) {
+    return new ConvertColorToVectorProcessorOperation(context);
+  }
+  else if (result_type == ResultType::Vector && expected_type == ResultType::Float) {
+    return new ConvertVectorToFloatProcessorOperation(context);
+  }
+  else if (result_type == ResultType::Vector && expected_type == ResultType::Color) {
+    return new ConvertVectorToColorProcessorOperation(context);
+  }
+  else {
+    return nullptr;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
  *  Convert Float To Vector Processor Operation.
  */
 
@@ -62,14 +94,12 @@ void ConvertFloatToVectorProcessorOperation::execute_single(const Result &input,
   output.set_vector_value(float3(input.get_float_value()));
 }
 
-/* Use the shader for color conversion since they are stored in similar textures and the conversion
- * is practically the same. */
 GPUShader *ConvertFloatToVectorProcessorOperation::get_conversion_shader() const
 {
-  return GPU_shader_create_from_info_name("compositor_convert_float_to_color");
+  return GPU_shader_create_from_info_name("compositor_convert_float_to_vector");
 }
 
-/* --------------------------------------------------------------------
+/* -------------------------------------------------------------------------------------------------
  *  Convert Float To Color Processor Operation.
  */
 
@@ -94,7 +124,7 @@ GPUShader *ConvertFloatToColorProcessorOperation::get_conversion_shader() const
   return GPU_shader_create_from_info_name("compositor_convert_float_to_color");
 }
 
-/* --------------------------------------------------------------------
+/* -------------------------------------------------------------------------------------------------
  *  Convert Color To Float Processor Operation.
  */
 
@@ -118,7 +148,31 @@ GPUShader *ConvertColorToFloatProcessorOperation::get_conversion_shader() const
   return GPU_shader_create_from_info_name("compositor_convert_color_to_float");
 }
 
-/* --------------------------------------------------------------------
+/* -------------------------------------------------------------------------------------------------
+ *  Convert Color To Vector Processor Operation.
+ */
+
+ConvertColorToVectorProcessorOperation::ConvertColorToVectorProcessorOperation(Context &context)
+    : ConversionProcessorOperation(context)
+{
+  InputDescriptor input_descriptor;
+  input_descriptor.type = ResultType::Color;
+  declare_input_descriptor(input_descriptor);
+  populate_result(Result(ResultType::Vector, texture_pool()));
+}
+
+void ConvertColorToVectorProcessorOperation::execute_single(const Result &input, Result &output)
+{
+  float4 color = input.get_color_value();
+  output.set_vector_value(float3(color));
+}
+
+GPUShader *ConvertColorToVectorProcessorOperation::get_conversion_shader() const
+{
+  return GPU_shader_create_from_info_name("compositor_convert_color_to_vector");
+}
+
+/* -------------------------------------------------------------------------------------------------
  *  Convert Vector To Float Processor Operation.
  */
 
@@ -137,14 +191,12 @@ void ConvertVectorToFloatProcessorOperation::execute_single(const Result &input,
   output.set_float_value((vector[0] + vector[1] + vector[2]) / 3.0f);
 }
 
-/* Use the shader for color conversion since they are stored in similar textures and the conversion
- * is practically the same. */
 GPUShader *ConvertVectorToFloatProcessorOperation::get_conversion_shader() const
 {
-  return GPU_shader_create_from_info_name("compositor_convert_color_to_float");
+  return GPU_shader_create_from_info_name("compositor_convert_vector_to_float");
 }
 
-/* --------------------------------------------------------------------
+/* -------------------------------------------------------------------------------------------------
  *  Convert Vector To Color Processor Operation.
  */
 

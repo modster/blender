@@ -99,4 +99,36 @@ Domain RealizeOnDomainProcessorOperation::compute_domain()
   return domain_;
 }
 
+ProcessorOperation *RealizeOnDomainProcessorOperation::construct_if_needed(
+    Context &context,
+    const Result &input_result,
+    const InputDescriptor &input_descriptor,
+    const Domain &operation_domain)
+{
+  /* This input wants to skip realization, the processor is not needed. */
+  if (input_descriptor.skip_realization) {
+    return nullptr;
+  }
+
+  /* The input expects a single value and if no single value is provided, it will be ignored and a
+   * default value will be used, so no need to realize it and the processor is not needed. */
+  if (input_descriptor.expects_single_value) {
+    return nullptr;
+  }
+
+  /* Input result is a single value and does not need realization, the processor is not needed. */
+  if (input_result.is_single_value()) {
+    return nullptr;
+  }
+
+  /* The input have an identical domain to the operation domain, so no need to realize it and the
+   * processor is not needed. */
+  if (input_result.domain() == operation_domain) {
+    return nullptr;
+  }
+
+  /* Otherwise, realization is needed. */
+  return new RealizeOnDomainProcessorOperation(context, operation_domain, input_descriptor.type);
+}
+
 }  // namespace blender::viewport_compositor

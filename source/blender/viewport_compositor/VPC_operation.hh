@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "BLI_map.hh"
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
@@ -15,71 +17,107 @@
 
 namespace blender::viewport_compositor {
 
-/* Forward declare processor operation because it is used in the operation definition.  */
+/* Forward declares processor operation because it is used in the operation definition.  */
 class ProcessorOperation;
 
-/* The most basic unit of the compositor. The class can be implemented to perform a certain action
- * in the compositor. */
+/* A type representing a vector of processor operations. */
+using ProcessorsVector = Vector<std::unique_ptr<ProcessorOperation>>;
+
+/* ------------------------------------------------------------------------------------------------
+ * Operation
+ *
+ * The operation is the basic unit of the compositor. Operations have a number of inputs and
+ * outputs that are declared during construction and are identified by string identifiers. Inputs
+ * are declared by calling declare_input_descriptor providing an appropriate descriptor. Those
+ * inputs are mapped to results computed by other operations linked to them. Such mappings are
+ * established by the compiler during compilation by calling the map_input_to_result method.
+ * Outputs are populated by calling the populate_result method, providing a result of an
+ * appropriate type. Those results are then allocated and computed by derived classes in their
+ * execute method.
+ *
+ * Each input may have one or more input processor operations, which are applied on the inputs
+ * before the operation is executed. And thus the effective input of the operation is the result of
+ * the last input processor if one exists. Input processors are added and evaluated by calling the
+ * add_and_evaluate_input_processors method, which provides a default implementation that does
+ * things like implicit conversion, domain realization, and more. This default implementation can,
+ * however, be overridden, extended, or removed. Once the input processors are added and evaluated
+ * for the first time, they are stored in the operation and future evaluations can evaluate them
+ * directly without having to add them again.
+ *
+ * The operation is evaluated by calling the evaluate method, which first adds the input processors
+ * if they weren't added already and evaluate them, then it calls the execute method of the
+ * operation, and finally it releases the results mapped to the inputs to declare that they are no
+ * longer needed. */
 class Operation {
  private:
   /* A reference to the compositor context. This member references the same object in all
    * operations but is included in the class for convenience. */
   Context &context_;
-  /* A mapping between each output of the operation identified by its identifier and the computed
-   * result for that output. A result for each output of an appropriate type should be constructed
-   * and added to the map during operation construction. The results should be allocated and their
-   * contents should be computed in the execute method. */
+  /* A mapping between each output of the operation identified by its identifier and the result for
+   * that output. A result for each output of the operation should be constructed and added to the
+   * map during operation construction by calling the populate_result method. The results should be
+   * allocated and their contents should be computed in the execute method. */
   Map<StringRef, Result> results_;
-  /* A mapping between each input of the operation identified by its identifier and a reference to
-   * the computed result providing its data. The mapped result can be one that was computed by
-   * another operation or one that was internally computed in the operation as part of an internal
-   * preprocessing step like implicit conversion. It is the responsibility of the evaluator to map
-   * the inputs to their linked results prior to invoking any method, which is done by calling
-   * map_input_to_result. It is the responsibility of the operation to map the inputs that are not
-   * linked to the result of an internal single value result computed by the operation during
-   * operation construction. */
-  Map<StringRef, Result *> inputs_to_results_map_;
-  /* A mapping between each input of the operation identified by its identifier and an ordered list
-   * of input processor operations to be applied on that input. */
-  Map<StringRef, Vector<ProcessorOperation *>> input_processors_;
   /* A mapping between each input of the operation identified by its identifier and its input
-   * descriptor. This should be populated during operation construction. */
+   * descriptor. Those descriptors should be declared during operation construction by calling the
+   * declare_input_descriptor method. */
   Map<StringRef, InputDescriptor> input_descriptors_;
+  /* A mapping between each input of the operation identified by its identifier and a pointer to
+   * the computed result providing its data. The mapped result is either one that was computed by
+   * another operation or one that was internally computed in the operation by the last input
+   * processor for that input. It is the responsibility of the evaluator to map the inputs to their
+   * linked results before evaluating the operation by calling the map_input_to_result method. */
+  Map<StringRef, Result *> results_mapped_to_inputs_;
+  /* A mapping between each input of the operation identified by its identifier and an ordered list
+   * of input processor operations to be applied on that input. This is initialized the first time
+   * the input processors are evaluated by calling the add_and_evaluate_input_processors method.
+   * Further evaluations will evaluate the processors directly without the need to add them again.
+   * The input_processors_added_ member indicates whether the processors were already added and can
+   * be evaluated directly or need to be added and evaluated. */
+  Map<StringRef, ProcessorsVector> input_processors_;
+  /* True if the input processors were already added and can be evaluated directly. False if the
+   * input processors are not yet added and needs to be added. */
+  bool input_processors_added_ = false;
 
  public:
   Operation(Context &context);
 
   virtual ~Operation();
 
-  /* Evaluate the operation as follows:
-   * 1. Run any pre-execute computations.
-   * 2. Add an evaluate any input processors.
-   * 3. Invoking the execute method of the operation.
-   * 4. Releasing the results mapped to the inputs. */
+  /* Evaluate the operation by:
+   * 1. Evaluating the input processors.
+   * 2. Calling the execute method of the operation.
+   * 3. Releasing the results mapped to the inputs. */
   void evaluate();
 
   /* Get a reference to the output result identified by the given identifier. */
   Result &get_result(StringRef identifier);
 
   /* Map the input identified by the given identifier to the result providing its data. This also
-   * increments the reference count of the result. See inputs_to_results_map_ for more details.
+   * increments the reference count of the result. See results_mapped_to_inputs_ for more details.
    * This should be called by the evaluator to establish links between different operations. */
   void map_input_to_result(StringRef identifier, Result *result);
 
  protected:
   /* Compute the operation domain of this operation. By default, this implements a default logic
    * that infers the operation domain from the inputs, which may be overridden for a different
-   * logic. See the Domain class for the inference logic and more information. */
+   * logic. See the discussion in VPC_domain.hh for the inference logic and more information. */
   virtual Domain compute_domain();
 
-  /* First, all the necessary input processors for each input. Then update the result mapped to
-   * each input to be that of the last processor for that input if any input processors exist for
-   * it. This is done now in a separate step after all processors were added because the operation
-   * might use the original mapped results to determine what processors needs to be added. Finally,
-   * evaluate all input processors in order. This is called before executing the operation to
-   * prepare its inputs. The class defines a default implementation, but derived class can override
-   * the method to have a different implementation, extend the implementation, or remove it. */
-  virtual void evaluate_input_processors();
+  /* Add and evaluate any needed input processors, which essentially just involves calling the
+   * add_and_evaluate_input_processor method with the needed processors. This is called before
+   * executing the operation to prepare its inputs. The class defines a default implementation
+   * which adds typically necessary processors, but derived classes can override the method to have
+   * a different implementation, extend the implementation, or remove it entirely. */
+  virtual void add_and_evaluate_input_processors();
+
+  /* Given the identifier of an input of the operation and a processor operation:
+   * - Add the given processor to the list of input processors for the input.
+   * - Map the input of the processor to be the result of the last input processor or the result
+   *   mapped to the input if no previous processors exists.
+   * - Switch the result mapped to the input to be the output result of the processor.
+   * - Evaluate the processor. */
+  void add_and_evaluate_input_processor(StringRef identifier, ProcessorOperation *processor);
 
   /* This method should allocate the operation results, execute the operation, and compute the
    * output results. */
@@ -94,13 +132,13 @@ class Operation {
   void switch_result_mapped_to_input(StringRef identifier, Result *result);
 
   /* Add the given result to the results_ map identified by the given output identifier. This
-   * should be called during operation construction for every output. The provided result shouldn't
+   * should be called during operation construction for all outputs. The provided result shouldn't
    * be allocated or initialized, this will happen later during execution. */
   void populate_result(StringRef identifier, Result result);
 
   /* Declare the descriptor of the input identified by the given identifier to be the given
    * descriptor. Adds the given descriptor to the input_descriptors_ map identified by the given
-   * input identifier. This should be called during operation constructor for every input. */
+   * input identifier. This should be called during operation constructor for all inputs. */
   void declare_input_descriptor(StringRef identifier, InputDescriptor descriptor);
 
   /* Get a reference to the descriptor of the input identified by the given identified. */
@@ -113,25 +151,9 @@ class Operation {
   TexturePool &texture_pool();
 
  private:
-  /* Add a reduce to single value input processor for the input identified by the given identifier
-   * if needed. */
-  void add_reduce_to_single_value_input_processor_if_needed(StringRef identifier);
-
-  /* Add an implicit conversion input processor for the input identified by the given identifier if
-   * needed. */
-  void add_implicit_conversion_input_processor_if_needed(StringRef identifier);
-
-  /* Add a realize on domain input processor for the input identified by the given identifier if
-   * needed. See the Domain class for more information. */
-  void add_realize_on_domain_input_processor_if_needed(StringRef identifier);
-
-  /* Add the given input processor operation to the list of input processors for the input
-   * identified by the given identifier. This will also involve mapping the input of the processor
-   * to be the result of the last input processor or the result mapped to the input if no previous
-   * processors exists. The result of the last input processor will not be mapped to the operation
-   * input in this method, this will be done later, see evaluate_input_processors for more
-   * information. */
-  void add_input_processor(StringRef identifier, ProcessorOperation *processor);
+  /* Evaluate the input processors. If the input processors were already added they will be
+   * evaluated directly. Otherwise, the input processors will be added and evaluated. */
+  void evaluate_input_processors();
 
   /* Release the results that are mapped to the inputs of the operation. This is called after the
    * evaluation of the operation to declare that the results are no longer needed by this

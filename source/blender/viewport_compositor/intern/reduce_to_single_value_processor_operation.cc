@@ -25,10 +25,12 @@ ReduceToSingleValueProcessorOperation::ReduceToSingleValueProcessorOperation(Con
 
 void ReduceToSingleValueProcessorOperation::execute()
 {
+  /* Download the input pixel from the GPU texture. */
   const Result &input = get_input();
   GPU_memory_barrier(GPU_BARRIER_TEXTURE_UPDATE);
   float *pixel = static_cast<float *>(GPU_texture_read(input.texture(), GPU_DATA_FLOAT, 0));
 
+  /* Allocate a single value result and set its value to the value of the downloaded pixel. */
   Result &result = get_result();
   result.allocate_single_value();
   switch (result.type()) {
@@ -43,7 +45,26 @@ void ReduceToSingleValueProcessorOperation::execute()
       break;
   }
 
+  /* Free the downloaded pixel. */
   MEM_freeN(pixel);
+}
+
+ProcessorOperation *ReduceToSingleValueProcessorOperation::construct_if_needed(
+    Context &context, const Result &input_result)
+{
+  /* Input result is already a single value, the processor is not needed. */
+  if (input_result.is_single_value()) {
+    return nullptr;
+  }
+
+  /* The input is a full sized texture can can't be reduced to a single value, the processor is not
+   * needed. */
+  if (input_result.domain().size != int2(1)) {
+    return nullptr;
+  }
+
+  /* The input is a texture of a single pixel and can be reduced to a single value. */
+  return new ReduceToSingleValueProcessorOperation(context, input_result.type());
 }
 
 }  // namespace blender::viewport_compositor

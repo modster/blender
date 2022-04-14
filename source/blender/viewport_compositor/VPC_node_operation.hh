@@ -21,8 +21,12 @@ namespace blender::viewport_compositor {
 
 using namespace nodes::derived_node_tree_types;
 
-/* The operation class that nodes should implement and instantiate in the bNodeType
- * get_compositor_operation, passing the given inputs to the constructor.  */
+/* The operation class that nodes should implement and instantiate in the get_compositor_operation
+ * function of the bNodeType, passing the inputs given to that function to the constructor. This
+ * class essentially just implements a default constructor that populates output results for all
+ * outputs of the node as well as input descriptors for all inputs of the nodes based on their
+ * socket declaration. The class also provides some utility methods for easier implementation of
+ * nodes. */
 class NodeOperation : public Operation {
  private:
   /* The node that this operation represents. */

@@ -21,7 +21,7 @@ void ProcessorOperation::map_input_to_result(Result *result)
   Operation::map_input_to_result(input_identifier_, result);
 }
 
-void ProcessorOperation::evaluate_input_processors()
+void ProcessorOperation::add_and_evaluate_input_processors()
 {
 }
 

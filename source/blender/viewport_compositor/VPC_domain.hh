@@ -44,7 +44,7 @@ class RealizationOptions {
 
 /* --------------------------------------------------------------------
  * Domain.
-
+ *
  * A domain is a rectangular area of a certain size in pixels that is transformed by a certain
  * transformation in pixel space relative to some reference space.
  *

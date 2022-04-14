@@ -25,14 +25,14 @@ using namespace nodes::derived_node_tree_types;
  * Evaluator
  *
  * The evaluator is the main class of the compositor. It is constructed from a compositor node
- * tree and a context. Upon calling the evaluate method, the evaluator will check if the node tree
- * is already compiled into an operations stream, and if it is, it will go over it and evaluate the
- * operations in order. It is then the responsibility of the caller to call the reset method when
- * the node tree changes to invalidate the operations stream. A reset is also required if the
- * resources used by the node tree change in structure, for instances, a change in the dimensions
- * of an image used by the node tree. This is necessary because the evaluator compiles the node
- * tree into an operations stream that is specifically optimized for the structure of the resources
- * used by the node tree.
+ * tree and a compositor context. Upon calling the evaluate method, the evaluator will check if the
+ * node tree is already compiled into an operations stream, and if it is, it will go over it and
+ * evaluate the operations in order. It is then the responsibility of the caller to call the reset
+ * method when the node tree changes to invalidate the operations stream. A reset is also required
+ * if the resources used by the node tree change in structure, for instances, a change in the
+ * dimensions of an image used by the node tree. This is necessary because the evaluator compiles
+ * the node tree into an operations stream that is specifically optimized for the structure of the
+ * resources used by the node tree.
  *
  * Otherwise, if the node tree is not yet compiled, the evaluator will compile it into an
  * operations stream, evaluating the operations in the process. It should be noted that operations
