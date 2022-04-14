@@ -38,35 +38,12 @@ struct Closure {
   }
 #  else
   /* Explicit Closure constructors -- To support GLSL syntax */
-  inline Closure(vec3 in_radiance,
-                 vec3 in_transmittance,
-                 float in_holdout,
-                 vec4 in_ssr_data,
-                 vec2 in_ssr_normal,
-                 int in_flag
-#    ifdef USE_SSS
-                 ,
-                 vec3 in_sss_irradiance,
-                 vec3 in_sss_albedo,
-                 float in_sss_radius
-#    endif /* USE_SSS */
-                 )
-      : radiance(in_radiance),
-        transmittance(in_transmittance),
-        holdout(in_holdout),
-        ssr_data(in_ssr_data),
-        ssr_normal(in_ssr_normal),
-        flag(in_flag)
-#    ifdef USE_SSS
-        ,
-        sss_irradiance(in_sss_irradiance),
-        sss_albedo(in_sss_albedo),
-        sss_radius(in_sss_radius)
-#    endif /* USE_SSS */
+  inline Closure(vec3 in_radiance, vec3 in_transmittance, float in_holdout)
+      : radiance(in_radiance), transmittance(in_transmittance), holdout(in_holdout)
   {
   }
-#  endif   /* VOLUMETRICS */
-#endif     /* GPU_METAL */
+#  endif /* VOLUMETRICS */
+#endif   /* GPU_METAL */
 };
 
 #ifndef GPU_METAL
