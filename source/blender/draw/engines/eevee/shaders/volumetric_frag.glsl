@@ -102,6 +102,7 @@ void main()
 #else
 #  ifdef MESH_SHADER
   g_data = init_globals();
+  attrib_load();
 #  endif
   Closure cl = nodetree_exec();
 #  ifdef MESH_SHADER
