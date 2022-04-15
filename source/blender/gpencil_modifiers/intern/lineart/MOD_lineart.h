@@ -224,8 +224,11 @@ typedef struct LineartRenderBuffer {
 
   float overscan;
 
-  struct LineartBoundingArea *initial_bounding_areas;
+  struct LineartBoundingArea **initial_bounding_areas;
   unsigned int bounding_area_initial_count;
+
+  /* Array of thread_count length for spatial locks. */
+  SpinLock *lock_bounding_areas;
 
   /* When splitting bounding areas, if there's an ortho camera placed at a straight angle, there
    * will be a lot of triangles aligned in line which can not be separated by continue subdividing
@@ -460,7 +463,7 @@ typedef struct LineartBoundingArea {
   double cx, cy;
 
   /** 1,2,3,4 quadrant */
-  struct LineartBoundingArea *child;
+  struct LineartBoundingArea *child[4];
 
   SpinLock lock;
 
@@ -469,10 +472,12 @@ typedef struct LineartBoundingArea {
   ListBase up;
   ListBase bp;
 
-  uint16_t triangle_count;
-  uint16_t max_triangle_count;
-  uint16_t line_count;
-  uint16_t max_line_count;
+  /* Need uint32 for the atomic cas instruction. */
+  uint32_t triangle_count;
+  uint32_t max_triangle_count;
+  uint32_t line_count;
+  uint32_t max_line_count;
+  uint32_t user_count;
 
   /* Use array for speeding up multiple accesses. */
   struct LineartTriangle **linked_triangles;

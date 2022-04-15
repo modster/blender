@@ -52,6 +52,8 @@
 
 #include "lineart_intern.h"
 
+#include "atomic_ops.h"
+
 typedef struct LineartIsecSingle {
   float v1[3], v2[3];
   LineartTriangle *tri1, *tri2;
@@ -130,6 +132,21 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *spl,
                                                         double *to);
 
 static void lineart_add_edge_to_list(LineartPendingEdges *pe, LineartEdge *e);
+
+static void lineart_bounding_area_link_triangle_cas(LineartRenderBuffer *rb,
+                                                    LineartBoundingArea **root_ba,
+                                                    LineartTriangle *tri,
+                                                    double *LRUB,
+                                                    int recursive,
+                                                    int recursive_level,
+                                                    bool do_intersection,
+                                                    struct LineartIsecThread *th);
+
+static void lineart_free_bounding_area_memory(LineartBoundingArea *ba,
+                                              bool recursive,
+                                              bool free_ba);
+
+static void lineart_free_bounding_area_memories(LineartRenderBuffer *rb);
 
 static LineartCache *lineart_init_cache(void);
 
@@ -344,24 +361,14 @@ BLI_INLINE bool lineart_occlusion_is_adjacent_intersection(LineartEdge *e, Linea
           (v2->base.flag && v2->intersecting_with == tri));
 }
 
-static void lineart_bounding_area_triangle_add(LineartRenderBuffer *rb,
-                                               LineartBoundingArea *ba,
-                                               LineartTriangle *tri)
-{ /* In case of too many triangles concentrating in one point, do not add anymore, these triangles
-   * will be either narrower than a single pixel, or will still be added into the list of other
-   * less dense areas. */
-  if (ba->triangle_count >= 65535) {
-    return;
-  }
-  if (ba->triangle_count >= ba->max_triangle_count) {
-    LineartTriangle **new_array = lineart_mem_acquire_thread(
-        &rb->render_data_pool, sizeof(LineartTriangle *) * ba->max_triangle_count * 2);
-    memcpy(new_array, ba->linked_triangles, sizeof(LineartTriangle *) * ba->max_triangle_count);
-    ba->max_triangle_count *= 2;
-    ba->linked_triangles = new_array;
-  }
-  ba->linked_triangles[ba->triangle_count] = tri;
-  ba->triangle_count++;
+static void lineart_bounding_area_triangle_reallocate(LineartBoundingArea *ba)
+{
+  LineartTriangle **new_array = MEM_callocN(sizeof(LineartTriangle *) * ba->max_triangle_count * 2,
+                                            "new ba_triangle_array");
+  memcpy(new_array, ba->linked_triangles, sizeof(LineartTriangle *) * ba->max_triangle_count);
+  ba->max_triangle_count *= 2;
+  MEM_freeN(ba->linked_triangles);
+  ba->linked_triangles = new_array;
 }
 
 static void lineart_bounding_area_line_add(LineartRenderBuffer *rb,
@@ -375,10 +382,11 @@ static void lineart_bounding_area_line_add(LineartRenderBuffer *rb,
     return;
   }
   if (ba->line_count >= ba->max_line_count) {
-    LineartEdge **new_array = lineart_mem_acquire(&rb->render_data_pool,
-                                                  sizeof(LineartEdge *) * ba->max_line_count * 2);
+    LineartEdge **new_array = MEM_mallocN(sizeof(LineartEdge *) * ba->max_line_count * 2,
+                                          "new ba_line_array");
     memcpy(new_array, ba->linked_lines, sizeof(LineartEdge *) * ba->max_line_count);
     ba->max_line_count *= 2;
+    MEM_freeN(ba->linked_lines);
     ba->linked_lines = new_array;
   }
   ba->linked_lines[ba->line_count] = edge;
@@ -3244,13 +3252,13 @@ static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
   double *G0 = tri->v[0]->gloc, *G1 = tri->v[1]->gloc, *G2 = tri->v[2]->gloc;
 
   /* If this is not the smallest subdiv bounding area. */
-  if (ba->child) {
-    lineart_triangle_intersect_in_bounding_area(rb, tri, &ba->child[0], th);
-    lineart_triangle_intersect_in_bounding_area(rb, tri, &ba->child[1], th);
-    lineart_triangle_intersect_in_bounding_area(rb, tri, &ba->child[2], th);
-    lineart_triangle_intersect_in_bounding_area(rb, tri, &ba->child[3], th);
-    return;
-  }
+  // if (ba->child[0]) {
+  //  lineart_triangle_intersect_in_bounding_area(rb, tri, ba->child[0], th);
+  //  lineart_triangle_intersect_in_bounding_area(rb, tri, ba->child[1], th);
+  //  lineart_triangle_intersect_in_bounding_area(rb, tri, ba->child[2], th);
+  //  lineart_triangle_intersect_in_bounding_area(rb, tri, ba->child[3], th);
+  //  return;
+  //}
 
   /* If this _is_ the smallest subdiv bounding area, then do the intersections there. */
   for (int i = 0; i < ba->triangle_count; i++) {
@@ -3317,9 +3325,9 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
 static void lineart_end_bounding_area_recursive(LineartBoundingArea *ba)
 {
   BLI_spin_end(&ba->lock);
-  if (ba->child) {
+  if (ba->child[0]) {
     for (int i = 0; i < 4; i++) {
-      lineart_end_bounding_area_recursive(&ba->child[i]);
+      lineart_end_bounding_area_recursive(ba->child[i]);
     }
   }
 }
@@ -3350,12 +3358,14 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
   for (int i = 0; i < rb->bounding_area_initial_count; i++) {
-    lineart_end_bounding_area_recursive(&rb->initial_bounding_areas[i]);
+    lineart_end_bounding_area_recursive(rb->initial_bounding_areas[i]);
   }
 
   if (rb->pending_edges.array) {
     MEM_freeN(rb->pending_edges.array);
   }
+
+  lineart_free_bounding_area_memories(rb);
 
   lineart_mem_destroy(&rb->render_data_pool);
 }
@@ -3551,9 +3561,10 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
 
   rb->bounding_area_initial_count = sp_w * sp_h;
   rb->initial_bounding_areas = lineart_mem_acquire(
-      &rb->render_data_pool, sizeof(LineartBoundingArea) * rb->bounding_area_initial_count);
+      &rb->render_data_pool, sizeof(LineartBoundingArea *) * rb->bounding_area_initial_count);
   for (int i = 0; i < rb->bounding_area_initial_count; i++) {
-    BLI_spin_init(&rb->initial_bounding_areas[i].lock);
+    rb->initial_bounding_areas[i] = MEM_callocN(sizeof(LineartBoundingArea), "initial ba");
+    BLI_spin_init(&rb->initial_bounding_areas[i]->lock);
   }
 
   int i_ba = 0;
@@ -3561,7 +3572,7 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
   /* Initialize tiles. */
   for (row = 0; row < sp_h; row++) {
     for (col = 0; col < sp_w; col++) {
-      ba = &rb->initial_bounding_areas[row * LRT_BA_ROWS + col];
+      ba = rb->initial_bounding_areas[row * LRT_BA_ROWS + col];
 
       /* Set the four direction limits. */
       ba->l = span_w * col - 1.0;
@@ -3575,38 +3586,14 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
       /* Init linked_triangles array. */
       ba->max_triangle_count = LRT_TILE_SPLITTING_TRIANGLE_LIMIT;
       ba->max_line_count = LRT_TILE_EDGE_COUNT_INITIAL;
-      ba->linked_triangles = lineart_mem_acquire(
-          &rb->render_data_pool, sizeof(LineartTriangle *) * ba->max_triangle_count);
-      ba->linked_lines = lineart_mem_acquire(&rb->render_data_pool,
-                                             sizeof(LineartEdge *) * ba->max_line_count);
+      ba->linked_triangles = MEM_callocN(sizeof(LineartTriangle *) * ba->max_triangle_count,
+                                         "ba_linked_triangles");
+      ba->linked_lines = MEM_callocN(sizeof(LineartEdge *) * ba->max_line_count,
+                                     "ba_linked_lines");
 
       /* Spatial lock assignment. */
       BLI_spin_init(&ba->lock);
       i_ba++;
-
-      /* Link adjacent ones. */
-      if (row) {
-        lineart_list_append_pointer_pool(
-            &ba->up,
-            &rb->render_data_pool,
-            &rb->initial_bounding_areas[(row - 1) * LRT_BA_ROWS + col]);
-      }
-      if (col) {
-        lineart_list_append_pointer_pool(&ba->lp,
-                                         &rb->render_data_pool,
-                                         &rb->initial_bounding_areas[row * LRT_BA_ROWS + col - 1]);
-      }
-      if (row != sp_h - 1) {
-        lineart_list_append_pointer_pool(
-            &ba->bp,
-            &rb->render_data_pool,
-            &rb->initial_bounding_areas[(row + 1) * LRT_BA_ROWS + col]);
-      }
-      if (col != sp_w - 1) {
-        lineart_list_append_pointer_pool(&ba->rp,
-                                         &rb->render_data_pool,
-                                         &rb->initial_bounding_areas[row * LRT_BA_ROWS + col + 1]);
-      }
     }
   }
 }
@@ -3616,19 +3603,19 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
  */
 static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartBoundingArea *root)
 {
-  LineartBoundingArea *ba = root->child, *tba;
+  LineartBoundingArea **ba = root->child, *tba;
   LinkData *lip2, *next_lip;
   LineartStaticMemPool *mph = &rb->render_data_pool;
 
   /* Inter-connection with newly created 4 child bounding areas. */
-  lineart_list_append_pointer_pool(&ba[1].rp, mph, &ba[0]);
-  lineart_list_append_pointer_pool(&ba[0].lp, mph, &ba[1]);
-  lineart_list_append_pointer_pool(&ba[1].bp, mph, &ba[2]);
-  lineart_list_append_pointer_pool(&ba[2].up, mph, &ba[1]);
-  lineart_list_append_pointer_pool(&ba[2].rp, mph, &ba[3]);
-  lineart_list_append_pointer_pool(&ba[3].lp, mph, &ba[2]);
-  lineart_list_append_pointer_pool(&ba[3].up, mph, &ba[0]);
-  lineart_list_append_pointer_pool(&ba[0].bp, mph, &ba[3]);
+  lineart_list_append_pointer_pool(&ba[1]->rp, mph, ba[0]);
+  lineart_list_append_pointer_pool(&ba[0]->lp, mph, ba[1]);
+  lineart_list_append_pointer_pool(&ba[1]->bp, mph, ba[2]);
+  lineart_list_append_pointer_pool(&ba[2]->up, mph, ba[1]);
+  lineart_list_append_pointer_pool(&ba[2]->rp, mph, ba[3]);
+  lineart_list_append_pointer_pool(&ba[3]->lp, mph, ba[2]);
+  lineart_list_append_pointer_pool(&ba[3]->up, mph, ba[0]);
+  lineart_list_append_pointer_pool(&ba[0]->bp, mph, ba[3]);
 
   /* Connect 4 child bounding areas to other areas that are
    * adjacent to their original parents. */
@@ -3641,46 +3628,46 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
     /* if this neighbor is adjacent to
      * the two new areas on the left side of the parent,
      * then add them to the adjacent list as well. */
-    if (ba[1].u > tba->b && ba[1].b < tba->u) {
-      lineart_list_append_pointer_pool(&ba[1].lp, mph, tba);
-      lineart_list_append_pointer_pool(&tba->rp, mph, &ba[1]);
+    if (ba[1]->u > tba->b && ba[1]->b < tba->u) {
+      lineart_list_append_pointer_pool(&ba[1]->lp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->rp, mph, ba[1]);
     }
-    if (ba[2].u > tba->b && ba[2].b < tba->u) {
-      lineart_list_append_pointer_pool(&ba[2].lp, mph, tba);
-      lineart_list_append_pointer_pool(&tba->rp, mph, &ba[2]);
+    if (ba[2]->u > tba->b && ba[2]->b < tba->u) {
+      lineart_list_append_pointer_pool(&ba[2]->lp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->rp, mph, ba[2]);
     }
   }
   LISTBASE_FOREACH (LinkData *, lip, &root->rp) {
     tba = lip->data;
-    if (ba[0].u > tba->b && ba[0].b < tba->u) {
-      lineart_list_append_pointer_pool(&ba[0].rp, mph, tba);
-      lineart_list_append_pointer_pool(&tba->lp, mph, &ba[0]);
+    if (ba[0]->u > tba->b && ba[0]->b < tba->u) {
+      lineart_list_append_pointer_pool(&ba[0]->rp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->lp, mph, ba[0]);
     }
-    if (ba[3].u > tba->b && ba[3].b < tba->u) {
-      lineart_list_append_pointer_pool(&ba[3].rp, mph, tba);
-      lineart_list_append_pointer_pool(&tba->lp, mph, &ba[3]);
+    if (ba[3]->u > tba->b && ba[3]->b < tba->u) {
+      lineart_list_append_pointer_pool(&ba[3]->rp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->lp, mph, ba[3]);
     }
   }
   LISTBASE_FOREACH (LinkData *, lip, &root->up) {
     tba = lip->data;
-    if (ba[0].r > tba->l && ba[0].l < tba->r) {
-      lineart_list_append_pointer_pool(&ba[0].up, mph, tba);
-      lineart_list_append_pointer_pool(&tba->bp, mph, &ba[0]);
+    if (ba[0]->r > tba->l && ba[0]->l < tba->r) {
+      lineart_list_append_pointer_pool(&ba[0]->up, mph, tba);
+      lineart_list_append_pointer_pool(&tba->bp, mph, ba[0]);
     }
-    if (ba[1].r > tba->l && ba[1].l < tba->r) {
-      lineart_list_append_pointer_pool(&ba[1].up, mph, tba);
-      lineart_list_append_pointer_pool(&tba->bp, mph, &ba[1]);
+    if (ba[1]->r > tba->l && ba[1]->l < tba->r) {
+      lineart_list_append_pointer_pool(&ba[1]->up, mph, tba);
+      lineart_list_append_pointer_pool(&tba->bp, mph, ba[1]);
     }
   }
   LISTBASE_FOREACH (LinkData *, lip, &root->bp) {
     tba = lip->data;
-    if (ba[2].r > tba->l && ba[2].l < tba->r) {
-      lineart_list_append_pointer_pool(&ba[2].bp, mph, tba);
-      lineart_list_append_pointer_pool(&tba->up, mph, &ba[2]);
+    if (ba[2]->r > tba->l && ba[2]->l < tba->r) {
+      lineart_list_append_pointer_pool(&ba[2]->bp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->up, mph, ba[2]);
     }
-    if (ba[3].r > tba->l && ba[3].l < tba->r) {
-      lineart_list_append_pointer_pool(&ba[3].bp, mph, tba);
-      lineart_list_append_pointer_pool(&tba->up, mph, &ba[3]);
+    if (ba[3]->r > tba->l && ba[3]->l < tba->r) {
+      lineart_list_append_pointer_pool(&ba[3]->bp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->up, mph, ba[3]);
     }
   }
 
@@ -3692,11 +3679,11 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
       tba = lip2->data;
       if (tba == root) {
         lineart_list_remove_pointer_item_no_free(&((LineartBoundingArea *)lip->data)->rp, lip2);
-        if (ba[1].u > tba->b && ba[1].b < tba->u) {
-          lineart_list_append_pointer_pool(&tba->rp, mph, &ba[1]);
+        if (ba[1]->u > tba->b && ba[1]->b < tba->u) {
+          lineart_list_append_pointer_pool(&tba->rp, mph, ba[1]);
         }
-        if (ba[2].u > tba->b && ba[2].b < tba->u) {
-          lineart_list_append_pointer_pool(&tba->rp, mph, &ba[2]);
+        if (ba[2]->u > tba->b && ba[2]->b < tba->u) {
+          lineart_list_append_pointer_pool(&tba->rp, mph, ba[2]);
         }
       }
     }
@@ -3707,11 +3694,11 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
       tba = lip2->data;
       if (tba == root) {
         lineart_list_remove_pointer_item_no_free(&((LineartBoundingArea *)lip->data)->lp, lip2);
-        if (ba[0].u > tba->b && ba[0].b < tba->u) {
-          lineart_list_append_pointer_pool(&tba->lp, mph, &ba[0]);
+        if (ba[0]->u > tba->b && ba[0]->b < tba->u) {
+          lineart_list_append_pointer_pool(&tba->lp, mph, ba[0]);
         }
-        if (ba[3].u > tba->b && ba[3].b < tba->u) {
-          lineart_list_append_pointer_pool(&tba->lp, mph, &ba[3]);
+        if (ba[3]->u > tba->b && ba[3]->b < tba->u) {
+          lineart_list_append_pointer_pool(&tba->lp, mph, ba[3]);
         }
       }
     }
@@ -3722,11 +3709,11 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
       tba = lip2->data;
       if (tba == root) {
         lineart_list_remove_pointer_item_no_free(&((LineartBoundingArea *)lip->data)->bp, lip2);
-        if (ba[0].r > tba->l && ba[0].l < tba->r) {
-          lineart_list_append_pointer_pool(&tba->up, mph, &ba[0]);
+        if (ba[0]->r > tba->l && ba[0]->l < tba->r) {
+          lineart_list_append_pointer_pool(&tba->up, mph, ba[0]);
         }
-        if (ba[1].r > tba->l && ba[1].l < tba->r) {
-          lineart_list_append_pointer_pool(&tba->up, mph, &ba[1]);
+        if (ba[1]->r > tba->l && ba[1]->l < tba->r) {
+          lineart_list_append_pointer_pool(&tba->up, mph, ba[1]);
         }
       }
     }
@@ -3737,11 +3724,11 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
       tba = lip2->data;
       if (tba == root) {
         lineart_list_remove_pointer_item_no_free(&((LineartBoundingArea *)lip->data)->up, lip2);
-        if (ba[2].r > tba->l && ba[2].l < tba->r) {
-          lineart_list_append_pointer_pool(&tba->bp, mph, &ba[2]);
+        if (ba[2]->r > tba->l && ba[2]->l < tba->r) {
+          lineart_list_append_pointer_pool(&tba->bp, mph, ba[2]);
         }
-        if (ba[3].r > tba->l && ba[3].l < tba->r) {
-          lineart_list_append_pointer_pool(&tba->bp, mph, &ba[3]);
+        if (ba[3]->r > tba->l && ba[3]->l < tba->r) {
+          lineart_list_append_pointer_pool(&tba->bp, mph, ba[3]);
         }
       }
     }
@@ -3757,10 +3744,10 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
 static void lineart_bounding_areas_connect_recursive(LineartRenderBuffer *rb,
                                                      LineartBoundingArea *root)
 {
-  if (root->child) {
+  if (root->child[0]) {
     lineart_bounding_areas_connect_new(rb, root);
     for (int i = 0; i < 4; i++) {
-      lineart_bounding_areas_connect_recursive(rb, &root->child[i]);
+      lineart_bounding_areas_connect_recursive(rb, root->child[i]);
     }
   }
 }
@@ -3768,8 +3755,37 @@ static void lineart_bounding_areas_connect_recursive(LineartRenderBuffer *rb,
 static void lineart_main_bounding_areas_connect_post(LineartRenderBuffer *rb)
 {
   int total_tile_initial = rb->tile_count_x * rb->tile_count_y;
+
+  for (int row = 0; row < rb->tile_count_y; row++) {
+    for (int col = 0; col < rb->tile_count_x; col++) {
+      LineartBoundingArea *ba = rb->initial_bounding_areas[row * LRT_BA_ROWS + col];
+      /* Link adjacent ones. */
+      if (row) {
+        lineart_list_append_pointer_pool(
+            &ba->up,
+            &rb->render_data_pool,
+            rb->initial_bounding_areas[(row - 1) * LRT_BA_ROWS + col]);
+      }
+      if (col) {
+        lineart_list_append_pointer_pool(&ba->lp,
+                                         &rb->render_data_pool,
+                                         rb->initial_bounding_areas[row * LRT_BA_ROWS + col - 1]);
+      }
+      if (row != LRT_BA_ROWS - 1) {
+        lineart_list_append_pointer_pool(
+            &ba->bp,
+            &rb->render_data_pool,
+            rb->initial_bounding_areas[(row + 1) * LRT_BA_ROWS + col]);
+      }
+      if (col != LRT_BA_ROWS - 1) {
+        lineart_list_append_pointer_pool(&ba->rp,
+                                         &rb->render_data_pool,
+                                         rb->initial_bounding_areas[row * LRT_BA_ROWS + col + 1]);
+      }
+    }
+  }
   for (int i = 0; i < total_tile_initial; i++) {
-    lineart_bounding_areas_connect_recursive(rb, &rb->initial_bounding_areas[i]);
+    lineart_bounding_areas_connect_recursive(rb, rb->initial_bounding_areas[i]);
   }
 }
 
@@ -3780,77 +3796,80 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
                                         LineartBoundingArea *root,
                                         int recursive_level)
 {
-  LineartBoundingArea *ba = lineart_mem_acquire_thread(&rb->render_data_pool,
-                                                       sizeof(LineartBoundingArea) * 4);
+  for (int i = 0; i < 4; i++) {
+    root->child[i] = MEM_callocN(sizeof(LineartBoundingArea), "split bounding area");
+  }
   LineartTriangle *tri;
+  LineartBoundingArea **ba = root->child;
 
-  ba[0].l = root->cx;
-  ba[0].r = root->r;
-  ba[0].u = root->u;
-  ba[0].b = root->cy;
-  ba[0].cx = (ba[0].l + ba[0].r) / 2;
-  ba[0].cy = (ba[0].u + ba[0].b) / 2;
+  ba[0]->l = root->cx;
+  ba[0]->r = root->r;
+  ba[0]->u = root->u;
+  ba[0]->b = root->cy;
+  ba[0]->cx = (ba[0]->l + ba[0]->r) / 2;
+  ba[0]->cy = (ba[0]->u + ba[0]->b) / 2;
 
-  ba[1].l = root->l;
-  ba[1].r = root->cx;
-  ba[1].u = root->u;
-  ba[1].b = root->cy;
-  ba[1].cx = (ba[1].l + ba[1].r) / 2;
-  ba[1].cy = (ba[1].u + ba[1].b) / 2;
+  ba[1]->l = root->l;
+  ba[1]->r = root->cx;
+  ba[1]->u = root->u;
+  ba[1]->b = root->cy;
+  ba[1]->cx = (ba[1]->l + ba[1]->r) / 2;
+  ba[1]->cy = (ba[1]->u + ba[1]->b) / 2;
 
-  ba[2].l = root->l;
-  ba[2].r = root->cx;
-  ba[2].u = root->cy;
-  ba[2].b = root->b;
-  ba[2].cx = (ba[2].l + ba[2].r) / 2;
-  ba[2].cy = (ba[2].u + ba[2].b) / 2;
+  ba[2]->l = root->l;
+  ba[2]->r = root->cx;
+  ba[2]->u = root->cy;
+  ba[2]->b = root->b;
+  ba[2]->cx = (ba[2]->l + ba[2]->r) / 2;
+  ba[2]->cy = (ba[2]->u + ba[2]->b) / 2;
 
-  ba[3].l = root->cx;
-  ba[3].r = root->r;
-  ba[3].u = root->cy;
-  ba[3].b = root->b;
-  ba[3].cx = (ba[3].l + ba[3].r) / 2;
-  ba[3].cy = (ba[3].u + ba[3].b) / 2;
-
-  root->child = ba;
+  ba[3]->l = root->cx;
+  ba[3]->r = root->r;
+  ba[3]->u = root->cy;
+  ba[3]->b = root->b;
+  ba[3]->cx = (ba[3]->l + ba[3]->r) / 2;
+  ba[3]->cy = (ba[3]->u + ba[3]->b) / 2;
 
   /* Do this in post add_triangle() now to avoid cross thread accessing. */
   /* lineart_bounding_areas_connect_new(rb, root); */
 
   /* Init linked_triangles array and lock reference. */
   for (int i = 0; i < 4; i++) {
-    ba[i].max_triangle_count = LRT_TILE_SPLITTING_TRIANGLE_LIMIT;
-    ba[i].max_line_count = LRT_TILE_EDGE_COUNT_INITIAL;
-    ba[i].linked_triangles = lineart_mem_acquire_thread(
-        &rb->render_data_pool, sizeof(LineartTriangle *) * LRT_TILE_SPLITTING_TRIANGLE_LIMIT);
-    ba[i].linked_lines = lineart_mem_acquire_thread(
-        &rb->render_data_pool, sizeof(LineartEdge *) * LRT_TILE_EDGE_COUNT_INITIAL);
-    BLI_spin_init(&ba[i].lock);
+    ba[i]->max_triangle_count = LRT_TILE_SPLITTING_TRIANGLE_LIMIT;
+    ba[i]->max_line_count = LRT_TILE_EDGE_COUNT_INITIAL;
+    ba[i]->linked_triangles = MEM_callocN(sizeof(LineartTriangle *) * ba[i]->max_triangle_count,
+                                          "ba_linked_triangles");
+    ba[i]->linked_lines = MEM_callocN(sizeof(LineartEdge *) * ba[i]->max_line_count,
+                                      "ba_linked_lines");
+    BLI_spin_init(&ba[i]->lock);
   }
 
   for (int i = 0; i < root->triangle_count; i++) {
-    tri = root->linked_triangles[i];
-    LineartBoundingArea *cba = root->child;
+    do {
+      tri = root->linked_triangles[i];
+      // tri = (LineartTriangle *)atomic_fetch_and_add_int64(&root->linked_triangles[i], 0);
+      /* Need to wait for worker threads to fill in the last few triangles. */
+    } while (UNLIKELY(tri == NULL));
     double b[4];
     b[0] = MIN3(tri->v[0]->fbcoord[0], tri->v[1]->fbcoord[0], tri->v[2]->fbcoord[0]);
     b[1] = MAX3(tri->v[0]->fbcoord[0], tri->v[1]->fbcoord[0], tri->v[2]->fbcoord[0]);
     b[2] = MAX3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
     b[3] = MIN3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
-    if (LRT_BOUND_AREA_CROSSES(b, &cba[0].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &cba[0], tri, b, 0, recursive_level + 1, false, false, NULL);
+    if (LRT_BOUND_AREA_CROSSES(b, &ba[0]->l)) {
+      lineart_bounding_area_link_triangle_cas(
+          rb, &ba[0], tri, b, 0, recursive_level + 1, false, NULL);
     }
-    if (LRT_BOUND_AREA_CROSSES(b, &cba[1].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &cba[1], tri, b, 0, recursive_level + 1, false, false, NULL);
+    if (LRT_BOUND_AREA_CROSSES(b, &ba[1]->l)) {
+      lineart_bounding_area_link_triangle_cas(
+          rb, &ba[1], tri, b, 0, recursive_level + 1, false, NULL);
     }
-    if (LRT_BOUND_AREA_CROSSES(b, &cba[2].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &cba[2], tri, b, 0, recursive_level + 1, false, false, NULL);
+    if (LRT_BOUND_AREA_CROSSES(b, &ba[2]->l)) {
+      lineart_bounding_area_link_triangle_cas(
+          rb, &ba[2], tri, b, 0, recursive_level + 1, false, NULL);
     }
-    if (LRT_BOUND_AREA_CROSSES(b, &cba[3].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &cba[3], tri, b, 0, recursive_level + 1, false, false, NULL);
+    if (LRT_BOUND_AREA_CROSSES(b, &ba[3]->l)) {
+      lineart_bounding_area_link_triangle_cas(
+          rb, &ba[3], tri, b, 0, recursive_level + 1, false, NULL);
     }
   }
 }
@@ -3957,8 +3976,8 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
     BLI_spin_lock(&root_ba->lock);
   }
 
-  if (root_ba->child == NULL) {
-    lineart_bounding_area_triangle_add(rb, root_ba, tri);
+  if (root_ba->child[0] == NULL) {
+    // lineart_bounding_area_triangle_add(rb, root_ba, tri);
     /* If splitting doesn't improve triangle separation, then shouldn't allow splitting anymore.
      * Here we use recursive limit. This is especially useful in orthographic render,
      * where a lot of faces could easily line up perfectly in image space,
@@ -3975,10 +3994,7 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
     }
   }
   else {
-    if (do_lock) {
-      BLI_spin_unlock(&root_ba->lock);
-    }
-    LineartBoundingArea *ba = root_ba->child;
+    LineartBoundingArea **ba = root_ba->child;
     double *B1 = LRUB;
     double b[4];
     if (!LRUB) {
@@ -3988,21 +4004,149 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
       b[3] = MIN3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
       B1 = b;
     }
-    if (LRT_BOUND_AREA_CROSSES(B1, &ba[0].l)) {
+    if (LRT_BOUND_AREA_CROSSES(B1, &ba[0]->l)) {
       lineart_bounding_area_link_triangle(
-          rb, &ba[0], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
+          rb, ba[0], tri, B1, recursive, recursive_level + 1, do_intersection, false, th);
     }
-    if (LRT_BOUND_AREA_CROSSES(B1, &ba[1].l)) {
+    if (LRT_BOUND_AREA_CROSSES(B1, &ba[1]->l)) {
       lineart_bounding_area_link_triangle(
-          rb, &ba[1], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
+          rb, ba[1], tri, B1, recursive, recursive_level + 1, do_intersection, false, th);
     }
-    if (LRT_BOUND_AREA_CROSSES(B1, &ba[2].l)) {
+    if (LRT_BOUND_AREA_CROSSES(B1, &ba[2]->l)) {
       lineart_bounding_area_link_triangle(
-          rb, &ba[2], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
+          rb, ba[2], tri, B1, recursive, recursive_level + 1, do_intersection, false, th);
     }
-    if (LRT_BOUND_AREA_CROSSES(B1, &ba[3].l)) {
+    if (LRT_BOUND_AREA_CROSSES(B1, &ba[3]->l)) {
       lineart_bounding_area_link_triangle(
-          rb, &ba[3], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
+          rb, ba[3], tri, B1, recursive, recursive_level + 1, do_intersection, false, th);
+    }
+  }
+}
+
+__attribute__((optimize("O0"))) static void lineart_bounding_area_link_triangle_cas(
+    LineartRenderBuffer *rb,
+    LineartBoundingArea **root_ba,
+    LineartTriangle *tri,
+    double *LRUB,
+    int recursive,
+    int recursive_level,
+    bool do_intersection,
+    struct LineartIsecThread *th)
+{
+  if (!lineart_bounding_area_triangle_intersect(rb, tri, *root_ba)) {
+    return;
+  }
+
+  LineartBoundingArea *ba_copied = th ? NULL : *root_ba;
+  bool go_into_child = false;
+  int last_isec_index = th ? th->current : 0;
+  LineartBoundingArea *old_ba = (*root_ba);
+
+  if (old_ba->child[0]) {
+    /* Wait for splitting thread to fully initialize child tiles. */
+    BLI_spin_lock(&old_ba->lock);
+    BLI_spin_unlock(&old_ba->lock);
+    double *B1 = LRUB;
+    double b[4];
+    if (!LRUB) {
+      b[0] = MIN3(tri->v[0]->fbcoord[0], tri->v[1]->fbcoord[0], tri->v[2]->fbcoord[0]);
+      b[1] = MAX3(tri->v[0]->fbcoord[0], tri->v[1]->fbcoord[0], tri->v[2]->fbcoord[0]);
+      b[2] = MAX3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
+      b[3] = MIN3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
+      B1 = b;
+    }
+    /* continue adding into the child */
+    for (int iba = 0; iba < 4; iba++) {
+      if (LRT_BOUND_AREA_CROSSES(B1, &old_ba->child[iba]->l)) {
+        lineart_bounding_area_link_triangle_cas(
+            rb, &old_ba->child[iba], tri, B1, recursive, recursive_level + 1, do_intersection, th);
+      }
+    }
+    return;
+  }
+
+  // if (th) {
+
+  /* Occupying tile for adding triangles, increase user count. */
+  // atomic_add_and_fetch_uint32(&old_ba->user_count, 1);
+  while (1) {
+    uint32_t old_tri_index = old_ba->triangle_count;
+    uint32_t new_tri_index = old_tri_index + 1;
+    uint32_t max_triangles = old_ba->max_triangle_count;
+    if (old_tri_index < max_triangles) {
+      uint32_t success_old_index = atomic_cas_uint32(
+          &old_ba->triangle_count, old_tri_index, new_tri_index);
+      if (success_old_index != old_tri_index) {
+        /* Too bad, other threads grabbed this index, we retry. */
+        continue;
+      }
+      /* Successfully grabbed a viable index to insert the triangle into.
+       * Insert into [old_tri_index] for correct array offset starting from [0]. */
+      old_ba->linked_triangles[old_tri_index] = tri;
+      /* Not occupying tile for adding triangles, reduce user count. */
+      // atomic_sub_and_fetch_uint32(&old_ba->user_count, 1);
+      break;
+    }
+    else { /* We need to wait for either splitting or array extension to be done. */
+      /* Not occupying tile for adding triangles, reduce user count. */
+      // atomic_sub_and_fetch_uint32(&old_ba->user_count, 1);
+
+      /* Splitting/extending can only be operated by one thread. */
+      BLI_spin_lock(&old_ba->lock);
+
+      if (recursive_level < rb->tile_recursive_level) {
+        if (!old_ba->child[0]) {
+          /* old_ba->child[0]==NULL, means we are the thread that's doing the splitting. */
+          lineart_bounding_area_split(rb, old_ba, recursive_level);
+        } /* Otherwise other thread has completed the splitting process. */
+      }
+      else {
+        if (max_triangles == old_ba->max_triangle_count) {
+          /* Means we are the thread that's doing the extension. */
+          lineart_bounding_area_triangle_reallocate(old_ba);
+        } /* Otherwise other thread has completed the extending the array. */
+      }
+
+      /* Job done, allow other threads to add into new tile. */
+      BLI_spin_unlock(&old_ba->lock);
+
+      /* Of course we still have our own triangle needs to be added. */
+      lineart_bounding_area_link_triangle_cas(
+          rb, root_ba, tri, LRUB, recursive, recursive_level, do_intersection, th);
+
+      break;
+    }
+  }
+  //}
+
+  // printf("T[%0x] Doing tri %0x\n", th, tri);
+}
+
+static void lineart_free_bounding_area_memory(LineartBoundingArea *ba,
+                                              bool recursive,
+                                              bool free_ba)
+{
+  if (ba->linked_lines) {
+    MEM_freeN(ba->linked_lines);
+  }
+  if (ba->linked_triangles) {
+    MEM_freeN(ba->linked_triangles);
+  }
+  if (recursive && ba->child[0]) {
+    for (int i = 0; i < 4; i++) {
+      lineart_free_bounding_area_memory(ba->child[i], recursive, free_ba);
+    }
+  }
+  if (free_ba) {
+    MEM_freeN(ba);
+  }
+}
+static void lineart_free_bounding_area_memories(LineartRenderBuffer *rb)
+{
+  for (int i = 0; i < rb->tile_count_x; i++) {
+    for (int j = 0; j < rb->tile_count_y; j++) {
+      lineart_free_bounding_area_memory(
+          rb->initial_bounding_areas[i * rb->tile_count_x + j], true, true);
     }
   }
 }
@@ -4011,25 +4155,25 @@ static void lineart_bounding_area_link_edge(LineartRenderBuffer *rb,
                                             LineartBoundingArea *root_ba,
                                             LineartEdge *e)
 {
-  if (root_ba->child == NULL) {
+  if (root_ba->child[0] == NULL) {
     lineart_bounding_area_line_add(rb, root_ba, e);
   }
   else {
     if (lineart_bounding_area_edge_intersect(
-            rb, e->v1->fbcoord, e->v2->fbcoord, &root_ba->child[0])) {
-      lineart_bounding_area_link_edge(rb, &root_ba->child[0], e);
+            rb, e->v1->fbcoord, e->v2->fbcoord, root_ba->child[0])) {
+      lineart_bounding_area_link_edge(rb, root_ba->child[0], e);
     }
     if (lineart_bounding_area_edge_intersect(
-            rb, e->v1->fbcoord, e->v2->fbcoord, &root_ba->child[1])) {
-      lineart_bounding_area_link_edge(rb, &root_ba->child[1], e);
+            rb, e->v1->fbcoord, e->v2->fbcoord, root_ba->child[1])) {
+      lineart_bounding_area_link_edge(rb, root_ba->child[1], e);
     }
     if (lineart_bounding_area_edge_intersect(
-            rb, e->v1->fbcoord, e->v2->fbcoord, &root_ba->child[2])) {
-      lineart_bounding_area_link_edge(rb, &root_ba->child[2], e);
+            rb, e->v1->fbcoord, e->v2->fbcoord, root_ba->child[2])) {
+      lineart_bounding_area_link_edge(rb, root_ba->child[2], e);
     }
     if (lineart_bounding_area_edge_intersect(
-            rb, e->v1->fbcoord, e->v2->fbcoord, &root_ba->child[3])) {
-      lineart_bounding_area_link_edge(rb, &root_ba->child[3], e);
+            rb, e->v1->fbcoord, e->v2->fbcoord, root_ba->child[3])) {
+      lineart_bounding_area_link_edge(rb, root_ba->child[3], e);
     }
   }
 }
@@ -4046,7 +4190,7 @@ static void lineart_main_link_lines(LineartRenderBuffer *rb)
       for (row = r1; row != r2 + 1; row++) {
         for (col = c1; col != c2 + 1; col++) {
           lineart_bounding_area_link_edge(
-              rb, &rb->initial_bounding_areas[row * LRT_BA_ROWS + col], e);
+              rb, rb->initial_bounding_areas[row * LRT_BA_ROWS + col], e);
         }
       }
     }
@@ -4174,7 +4318,7 @@ LineartBoundingArea *MOD_lineart_get_parent_bounding_area(LineartRenderBuffer *r
     row = 0;
   }
 
-  return &rb->initial_bounding_areas[row * LRT_BA_ROWS + col];
+  return rb->initial_bounding_areas[row * LRT_BA_ROWS + col];
 }
 
 static LineartBoundingArea *lineart_get_bounding_area(LineartRenderBuffer *rb, double x, double y)
@@ -4196,22 +4340,22 @@ static LineartBoundingArea *lineart_get_bounding_area(LineartRenderBuffer *rb, d
     c = rb->tile_count_x - 1;
   }
 
-  iba = &rb->initial_bounding_areas[r * LRT_BA_ROWS + c];
-  while (iba->child) {
+  iba = rb->initial_bounding_areas[r * LRT_BA_ROWS + c];
+  while (iba->child[0]) {
     if (x > iba->cx) {
       if (y > iba->cy) {
-        iba = &iba->child[0];
+        iba = iba->child[0];
       }
       else {
-        iba = &iba->child[3];
+        iba = iba->child[3];
       }
     }
     else {
       if (y > iba->cy) {
-        iba = &iba->child[1];
+        iba = iba->child[1];
       }
       else {
-        iba = &iba->child[2];
+        iba = iba->child[2];
       }
     }
   }
@@ -4245,15 +4389,15 @@ static void lineart_add_triangles_worker(TaskPool *__restrict UNUSED(pool), Line
       if (lineart_get_triangle_bounding_areas(rb, tri, &y1, &y2, &x1, &x2)) {
         for (co = x1; co <= x2; co++) {
           for (r = y1; r <= y2; r++) {
-            lineart_bounding_area_link_triangle(rb,
-                                                &rb->initial_bounding_areas[r * LRT_BA_ROWS + co],
-                                                tri,
-                                                0,
-                                                1,
-                                                0,
-                                                (!(tri->flags & LRT_TRIANGLE_NO_INTERSECTION)),
-                                                true,
-                                                th);
+            lineart_bounding_area_link_triangle_cas(
+                rb,
+                &rb->initial_bounding_areas[r * LRT_BA_ROWS + co],
+                tri,
+                0,
+                1,
+                0,
+                (!(tri->flags & LRT_TRIANGLE_NO_INTERSECTION)),
+                th);
           }
         }
       } /* Else throw away. */
