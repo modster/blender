@@ -235,6 +235,7 @@ set(SRC
   intern/outliner_treehash.c
   intern/packedFile.c
   intern/paint.c
+  intern/paint_canvas.cc
   intern/paint_toolslots.c
   intern/particle.c
   intern/particle_child.c
@@ -243,6 +244,7 @@ set(SRC
   intern/pbvh.cc
   intern/pbvh.c
   intern/pbvh_bmesh.c
+  intern/pbvh_pixels.cc
   intern/pointcache.c
   intern/pointcloud.cc
   intern/preferences.c
