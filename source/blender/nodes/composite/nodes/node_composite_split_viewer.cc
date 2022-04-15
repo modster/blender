@@ -102,8 +102,7 @@ class ViewerOperation : public NodeOperation {
   /* The operation domain have the same dimensions of the viewport without any transformations. */
   Domain compute_domain() override
   {
-    GPUTexture *viewport_texture = context().get_viewport_texture();
-    return Domain(int2(GPU_texture_width(viewport_texture), GPU_texture_height(viewport_texture)));
+    return Domain(context().get_viewport_size());
   }
 
   GPUShader *get_split_viewer_shader()

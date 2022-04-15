@@ -169,6 +169,7 @@ void Operation::evaluate_input_processors()
   /* The input processors are not added yet, so add and evaluate the input processors. */
   if (!input_processors_added_) {
     add_and_evaluate_input_processors();
+    input_processors_added_ = true;
     return;
   }
 

@@ -61,7 +61,7 @@ class CompositeOperation : public NodeOperation {
     GPUTexture *viewport_texture = context().get_viewport_texture();
 
     /* If the input image is a texture, copy the input texture to the viewport texture. */
-    if (get_input("Image").is_texture()) {
+    if (input_image.is_texture()) {
       /* Make sure any prior writes to the texture are reflected before copying it. */
       GPU_memory_barrier(GPU_BARRIER_TEXTURE_UPDATE);
 
@@ -77,8 +77,7 @@ class CompositeOperation : public NodeOperation {
   /* The operation domain have the same dimensions of the viewport without any transformations. */
   Domain compute_domain() override
   {
-    GPUTexture *viewport_texture = context().get_viewport_texture();
-    return Domain(int2(GPU_texture_width(viewport_texture), GPU_texture_height(viewport_texture)));
+    return Domain(context().get_viewport_size());
   }
 };
 

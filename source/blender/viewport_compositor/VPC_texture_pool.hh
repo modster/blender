@@ -17,14 +17,17 @@ namespace blender::viewport_compositor {
  * Texture Pool Key.
  */
 
-/* A key structure used to identify a texture specification in a texture pool. Defines a hash and
- * an equality operator for use in a hash map. */
+/* A key used to identify a texture specification in a texture pool. Defines a hash and an equality
+ * operator for use in a hash map. */
 class TexturePoolKey {
  public:
   int2 size;
   eGPUTextureFormat format;
 
+  /* Construct a key from the given texture size and format. */
   TexturePoolKey(int2 size, eGPUTextureFormat format);
+
+  /* Construct a key from the size and format of the given texture. */
   TexturePoolKey(const GPUTexture *texture);
 
   uint64_t hash() const;
@@ -34,12 +37,12 @@ class TexturePoolKey {
  * Texture Pool.
  */
 
-/* A pool of textures that can be used to allocate textures and reused transparently throughout the
- * evaluation of the compositor. This texture pool only pools textures throughout a single
- * evaluation of the compositor and will reset after the evaluation without freeing any textures.
- * Cross-evaluation pooling and freeing of unused textures is the responsibility of the back-end
- * texture pool used by the allocate_texture method. In the case of the viewport compositor engine,
- * this would be the global DRWTexturePool of the draw manager. */
+/* A pool of textures that can be used to allocate textures that can be reused transparently
+ * throughout the evaluation of the compositor. This texture pool only pools textures throughout a
+ * single evaluation of the compositor and will reset after the evaluation without freeing any
+ * textures. Cross-evaluation pooling and freeing of unused textures is the responsibility of the
+ * back-end texture pool used by the allocate_texture method. In the case of the viewport
+ * compositor engine, this would be the global DRWTexturePool of the draw manager. */
 class TexturePool {
  private:
   /* The set of textures in the pool that are available to acquire for each distinct texture
@@ -56,7 +59,7 @@ class TexturePool {
   GPUTexture *acquire_color(int2 size);
 
   /* Shorthand for acquire with GPU_RGBA16F format. Identical to acquire_color because vector
-   * textures are and should internally be stored in RGBA textures. */
+   * are stored in RGBA textures because RGB texture have limited support. */
   GPUTexture *acquire_vector(int2 size);
 
   /* Shorthand for acquire with GPU_R16F format. */
@@ -65,6 +68,11 @@ class TexturePool {
   /* Put the texture back into the pool, potentially to be acquired later by another user. Expects
    * the texture to be one that was acquired using the same texture pool. */
   void release(GPUTexture *texture);
+
+  /* Reset the texture pool by clearing all available textures. The textures are not freed. If they
+   * are not needed, they should be freed by the back-end texture pool used by the allocate_texture
+   * method. This should be called after the compositor is done evaluating. */
+  void reset();
 
  private:
   /* Returns a newly allocated texture with the given specification. This method should be

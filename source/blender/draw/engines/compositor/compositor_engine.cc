@@ -5,6 +5,7 @@
 
 #include "BLT_translation.h"
 
+#include "DNA_ID_enums.h"
 #include "DNA_scene_types.h"
 
 #include "DEG_depsgraph_query.h"
@@ -30,18 +31,18 @@ class DRWTexturePool : public TexturePool {
   }
 };
 
-static const Scene *get_context_scene()
-{
-  return DRW_context_state_get()->scene;
-}
-
 class DRWContext : public Context {
  public:
   using Context::Context;
 
   const Scene *get_scene() override
   {
-    return get_context_scene();
+    return DRW_context_state_get()->scene;
+  }
+
+  int2 get_viewport_size() override
+  {
+    return int2(float2(DRW_viewport_size_get()));
   }
 
   GPUTexture *get_viewport_texture() override
@@ -56,59 +57,116 @@ class DRWContext : public Context {
   }
 };
 
-/* It is sufficient to check for the scene node tree because the engine will not be enabled when
- * the viewport shading option is disabled. */
-static bool is_compositor_enabled()
-{
-  const Scene *scene = get_context_scene();
-  if (scene->use_nodes && scene->nodetree) {
-    return true;
-  }
-  return false;
-}
+class Engine {
+ private:
+  DRWTexturePool texture_pool_;
+  DRWContext context_;
+  Evaluator evaluator_;
+  /* Stores the viewport size at the time the last compositor evaluation happened. See the
+   * update_viewport_size method for more information. */
+  int2 viewport_size_;
 
-static void draw()
-{
-  if (!is_compositor_enabled()) {
-    return;
+ public:
+  Engine() : context_(texture_pool_), evaluator_(context_, node_tree())
+  {
   }
 
-  /* Reset default view. */
-  DRW_view_set_active(nullptr);
+  /* Update the viewport size and evaluate the compositor. */
+  void draw()
+  {
+    update_viewport_size();
+    evaluator_.evaluate();
+  }
 
-  DRWTexturePool texture_pool;
-  DRWContext context(texture_pool);
-  const Scene *scene = get_context_scene();
-  Evaluator evaluator(context, *scene->nodetree);
-  evaluator.evaluate();
-}
+  /* If the size of the viewport changed from the last time the compositor was evaluated, update
+   * the viewport size and reset the evaluator. That's because the evaluator compiles the node tree
+   * in a manner that is specifically optimized for the size of the viewport. This should be called
+   * before evaluating the compositor. */
+  void update_viewport_size()
+  {
+    if (viewport_size_ == context_.get_viewport_size()) {
+      return;
+    }
+
+    viewport_size_ = context_.get_viewport_size();
+
+    evaluator_.reset();
+  }
+
+  /* If the compositor node tree changed, reset the evaluator. */
+  void update(const Depsgraph *depsgraph)
+  {
+    if (DEG_id_type_updated(depsgraph, ID_NT)) {
+      evaluator_.reset();
+    }
+  }
+
+  /* Get a reference to the compositor node tree. */
+  static bNodeTree &node_tree()
+  {
+    return *DRW_context_state_get()->scene->nodetree;
+  }
+};
 
 }  // namespace blender::viewport_compositor
 
-static void compositor_draw(void *UNUSED(data))
+using namespace blender::viewport_compositor;
+
+typedef struct CompositorData {
+  DrawEngineType *engine_type;
+  DRWViewportEmptyList *fbl;
+  DRWViewportEmptyList *txl;
+  DRWViewportEmptyList *psl;
+  DRWViewportEmptyList *stl;
+  Engine *instance_data;
+} CompositorData;
+
+static void compositor_engine_init(void *data)
 {
-  blender::viewport_compositor::draw();
+  CompositorData *compositor_data = static_cast<CompositorData *>(data);
+
+  if (!compositor_data->instance_data) {
+    compositor_data->instance_data = new Engine();
+  }
+}
+
+static void compositor_engine_free(void *instance_data)
+{
+  Engine *engine = static_cast<Engine *>(instance_data);
+  delete engine;
+}
+
+static void compositor_engine_draw(void *data)
+{
+  const CompositorData *compositor_data = static_cast<CompositorData *>(data);
+  compositor_data->instance_data->draw();
+}
+
+static void compositor_engine_update(void *data)
+{
+  const CompositorData *compositor_data = static_cast<CompositorData *>(data);
+  compositor_data->instance_data->update(DRW_context_state_get()->depsgraph);
 }
 
 extern "C" {
 
-static const DrawEngineDataSize compositor_data_size = {};
+static const DrawEngineDataSize compositor_data_size = DRW_VIEWPORT_DATA_SIZE(CompositorData);
 
 DrawEngineType draw_engine_compositor_type = {
-    nullptr,
-    nullptr,
-    N_("Compositor"),
-    &compositor_data_size,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    &compositor_draw,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
+    nullptr,                   /* next */
+    nullptr,                   /* prev */
+    N_("Compositor"),          /* idname */
+    &compositor_data_size,     /* vedata_size */
+    &compositor_engine_init,   /* engine_init */
+    nullptr,                   /* engine_free */
+    &compositor_engine_free,   /* instance_free */
+    nullptr,                   /* cache_init */
+    nullptr,                   /* cache_populate */
+    nullptr,                   /* cache_finish */
+    &compositor_engine_draw,   /* draw_scene */
+    &compositor_engine_update, /* view_update */
+    nullptr,                   /* id_update */
+    nullptr,                   /* render_to_image */
+    nullptr,                   /* store_metadata */
 };
 }

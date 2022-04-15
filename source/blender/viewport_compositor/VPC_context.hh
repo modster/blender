@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "BLI_math_vec_types.hh"
+
 #include "DNA_scene_types.h"
 
 #include "GPU_texture.h"
@@ -24,6 +26,9 @@ class Context {
 
   /* Get the active compositing scene. */
   virtual const Scene *get_scene() = 0;
+
+  /* Get the dimensions of the viewport. */
+  virtual int2 get_viewport_size() = 0;
 
   /* Get the texture representing the viewport where the result of the compositor should be
    * written. This should be called by output nodes to get their target texture. */

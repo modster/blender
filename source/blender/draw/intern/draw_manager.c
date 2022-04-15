@@ -1434,6 +1434,27 @@ static void drw_engines_enable_editors(void)
   }
 }
 
+static bool is_compositor_enabled()
+{
+  if (!(DST.draw_ctx.v3d->shading.flag & V3D_SHADING_COMPOSITOR)) {
+    return false;
+  }
+
+  if (!(DST.draw_ctx.v3d->shading.type > OB_MATERIAL)) {
+    return false;
+  }
+
+  if (!DST.draw_ctx.scene->use_nodes) {
+    return false;
+  }
+
+  if (!DST.draw_ctx.scene->nodetree) {
+    return false;
+  }
+
+  return true;
+}
+
 /* Beware: This can go recursive if not handled properly. */
 static void drw_compositor_scenes_render(DRWManager *drw,
                                          Scene *scene_active,
@@ -1456,10 +1477,7 @@ static void drw_compositor_scenes_render(DRWManager *drw,
   int view = GPU_viewport_active_view_get(viewport);
   int prev_flag2 = v3d->flag2;
 
-  const eDrawType drawtype = drw->draw_ctx.v3d->shading.type;
-  const bool use_compositor = ((drw->draw_ctx.v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) &&
-                              (drawtype > OB_MATERIAL) && (scene_active->nodetree != NULL) &&
-                              (scene_active->use_nodes != false);
+  const bool use_compositor = is_compositor_enabled();
 
   if (!use_compositor) {
     /* Still setup the current active view. This way we get correct update without compositor. */
@@ -1581,7 +1599,7 @@ static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
   }
 
   if (!DST.options.is_compositor_scene_render) {
-    if (((v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) && (drawtype > OB_MATERIAL)) {
+    if (is_compositor_enabled()) {
       use_drw_engine(&draw_engine_compositor_type);
     }
 

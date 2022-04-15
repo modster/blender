@@ -27,9 +27,13 @@ Evaluator::Evaluator(Context &context, bNodeTree &node_tree)
 
 void Evaluator::evaluate()
 {
+  /* Reset the texture pool that was potentially populated from a previous evaluation. */
+  context_.texture_pool().reset();
+
   /* The node tree is not compiled yet, so compile and evaluate the node tree. */
   if (!is_compiled_) {
     compile_and_evaluate();
+    is_compiled_ = true;
     return;
   }
 
@@ -80,9 +84,6 @@ void Evaluator::compile_and_evaluate()
       compile_and_evaluate_node(node, compile_state);
     }
   }
-
-  /* Mark the node tree as compiled. */
-  is_compiled_ = true;
 }
 
 void Evaluator::compile_and_evaluate_node(DNode node, CompileState &compile_state)

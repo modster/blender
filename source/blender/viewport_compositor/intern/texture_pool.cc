@@ -61,9 +61,9 @@ GPUTexture *TexturePool::acquire_color(int2 size)
   return acquire(size, GPU_RGBA16F);
 }
 
-/* Vectors are and should be stored in RGBA textures. */
 GPUTexture *TexturePool::acquire_vector(int2 size)
 {
+  /* Vectors are stored in RGBA textures because RGB textures have limited support. */
   return acquire(size, GPU_RGBA16F);
 }
 
@@ -75,6 +75,11 @@ GPUTexture *TexturePool::acquire_float(int2 size)
 void TexturePool::release(GPUTexture *texture)
 {
   textures_.lookup(TexturePoolKey(texture)).append(texture);
+}
+
+void TexturePool::reset()
+{
+  textures_.clear();
 }
 
 }  // namespace blender::viewport_compositor
