@@ -459,25 +459,25 @@ static LineartBoundingArea *lineart_bounding_area_get_eci_recursive(LineartRende
                                                                     LineartBoundingArea *root,
                                                                     LineartEdgeChainItem *eci)
 {
-  if (root->child == NULL) {
+  if (root->child[0] == NULL) {
     return root;
   }
 
-  LineartBoundingArea *ch = root->child;
+  LineartBoundingArea **ch = root->child;
 #define IN_BOUND(ba, eci) \
-  ba.l <= eci->pos[0] && ba.r >= eci->pos[0] && ba.b <= eci->pos[1] && ba.u >= eci->pos[1]
+  ba->l <= eci->pos[0] && ba->r >= eci->pos[0] && ba->b <= eci->pos[1] && ba->u >= eci->pos[1]
 
   if (IN_BOUND(ch[0], eci)) {
-    return lineart_bounding_area_get_eci_recursive(rb, &ch[0], eci);
+    return lineart_bounding_area_get_eci_recursive(rb, ch[0], eci);
   }
   if (IN_BOUND(ch[1], eci)) {
-    return lineart_bounding_area_get_eci_recursive(rb, &ch[1], eci);
+    return lineart_bounding_area_get_eci_recursive(rb, ch[1], eci);
   }
   if (IN_BOUND(ch[2], eci)) {
-    return lineart_bounding_area_get_eci_recursive(rb, &ch[2], eci);
+    return lineart_bounding_area_get_eci_recursive(rb, ch[2], eci);
   }
   if (IN_BOUND(ch[3], eci)) {
-    return lineart_bounding_area_get_eci_recursive(rb, &ch[3], eci);
+    return lineart_bounding_area_get_eci_recursive(rb, ch[3], eci);
   }
 #undef IN_BOUND
   return NULL;
@@ -507,7 +507,7 @@ static void lineart_bounding_area_link_point_recursive(LineartRenderBuffer *rb,
                                                        LineartEdgeChain *ec,
                                                        LineartEdgeChainItem *eci)
 {
-  if (root->child == NULL) {
+  if (root->child[0] == NULL) {
     LineartChainRegisterEntry *cre = lineart_list_append_pointer_pool_sized(
         &root->linked_chains, &rb->render_data_pool, ec, sizeof(LineartChainRegisterEntry));
 
@@ -518,22 +518,22 @@ static void lineart_bounding_area_link_point_recursive(LineartRenderBuffer *rb,
     }
   }
   else {
-    LineartBoundingArea *ch = root->child;
+    LineartBoundingArea **ch = root->child;
 
 #define IN_BOUND(ba, eci) \
-  ba.l <= eci->pos[0] && ba.r >= eci->pos[0] && ba.b <= eci->pos[1] && ba.u >= eci->pos[1]
+  ba->l <= eci->pos[0] && ba->r >= eci->pos[0] && ba->b <= eci->pos[1] && ba->u >= eci->pos[1]
 
     if (IN_BOUND(ch[0], eci)) {
-      lineart_bounding_area_link_point_recursive(rb, &ch[0], ec, eci);
+      lineart_bounding_area_link_point_recursive(rb, ch[0], ec, eci);
     }
     else if (IN_BOUND(ch[1], eci)) {
-      lineart_bounding_area_link_point_recursive(rb, &ch[1], ec, eci);
+      lineart_bounding_area_link_point_recursive(rb, ch[1], ec, eci);
     }
     else if (IN_BOUND(ch[2], eci)) {
-      lineart_bounding_area_link_point_recursive(rb, &ch[2], ec, eci);
+      lineart_bounding_area_link_point_recursive(rb, ch[2], ec, eci);
     }
     else if (IN_BOUND(ch[3], eci)) {
-      lineart_bounding_area_link_point_recursive(rb, &ch[3], ec, eci);
+      lineart_bounding_area_link_point_recursive(rb, ch[3], ec, eci);
     }
 
 #undef IN_BOUND
