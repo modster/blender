@@ -247,15 +247,18 @@ template<typename ImageBuffer> class PaintingKernel {
   }
 
   float3 init_pixel_pos(const TrianglePaintInput &triangle,
-                        const float3 &barycentric_weights) const
+                        const float2 &barycentric_weights) const
   {
     const int3 &vert_indices = triangle.vert_indices;
     float3 result;
+    const float3 barycentric(barycentric_weights.x,
+                             barycentric_weights.y,
+                             1.0f - barycentric_weights.x - barycentric_weights.y);
     interp_v3_v3v3v3(result,
                      mvert[vert_indices[0]].co,
                      mvert[vert_indices[1]].co,
                      mvert[vert_indices[2]].co,
-                     barycentric_weights);
+                     barycentric);
     return result;
   }
 };

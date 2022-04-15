@@ -25,20 +25,16 @@ struct TrianglePaintInput {
    *
    * Only the first two coordinates are stored. The third should be recalculated
    */
-  float3 delta_barycentric_coord_u;
-  /** Delta barycentric coordinates between 2 neighbouring UV's in the V direction. */
-  float3 delta_barycentric_coord_v;
+  float2 delta_barycentric_coord_u;
 
   /**
    * Initially only the vert indices are known.
    *
-   * delta_barycentric_coord_u/v are initialized in a later stage as it requires image tile
+   * delta_barycentric_coord_u is initialized in a later stage as it requires image tile
    * dimensions.
    */
   TrianglePaintInput(const int3 vert_indices)
-      : vert_indices(vert_indices),
-        delta_barycentric_coord_u(0.0f, 0.0f, 0.0f),
-        delta_barycentric_coord_v(0.0f, 0.0f, 0.0f)
+      : vert_indices(vert_indices), delta_barycentric_coord_u(0.0f, 0.0f)
   {
   }
 };
@@ -90,7 +86,7 @@ struct Triangles {
  */
 struct PackedPixelRow {
   /** Barycentric coordinate of the first pixel. */
-  float3 start_barycentric_coord;
+  float2 start_barycentric_coord;
   /** Image coordinate starting of the first pixel. */
   ushort2 start_image_coordinate;
   /** Number of sequential pixels encoded in this package. */

@@ -29,7 +29,7 @@ constexpr bool USE_WATERTIGHT_CHECK = false;
 /**
  * Calculate the delta of two neighbour uv coordinates in the given image buffer.
  */
-static float3 calc_barycentric_delta(const float2 uvs[3],
+static float2 calc_barycentric_delta(const float2 uvs[3],
                                      const float2 start_uv,
                                      const float2 end_uv)
 {
@@ -38,26 +38,17 @@ static float3 calc_barycentric_delta(const float2 uvs[3],
   barycentric_weights_v2(uvs[0], uvs[1], uvs[2], start_uv, start_barycentric);
   float3 end_barycentric;
   barycentric_weights_v2(uvs[0], uvs[1], uvs[2], end_uv, end_barycentric);
-  return end_barycentric - start_barycentric;
+  float3 barycentric = end_barycentric - start_barycentric;
+  return float2(barycentric.x, barycentric.y);
 }
 
-static float3 calc_barycentric_delta_x(const ImBuf *image_buffer,
+static float2 calc_barycentric_delta_x(const ImBuf *image_buffer,
                                        const float2 uvs[3],
                                        const int x,
                                        const int y)
 {
   const float2 start_uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
   const float2 end_uv(float(x + 1) / image_buffer->x, float(y) / image_buffer->y);
-  return calc_barycentric_delta(uvs, start_uv, end_uv);
-}
-
-static float3 calc_barycentric_delta_y(const ImBuf *image_buffer,
-                                       const float2 uvs[3],
-                                       const int x,
-                                       const int y)
-{
-  const float2 start_uv(float(x) / image_buffer->x, float(y) / image_buffer->y);
-  const float2 end_uv(float(x) / image_buffer->x, float(y + 1) / image_buffer->y);
   return calc_barycentric_delta(uvs, start_uv, end_uv);
 }
 
@@ -86,7 +77,7 @@ static void extract_barycentric_pixels(UDIMTilePixels &tile_data,
       if (!start_detected && is_inside) {
         start_detected = true;
         pixel_row.start_image_coordinate = ushort2(x, y);
-        pixel_row.start_barycentric_coord = barycentric_weights;
+        pixel_row.start_barycentric_coord = float2(barycentric_weights.x, barycentric_weights.y);
       }
       else if (start_detected && !is_inside) {
         break;
@@ -159,7 +150,6 @@ static void do_encode_pixels(void *__restrict userdata,
 
       TrianglePaintInput &triangle = triangles.get_paint_input(triangle_index);
       triangle.delta_barycentric_coord_u = calc_barycentric_delta_x(image_buffer, uvs, minx, miny);
-      triangle.delta_barycentric_coord_v = calc_barycentric_delta_y(image_buffer, uvs, minx, miny);
       extract_barycentric_pixels(
           tile_data, image_buffer, triangle_index, uvs, minx, miny, maxx, maxy);
     }
