@@ -1,0 +1,238 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2022 Blender Foundation. All rights reserved. */
+
+#include "BKE_image.h"
+#include "BKE_image_wrappers.hh"
+#include "BKE_pbvh.h"
+#include "BKE_pbvh_pixels.hh"
+
+#include "IMB_imbuf_types.h"
+
+#include "DNA_mesh_types.h"
+#include "DNA_object_types.h"
+
+#include "BLI_vector.hh"
+
+#include "bmesh.h"
+
+#include "pbvh_intern.h"
+
+using BMLoopPair = std::pair<BMLoop *, BMLoop *>;
+
+namespace blender::bke::pbvh::pixels {
+
+/**
+ * Find loops that are connected in 3d space, but not in uv space. Or loops that don't have any
+ * connection at all.
+ *
+ * TODO better name would be to find loops that need uv seam fixes.
+ */
+Vector<BMLoopPair> find_connected_loops(BMesh *bm, int cd_loop_uv_offset)
+{
+  Vector<BMLoopPair> pairs;
+
+  BMEdge *e;
+  BMIter eiter;
+  BMLoop *l;
+  BMIter liter;
+  BM_ITER_MESH (e, &eiter, bm, BM_EDGES_OF_MESH) {
+    bool first = true;
+    bool connection_found = false;
+    BMLoop *l_first;
+
+    BM_ITER_ELEM (l, &liter, e, BM_LOOPS_OF_EDGE) {
+      if (first) {
+        l_first = l;
+        first = false;
+      }
+      else {
+        connection_found = true;
+        if (!BM_loop_uv_share_edge_check(l_first, l, cd_loop_uv_offset)) {
+          // This is an edge which is connected in 3d space, but not connected in uv space so fixes
+          // are needed.
+
+          pairs.append(BMLoopPair(l_first, l));
+          break;
+        }
+      }
+    }
+    if (!connection_found) {
+      pairs.append(BMLoopPair(l_first, nullptr));
+    }
+  }
+  return pairs;
+}
+
+struct PixelInfo {
+  const static uint32_t IS_EXTRACTED = 1 << 0;
+  const static uint32_t IS_SEAM_FIX = 1 << 1;
+
+  uint32_t node = 0;
+  PixelInfo() = default;
+  PixelInfo(const PixelInfo &other) = default;
+
+  static PixelInfo from_node(int node_index)
+  {
+    PixelInfo result;
+    result.node = node_index << 2 | PixelInfo::IS_EXTRACTED;
+    return result;
+  }
+
+  uint32_t get_node_index() const
+  {
+    return node >> 2;
+  }
+
+  bool is_extracted() const
+  {
+    return (node & PixelInfo::IS_EXTRACTED) != 0;
+  }
+  bool is_seam_fix() const
+  {
+    return (node & PixelInfo::IS_SEAM_FIX) != 0;
+  }
+  bool is_empty_space() const
+  {
+    return !(is_extracted() || is_seam_fix());
+  }
+};
+
+struct Bitmap {
+  image::ImageTileWrapper image_tile;
+  Vector<PixelInfo> bitmap;
+  int2 resolution;
+
+  Bitmap(image::ImageTileWrapper &image_tile, Vector<PixelInfo> bitmap, int2 resolution)
+      : image_tile(image_tile), bitmap(bitmap), resolution(resolution)
+  {
+  }
+};
+
+struct Bitmaps {
+  Vector<Bitmap> bitmaps;
+};
+
+Vector<PixelInfo> create_tile_bitmap(const PBVH &pbvh,
+                                     image::ImageTileWrapper &image_tile,
+                                     ImBuf &image_buffer)
+{
+  Vector<PixelInfo> result(image_buffer.x * image_buffer.y);
+
+  for (int n = 0; n < pbvh.totnode; n++) {
+    PBVHNode *node = &pbvh.nodes[n];
+    if ((node->flag & PBVH_Leaf) == 0) {
+      continue;
+    }
+    NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
+    UDIMTilePixels *tile_node_data = node_data->find_tile_data(image_tile);
+    if (tile_node_data == nullptr) {
+      continue;
+    }
+
+    for (PackedPixelRow &pixel_row : tile_node_data->pixel_rows) {
+      int pixel_offset = pixel_row.start_image_coordinate.y * image_buffer.x +
+                         pixel_row.start_image_coordinate.x;
+      for (int x = 0; x < pixel_row.num_pixels; x++) {
+        result[pixel_offset] = PixelInfo::from_node(n);
+        pixel_offset += 1;
+      }
+    }
+  }
+  return result;
+}
+
+Bitmaps create_tile_bitmap(const PBVH &pbvh, Image &image, ImageUser &image_user)
+{
+  Bitmaps result;
+  ImageUser watertight = image_user;
+  LISTBASE_FOREACH (ImageTile *, tile_data, &image.tiles) {
+    image::ImageTileWrapper image_tile(tile_data);
+    watertight.tile = image_tile.get_tile_number();
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &watertight, nullptr);
+    if (image_buffer == nullptr) {
+      continue;
+    }
+
+    Vector<PixelInfo> bitmap = create_tile_bitmap(pbvh, image_tile, *image_buffer);
+    result.bitmaps.append(Bitmap(image_tile, bitmap, int2(image_buffer->x, image_buffer->y)));
+
+    BKE_image_release_ibuf(&image, image_buffer, nullptr);
+  }
+  return result;
+}
+
+void BKE_pbvh_pixels_rebuild_seams(
+    PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user, int cd_loop_uv_offset)
+{
+  const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(mesh);
+
+  BMeshCreateParams bmesh_create_params{};
+  bmesh_create_params.use_toolflags = true;
+  BMesh *bm = BM_mesh_create(&allocsize, &bmesh_create_params);
+
+  BMeshFromMeshParams from_mesh_params{};
+  from_mesh_params.calc_face_normal = false;
+  from_mesh_params.calc_vert_normal = false;
+  BM_mesh_bm_from_me(bm, mesh, &from_mesh_params);
+
+  // find seams.
+  // for each edge
+  Vector<BMLoopPair> pairs = find_connected_loops(bm, cd_loop_uv_offset);
+  printf("found %lld pairs\n", pairs.size());
+
+  // Make a bitmap per tile indicating pixels that have already been assigned to a PBVHNode.
+  // to we could also loop over each node/tile/packed pixels, but that might take to much time.
+  Bitmaps bitmaps = create_tile_bitmap(*pbvh, *image, *image_user);
+
+  for (BMLoopPair &pair : pairs) {
+    // determine bounding rect in uv space + margin of 1;
+    rctf uvbounds;
+    BLI_rctf_init_minmax(&uvbounds);
+    MLoopUV *luv_1 = static_cast<MLoopUV *>(BM_ELEM_CD_GET_VOID_P(pair.first, cd_loop_uv_offset));
+    MLoopUV *luv_2 = static_cast<MLoopUV *>(
+        BM_ELEM_CD_GET_VOID_P(pair.first->next, cd_loop_uv_offset));
+    BLI_rctf_do_minmax_v(&uvbounds, luv_1->uv);
+    BLI_rctf_do_minmax_v(&uvbounds, luv_2->uv);
+
+    for (Bitmap &bitmap : bitmaps.bitmaps) {
+      rcti uvbounds_i;
+      const int MARGIN = 1;
+      uvbounds_i.xmin = (uvbounds.xmin - bitmap.image_tile.get_tile_x_offset()) *
+                            bitmap.resolution[0] -
+                        MARGIN;
+      uvbounds_i.ymin = (uvbounds.ymin - bitmap.image_tile.get_tile_y_offset()) *
+                            bitmap.resolution[1] -
+                        MARGIN;
+      uvbounds_i.xmax = (uvbounds.xmax - bitmap.image_tile.get_tile_x_offset()) *
+                            bitmap.resolution[0] +
+                        MARGIN;
+      uvbounds_i.ymax = (uvbounds.ymax - bitmap.image_tile.get_tile_y_offset()) *
+                            bitmap.resolution[1] +
+                        MARGIN;
+
+      if (pair.second != nullptr) {
+        // TODO..
+        continue;
+      }
+      else {
+        for (int v = uvbounds_i.ymin; v < uvbounds_i.ymax; v++) {
+          for (int u = uvbounds_i.xmin; u < uvbounds_i.xmax; u++) {
+            if (u < 0 || u > bitmap.resolution[0] || v < 0 || v > bitmap.resolution[1]) {
+              /** Pixel not part of this tile. */
+              continue;
+            }
+            int pixel_offset = v * bitmap.resolution[0] + u;
+            PixelInfo &pixel_info = bitmap.bitmap[pixel_offset];
+            if (pixel_info.is_extracted() || pixel_info.is_seam_fix()) {
+              continue;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  BM_mesh_free(bm);
+}
+
+}  // namespace blender::bke::pbvh::pixels

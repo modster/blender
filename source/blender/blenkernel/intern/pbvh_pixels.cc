@@ -274,8 +274,7 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
 }
 
 static void update_pixels(PBVH *pbvh,
-                          const struct MLoop *mloop,
-                          struct CustomData *ldata,
+                          Mesh *mesh,
                           struct Image *image,
                           struct ImageUser *image_user)
 {
@@ -285,14 +284,15 @@ static void update_pixels(PBVH *pbvh,
     return;
   }
 
-  MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(ldata, CD_MLOOPUV));
+  MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
   if (ldata_uv == nullptr) {
     return;
   }
+  int cd_loop_uv_offset = CustomData_get_offset(&mesh->ldata, CD_MLOOPUV);
 
   for (PBVHNode *node : nodes_to_update) {
     NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
-    init_triangles(pbvh, node, node_data, mloop);
+    init_triangles(pbvh, node, node_data, mesh->mloop);
   }
 
   EncodePixelsUserData user_data;
@@ -308,6 +308,7 @@ static void update_pixels(PBVH *pbvh,
   if (USE_WATERTIGHT_CHECK) {
     apply_watertight_check(pbvh, image, image_user);
   }
+  BKE_pbvh_pixels_rebuild_seams(pbvh, mesh, image, image_user, cd_loop_uv_offset);
 
   /* Clear the UpdatePixels flag. */
   for (PBVHNode *node : nodes_to_update) {
@@ -376,12 +377,11 @@ extern "C" {
 using namespace blender::bke::pbvh::pixels;
 
 void BKE_pbvh_build_pixels(PBVH *pbvh,
-                           const struct MLoop *mloop,
-                           struct CustomData *ldata,
+                           struct Mesh *mesh,
                            struct Image *image,
                            struct ImageUser *image_user)
 {
-  update_pixels(pbvh, mloop, ldata, image, image_user);
+  update_pixels(pbvh, mesh, image, image_user);
 }
 
 void pbvh_pixels_free(PBVHNode *node)
