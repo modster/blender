@@ -35,7 +35,6 @@ using namespace blender::bke::pbvh::pixels;
 using namespace blender::bke::image;
 
 struct ImageData {
-  void *lock = nullptr;
   Image *image = nullptr;
   ImageUser *image_user = nullptr;
 
