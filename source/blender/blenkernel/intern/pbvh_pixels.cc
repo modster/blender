@@ -25,7 +25,6 @@ namespace blender::bke::pbvh::pixels {
 /** Durind debugging this check could be enabled. It will write to each image pixel that is covered
  * by the pbvh. */
 constexpr bool USE_WATERTIGHT_CHECK = false;
-constexpr bool USE_WATERTIGHT_SEAM_CHECK = true;
 
 /**
  * Calculate the delta of two neighbour uv coordinates in the given image buffer.
@@ -268,12 +267,7 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
                            pixel_row.start_image_coordinate.x;
         for (int x = 0; x < pixel_row.num_pixels; x++) {
           if (image_buffer->rect_float) {
-            if (USE_WATERTIGHT_SEAM_CHECK) {
-              image_buffer->rect_float[pixel_offset * 4] += 0.5;
-            }
-            else {
-              copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
-            }
+            copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
           }
           if (image_buffer->rect) {
             uint8_t *dest = static_cast<uint8_t *>(
@@ -321,10 +315,6 @@ static void update_pixels(PBVH *pbvh,
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, nodes_to_update.size());
   BLI_task_parallel_range(0, nodes_to_update.size(), &user_data, do_encode_pixels, &settings);
-  if (USE_WATERTIGHT_CHECK && USE_WATERTIGHT_SEAM_CHECK) {
-    apply_watertight_check(pbvh, image, image_user);
-  }
-  BKE_pbvh_pixels_fix_seams(*pbvh, *image, *image_user, ldata_uv);
   if (USE_WATERTIGHT_CHECK) {
     apply_watertight_check(pbvh, image, image_user);
   }
