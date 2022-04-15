@@ -59,9 +59,6 @@
 
 #include "RNA_enum_types.h"
 
-/* TODO(jbakker) Bad include/call. Move paint_canvas to BKE_paint but in master directly. */
-#include "../../editors/include/ED_paint.h"
-
 #include "BLO_read_write.h"
 
 #include "bmesh.h"
