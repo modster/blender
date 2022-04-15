@@ -410,11 +410,4 @@ void pbvh_pixels_free(PBVHNode *node)
   MEM_delete(node_data);
   node->pixels.node_data = nullptr;
 }
-
-void pbvh_pixels_free_brush_test(PBVHNode *node)
-{
-  NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
-  BLI_assert(node_data);
-  node_data->triangles.clear_brush_test();
-}
 }

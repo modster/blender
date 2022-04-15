@@ -256,9 +256,11 @@ template<typename ImageBuffer> class PaintingKernel {
   }
 };
 
-static void update_triangle_brush_test(SculptSession *ss, Triangles &triangles, const MVert *mvert)
+static std::vector<bool> init_triangle_brush_test(SculptSession *ss,
+                                                  Triangles &triangles,
+                                                  const MVert *mvert)
 {
-  triangles.init_brush_test();
+  std::vector<bool> brush_test(triangles.size());
   SculptBrushTest test;
   SCULPT_brush_test_init(ss, &test);
   float3 brush_min_bounds(test.location[0] - test.radius,
@@ -281,9 +283,10 @@ static void update_triangle_brush_test(SculptSession *ss, Triangles &triangles, 
       triangle_max_bounds.y = max_ff(triangle_max_bounds.y, pos.y);
       triangle_max_bounds.z = max_ff(triangle_max_bounds.z, pos.z);
     }
-    triangles.brush_test[triangle_index] = isect_aabb_aabb_v3(
+    brush_test[triangle_index] = isect_aabb_aabb_v3(
         brush_min_bounds, brush_max_bounds, triangle_min_bounds, triangle_max_bounds);
   }
+  return brush_test;
 }
 
 static void do_paint_pixels(void *__restrict userdata,
@@ -300,7 +303,7 @@ static void do_paint_pixels(void *__restrict userdata,
   const int thread_id = BLI_task_parallel_thread_id(tls);
   MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
 
-  update_triangle_brush_test(ss, node_data.triangles, mvert);
+  std::vector<bool> brush_test = init_triangle_brush_test(ss, node_data.triangles, mvert);
 
   PaintingKernel<ImageBufferFloat4> kernel_float4(ss, brush, thread_id, mvert);
   PaintingKernel<ImageBufferByte4> kernel_byte4(ss, brush, thread_id, mvert);
@@ -326,7 +329,7 @@ static void do_paint_pixels(void *__restrict userdata,
         }
 
         for (const PackedPixelRow &pixel_row : tile_data.pixel_rows) {
-          if (!node_data.triangles.brush_test[pixel_row.triangle_index]) {
+          if (!brush_test[pixel_row.triangle_index]) {
             continue;
           }
           bool pixels_painted = false;

@@ -1496,16 +1496,6 @@ void BKE_pbvh_update_vertex_data(PBVH *pbvh, int flag)
   }
 }
 
-void BKE_pbvh_pixels_free_brush_test(PBVH *pbvh)
-{
-  for (int n = 0; n < pbvh->totnode; n++) {
-    PBVHNode *node = &pbvh->nodes[n];
-    if (node->flag & PBVH_Leaf && node->pixels.node_data != NULL) {
-      pbvh_pixels_free_brush_test(node);
-    }
-  }
-}
-
 static void pbvh_faces_node_visibility_update(PBVH *pbvh, PBVHNode *node)
 {
   MVert *mvert;

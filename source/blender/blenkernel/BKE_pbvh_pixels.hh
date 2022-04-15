@@ -53,12 +53,6 @@ struct Triangles {
   /** Data accessed by the inner loop of the painting brush. */
   Vector<TrianglePaintInput> paint_input;
 
-  /**
-   * For storing brush tests per triangle during painting.
-   * Will be freed after a painting a stroke.
-   */
-  std::vector<bool> brush_test;
-
  public:
   void append(const int3 vert_indices)
   {
@@ -80,18 +74,6 @@ struct Triangles {
     paint_input.clear();
   }
 
-  void init_brush_test()
-  {
-    if (brush_test.size() != size()) {
-      brush_test.resize(size(), false);
-    }
-  }
-
-  void clear_brush_test()
-  {
-    brush_test.resize(0, false);
-  }
-
   uint64_t size() const
   {
     return paint_input.size();
@@ -99,7 +81,7 @@ struct Triangles {
 
   uint64_t mem_size() const
   {
-    return paint_input.size() * sizeof(TrianglePaintInput) + brush_test.size() / 8;
+    return paint_input.size() * sizeof(TrianglePaintInput);
   }
 };
 
