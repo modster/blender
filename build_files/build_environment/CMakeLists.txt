@@ -112,7 +112,9 @@ if(BLENDER_PLATFORM_ARM)
 endif()
 
 include(cmake/webp.cmake)
-include(cmake/level-zero.cmake)
+if(NOT APPLE)
+  include(cmake/level-zero.cmake)
+endif()
 
 if(NOT WIN32 OR ENABLE_MINGW64)
   include(cmake/gmp.cmake)
