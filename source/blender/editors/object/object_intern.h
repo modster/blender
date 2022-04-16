@@ -36,6 +36,7 @@ void OBJECT_OT_scale_clear(struct wmOperatorType *ot);
 void OBJECT_OT_origin_clear(struct wmOperatorType *ot);
 void OBJECT_OT_visual_transform_apply(struct wmOperatorType *ot);
 void OBJECT_OT_transform_apply(struct wmOperatorType *ot);
+void OBJECT_OT_parent_inverse_apply(wmOperatorType *ot);
 void OBJECT_OT_transform_axis_target(struct wmOperatorType *ot);
 void OBJECT_OT_origin_set(struct wmOperatorType *ot);
 
@@ -113,7 +114,8 @@ void OBJECT_OT_light_add(struct wmOperatorType *ot);
 void OBJECT_OT_effector_add(struct wmOperatorType *ot);
 void OBJECT_OT_camera_add(struct wmOperatorType *ot);
 void OBJECT_OT_speaker_add(struct wmOperatorType *ot);
-void OBJECT_OT_hair_curves_add(struct wmOperatorType *ot);
+void OBJECT_OT_curves_random_add(struct wmOperatorType *ot);
+void OBJECT_OT_curves_empty_hair_add(struct wmOperatorType *ot);
 void OBJECT_OT_pointcloud_add(struct wmOperatorType *ot);
 /**
  * Only used as menu.

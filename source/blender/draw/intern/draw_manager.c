@@ -197,7 +197,7 @@ bool DRW_object_is_renderable(const Object *ob)
 bool DRW_object_is_in_edit_mode(const Object *ob)
 {
   if (BKE_object_is_in_editmode(ob)) {
-    if (ob->type == OB_MESH) {
+    if (ELEM(ob->type, OB_MESH, OB_CURVES)) {
       if ((ob->mode & OB_MODE_EDIT) == 0) {
         return false;
       }
@@ -1285,6 +1285,10 @@ void DRW_notify_view_update(const DRWUpdateContext *update_ctx)
   }
 
   const bool gpencil_engine_needed = drw_gpencil_engine_needed(depsgraph, v3d);
+
+  if (G.is_rendering) {
+    return;
+  }
 
   /* XXX Really nasty locking. But else this could
    * be executed by the material previews thread

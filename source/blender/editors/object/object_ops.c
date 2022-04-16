@@ -33,6 +33,7 @@ void ED_operatortypes_object(void)
   WM_operatortype_append(OBJECT_OT_origin_clear);
   WM_operatortype_append(OBJECT_OT_visual_transform_apply);
   WM_operatortype_append(OBJECT_OT_transform_apply);
+  WM_operatortype_append(OBJECT_OT_parent_inverse_apply);
   WM_operatortype_append(OBJECT_OT_transform_axis_target);
   WM_operatortype_append(OBJECT_OT_origin_set);
 
@@ -89,7 +90,8 @@ void ED_operatortypes_object(void)
   WM_operatortype_append(OBJECT_OT_light_add);
   WM_operatortype_append(OBJECT_OT_camera_add);
   WM_operatortype_append(OBJECT_OT_speaker_add);
-  WM_operatortype_append(OBJECT_OT_hair_curves_add);
+  WM_operatortype_append(OBJECT_OT_curves_random_add);
+  WM_operatortype_append(OBJECT_OT_curves_empty_hair_add);
   WM_operatortype_append(OBJECT_OT_pointcloud_add);
   WM_operatortype_append(OBJECT_OT_volume_add);
   WM_operatortype_append(OBJECT_OT_volume_import);
