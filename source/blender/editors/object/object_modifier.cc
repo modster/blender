@@ -3316,14 +3316,14 @@ static int geometry_node_tree_copy_assign_exec(bContext *C, wmOperator *op)
 
   NodesModifierData *nmd = (NodesModifierData *)md;
   bNodeTree *tree = nmd->node_group;
-  if (tree == NULL) {
+  if (tree == nullptr) {
     return OPERATOR_CANCELLED;
   }
 
   bNodeTree *new_tree = (bNodeTree *)BKE_id_copy_ex(
-      bmain, &tree->id, NULL, LIB_ID_COPY_ACTIONS | LIB_ID_COPY_DEFAULT);
+      bmain, &tree->id, nullptr, LIB_ID_COPY_ACTIONS | LIB_ID_COPY_DEFAULT);
 
-  if (new_tree == NULL) {
+  if (new_tree == nullptr) {
     return OPERATOR_CANCELLED;
   }
 
