@@ -8,7 +8,6 @@
 #  include "device/kernel.h"
 #  include "device/memory.h"
 #  include "device/queue.h"
-#  include <set>
 
 #  include "device/oneapi/device.h"
 #  include "device/oneapi/dll_interface.h"
