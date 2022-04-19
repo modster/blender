@@ -366,6 +366,8 @@ static void do_mark_dirty_regions(void *__restrict userdata,
 {
   TexturePaintingUserData *data = static_cast<TexturePaintingUserData *>(userdata);
   PBVHNode *node = data->nodes[n];
+  /* TODO: we should test if we want to postpone the seam fixing to reduce overhead. */
+  BKE_pbvh_pixels_fix_seams(node, data->image_data.image, data->image_data.image_user);
   BKE_pbvh_pixels_mark_image_dirty(*node, *data->image_data.image, *data->image_data.image_user);
 }
 

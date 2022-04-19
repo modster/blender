@@ -182,7 +182,7 @@ Bitmaps create_tile_bitmap(const PBVH &pbvh, Image &image, ImageUser &image_user
 
 int2 find_source_pixel()
 {
-  return int2(0, 0);
+  return int2(50, 50);
 }
 
 static void BKE_pbvh_pixels_clear_seams(PBVH *pbvh)
@@ -264,8 +264,8 @@ void BKE_pbvh_pixels_rebuild_seams(
       }
       else {
 
-        for (int v = uvbounds_i.ymin; v < uvbounds_i.ymax; v++) {
-          for (int u = uvbounds_i.xmin; u < uvbounds_i.xmax; u++) {
+        for (int v = uvbounds_i.ymin; v <= uvbounds_i.ymax; v++) {
+          for (int u = uvbounds_i.xmin; u <= uvbounds_i.xmax; u++) {
             if (u < 0 || u > bitmap.resolution[0] || v < 0 || v > bitmap.resolution[1]) {
               /** Pixel not part of this tile. */
               continue;
@@ -282,10 +282,23 @@ void BKE_pbvh_pixels_rebuild_seams(
             float2 closest_point;
             float lambda = closest_to_line_v2(closest_point, uv, luv_1->uv, luv_2->uv);
 
+            /* Calcualte the distance in pixel space. */
+            float2 uv_coord(u, v);
+            float2 closest_coord(closest_point.x * bitmap.resolution.x,
+                                 closest_point.y * bitmap.resolution.y);
+            float distance_to_edge = len_v2v2(uv_coord, closest_coord);
+            if (distance_to_edge > 2.5f) {
+              continue;
+            }
+
             int2 source_pixel = find_source_pixel();
             int2 destination_pixel(u, v);
-            int source_node = bitmap.get_pixel_info(source_pixel).get_node_index();
-            PBVHNode &node = pbvh->nodes[source_node];
+
+            PixelInfo src_pixel_info = bitmap.get_pixel_info(source_pixel);
+            BLI_assert(src_pixel_info.is_extracted());
+            int src_node = src_pixel_info.get_node_index();
+
+            PBVHNode &node = pbvh->nodes[src_node];
             add_seam_fix(node,
                          bitmap.image_tile.get_tile_number(),
                          source_pixel,
@@ -301,8 +314,30 @@ void BKE_pbvh_pixels_rebuild_seams(
   BM_mesh_free(bm);
 }
 
-void BKE_pbvh_pixels_fix_seams(PBVH *pbvh, Image *image, ImageUser *image_user)
+void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_user)
 {
+  NodeData &node_data = BKE_pbvh_pixels_node_data_get(*node);
+  ImageUser iuser = *image_user;
+
+  for (UDIMSeamFixes &fixes : node_data.seams) {
+    iuser.tile = fixes.dst_tile_number;
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &iuser, nullptr);
+    if (image_buffer == nullptr) {
+      continue;
+    }
+
+    for (SeamFix &fix : fixes.pixels) {
+      int src_offset = fix.src_pixel.y * image_buffer->x + fix.src_pixel.x;
+      int dst_offset = fix.dst_pixel.y * image_buffer->x + fix.dst_pixel.x;
+      if (image_buffer->rect_float != nullptr) {
+        copy_v4_fl4(&image_buffer->rect_float[dst_offset * 4], 1.0, 0.0, 0.0, 1.0);
+      }
+    }
+    /* TODO: should be narrowed to the part of the image that needs to be updated. Requires
+     * access to the image tile.*/
+    BKE_image_partial_update_mark_full_update(image);
+    BKE_image_release_ibuf(image, image_buffer, nullptr);
+  }
 }
 
 }  // namespace blender::bke::pbvh::pixels
