@@ -20,7 +20,7 @@
 CCL_NAMESPACE_BEGIN
 
 #ifdef WITH_ONEAPI
-static oneAPIDLLInterface oneapi_dll;
+static OneAPIDLLInterface oneapi_dll;
 #endif
 
 #ifdef _WIN32

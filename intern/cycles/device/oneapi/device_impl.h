@@ -24,7 +24,7 @@ class OneapiDevice : public Device {
   void *kg_memory;
   void *kg_memory_device;
   size_t kg_memory_size = (size_t)0;
-  oneAPIDLLInterface oneapi_dll;
+  OneAPIDLLInterface oneapi_dll;
   std::string oneapi_error_string;
 
  public:
@@ -34,7 +34,7 @@ class OneapiDevice : public Device {
   // void set_error(const string &error) override;
 
   OneapiDevice(const DeviceInfo &info,
-               oneAPIDLLInterface &oneapi_dll_object,
+               OneAPIDLLInterface &oneapi_dll_object,
                Stats &stats,
                Profiler &profiler);
 
@@ -58,7 +58,7 @@ class OneapiDevice : public Device {
 
   string oneapi_error_message();
 
-  oneAPIDLLInterface oneapi_dll_object();
+  OneAPIDLLInterface oneapi_dll_object();
 
   void *kernel_globals_device_pointer();
 

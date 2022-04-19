@@ -20,7 +20,7 @@ static void queue_error_cb(const char *message, void *user_ptr)
 }
 
 OneapiDevice::OneapiDevice(const DeviceInfo &info,
-                           oneAPIDLLInterface &oneapi_dll_object,
+                           OneAPIDLLInterface &oneapi_dll_object,
                            Stats &stats,
                            Profiler &profiler)
     : Device(info, stats, profiler),
@@ -179,7 +179,7 @@ string OneapiDevice::oneapi_error_message()
   return string(oneapi_error_string.c_str());
 }
 
-oneAPIDLLInterface OneapiDevice::oneapi_dll_object()
+OneAPIDLLInterface OneapiDevice::oneapi_dll_object()
 {
   return oneapi_dll;
 }
