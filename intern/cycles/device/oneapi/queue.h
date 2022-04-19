@@ -21,7 +21,7 @@ class device_memory;
 /* Base class for Oneapi queues. */
 class OneapiDeviceQueue : public DeviceQueue {
  public:
-  OneapiDeviceQueue(OneapiDevice *device);
+  explicit OneapiDeviceQueue(OneapiDevice *device);
   ~OneapiDeviceQueue();
 
   virtual int num_concurrent_states(const size_t state_size) const override;
