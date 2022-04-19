@@ -83,23 +83,27 @@ static OneapiKernelStats global_kernel_stats;
 
 OneapiDeviceQueue::OneapiDeviceQueue(OneapiDevice *device)
     : DeviceQueue(device),
-      oneapi_device(device),
-      oneapi_dll(device->oneapi_dll_object()),
-      kernel_context(nullptr)
+      oneapi_device_(device),
+      oneapi_dll_(device->oneapi_dll_object()),
+      kernel_context_(nullptr)
 {
-  if (getenv("CYCLES_ONEAPI_KERNEL_STATS") && VLOG_IS_ON(1))
-    with_kernel_statistics = true;
-  else
-    with_kernel_statistics = false;
+  if (getenv("CYCLES_ONEAPI_KERNEL_STATS") && VLOG_IS_ON(1)) {
+    with_kernel_statistics_ = true;
+  }
+  else {
+    with_kernel_statistics_ = false;
+  }
 }
 
 OneapiDeviceQueue::~OneapiDeviceQueue()
 {
-  if (kernel_context)
-    delete kernel_context;
+  if (kernel_context_) {
+    delete kernel_context_;
+  }
 
-  if (with_kernel_statistics)
+  if (with_kernel_statistics_) {
     global_kernel_stats.print_and_reset();
+  }
 }
 
 int OneapiDeviceQueue::num_concurrent_states(const size_t state_size) const
@@ -107,7 +111,7 @@ int OneapiDeviceQueue::num_concurrent_states(const size_t state_size) const
   int num_states;
 
   const size_t compute_units =
-      (oneapi_dll.oneapi_get_compute_units_amount)(oneapi_device->sycl_queue());
+      (oneapi_dll_.oneapi_get_compute_units_amount)(oneapi_device_->sycl_queue());
   if (compute_units >= 128) {
     // dGPU path, make sense to allocate more states, because it will be dedicated GPU memory
     int base = 1024 * 1024;
@@ -117,7 +121,8 @@ int OneapiDeviceQueue::num_concurrent_states(const size_t state_size) const
     // Limit amount of integrator states by one quarter of device memory, because
     // other allocations will need some space as well
     size_t states_memory_size = num_states * state_size;
-    size_t device_memory_amount = (oneapi_dll.oneapi_get_memcapacity)(oneapi_device->sycl_queue());
+    size_t device_memory_amount =
+        (oneapi_dll_.oneapi_get_memcapacity)(oneapi_device_->sycl_queue());
     if (states_memory_size >= device_memory_amount / 4) {
       num_states = device_memory_amount / 4 / state_size;
     }
@@ -137,7 +142,7 @@ int OneapiDeviceQueue::num_concurrent_states(const size_t state_size) const
 int OneapiDeviceQueue::num_concurrent_busy_states() const
 {
   const size_t compute_units =
-      (oneapi_dll.oneapi_get_compute_units_amount)(oneapi_device->sycl_queue());
+      (oneapi_dll_.oneapi_get_compute_units_amount)(oneapi_device_->sycl_queue());
   if (compute_units >= 128) {
     return 1024 * 1024;
   }
@@ -148,13 +153,13 @@ int OneapiDeviceQueue::num_concurrent_busy_states() const
 
 void OneapiDeviceQueue::init_execution()
 {
-  oneapi_device->load_texture_info();
+  oneapi_device_->load_texture_info();
 
-  SyclQueue *device_queue = oneapi_device->sycl_queue();
-  void *kg_dptr = (void *)oneapi_device->kernel_globals_device_pointer();
+  SyclQueue *device_queue = oneapi_device_->sycl_queue();
+  void *kg_dptr = (void *)oneapi_device_->kernel_globals_device_pointer();
   assert(device_queue);
   assert(kg_dptr);
-  kernel_context = new KernelContext{device_queue, kg_dptr, with_kernel_statistics};
+  kernel_context_ = new KernelContext{device_queue, kg_dptr, with_kernel_statistics_};
 
   debug_init_execution();
 }
@@ -163,7 +168,7 @@ bool OneapiDeviceQueue::enqueue(DeviceKernel kernel,
                                 const int signed_kernel_work_size,
                                 DeviceKernelArguments const &_args)
 {
-  if (oneapi_device->have_error()) {
+  if (oneapi_device_->have_error()) {
     return false;
   }
 
@@ -173,27 +178,30 @@ bool OneapiDeviceQueue::enqueue(DeviceKernel kernel,
   assert(signed_kernel_work_size >= 0);
   size_t kernel_work_size = (size_t)signed_kernel_work_size;
 
-  size_t kernel_local_size = (oneapi_dll.oneapi_kernel_prefered_local_size)(kernel_context->queue,
-                                                                            (::DeviceKernel)kernel,
-                                                                            kernel_work_size);
+  size_t kernel_local_size =
+      (oneapi_dll_.oneapi_kernel_prefered_local_size)(kernel_context_->queue,
+                                                      (::DeviceKernel)kernel,
+                                                      kernel_work_size);
   size_t uniformed_kernel_work_size = round_up(kernel_work_size, kernel_local_size);
 
-  assert(kernel_context);
+  assert(kernel_context_);
 
-  if (with_kernel_statistics)
+  if (with_kernel_statistics_)
     global_kernel_stats.kernel_enqueued(kernel);
 
   /* Call the oneAPI kernel DLL to launch the requested kernel. */
-  bool is_finished_ok =
-      (oneapi_dll.oneapi_enqueue_kernel)(kernel_context, kernel, uniformed_kernel_work_size, args);
+  bool is_finished_ok = (oneapi_dll_.oneapi_enqueue_kernel)(kernel_context_,
+                                                            kernel,
+                                                            uniformed_kernel_work_size,
+                                                            args);
 
-  if (with_kernel_statistics)
+  if (with_kernel_statistics_)
     global_kernel_stats.kernel_finished(kernel, uniformed_kernel_work_size);
 
   if (is_finished_ok == false) {
-    oneapi_device->set_error("oneAPI kernel \"" + std::string(device_kernel_as_string(kernel)) +
-                             "\" execution error: got runtime exception \"" +
-                             oneapi_device->oneapi_error_message() + "\"");
+    oneapi_device_->set_error("oneAPI kernel \"" + std::string(device_kernel_as_string(kernel)) +
+                              "\" execution error: got runtime exception \"" +
+                              oneapi_device_->oneapi_error_message() + "\"");
   }
 
   return is_finished_ok;
@@ -201,33 +209,33 @@ bool OneapiDeviceQueue::enqueue(DeviceKernel kernel,
 
 bool OneapiDeviceQueue::synchronize()
 {
-  if (oneapi_device->have_error()) {
+  if (oneapi_device_->have_error()) {
     return false;
   }
 
-  bool is_finished_ok = (oneapi_dll.oneapi_queue_synchronize)(oneapi_device->sycl_queue());
+  bool is_finished_ok = (oneapi_dll_.oneapi_queue_synchronize)(oneapi_device_->sycl_queue());
   if (is_finished_ok == false)
-    oneapi_device->set_error("oneAPI unknown kernel execution error: got runtime exception \"" +
-                             oneapi_device->oneapi_error_message() + "\"");
+    oneapi_device_->set_error("oneAPI unknown kernel execution error: got runtime exception \"" +
+                              oneapi_device_->oneapi_error_message() + "\"");
 
   debug_synchronize();
 
-  return !(oneapi_device->have_error());
+  return !(oneapi_device_->have_error());
 }
 
 void OneapiDeviceQueue::zero_to_device(device_memory &mem)
 {
-  oneapi_device->mem_zero(mem);
+  oneapi_device_->mem_zero(mem);
 }
 
 void OneapiDeviceQueue::copy_to_device(device_memory &mem)
 {
-  oneapi_device->mem_copy_to(mem);
+  oneapi_device_->mem_copy_to(mem);
 }
 
 void OneapiDeviceQueue::copy_from_device(device_memory &mem)
 {
-  oneapi_device->mem_copy_from(mem, 0, 1, 1, mem.memory_size());
+  oneapi_device_->mem_copy_from(mem, 0, 1, 1, mem.memory_size());
 }
 
 CCL_NAMESPACE_END

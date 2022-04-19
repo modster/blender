@@ -41,10 +41,10 @@ class OneapiDeviceQueue : public DeviceQueue {
   virtual void copy_from_device(device_memory &mem) override;
 
  protected:
-  OneapiDevice *oneapi_device;
-  OneAPIDLLInterface oneapi_dll;
-  KernelContext *kernel_context;
-  bool with_kernel_statistics;
+  OneapiDevice *oneapi_device_;
+  OneAPIDLLInterface oneapi_dll_;
+  KernelContext *kernel_context_;
+  bool with_kernel_statistics_;
 };
 
 CCL_NAMESPACE_END
