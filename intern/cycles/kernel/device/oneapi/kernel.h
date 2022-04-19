@@ -40,6 +40,8 @@ struct KernelContext {
   bool with_per_kernel_statistics;
 };
 
+/* Use extern C linking so that the symbols can be easily load from the dynamic library at runtime.
+ */
 #  ifdef __cplusplus
 extern "C" {
 #  endif
