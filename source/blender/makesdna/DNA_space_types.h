@@ -517,7 +517,7 @@ typedef enum eGraphEdit_Mode {
 typedef enum eGraphEdit_Runtime_Flag {
   /** Temporary flag to force channel selections to be synced with main. */
   SIPO_RUNTIME_FLAG_NEED_CHAN_SYNC = (1 << 0),
-  /** Temporary flag to force F-curves to recalculate colors. */
+  /** Temporary flag to force F-Curves to recalculate colors. */
   SIPO_RUNTIME_FLAG_NEED_CHAN_SYNC_COLOR = (1 << 1),
 
   /**
@@ -1513,6 +1513,7 @@ typedef enum eSpaceNodeOverlay_Flag {
   SN_OVERLAY_SHOW_WIRE_COLORS = (1 << 2),
   SN_OVERLAY_SHOW_TIMINGS = (1 << 3),
   SN_OVERLAY_SHOW_PATH = (1 << 4),
+  SN_OVERLAY_SHOW_NAMED_ATTRIBUTES = (1 << 5),
 } eSpaceNodeOverlay_Flag;
 
 typedef struct SpaceNode {

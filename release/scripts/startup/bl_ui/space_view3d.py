@@ -2722,6 +2722,9 @@ class VIEW3D_MT_object_apply(Menu):
             text_ctxt=i18n_contexts.default,
         ).target = 'MESH'
         layout.operator("object.duplicates_make_real")
+        layout.operator("object.parent_inverse_apply",
+                        text="Parent Inverse",
+                        text_ctxt=i18n_contexts.default)
 
 
 class VIEW3D_MT_object_parent(Menu):
@@ -2831,6 +2834,7 @@ class VIEW3D_MT_object_cleanup(Menu):
         layout.separator()
 
         layout.operator("object.material_slot_remove_unused", text="Remove Unused Material Slots")
+
 
 class VIEW3D_MT_object_asset(Menu):
     bl_label = "Asset"
@@ -6495,7 +6499,6 @@ class VIEW3D_PT_overlay_edit_mesh_normals(Panel):
             sub.prop(overlay, "normals_length", text="Size")
 
         row.prop(overlay, "use_normals_constant_screen_size", text="", icon='FIXED_SIZE')
-
 
 
 class VIEW3D_PT_overlay_edit_mesh_freestyle(Panel):
