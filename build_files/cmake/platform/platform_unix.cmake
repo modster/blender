@@ -45,6 +45,9 @@ if(EXISTS ${LIBDIR})
   # which is a part of OpenCollada. They have different ABI, and we
   # do need to use the official one.
   set(CMAKE_PREFIX_PATH ${LIBDIR}/zlib ${LIB_SUBDIRS})
+
+  include(platform_old_libs_update)
+
   set(WITH_STATIC_LIBS ON)
   # OpenMP usually can't be statically linked into shared libraries,
   # due to not being compiled with position independent code.
@@ -57,8 +60,6 @@ if(EXISTS ${LIBDIR})
   set(Boost_NO_SYSTEM_PATHS ON)
   set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
   set(CLANG_ROOT_DIR ${LIBDIR}/llvm)
-
-  include(platform_old_libs_update)
 endif()
 
 if(WITH_STATIC_LIBS)

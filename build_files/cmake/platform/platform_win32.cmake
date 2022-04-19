@@ -262,6 +262,8 @@ if(NOT EXISTS "${LIBDIR}/")
   message(FATAL_ERROR "\n\nWindows requires pre-compiled libs at: '${LIBDIR}'. Please run `make update` in the blender source folder to obtain them.")
 endif()
 
+include(platform_old_libs_update)
+
 if(CMAKE_GENERATOR MATCHES "^Visual Studio.+" AND # Only supported in the VS IDE
    MSVC_VERSION GREATER_EQUAL 1924            AND # Supported for 16.4+
    WITH_CLANG_TIDY                                # And Clang Tidy needs to be on
