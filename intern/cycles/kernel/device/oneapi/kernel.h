@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright 2021-2022 Intel Corporation */
 
-#ifndef _ONEAPI_KERNEL_H_
-#define _ONEAPI_KERNEL_H_
+#pragma once
 
 #ifdef WITH_ONEAPI
 
@@ -55,5 +54,3 @@ extern "C" {
 #  endif
 
 #endif /* WITH_ONEAPI */
-
-#endif /* _ONEAPI_KERNEL_H_ */
