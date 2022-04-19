@@ -719,7 +719,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     ${SRC_UTIL_HEADERS}
   )
 
-  set(dpcpp_flags
+  set(sycl_compiler_flags
       ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_KERNEL_DEVICE_ONEAPI}
       -fsycl
       -fsycl-unnamed-lambda
@@ -736,25 +736,25 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       ${ONEAPI_DPCPP_FLAGS}
       )
   if (WITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED)
-    list(APPEND dpcpp_flags -DWITH_ONEAPI_SYCL_HOST_ENABLED)
+    list(APPEND sycl_compiler_flags -DWITH_ONEAPI_SYCL_HOST_ENABLED)
   endif()
   if (WITH_CYCLES_ONEAPI_BINARIES)
     set (CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS "-internal_options '-ze-opt-large-register-file -ze-opt-regular-grf-kernel integrator_intersect'")
-    list(APPEND dpcpp_flags
+    list(APPEND sycl_compiler_flags
       -fsycl-targets=spir64_gen
       -Xsycl-target-backend=spir64_gen "-device ${CYCLES_ONEAPI_AOT_TARGETS} ${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}")
   endif()
   if(WITH_NANOVDB)
-    list(APPEND dpcpp_flags
+    list(APPEND sycl_compiler_flags
       -DWITH_NANOVDB
       -I"${NANOVDB_INCLUDE_DIR}")
   endif()
 
-  get_filename_component(dpcpp_root ${SYCL_DPCPP_COMPILER} DIRECTORY)
+  get_filename_component(sycl_compiler_root ${SYCL_COMPILER} DIRECTORY)
+  get_filename_component(sycl_compiler_compiler_name ${SYCL_COMPILER} NAME_WE)
 
   if(WIN32)
-    list(APPEND dpcpp_flags
-    /EHsc
+    list(APPEND sycl_compiler_flags
     -fms-extensions
     -fms-compatibility
     -D_WINDLL
@@ -763,16 +763,31 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     -D_WINDOWS
     -DONEAPI_EXPORT)
 
-    add_custom_command(
-      OUTPUT ${cycles_kernel_oneapi_lib}
-      COMMAND "${dpcpp_root}/../../env/vars.bat"
-      COMMAND ${SYCL_DPCPP_COMPILER} ${dpcpp_flags}
-      DEPENDS ${cycles_oneapi_kernel_sources})
+    if(sycl_compiler_compiler_name MATCHES "dpcpp")
+      add_custom_command(
+        OUTPUT ${cycles_kernel_oneapi_lib}
+        COMMAND "${sycl_compiler_root}/../../env/vars.bat"
+        COMMAND ${SYCL_COMPILER} ${sycl_compiler_flags}
+        DEPENDS ${cycles_oneapi_kernel_sources})
+    else()
+      string(REPLACE /Redist/ /Tools/ MSVC_TOOLS_DIR ${MSVC_REDIST_DIR})
+      list(APPEND sycl_compiler_flags
+	      -L "${MSVC_TOOLS_DIR}/lib/x64"
+	      -L "${WINDOWS_KITS_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64"
+	      -L "${WINDOWS_KITS_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/ucrt/x64")
+      add_custom_command(
+        OUTPUT ${cycles_kernel_oneapi_lib}
+	COMMAND ${CMAKE_COMMAND} -E env
+	        "LIB=${sycl_compiler_root}/../lib;${LIB}"
+		"PATH=${sycl_compiler_root}/../lib/ocloc;${sycl_compiler_root};${PATH}"
+                ${SYCL_COMPILER} ${sycl_compiler_flags}
+        DEPENDS ${cycles_oneapi_kernel_sources})
+    endif()
   else()
-    list(APPEND dpcpp_flags -fPIC)
+    list(APPEND sycl_compiler_flags -fPIC)
     add_custom_command(
       OUTPUT ${cycles_kernel_oneapi_lib}
-      COMMAND bash -c \"source ${dpcpp_root}/../../env/vars.sh&&${SYCL_DPCPP_COMPILER} ${dpcpp_flags}\"
+      COMMAND bash -c \"source ${sycl_compiler_root}/../../env/vars.sh&&${SYCL_COMPILER} ${sycl_compiler_flags}\"
       DEPENDS ${cycles_oneapi_kernel_sources})
   endif()
 

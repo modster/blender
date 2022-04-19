@@ -10,6 +10,7 @@
 #  include <set>
 
 #  include <level_zero/ze_api.h>
+#  include <CL/sycl.hpp>
 #  include <ext/oneapi/backend/level_zero.hpp>
 
 #  include "kernel/device/oneapi/compat.h"
@@ -185,7 +186,7 @@ bool oneapi_trigger_runtime_compilation(SyclQueue *queue_)
 
   try {
     queue->submit([&](sycl::handler &cgh) {
-      sycl::accessor A_acc(A, cgh, sycl::read_only, sycl::no_init);
+      sycl::accessor A_acc(A, cgh, sycl::read_only);
       sycl::accessor B_acc(B, cgh, sycl::write_only, sycl::no_init);
 
       cgh.parallel_for(N, [=](sycl::id<1> idx) { B_acc[idx] = A_acc[idx] + idx.get(0); });
