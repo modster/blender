@@ -508,6 +508,8 @@ static void drw_manager_init(DRWManager *dst, GPUViewport *viewport, const int s
   RegionView3D *rv3d = dst->draw_ctx.rv3d;
   ARegion *region = dst->draw_ctx.region;
 
+  dst->compiler_time = 0.0;
+
   int view = (viewport) ? GPU_viewport_active_view_get(viewport) : 0;
 
   if (!dst->viewport && dst->vmempool) {

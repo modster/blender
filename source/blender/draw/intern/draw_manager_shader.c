@@ -436,20 +436,12 @@ GPUMaterial *DRW_shader_from_world(World *wo,
                                                 false,
                                                 callback,
                                                 thunk);
-  if (!DRW_state_is_image_render() && deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
-    /* Shader has been already queued. */
-    return mat;
+  if (DRW_state_is_image_render()) {
+    /* Do not deferred if doing render. */
+    deferred = false;
   }
 
-  if (GPU_material_status(mat) == GPU_MAT_CREATED) {
-    GPU_material_status_set(mat, GPU_MAT_QUEUED);
-    drw_deferred_shader_add(mat, deferred);
-  }
-
-  if (!deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
-    /* Force compilation for shaders already queued. */
-    drw_deferred_shader_add(mat, false);
-  }
+  DRW_deferred_shader_add(mat, deferred);
   return mat;
 }
 
@@ -478,20 +470,7 @@ GPUMaterial *DRW_shader_from_material(Material *ma,
     deferred = false;
   }
 
-  if (deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
-    /* Shader has been already queued. */
-    return mat;
-  }
-
-  if (GPU_material_status(mat) == GPU_MAT_CREATED) {
-    GPU_material_status_set(mat, GPU_MAT_QUEUED);
-    drw_deferred_shader_add(mat, deferred);
-  }
-
-  if (!deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
-    /* Force compilation for shaders already queued. */
-    drw_deferred_shader_add(mat, false);
-  }
+  DRW_deferred_shader_add(mat, deferred);
   return mat;
 }
 

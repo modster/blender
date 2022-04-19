@@ -642,6 +642,9 @@ typedef struct DRWManager {
 
   GPUDrawList *draw_list;
 
+  /* Deferred compilation. */
+  double compiler_time;
+
   struct {
     /* TODO(@fclem): optimize: use chunks. */
     DRWDebugLine *lines;

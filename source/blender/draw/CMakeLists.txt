@@ -83,6 +83,7 @@ set(SRC
   intern/draw_color_management.cc
   intern/draw_common.c
   intern/draw_debug.c
+  intern/draw_deferred_compilation.cc
   intern/draw_fluid.c
   intern/draw_hair.c
   intern/draw_instance_data.c

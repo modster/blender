@@ -197,6 +197,7 @@ void DRW_gpu_render_context_enable(void *re_gpu_context);
  */
 void DRW_gpu_render_context_disable(void *re_gpu_context);
 
+void DRW_deferred_shader_add(struct GPUMaterial *mat, bool deferred);
 void DRW_deferred_shader_remove(struct GPUMaterial *mat);
 
 /**
