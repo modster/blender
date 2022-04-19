@@ -43,7 +43,6 @@ class OneapiDeviceQueue : public DeviceQueue {
   OneapiDevice *oneapi_device;
   oneAPIDLLInterface oneapi_dll;
   KernelContext *kernel_context;
-  static std::set<DeviceKernel> SUPPORTED_KERNELS;
   bool with_kernel_statistics;
 };
 
