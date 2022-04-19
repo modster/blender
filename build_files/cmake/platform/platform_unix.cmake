@@ -57,6 +57,8 @@ if(EXISTS ${LIBDIR})
   set(Boost_NO_SYSTEM_PATHS ON)
   set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
   set(CLANG_ROOT_DIR ${LIBDIR}/llvm)
+
+  include(platform_old_libs_update)
 endif()
 
 if(WITH_STATIC_LIBS)
