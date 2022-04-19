@@ -56,7 +56,7 @@ OneapiDevice::OneapiDevice(const DeviceInfo &info,
               oneapi_error_string + "\"");
   }
   else {
-    VLOG(1) << "Successfuly created global/constant memory segment (kernel globals object)";
+    VLOG(1) << "Successfully created global/constant memory segment (kernel globals object)";
   }
 
   kg_memory = (oneapi_dll.oneapi_usm_aligned_alloc_host)(device_queue, globals_segment_size, 16);
@@ -100,7 +100,7 @@ bool OneapiDevice::load_kernels(const uint requested_features)
 {
   assert(device_queue);
   // NOTE(sirgienko) oneAPI can support compilation of kernel code with sertain feature set
-  // with specialisation constants, but it hasn't been implemented yet.
+  // with specialization constants, but it hasn't been implemented yet.
   (void)requested_features;
 
   bool is_finished_ok = (oneapi_dll.oneapi_trigger_runtime_compilation)(device_queue);
@@ -134,7 +134,7 @@ void OneapiDevice::generic_alloc(device_memory &mem)
   assert(device_queue);
   // NOTE(sirgienko) There are three types of Unified Shared Memory (USM) in oneAPI: host, device
   // and shared. For new project it maybe more beneficial to use USM shared memory, because it
-  // provides automatic migration mechansim in order to allow to use the same pointer on host and
+  // provides automatic migration mechanism in order to allow to use the same pointer on host and
   // on device, without need to worry about explicit memory transfer operations. But for
   // Blender/Cycles this type of memory is not very suitable in current application architecture,
   // because Cycles already uses two different pointer for host activity and device activity, and
@@ -211,8 +211,8 @@ void OneapiDevice::mem_alloc(device_memory &mem)
   else {
     if (mem.name) {
       VLOG(2) << "OneapiDevice::mem_alloc: \"" << mem.name << "\", "
-              << string_human_readable_number(mem.memory_size()).c_str() << " bytes. ("
-              << string_human_readable_size(mem.memory_size()).c_str() << ")";
+              << string_human_readable_number(mem.memory_size()) << " bytes. ("
+              << string_human_readable_size(mem.memory_size()) << ")";
     }
     generic_alloc(mem);
   }
@@ -222,8 +222,8 @@ void OneapiDevice::mem_copy_to(device_memory &mem)
 {
   if (mem.name) {
     VLOG(4) << "OneapiDevice::mem_copy_to: \"" << mem.name << "\", "
-            << string_human_readable_number(mem.memory_size()).c_str() << " bytes. ("
-            << string_human_readable_size(mem.memory_size()).c_str() << ")";
+            << string_human_readable_number(mem.memory_size()) << " bytes. ("
+            << string_human_readable_size(mem.memory_size()) << ")";
   }
 
   if (mem.type == MEM_GLOBAL) {
@@ -253,9 +253,9 @@ void OneapiDevice::mem_copy_from(device_memory &mem, size_t y, size_t w, size_t 
 
     if (mem.name) {
       VLOG(4) << "OneapiDevice::mem_copy_from: \"" << mem.name << "\" object of "
-              << string_human_readable_number(mem.memory_size()).c_str() << " bytes. ("
-              << string_human_readable_size(mem.memory_size()).c_str() << ") from offset "
-              << offset << " data " << size << " bytes";
+              << string_human_readable_number(mem.memory_size()) << " bytes. ("
+              << string_human_readable_size(mem.memory_size()) << ") from offset " << offset
+              << " data " << size << " bytes";
     }
 
     assert(device_queue);
@@ -277,8 +277,8 @@ void OneapiDevice::mem_zero(device_memory &mem)
 {
   if (mem.name) {
     VLOG(4) << "OneapiDevice::mem_zero: \"" << mem.name << "\", "
-            << string_human_readable_number(mem.memory_size()).c_str() << " bytes. ("
-            << string_human_readable_size(mem.memory_size()).c_str() << ")\n";
+            << string_human_readable_number(mem.memory_size()) << " bytes. ("
+            << string_human_readable_size(mem.memory_size()) << ")\n";
   }
 
   if (!mem.device_pointer) {
@@ -303,8 +303,8 @@ void OneapiDevice::mem_free(device_memory &mem)
 {
   if (mem.name) {
     VLOG(2) << "OneapiDevice::mem_free: \"" << mem.name << "\", "
-            << string_human_readable_number(mem.device_size).c_str() << " bytes. ("
-            << string_human_readable_size(mem.device_size).c_str() << ")\n";
+            << string_human_readable_number(mem.device_size) << " bytes. ("
+            << string_human_readable_size(mem.device_size) << ")\n";
   }
 
   if (mem.type == MEM_GLOBAL) {
@@ -328,8 +328,8 @@ void OneapiDevice::const_copy_to(const char *name, void *host, size_t size)
   assert(name);
 
   VLOG(4) << "OneapiDevice::const_copy_to \"" << name << "\" object "
-          << string_human_readable_number(size).c_str() << " bytes. ("
-          << string_human_readable_size(size).c_str() << ")";
+          << string_human_readable_number(size) << " bytes. (" << string_human_readable_size(size)
+          << ")";
 
   ConstMemMap::iterator i = m_const_mem_map.find(name);
   device_vector<uchar> *data;
@@ -359,8 +359,8 @@ void OneapiDevice::global_alloc(device_memory &mem)
 
   size_t size = mem.memory_size();
   VLOG(2) << "OneapiDevice::global_alloc \"" << mem.name << "\" object "
-          << string_human_readable_number(size).c_str() << " bytes. ("
-          << string_human_readable_size(size).c_str() << ")";
+          << string_human_readable_number(size) << " bytes. (" << string_human_readable_size(size)
+          << ")";
 
   generic_alloc(mem);
   generic_copy_to(mem);
