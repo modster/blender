@@ -29,8 +29,6 @@ class OneapiDeviceQueue : public DeviceQueue {
 
   virtual void init_execution() override;
 
-  virtual bool kernel_available(DeviceKernel kernel) const override;
-
   virtual bool enqueue(DeviceKernel kernel,
                        const int kernel_work_size,
                        DeviceKernelArguments const &args) override;
