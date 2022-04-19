@@ -78,6 +78,13 @@ struct PixelInfo {
     return result;
   }
 
+  static PixelInfo seam_fix()
+  {
+    PixelInfo result;
+    result.node = IS_SEAM_FIX;
+    return result;
+  }
+
   uint32_t get_node_index() const
   {
     return node >> 2;
@@ -105,6 +112,18 @@ struct Bitmap {
   Bitmap(image::ImageTileWrapper &image_tile, Vector<PixelInfo> bitmap, int2 resolution)
       : image_tile(image_tile), bitmap(bitmap), resolution(resolution)
   {
+  }
+
+  void mark_seam_fix(int2 image_coordinate)
+  {
+    int offset = image_coordinate.y * resolution.x + image_coordinate.x;
+    bitmap[offset] = PixelInfo::seam_fix();
+  }
+
+  const PixelInfo &get_pixel_info(int2 image_coordinate) const
+  {
+    int offset = image_coordinate.y * resolution.x + image_coordinate.x;
+    return bitmap[offset];
   }
 };
 
@@ -161,6 +180,34 @@ Bitmaps create_tile_bitmap(const PBVH &pbvh, Image &image, ImageUser &image_user
   return result;
 }
 
+int2 find_source_pixel()
+{
+  return int2(0, 0);
+}
+
+static void BKE_pbvh_pixels_clear_seams(PBVH *pbvh)
+{
+  for (int n = 0; n < pbvh->totnode; n++) {
+    PBVHNode &node = pbvh->nodes[n];
+    if ((node.flag & PBVH_Leaf) == 0) {
+      continue;
+    }
+    NodeData &node_data = BKE_pbvh_pixels_node_data_get(node);
+    node_data.seams.clear();
+  }
+}
+
+static void add_seam_fix(PBVHNode &node,
+                         uint16_t src_tile_number,
+                         int2 src_pixel,
+                         uint16_t dst_tile_number,
+                         int2 dst_pixel)
+{
+  NodeData &node_data = BKE_pbvh_pixels_node_data_get(node);
+  UDIMSeamFixes &seam_fixes = node_data.ensure_seam_fixes(src_tile_number, dst_tile_number);
+  seam_fixes.pixels.append(SeamFix{src_pixel, dst_pixel});
+}
+
 void BKE_pbvh_pixels_rebuild_seams(
     PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user, int cd_loop_uv_offset)
 {
@@ -175,13 +222,14 @@ void BKE_pbvh_pixels_rebuild_seams(
   from_mesh_params.calc_vert_normal = false;
   BM_mesh_bm_from_me(bm, mesh, &from_mesh_params);
 
+  BKE_pbvh_pixels_clear_seams(pbvh);
+
   // find seams.
   // for each edge
   Vector<BMLoopPair> pairs = find_connected_loops(bm, cd_loop_uv_offset);
   printf("found %lld pairs\n", pairs.size());
 
   // Make a bitmap per tile indicating pixels that have already been assigned to a PBVHNode.
-  // to we could also loop over each node/tile/packed pixels, but that might take to much time.
   Bitmaps bitmaps = create_tile_bitmap(*pbvh, *image, *image_user);
 
   for (BMLoopPair &pair : pairs) {
@@ -215,6 +263,7 @@ void BKE_pbvh_pixels_rebuild_seams(
         continue;
       }
       else {
+
         for (int v = uvbounds_i.ymin; v < uvbounds_i.ymax; v++) {
           for (int u = uvbounds_i.xmin; u < uvbounds_i.xmax; u++) {
             if (u < 0 || u > bitmap.resolution[0] || v < 0 || v > bitmap.resolution[1]) {
@@ -224,8 +273,25 @@ void BKE_pbvh_pixels_rebuild_seams(
             int pixel_offset = v * bitmap.resolution[0] + u;
             PixelInfo &pixel_info = bitmap.bitmap[pixel_offset];
             if (pixel_info.is_extracted() || pixel_info.is_seam_fix()) {
+              /* Skip this pixel as it already has a solution. */
               continue;
             }
+
+            // What is the distance to the edge.
+            float2 uv(float(u) / bitmap.resolution[0], float(v) / bitmap.resolution[1]);
+            float2 closest_point;
+            float lambda = closest_to_line_v2(closest_point, uv, luv_1->uv, luv_2->uv);
+
+            int2 source_pixel = find_source_pixel();
+            int2 destination_pixel(u, v);
+            int source_node = bitmap.get_pixel_info(source_pixel).get_node_index();
+            PBVHNode &node = pbvh->nodes[source_node];
+            add_seam_fix(node,
+                         bitmap.image_tile.get_tile_number(),
+                         source_pixel,
+                         bitmap.image_tile.get_tile_number(),
+                         destination_pixel);
+            bitmap.mark_seam_fix(destination_pixel);
           }
         }
       }
@@ -233,6 +299,10 @@ void BKE_pbvh_pixels_rebuild_seams(
   }
 
   BM_mesh_free(bm);
+}
+
+void BKE_pbvh_pixels_fix_seams(PBVH *pbvh, Image *image, ImageUser *image_user)
+{
 }
 
 }  // namespace blender::bke::pbvh::pixels

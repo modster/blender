@@ -132,6 +132,22 @@ struct UDIMTilePixels {
   }
 };
 
+struct SeamFix {
+  int2 src_pixel;
+  int2 dst_pixel;
+};
+
+struct UDIMSeamFixes {
+  ushort src_tile_number;
+  ushort dst_tile_number;
+  Vector<SeamFix> pixels;
+
+  UDIMSeamFixes(uint16_t src_tile_number, uint16_t dst_tile_number)
+      : src_tile_number(src_tile_number), dst_tile_number(dst_tile_number)
+  {
+  }
+};
+
 struct NodeData {
   struct {
     bool dirty : 1;
@@ -139,6 +155,8 @@ struct NodeData {
 
   Vector<UDIMTilePixels> tiles;
   Triangles triangles;
+  /* TODO: This should be ordered between source and destination UDIM tiles. */
+  Vector<UDIMSeamFixes> seams;
 
   NodeData()
   {
@@ -153,6 +171,17 @@ struct NodeData {
       }
     }
     return nullptr;
+  }
+
+  UDIMSeamFixes &ensure_seam_fixes(uint16_t src_tile_number, uint16_t dst_tile_number)
+  {
+    for (UDIMSeamFixes &fixes : seams) {
+      if (fixes.src_tile_number == src_tile_number && fixes.dst_tile_number == dst_tile_number) {
+        return fixes;
+      }
+    }
+    seams.append(UDIMSeamFixes(src_tile_number, dst_tile_number));
+    return seams.last();
   }
 
   void mark_region(Image &image, const image::ImageTileWrapper &image_tile, ImBuf &image_buffer)
@@ -183,5 +212,6 @@ void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &i
 
 void BKE_pbvh_pixels_rebuild_seams(
     PBVH *pbvh, Mesh *me, Image *image, ImageUser *image_user, int cd_loop_uv_offset);
+void BKE_pbvh_pixels_fix_seams(PBVH *pbvh, Image *image, ImageUser *image_user);
 
 }  // namespace blender::bke::pbvh::pixels
