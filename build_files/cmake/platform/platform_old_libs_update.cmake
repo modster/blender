@@ -13,7 +13,9 @@ function(unset_cache_variables pattern)
 endfunction()
 
 # Detect update from 3.1 to 3.2 libs.
-if(OPENEXR_VERSION AND ${OPENEXR_VERSION} VERSION_LESS "3.0.0" AND EXISTS ${LIBDIR}/imath)
+if(DEFINED OPENEXR_VERSION AND
+   OPENEXR_VERSION VERSION_LESS "3.0.0" AND
+   EXISTS ${LIBDIR}/imath)
   message(STATUS "Auto updating CMake configuration for Blender 3.2 libraries")
 
   unset_cache_variables("^OPENIMAGEIO")
