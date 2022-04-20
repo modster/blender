@@ -234,6 +234,7 @@ static void add_seam_fix(PBVHNode &node,
 {
   NodeData &node_data = BKE_pbvh_pixels_node_data_get(node);
   UDIMSeamFixes &seam_fixes = node_data.ensure_seam_fixes(src_tile_number, dst_tile_number);
+  BLI_rcti_do_minmax_v(&seam_fixes.dst_partial_region, dst_pixel);
   seam_fixes.pixels.append(SeamFix{src_pixel, dst_pixel});
 }
 
@@ -522,9 +523,16 @@ void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_us
       }
     }
 
-    /* TODO: should be narrowed to the part of the image that needs to be updated. Requires
-     * access to the image tile. can be stored in the UDIMSeamFixes struct.  */
-    BKE_image_partial_update_mark_full_update(image);
+    /* Mark dst_image_buffer region dirty covering each dst_pixel. */
+    LISTBASE_FOREACH (ImageTile *, image_tile, &image->tiles) {
+      if (image_tile->tile_number != fixes.dst_tile_number) {
+        continue;
+      }
+
+      BKE_image_partial_update_mark_region(
+          image, image_tile, dst_image_buffer, &fixes.dst_partial_region);
+      break;
+    }
     BKE_image_release_ibuf(image, src_image_buffer, nullptr);
     BKE_image_release_ibuf(image, dst_image_buffer, nullptr);
   }

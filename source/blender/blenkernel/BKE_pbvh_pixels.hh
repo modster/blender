@@ -138,13 +138,16 @@ struct SeamFix {
 };
 
 struct UDIMSeamFixes {
-  ushort src_tile_number;
-  ushort dst_tile_number;
+  uint16_t src_tile_number;
+  uint16_t dst_tile_number;
   Vector<SeamFix> pixels;
+  /* Region of the dst image buffer for partial update. Should cover all `pixels.dst_pixels`. */
+  rcti dst_partial_region;
 
   UDIMSeamFixes(uint16_t src_tile_number, uint16_t dst_tile_number)
       : src_tile_number(src_tile_number), dst_tile_number(dst_tile_number)
   {
+    BLI_rcti_init_minmax(&dst_partial_region);
   }
 };
 
@@ -155,7 +158,6 @@ struct NodeData {
 
   Vector<UDIMTilePixels> tiles;
   Triangles triangles;
-  /* TODO: This should be ordered between source and destination UDIM tiles. */
   Vector<UDIMSeamFixes> seams;
 
   NodeData()
