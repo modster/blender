@@ -37,7 +37,7 @@ DLL_INTERFACE_CALL(oneapi_set_global_memory,
                    const char *memory_name,
                    void *memory_device_pointer)
 
-DLL_INTERFACE_CALL(oneapi_kernel_prefered_local_size,
+DLL_INTERFACE_CALL(oneapi_kernel_preferred_local_size,
                    size_t,
                    SyclQueue *queue,
                    const DeviceKernel kernel,

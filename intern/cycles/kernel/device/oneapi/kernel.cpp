@@ -256,17 +256,17 @@ void oneapi_set_global_memory(SyclQueue *queue_,
 #  undef KERNEL_TEX
 }
 
-size_t oneapi_kernel_prefered_local_size(SyclQueue *queue_,
-                                         const DeviceKernel kernel,
-                                         const size_t kernel_global_size)
+size_t oneapi_kernel_preferred_local_size(SyclQueue *queue_,
+                                          const DeviceKernel kernel,
+                                          const size_t kernel_global_size)
 {
   assert(queue_);
   sycl::queue *queue = reinterpret_cast<sycl::queue *>(queue_);
   (void)kernel_global_size;
-  const static size_t prefered_work_group_size_intersect_shading = 32;
-  const static size_t prefered_work_group_size_technical = 1024;
+  const static size_t preferred_work_group_size_intersect_shading = 32;
+  const static size_t preferred_work_group_size_technical = 1024;
 
-  size_t prefered_work_group_size = 0;
+  size_t preferred_work_group_size = 0;
   switch (kernel) {
     case DEVICE_KERNEL_INTEGRATOR_INIT_FROM_CAMERA:
     case DEVICE_KERNEL_INTEGRATOR_INIT_FROM_BAKE:
@@ -280,7 +280,7 @@ size_t oneapi_kernel_prefered_local_size(SyclQueue *queue_,
     case DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE:
     case DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME:
     case DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW:
-      prefered_work_group_size = prefered_work_group_size_intersect_shading;
+      preferred_work_group_size = preferred_work_group_size_intersect_shading;
       break;
 
     case DEVICE_KERNEL_INTEGRATOR_QUEUED_PATHS_ARRAY:
@@ -295,16 +295,16 @@ size_t oneapi_kernel_prefered_local_size(SyclQueue *queue_,
     case DEVICE_KERNEL_INTEGRATOR_COMPACT_SHADOW_STATES:
     case DEVICE_KERNEL_INTEGRATOR_RESET:
     case DEVICE_KERNEL_INTEGRATOR_SHADOW_CATCHER_COUNT_POSSIBLE_SPLITS:
-      prefered_work_group_size = prefered_work_group_size_technical;
+      preferred_work_group_size = preferred_work_group_size_technical;
       break;
 
     default:
-      prefered_work_group_size = 512;
+      preferred_work_group_size = 512;
   }
 
   const size_t limit_work_group_size =
       queue->get_device().get_info<sycl::info::device::max_work_group_size>();
-  return std::min(limit_work_group_size, prefered_work_group_size);
+  return std::min(limit_work_group_size, preferred_work_group_size);
 }
 
 bool oneapi_enqueue_kernel(KernelContext *kernel_context,
@@ -321,7 +321,7 @@ bool oneapi_enqueue_kernel(KernelContext *kernel_context,
     return false;
   }
 
-  size_t local_size = oneapi_kernel_prefered_local_size(
+  size_t local_size = oneapi_kernel_preferred_local_size(
       kernel_context->queue, device_kernel, global_size);
   assert(global_size % local_size == 0);
 

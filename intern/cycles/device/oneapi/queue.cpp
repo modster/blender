@@ -128,7 +128,7 @@ int OneapiDeviceQueue::num_concurrent_states(const size_t state_size) const
     }
   }
   else {
-    // iGPU path - no really nead to allocate a lot of integrator states, because it is shared GPU
+    // iGPU path - no really need to allocate a lot of integrator states, because it is shared GPU
     // memory
     num_states = 1024 * 512;
   }
@@ -179,9 +179,9 @@ bool OneapiDeviceQueue::enqueue(DeviceKernel kernel,
   size_t kernel_work_size = (size_t)signed_kernel_work_size;
 
   size_t kernel_local_size =
-      (oneapi_dll_.oneapi_kernel_prefered_local_size)(kernel_context_->queue,
-                                                      (::DeviceKernel)kernel,
-                                                      kernel_work_size);
+      (oneapi_dll_.oneapi_kernel_preferred_local_size)(kernel_context_->queue,
+                                                       (::DeviceKernel)kernel,
+                                                       kernel_work_size);
   size_t uniformed_kernel_work_size = round_up(kernel_work_size, kernel_local_size);
 
   assert(kernel_context_);
