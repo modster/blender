@@ -30,9 +30,6 @@ class OneapiDevice : public Device {
  public:
   virtual BVHLayoutMask get_bvh_layout_mask() const override;
 
-  // No need to override
-  // void set_error(const string &error) override;
-
   OneapiDevice(const DeviceInfo &info,
                OneAPIDLLInterface &oneapi_dll_object,
                Stats &stats,
