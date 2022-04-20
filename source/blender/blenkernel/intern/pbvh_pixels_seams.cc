@@ -395,15 +395,19 @@ void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_us
       continue;
     }
 
-    for (SeamFix &fix : fixes.pixels) {
-      int src_offset = fix.src_pixel.y * src_image_buffer->x + fix.src_pixel.x;
-      int dst_offset = fix.dst_pixel.y * dst_image_buffer->x + fix.dst_pixel.x;
-      if (src_image_buffer->rect_float != nullptr && dst_image_buffer->rect_float != nullptr) {
+    if (src_image_buffer->rect_float != nullptr && dst_image_buffer->rect_float != nullptr) {
+      for (SeamFix &fix : fixes.pixels) {
+        int src_offset = fix.src_pixel.y * src_image_buffer->x + fix.src_pixel.x;
+        int dst_offset = fix.dst_pixel.y * dst_image_buffer->x + fix.dst_pixel.x;
         copy_v4_v4(&dst_image_buffer->rect_float[dst_offset * 4],
                    &src_image_buffer->rect_float[src_offset * 4]);
       }
-      else if (src_image_buffer->rect != nullptr && dst_image_buffer->rect != nullptr) {
-        dst_image_buffer->rect_float[dst_offset] = src_image_buffer->rect_float[src_offset];
+    }
+    else if (src_image_buffer->rect != nullptr && dst_image_buffer->rect != nullptr) {
+      for (SeamFix &fix : fixes.pixels) {
+        int src_offset = fix.src_pixel.y * src_image_buffer->x + fix.src_pixel.x;
+        int dst_offset = fix.dst_pixel.y * dst_image_buffer->x + fix.dst_pixel.x;
+        dst_image_buffer->rect[dst_offset] = src_image_buffer->rect[src_offset];
       }
     }
 
