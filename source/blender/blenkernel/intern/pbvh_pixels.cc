@@ -287,7 +287,6 @@ static void update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image
   if (ldata_uv == nullptr) {
     return;
   }
-  int cd_loop_uv_offset = CustomData_get_offset(&mesh->ldata, CD_MLOOPUV);
 
   for (PBVHNode *node : nodes_to_update) {
     NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
@@ -307,6 +306,8 @@ static void update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image
   if (USE_WATERTIGHT_CHECK) {
     apply_watertight_check(pbvh, image, image_user);
   }
+
+  int cd_loop_uv_offset = CustomData_get_offset(&mesh->ldata, CD_MLOOPUV);
   BKE_pbvh_pixels_rebuild_seams(pbvh, mesh, image, image_user, cd_loop_uv_offset);
 
   /* Clear the UpdatePixels flag. */
