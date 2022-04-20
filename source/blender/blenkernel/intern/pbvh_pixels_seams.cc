@@ -180,12 +180,39 @@ Bitmaps create_tile_bitmap(const PBVH &pbvh, Image &image, ImageUser &image_user
   return result;
 }
 
-int2 find_source_pixel()
+int2 find_source_pixel(Bitmap &bitmap, float2 near_image_coord)
 {
-  return int2(50, 50);
+  // TODO: Should we take lambda into account?
+  const int SEARCH_RADIUS = 2;
+  float min_distance = FLT_MAX;
+  int2 result(0, 0);
+  int2 image_coord(int(near_image_coord.x), int(near_image_coord.y));
+  for (int v = image_coord.y - SEARCH_RADIUS; v <= image_coord.y + SEARCH_RADIUS; v++) {
+    for (int u = image_coord.x - SEARCH_RADIUS; u <= image_coord.x + SEARCH_RADIUS; u++) {
+      if (u < 0 || u > bitmap.resolution.x || v < 0 || v > bitmap.resolution.y) {
+        /** Pixel not part of this tile. */
+        continue;
+      }
+
+      int2 uv(u, v);
+      const PixelInfo &pixel_info = bitmap.get_pixel_info(uv);
+      if (!pixel_info.is_extracted()) {
+        continue;
+      }
+
+      float distance = len_v2v2_int(uv, image_coord);
+      if (distance < min_distance) {
+        result = uv;
+        min_distance = distance;
+      }
+    }
+  }
+
+  return result;
 }
 
-static void BKE_pbvh_pixels_clear_seams(PBVH *pbvh)
+/** Clears all existing seam fixes in the given PBVH. */
+static void pbvh_pixels_clear_seams(PBVH *pbvh)
 {
   for (int n = 0; n < pbvh->totnode; n++) {
     PBVHNode &node = pbvh->nodes[n];
@@ -208,6 +235,57 @@ static void add_seam_fix(PBVHNode &node,
   seam_fixes.pixels.append(SeamFix{src_pixel, dst_pixel});
 }
 
+static void fix_unconnected_seam(
+    PBVH &pbvh, Bitmap &bitmap, const rcti &uvbounds, const MLoopUV &luv_1, const MLoopUV &luv_2)
+{
+  for (int v = uvbounds.ymin; v <= uvbounds.ymax; v++) {
+    for (int u = uvbounds.xmin; u <= uvbounds.xmax; u++) {
+      if (u < 0 || u > bitmap.resolution[0] || v < 0 || v > bitmap.resolution[1]) {
+        /** Pixel not part of this tile. */
+        continue;
+      }
+      int pixel_offset = v * bitmap.resolution[0] + u;
+      PixelInfo &pixel_info = bitmap.bitmap[pixel_offset];
+      if (pixel_info.is_extracted() || pixel_info.is_seam_fix()) {
+        /* Skip this pixel as it already has a solution. */
+        continue;
+      }
+
+      // What is the distance to the edge.
+      float2 uv(float(u) / bitmap.resolution[0], float(v) / bitmap.resolution[1]);
+      float2 closest_point;
+      // TODO: Should we use lambda to reduce artifacts?
+      closest_to_line_v2(closest_point, uv, luv_1.uv, luv_2.uv);
+
+      /* Calculate the distance in pixel space. */
+      float2 uv_coord(u, v);
+      float2 closest_coord(closest_point.x * bitmap.resolution.x,
+                           closest_point.y * bitmap.resolution.y);
+      float distance_to_edge = len_v2v2(uv_coord, closest_coord);
+      if (distance_to_edge > 2.5f) {
+        continue;
+      }
+
+      int2 source_pixel = find_source_pixel(bitmap, closest_coord);
+      int2 destination_pixel(u, v);
+
+      PixelInfo src_pixel_info = bitmap.get_pixel_info(source_pixel);
+      if (!src_pixel_info.is_extracted()) {
+        continue;
+      }
+      int src_node = src_pixel_info.get_node_index();
+
+      PBVHNode &node = pbvh.nodes[src_node];
+      add_seam_fix(node,
+                   bitmap.image_tile.get_tile_number(),
+                   source_pixel,
+                   bitmap.image_tile.get_tile_number(),
+                   destination_pixel);
+      bitmap.mark_seam_fix(destination_pixel);
+    }
+  }
+}
+
 void BKE_pbvh_pixels_rebuild_seams(
     PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user, int cd_loop_uv_offset)
 {
@@ -222,12 +300,11 @@ void BKE_pbvh_pixels_rebuild_seams(
   from_mesh_params.calc_vert_normal = false;
   BM_mesh_bm_from_me(bm, mesh, &from_mesh_params);
 
-  BKE_pbvh_pixels_clear_seams(pbvh);
+  pbvh_pixels_clear_seams(pbvh);
 
   // find seams.
   // for each edge
   Vector<BMLoopPair> pairs = find_connected_loops(bm, cd_loop_uv_offset);
-  printf("found %lld pairs\n", pairs.size());
 
   // Make a bitmap per tile indicating pixels that have already been assigned to a PBVHNode.
   Bitmaps bitmaps = create_tile_bitmap(*pbvh, *image, *image_user);
@@ -263,50 +340,7 @@ void BKE_pbvh_pixels_rebuild_seams(
         continue;
       }
       else {
-
-        for (int v = uvbounds_i.ymin; v <= uvbounds_i.ymax; v++) {
-          for (int u = uvbounds_i.xmin; u <= uvbounds_i.xmax; u++) {
-            if (u < 0 || u > bitmap.resolution[0] || v < 0 || v > bitmap.resolution[1]) {
-              /** Pixel not part of this tile. */
-              continue;
-            }
-            int pixel_offset = v * bitmap.resolution[0] + u;
-            PixelInfo &pixel_info = bitmap.bitmap[pixel_offset];
-            if (pixel_info.is_extracted() || pixel_info.is_seam_fix()) {
-              /* Skip this pixel as it already has a solution. */
-              continue;
-            }
-
-            // What is the distance to the edge.
-            float2 uv(float(u) / bitmap.resolution[0], float(v) / bitmap.resolution[1]);
-            float2 closest_point;
-            float lambda = closest_to_line_v2(closest_point, uv, luv_1->uv, luv_2->uv);
-
-            /* Calcualte the distance in pixel space. */
-            float2 uv_coord(u, v);
-            float2 closest_coord(closest_point.x * bitmap.resolution.x,
-                                 closest_point.y * bitmap.resolution.y);
-            float distance_to_edge = len_v2v2(uv_coord, closest_coord);
-            if (distance_to_edge > 2.5f) {
-              continue;
-            }
-
-            int2 source_pixel = find_source_pixel();
-            int2 destination_pixel(u, v);
-
-            PixelInfo src_pixel_info = bitmap.get_pixel_info(source_pixel);
-            BLI_assert(src_pixel_info.is_extracted());
-            int src_node = src_pixel_info.get_node_index();
-
-            PBVHNode &node = pbvh->nodes[src_node];
-            add_seam_fix(node,
-                         bitmap.image_tile.get_tile_number(),
-                         source_pixel,
-                         bitmap.image_tile.get_tile_number(),
-                         destination_pixel);
-            bitmap.mark_seam_fix(destination_pixel);
-          }
-        }
+        fix_unconnected_seam(*pbvh, bitmap, uvbounds_i, *luv_1, *luv_2);
       }
     }
   }
@@ -321,22 +355,34 @@ void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_us
 
   for (UDIMSeamFixes &fixes : node_data.seams) {
     iuser.tile = fixes.dst_tile_number;
-    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &iuser, nullptr);
-    if (image_buffer == nullptr) {
+    ImBuf *dst_image_buffer = BKE_image_acquire_ibuf(image, &iuser, nullptr);
+    if (dst_image_buffer == nullptr) {
+      continue;
+    }
+
+    iuser.tile = fixes.src_tile_number;
+    ImBuf *src_image_buffer = BKE_image_acquire_ibuf(image, &iuser, nullptr);
+    if (src_image_buffer == nullptr) {
       continue;
     }
 
     for (SeamFix &fix : fixes.pixels) {
-      int src_offset = fix.src_pixel.y * image_buffer->x + fix.src_pixel.x;
-      int dst_offset = fix.dst_pixel.y * image_buffer->x + fix.dst_pixel.x;
-      if (image_buffer->rect_float != nullptr) {
-        copy_v4_fl4(&image_buffer->rect_float[dst_offset * 4], 1.0, 0.0, 0.0, 1.0);
+      int src_offset = fix.src_pixel.y * src_image_buffer->x + fix.src_pixel.x;
+      int dst_offset = fix.dst_pixel.y * dst_image_buffer->x + fix.dst_pixel.x;
+      if (src_image_buffer->rect_float != nullptr && dst_image_buffer->rect_float != nullptr) {
+        copy_v4_v4(&dst_image_buffer->rect_float[dst_offset * 4],
+                   &src_image_buffer->rect_float[src_offset * 4]);
+      }
+      else if (src_image_buffer->rect != nullptr && dst_image_buffer->rect != nullptr) {
+        dst_image_buffer->rect_float[dst_offset] = src_image_buffer->rect_float[src_offset];
       }
     }
+
     /* TODO: should be narrowed to the part of the image that needs to be updated. Requires
-     * access to the image tile.*/
+     * access to the image tile. */
     BKE_image_partial_update_mark_full_update(image);
-    BKE_image_release_ibuf(image, image_buffer, nullptr);
+    BKE_image_release_ibuf(image, src_image_buffer, nullptr);
+    BKE_image_release_ibuf(image, dst_image_buffer, nullptr);
   }
 }
 
