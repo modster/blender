@@ -691,7 +691,7 @@ GPUMaterial *GPU_material_from_nodetree(Scene *scene,
         gpu_node_graph_free_nodes(&mat->graph);
       }
       else {
-        mat->status = GPU_MAT_QUEUED;
+        mat->status = GPU_MAT_CREATED;
       }
     }
   }
@@ -717,8 +717,6 @@ void GPU_material_compile(GPUMaterial *mat)
 
   BLI_assert(mat->status == GPU_MAT_QUEUED);
   BLI_assert(mat->pass);
-
-  printf("Compiling %s\n", mat->name);
 
   /* NOTE: The shader may have already been compiled here since we are
    * sharing GPUShader across GPUMaterials. In this case it's a no-op. */
