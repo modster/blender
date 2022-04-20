@@ -3831,7 +3831,9 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
     lineart_end_bounding_area_recursive(&rb->initial_bounding_areas[i]);
   }
 
-  MEM_freeN(rb->pending_edges.array);
+  if (rb->pending_edges.array) {
+    MEM_freeN(rb->pending_edges.array);
+  }
 
   lineart_mem_destroy(&rb->render_data_pool);
 }
