@@ -275,10 +275,7 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
   BKE_image_partial_update_mark_full_update(image);
 }
 
-static void update_pixels(PBVH *pbvh,
-                          Mesh *mesh,
-                          struct Image *image,
-                          struct ImageUser *image_user)
+static void update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
 {
   Vector<PBVHNode *> nodes_to_update;
 
@@ -378,10 +375,7 @@ void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &i
 extern "C" {
 using namespace blender::bke::pbvh::pixels;
 
-void BKE_pbvh_build_pixels(PBVH *pbvh,
-                           struct Mesh *mesh,
-                           struct Image *image,
-                           struct ImageUser *image_user)
+void BKE_pbvh_build_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
 {
   update_pixels(pbvh, mesh, image, image_user);
 }
