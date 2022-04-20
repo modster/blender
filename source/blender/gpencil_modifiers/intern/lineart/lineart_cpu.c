@@ -1450,6 +1450,28 @@ static void lineart_vert_transform(
   mul_v4_m4v3_db(vt->fbcoord, mvp_mat, co);
 }
 
+static void lineart_vert_transform_me(
+    MVert *v, int index, LineartVert *RvBuf, double (*mv_mat)[4], double (*mvp_mat)[4])
+{
+  double co[4];
+  LineartVert *vt = &RvBuf[index];
+  copy_v3db_v3fl(co, v->co);
+  mul_v3_m4v3_db(vt->gloc, mv_mat, co);
+  mul_v4_m4v3_db(vt->fbcoord, mvp_mat, co);
+}
+
+typedef struct LineartAdjacentItem {
+  unsigned int v1;
+  unsigned int v2;
+  unsigned int e;
+} LineartAdjacentItem;
+
+typedef struct LineartEdgeNeighbor {
+  int e;
+  short flags;
+  int v1, v2;
+} LineartEdgeNeighbor;
+
 typedef struct VertData {
   MVert *mvert;
   LineartVert *v_arr;
@@ -1673,6 +1695,163 @@ static uint16_t lineart_identify_medge_feature_edges(
     if (fe->flag & FREESTYLE_EDGE_MARK) {
       edge_flag_result |= LRT_EDGE_FLAG_EDGE_MARK;
     }
+  }
+
+  return edge_flag_result;
+}
+
+__attribute__((optimize("O0"))) static uint16_t lineart_identify_feature_line_me(
+    LineartRenderBuffer *rb,
+    int eindex,
+    LineartTriangle *rt_array,
+    LineartVert *rv_array,
+    float crease_threshold,
+    bool use_auto_smooth,
+    bool use_freestyle_edge,
+    bool use_freestyle_face,
+    Mesh *me,
+    LineartEdgeNeighbor *en,
+    float (*normals)[3])
+{
+
+  MPoly *ll = NULL, *lr = NULL;
+
+  int t1i = -1, t1e = -1, t2i = -1;
+  if (en[eindex].e >= 0) {
+    t1i = en[eindex].e / 3;
+    t1e = en[eindex].e;
+  }
+  if (t1e >= 0 && en[t1e].e >= 0) {
+    t2i = en[t1e].e / 3;
+  }
+
+  if (t1i >= 0) {
+    ll = &me->mpoly[me->runtime.looptris.array[t1i].poly];
+  }
+  if (t2i >= 0) {
+    lr = &me->mpoly[me->runtime.looptris.array[t2i].poly];
+  }
+
+  if (t1i < 0 && t2i < 0) {
+    if (!rb->use_loose_as_contour) {
+      if (use_freestyle_face && rb->filter_face_mark) {
+        if (rb->filter_face_mark_invert) {
+          return LRT_EDGE_FLAG_LOOSE;
+        }
+        return 0;
+      }
+      return LRT_EDGE_FLAG_LOOSE;
+    }
+  }
+
+  FreestyleEdge *fel, *fer;
+  bool face_mark_filtered = false;
+  bool only_contour = false;
+
+  uint16_t edge_flag_result = 0;
+
+  /* Mesh boundary */
+  if (!ll || !lr) {
+    return (edge_flag_result | LRT_EDGE_FLAG_CONTOUR);
+  }
+
+  LineartTriangle *tri1, *tri2;
+  LineartVert *l;
+
+  /* The mesh should already be triangulated now, so we can assume each face is a triangle. */
+  tri1 = lineart_triangle_from_index(rb, rt_array, t1i);
+  tri2 = lineart_triangle_from_index(rb, rt_array, t2i);
+
+  l = &rv_array[en[eindex].v1];
+
+  double vv[3];
+  double *view_vector = vv;
+  double dot_1 = 0, dot_2 = 0;
+  double result;
+  bool material_back_face = ((tri1->flags | tri2->flags) & LRT_TRIANGLE_MAT_BACK_FACE_CULLING);
+
+  if (rb->use_contour || rb->use_back_face_culling || material_back_face) {
+
+    if (rb->cam_is_persp) {
+      sub_v3_v3v3_db(view_vector, rb->camera_pos, l->gloc);
+    }
+    else {
+      view_vector = rb->view_vector;
+    }
+
+    dot_1 = dot_v3v3_db(view_vector, tri1->gn);
+    dot_2 = dot_v3v3_db(view_vector, tri2->gn);
+
+    if (rb->use_contour && (result = dot_1 * dot_2) <= 0 && (fabs(dot_1) + fabs(dot_2))) {
+      edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
+    }
+
+    /* Because the ray points towards the camera, so backface is when dot value being negative.*/
+    if (rb->use_back_face_culling) {
+      if (dot_1 < 0) {
+        tri1->flags |= LRT_CULL_DISCARD;
+      }
+      if (dot_2 < 0) {
+        tri2->flags |= LRT_CULL_DISCARD;
+      }
+    }
+    if (material_back_face) {
+      if (tri1->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_1 < 0) {
+        tri1->flags |= LRT_CULL_DISCARD;
+      }
+      if (tri2->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_2 < 0) {
+        tri2->flags |= LRT_CULL_DISCARD;
+      }
+    }
+  }
+
+  /* For when face mark filtering decided that we discard the face but keep_contour option is on.
+   * so we still have correct full contour around the object. */
+  if (only_contour) {
+    return edge_flag_result;
+  }
+
+  if (rb->use_light_contour) {
+    if (rb->light_is_sun) {
+      view_vector = rb->light_vector;
+    }
+    else {
+      view_vector = vv;
+      sub_v3_v3v3_db(view_vector, l->gloc, rb->light_vector);
+    }
+
+    dot_1 = dot_v3v3_db(view_vector, tri1->gn);
+    dot_2 = dot_v3v3_db(view_vector, tri2->gn);
+
+    if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+      edge_flag_result |= LRT_EDGE_FLAG_LIGHT_CONTOUR;
+    }
+  }
+
+  /* For when face mark filtering decided that we discard the face but keep_contour option is on.
+   * so we still have correct full contour around the object. */
+  if (only_contour) {
+    return edge_flag_result;
+  }
+
+  /* Do not show lines other than contour on back face (because contour has one adjacent face that
+   * isn't a back face).
+   * TODO(Yiming): Do we need separate option for this? */
+  if (rb->use_back_face_culling ||
+      ((tri1->flags & tri2->flags) & LRT_TRIANGLE_MAT_BACK_FACE_CULLING)) {
+    if (dot_1 < 0 && dot_2 < 0) {
+      return edge_flag_result;
+    }
+  }
+
+  if (rb->use_crease) {
+    if (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold) {
+      edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+    }
+  }
+
+  if (rb->use_material && (ll->mat_nr != lr->mat_nr)) {
+    edge_flag_result |= LRT_EDGE_FLAG_MATERIAL;
   }
 
   return edge_flag_result;
@@ -1943,6 +2122,7 @@ typedef struct TriData {
   LineartTriangle *tri_arr;
   int lineart_triangle_size;
   LineartTriangleAdjacent *tri_adj;
+  LineartEdgeNeighbor *en;
 } TriData;
 
 typedef struct TriDataReduce {
@@ -2085,6 +2265,54 @@ static void lineart_load_tri_reduce(const void *__restrict UNUSED(userdata),
   /* Free data from the chunk that will be left behind. */
   MEM_freeN(data_reduce->edge_pair_arr);
   BLI_edgehash_free(data_reduce->edge_hash, NULL);
+}
+
+static int cmp_adjacent_items(const void *ps1, const void *ps2)
+{
+  LineartAdjacentItem *p1 = (LineartAdjacentItem *)ps1;
+  LineartAdjacentItem *p2 = (LineartAdjacentItem *)ps2;
+  int a = (int)p1->v1 - (int)p2->v1;
+  int b = (int)p1->v2 - (int)p2->v2;
+  return a ? a : b;
+}
+static LineartEdgeNeighbor *lineart_build_edge_neighbor(Mesh *me, int total_edges)
+{
+  /* Because the mesh is traingulated, so me->totedge should be reliable? */
+  LineartAdjacentItem *ai = MEM_mallocN(sizeof(LineartAdjacentItem) * total_edges,
+                                        "LineartAdjacentItem arr");
+  LineartEdgeNeighbor *en = MEM_mallocN(sizeof(LineartEdgeNeighbor) * total_edges,
+                                        "LineartEdgeNeighbor arr");
+
+  MLoopTri *lt = me->runtime.looptris.array;
+
+  for (int i = 0; i < total_edges; i++) {
+    ai[i].e = i;
+    ai[i].v1 = me->mloop[lt[i / 3].tri[i % 3]].v;
+    ai[i].v2 = me->mloop[lt[i / 3].tri[(i + 1) % 3]].v;
+    if (ai[i].v1 > ai[i].v2) {
+      SWAP(unsigned int, ai[i].v1, ai[i].v2);
+    }
+    en[i].e = -1;
+
+    en[i].v1 = ai[i].v1;
+    en[i].v2 = ai[i].v2;
+  }
+
+  en[total_edges - 1].v1 = ai[total_edges - 1].v1;
+  en[total_edges - 1].v2 = ai[total_edges - 1].v2;
+
+  qsort(ai, total_edges, sizeof(LineartAdjacentItem), cmp_adjacent_items);
+
+  for (int i = 0; i < total_edges - 1; i++) {
+    if (ai[i].v1 == ai[i + 1].v1 && ai[i].v2 == ai[i + 1].v2) {
+      en[ai[i].e].e = ai[i + 1].e;
+      en[ai[i].e + 1].e = ai[i].e;
+    }
+  }
+
+  MEM_freeN(ai);
+
+  return en;
 }
 
 static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
@@ -2248,6 +2476,9 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
   tri_data.tri_arr = la_tri_arr;
   tri_data.lineart_triangle_size = re_buf->triangle_size;
   tri_data.tri_adj = tri_adj;
+
+  unsigned int total_edges = me->runtime.looptris.len * 3;
+  tri_data.en = lineart_build_edge_neighbor(me, total_edges);
 
   BLI_task_parallel_range(0, tot_tri, &tri_data, lineart_load_tri_task, &tri_settings);
 
@@ -2442,6 +2673,262 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
 
   if (ob_info->free_use_mesh) {
     BKE_id_free(NULL, me);
+  }
+}
+
+static void lineart_geometry_object_load_edge_neighbor(LineartObjectInfo *obi,
+                                                       LineartRenderBuffer *rb)
+{
+  MVert *v;
+  MPoly *f;
+  MEdge *e;
+  MLoop *loop;
+  MLoopTri *looptri;
+  LineartEdge *la_e;
+  LineartEdgeSegment *la_s;
+  LineartTriangle *tri;
+  LineartTriangleAdjacent *orta;
+  double(*model_view_proj)[4] = obi->model_view_proj, (*model_view)[4] = obi->model_view,
+  (*normal)[4] = obi->normal;
+  LineartElementLinkNode *eln;
+  LineartVert *orv;
+  LineartEdge *o_la_e;
+  LineartEdgeSegment *o_la_s;
+  LineartTriangle *ort;
+  Object *orig_ob;
+  bool can_find_freestyle_edge = false;
+  bool can_find_freestyle_face = false;
+  int i;
+  float use_crease = 0;
+
+  int usage = obi->usage;
+
+  Mesh *me = obi->original_me;
+
+  BKE_mesh_runtime_looptri_ensure(me);
+  float(*poly_normals)[3] = BKE_mesh_poly_normals_ensure(me);
+  const int tot_tri = me->runtime.looptris.len;
+
+  unsigned int total_edges = me->runtime.looptris.len * 3;
+  LineartEdgeNeighbor *en = lineart_build_edge_neighbor(me, total_edges);
+
+  if (CustomData_has_layer(&me->edata, CD_FREESTYLE_EDGE)) {
+    can_find_freestyle_edge = true;
+  }
+  if (CustomData_has_layer(&me->pdata, CD_FREESTYLE_FACE)) {
+    can_find_freestyle_face = true;
+  }
+
+  /* If we allow duplicated edges, one edge should get added multiple times if is has been
+   * classified as more than one edge type. This is so we can create multiple different line type
+   * chains containing the same edge. */
+  orv = lineart_mem_acquire_thread(&rb->render_data_pool, sizeof(LineartVert) * me->totvert);
+  ort = lineart_mem_acquire_thread(&rb->render_data_pool, tot_tri * rb->triangle_size);
+
+  orig_ob = obi->original_ob;
+
+  BLI_spin_lock(&rb->lock_task);
+  eln = lineart_list_append_pointer_pool_sized_thread(
+      &rb->vertex_buffer_pointers, &rb->render_data_pool, orv, sizeof(LineartElementLinkNode));
+  BLI_spin_unlock(&rb->lock_task);
+
+  eln->element_count = me->totvert;
+  eln->object_ref = orig_ob;
+  obi->eln = eln;
+
+  bool use_auto_smooth = false;
+  if (orig_ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
+    use_crease = cosf(M_PI - orig_ob->lineart.crease_threshold);
+  }
+  else if (obi->original_me->flag & ME_AUTOSMOOTH) {
+    use_crease = cosf(obi->original_me->smoothresh);
+    use_auto_smooth = true;
+  }
+  else {
+    use_crease = rb->crease_threshold;
+  }
+
+  /* FIXME(Yiming): Hack for getting clean 3D text, the seam that extruded text object creates
+   * erroneous detection on creases. Future configuration should allow options. */
+  if (orig_ob->type == OB_FONT) {
+    eln->flags |= LRT_ELEMENT_BORDER_ONLY;
+  }
+
+  BLI_spin_lock(&rb->lock_task);
+  eln = lineart_list_append_pointer_pool_sized_thread(
+      &rb->triangle_buffer_pointers, &rb->render_data_pool, ort, sizeof(LineartElementLinkNode));
+  BLI_spin_unlock(&rb->lock_task);
+
+  eln->element_count = tot_tri;
+  eln->object_ref = orig_ob;
+  eln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
+
+  /* Note this memory is not from pool, will be deleted after culling. */
+  orta = MEM_callocN(sizeof(LineartTriangleAdjacent) * tot_tri, "LineartTriangleAdjacent");
+  /* Link is minimal so we use pool anyway. */
+  BLI_spin_lock(&rb->lock_task);
+  lineart_list_append_pointer_pool_thread(
+      &rb->triangle_adjacent_pointers, &rb->render_data_pool, orta);
+  BLI_spin_unlock(&rb->lock_task);
+
+  for (i = 0; i < me->totvert; i++) {
+    v = &me->mvert[i];
+    lineart_vert_transform_me(v, i, orv, model_view, model_view_proj);
+    orv[i].index = i;
+  }
+
+  tri = ort;
+  for (i = 0; i < tot_tri; i++) {
+    looptri = &me->runtime.looptris.array[i];
+
+    tri->v[0] = &orv[me->mloop[looptri->tri[0]].v];
+    tri->v[1] = &orv[me->mloop[looptri->tri[1]].v];
+    tri->v[2] = &orv[me->mloop[looptri->tri[2]].v];
+
+    f = &me->mpoly[looptri->poly];
+
+    /* Material mask bits and occlusion effectiveness assignment. */
+    Material *mat = BKE_object_material_get(orig_ob, f->mat_nr + 1);
+    tri->material_mask_bits |= ((mat && (mat->lineart.flags & LRT_MATERIAL_MASK_ENABLED)) ?
+                                    mat->lineart.material_mask_bits :
+                                    0);
+    tri->mat_occlusion |= (mat ? mat->lineart.mat_occlusion : 1);
+    tri->flags |= (mat && (mat->blend_flag & MA_BL_CULL_BACKFACE)) ?
+                      LRT_TRIANGLE_MAT_BACK_FACE_CULLING :
+                      0;
+
+    tri->intersection_mask = obi->override_intersection_mask;
+
+    float _gn[3];
+    double gn[3];
+    normal_tri_v3(_gn,
+                  me->mvert[me->mloop[looptri->tri[0]].v].co,
+                  me->mvert[me->mloop[looptri->tri[1]].v].co,
+                  me->mvert[me->mloop[looptri->tri[2]].v].co);
+    copy_v3db_v3fl(gn, _gn);
+    mul_v3_mat3_m4v3_db(tri->gn, normal, gn);
+    normalize_v3_db(tri->gn);
+
+    if (usage == OBJECT_LRT_INTERSECTION_ONLY) {
+      tri->flags |= LRT_TRIANGLE_INTERSECTION_ONLY;
+    }
+    else if (ELEM(usage, OBJECT_LRT_NO_INTERSECTION, OBJECT_LRT_OCCLUSION_ONLY)) {
+      tri->flags |= LRT_TRIANGLE_NO_INTERSECTION;
+    }
+
+    /* Re-use this field to refer to adjacent info, will be cleared after culling stage. */
+    tri->intersecting_verts = (void *)&orta[i];
+
+    tri = (LineartTriangle *)(((uchar *)tri) + rb->triangle_size);
+  }
+
+  /* Use BM_ELEM_TAG in f->head.hflag to store needed faces in the first iteration. */
+
+  printf("Edge neighbors ");
+  for (int n = 0; n < total_edges; n++) {
+    printf("%d ", en[n].e);
+  }
+  printf("\n");
+  printf("Edges ");
+  for (int n = 0; n < total_edges; n++) {
+    printf("%d-%d ", en[n].v1, en[n].v2);
+  }
+  printf("\n");
+
+  int allocate_la_e = 0;
+  for (i = 0; i < total_edges; i++) {
+    // e = &me->medge[i];
+
+    /* Because e->head.hflag is char, so line type flags should not exceed positive 7 bits. */
+    uint16_t eflag = lineart_identify_feature_line_me(
+        rb, i, ort, orv, use_crease, use_auto_smooth, false, false, me, en, poly_normals);
+    if (eflag) {
+      /* Only allocate for feature lines (instead of all lines) to save memory.
+       * If allow duplicated edges, one edge gets added multiple times if it has multiple types.
+       */
+      allocate_la_e += rb->allow_duplicated_types ? lineart_edge_type_duplication_count(eflag) : 1;
+    }
+    /* Here we just use bm's flag for when loading actual lines, then we don't need to call
+     * lineart_identify_feature_line() again, e->head.hflag deleted after loading anyway. Always
+     * set the flag, so hflag stays 0 for lines that are not feature lines. */
+    en[i].flags = 0;
+    en[i].flags |= eflag;
+  }
+
+  o_la_e = lineart_mem_acquire_thread(&rb->render_data_pool, sizeof(LineartEdge) * allocate_la_e);
+  o_la_s = lineart_mem_acquire_thread(&rb->render_data_pool,
+                                      sizeof(LineartEdgeSegment) * allocate_la_e);
+  BLI_spin_lock(&rb->lock_task);
+  eln = lineart_list_append_pointer_pool_sized_thread(
+      &rb->line_buffer_pointers, &rb->render_data_pool, o_la_e, sizeof(LineartElementLinkNode));
+  BLI_spin_unlock(&rb->lock_task);
+  eln->element_count = allocate_la_e;
+  eln->object_ref = orig_ob;
+
+  la_e = o_la_e;
+  la_s = o_la_s;
+  for (i = 0; i < total_edges; i++) {
+    // e = &me->medge[i];
+
+    /* Not a feature line, so we skip. */
+    if (!en[i].flags) {
+      continue;
+    }
+
+    bool edge_added = false;
+
+    /* See eLineartEdgeFlag for details. */
+    for (int flag_bit = 0; flag_bit < LRT_EDGE_FLAG_TYPE_MAX_BITS; flag_bit++) {
+      uint8_t use_type = 1 << flag_bit;
+      if (!(use_type & en[i].flags)) {
+        continue;
+      }
+
+      la_e->v1 = &orv[en[i].v1];
+      la_e->v2 = &orv[en[i].v2];
+
+      int t1i = -1, t1e = -1, t2i = -1;
+      if (en[i].e >= 0) {
+        t1i = en[i].e / 3;
+        t1e = en[i].e % 3;
+      }
+      if (t1e >= 0) {
+        t2i = t1e / 3;
+      }
+      if (t1i >= 0) {
+        int findex = t1i;
+        la_e->t1 = lineart_triangle_from_index(rb, ort, findex);
+        if (!edge_added) {
+          lineart_triangle_adjacent_assign(la_e->t1, &orta[findex], la_e);
+        }
+        if (t2i >= 0) {
+          findex = t2i;
+          la_e->t2 = lineart_triangle_from_index(rb, ort, findex);
+          if (!edge_added) {
+            lineart_triangle_adjacent_assign(la_e->t2, &orta[findex], la_e);
+          }
+        }
+      }
+      la_e->flags = use_type;
+      la_e->object_ref = orig_ob;
+      BLI_addtail(&la_e->segments, la_s);
+      if (ELEM(usage, OBJECT_LRT_INHERIT, OBJECT_LRT_INCLUDE, OBJECT_LRT_NO_INTERSECTION)) {
+        lineart_add_edge_to_list_thread(obi, la_e);
+      }
+
+      edge_added = true;
+
+      la_e++;
+      la_s++;
+
+      if (!rb->allow_duplicated_types) {
+        break;
+      }
+    }
+  }
+
+  if (obi->free_use_mesh) {
+    BKE_id_free(NULL, obi->original_me);
   }
 }
 
@@ -2731,7 +3218,8 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
   //- Assign the number of objects instead of number of threads
   printf("thread start: %d\n", olti->thread_id);
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
-    lineart_geometry_object_load_no_bmesh(obi, olti->rb);
+    // lineart_geometry_object_load_no_bmesh(obi, olti->rb);
+    lineart_geometry_object_load_edge_neighbor(obi, olti->rb);
     // lineart_geometry_object_load(obi, olti->rb);
     printf("thread id: %d processed: %d\n", olti->thread_id, obi->original_me->totpoly);
   }
