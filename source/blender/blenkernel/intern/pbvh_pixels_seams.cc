@@ -184,14 +184,14 @@ Bitmaps create_tile_bitmap(const PBVH &pbvh, Image &image, ImageUser &image_user
 
 int2 find_source_pixel(Bitmap &bitmap, float2 near_image_coord)
 {
-  // TODO: Should we take lambda into account?
+  // TODO: We should take lambda into account.
   const int SEARCH_RADIUS = 2;
   float min_distance = FLT_MAX;
   int2 result(0, 0);
   int2 image_coord(int(near_image_coord.x), int(near_image_coord.y));
   for (int v = image_coord.y - SEARCH_RADIUS; v <= image_coord.y + SEARCH_RADIUS; v++) {
     for (int u = image_coord.x - SEARCH_RADIUS; u <= image_coord.x + SEARCH_RADIUS; u++) {
-      if (u < 0 || u > bitmap.resolution.x || v < 0 || v > bitmap.resolution.y) {
+      if (u < 0 || u >= bitmap.resolution.x || v < 0 || v >= bitmap.resolution.y) {
         /** Pixel not part of this tile. */
         continue;
       }
@@ -237,12 +237,142 @@ static void add_seam_fix(PBVHNode &node,
   seam_fixes.pixels.append(SeamFix{src_pixel, dst_pixel});
 }
 
-static void fix_unconnected_seam(
+/* -------------------------------------------------------------------- */
+
+/** \name Build fixes for connected edges.
+ * \{ */
+
+static void build_fixes(PBVH &pbvh,
+                        Bitmap &bitmap,
+                        const rcti &uvbounds,
+                        const MLoopUV &luv_a_1,
+                        const MLoopUV &luv_a_2,
+                        const MLoopUV &luv_b_1,
+                        const MLoopUV &luv_b_2,
+                        const float scale_factor)
+{
+  for (int v = uvbounds.ymin; v <= uvbounds.ymax; v++) {
+    for (int u = uvbounds.xmin; u <= uvbounds.xmax; u++) {
+      if (u < 0 || u >= bitmap.resolution[0] || v < 0 || v >= bitmap.resolution[1]) {
+        /** Pixel not part of this tile. */
+        continue;
+      }
+      int pixel_offset = v * bitmap.resolution[0] + u;
+      PixelInfo &pixel_info = bitmap.bitmap[pixel_offset];
+      if (pixel_info.is_extracted() || pixel_info.is_seam_fix()) {
+        /* Skip this pixel as it already has a solution. */
+        continue;
+      }
+      float2 uv_coord(u, v);
+      // What is the distance to the edge.
+      float2 uv(uv_coord.x / bitmap.resolution.x, uv_coord.y / bitmap.resolution.y);
+      float2 closest_point;
+      // TODO: Should we use lambda to reduce artifacts?
+      const float lambda = closest_to_line_v2(closest_point, uv, luv_a_1.uv, luv_a_2.uv);
+      float2 closest_coord(closest_point.x * bitmap.resolution.x,
+                           closest_point.y * bitmap.resolution.y);
+
+      /* Distance to the edge in pixel space. */
+      float distance_to_edge = len_v2v2(closest_coord, uv_coord);
+      if (distance_to_edge > 2.5f) {
+        continue;
+      }
+
+      /*
+       * Project the point over onto the connected UV space. Taking into account the scale
+       * difference.
+       */
+      float2 other_closest_point;
+      interp_v2_v2v2(other_closest_point, luv_b_2.uv, luv_b_1.uv, lambda);
+      float2 direction_b;
+      sub_v2_v2v2(direction_b, luv_b_2.uv, luv_b_1.uv);
+      float2 perpedicular_b(direction_b.y, -direction_b.x);
+      normalize_v2(perpedicular_b);
+      perpedicular_b.x /= bitmap.resolution.x;
+      perpedicular_b.y /= bitmap.resolution.y;
+      float2 projected_coord = other_closest_point +
+                               perpedicular_b * distance_to_edge * scale_factor;
+      projected_coord.x *= bitmap.resolution.x;
+      projected_coord.y *= bitmap.resolution.y;
+
+      int2 source_pixel = find_source_pixel(bitmap, projected_coord);
+      int2 destination_pixel(u, v);
+
+      PixelInfo src_pixel_info = bitmap.get_pixel_info(source_pixel);
+      if (!src_pixel_info.is_extracted()) {
+        continue;
+      }
+      int src_node = src_pixel_info.get_node_index();
+
+      PBVHNode &node = pbvh.nodes[src_node];
+      add_seam_fix(node,
+                   bitmap.image_tile.get_tile_number(),
+                   source_pixel,
+                   bitmap.image_tile.get_tile_number(),
+                   destination_pixel);
+      bitmap.mark_seam_fix(destination_pixel);
+    }
+  }
+}
+
+static void build_fixes(PBVH &pbvh,
+                        const Vector<BMLoopConnection> &connected,
+                        Bitmaps &bitmaps,
+                        const int cd_loop_uv_offset)
+{
+  for (const BMLoopConnection &pair : connected) {
+    // determine bounding rect in uv space + margin of 1;
+    rctf uvbounds;
+    BLI_rctf_init_minmax(&uvbounds);
+    MLoopUV *luv_a_1 = static_cast<MLoopUV *>(
+        BM_ELEM_CD_GET_VOID_P(pair.first, cd_loop_uv_offset));
+    MLoopUV *luv_a_2 = static_cast<MLoopUV *>(
+        BM_ELEM_CD_GET_VOID_P(pair.first->next, cd_loop_uv_offset));
+    BLI_rctf_do_minmax_v(&uvbounds, luv_a_1->uv);
+    BLI_rctf_do_minmax_v(&uvbounds, luv_a_2->uv);
+
+    MLoopUV *luv_b_1 = static_cast<MLoopUV *>(
+        BM_ELEM_CD_GET_VOID_P(pair.second, cd_loop_uv_offset));
+    MLoopUV *luv_b_2 = static_cast<MLoopUV *>(
+        BM_ELEM_CD_GET_VOID_P(pair.second->next, cd_loop_uv_offset));
+
+    const float scale_factor = len_v2v2(luv_b_1->uv, luv_b_2->uv) /
+                               len_v2v2(luv_a_1->uv, luv_a_2->uv);
+
+    for (Bitmap &bitmap : bitmaps.bitmaps) {
+      rcti uvbounds_i;
+      const int MARGIN = 1;
+      uvbounds_i.xmin = (uvbounds.xmin - bitmap.image_tile.get_tile_x_offset()) *
+                            bitmap.resolution[0] -
+                        MARGIN;
+      uvbounds_i.ymin = (uvbounds.ymin - bitmap.image_tile.get_tile_y_offset()) *
+                            bitmap.resolution[1] -
+                        MARGIN;
+      uvbounds_i.xmax = (uvbounds.xmax - bitmap.image_tile.get_tile_x_offset()) *
+                            bitmap.resolution[0] +
+                        MARGIN;
+      uvbounds_i.ymax = (uvbounds.ymax - bitmap.image_tile.get_tile_y_offset()) *
+                            bitmap.resolution[1] +
+                        MARGIN;
+
+      build_fixes(pbvh, bitmap, uvbounds_i, *luv_a_1, *luv_a_2, *luv_b_1, *luv_b_2, scale_factor);
+    }
+  }
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+
+/** \name Build fixes for unconnected edges.
+ * \{ */
+
+static void build_fixes(
     PBVH &pbvh, Bitmap &bitmap, const rcti &uvbounds, const MLoopUV &luv_1, const MLoopUV &luv_2)
 {
   for (int v = uvbounds.ymin; v <= uvbounds.ymax; v++) {
     for (int u = uvbounds.xmin; u <= uvbounds.xmax; u++) {
-      if (u < 0 || u > bitmap.resolution[0] || v < 0 || v > bitmap.resolution[1]) {
+      if (u < 0 || u >= bitmap.resolution[0] || v < 0 || v >= bitmap.resolution[1]) {
         /** Pixel not part of this tile. */
         continue;
       }
@@ -288,61 +418,11 @@ static void fix_unconnected_seam(
   }
 }
 
-void BKE_pbvh_pixels_rebuild_seams(
-    PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user, int cd_loop_uv_offset)
+static void build_fixes(PBVH &pbvh,
+                        const Vector<BMLoop *> &unconnected,
+                        Bitmaps &bitmaps,
+                        const int cd_loop_uv_offset)
 {
-  const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(mesh);
-
-  BMeshCreateParams bmesh_create_params{};
-  bmesh_create_params.use_toolflags = true;
-  BMesh *bm = BM_mesh_create(&allocsize, &bmesh_create_params);
-
-  BMeshFromMeshParams from_mesh_params{};
-  from_mesh_params.calc_face_normal = false;
-  from_mesh_params.calc_vert_normal = false;
-  BM_mesh_bm_from_me(bm, mesh, &from_mesh_params);
-
-  pbvh_pixels_clear_seams(pbvh);
-
-  // find seams.
-  // for each edge
-  Vector<BMLoopConnection> connected;
-  Vector<BMLoop *> unconnected;
-  find_connected_loops(bm, cd_loop_uv_offset, connected, unconnected);
-
-  // Make a bitmap per tile indicating pixels that have already been assigned to a PBVHNode.
-  Bitmaps bitmaps = create_tile_bitmap(*pbvh, *image, *image_user);
-
-  for (BMLoopConnection &pair : connected) {
-    // determine bounding rect in uv space + margin of 1;
-    rctf uvbounds;
-    BLI_rctf_init_minmax(&uvbounds);
-    MLoopUV *luv_1 = static_cast<MLoopUV *>(BM_ELEM_CD_GET_VOID_P(pair.first, cd_loop_uv_offset));
-    MLoopUV *luv_2 = static_cast<MLoopUV *>(
-        BM_ELEM_CD_GET_VOID_P(pair.first->next, cd_loop_uv_offset));
-    BLI_rctf_do_minmax_v(&uvbounds, luv_1->uv);
-    BLI_rctf_do_minmax_v(&uvbounds, luv_2->uv);
-
-    for (Bitmap &bitmap : bitmaps.bitmaps) {
-      rcti uvbounds_i;
-      const int MARGIN = 1;
-      uvbounds_i.xmin = (uvbounds.xmin - bitmap.image_tile.get_tile_x_offset()) *
-                            bitmap.resolution[0] -
-                        MARGIN;
-      uvbounds_i.ymin = (uvbounds.ymin - bitmap.image_tile.get_tile_y_offset()) *
-                            bitmap.resolution[1] -
-                        MARGIN;
-      uvbounds_i.xmax = (uvbounds.xmax - bitmap.image_tile.get_tile_x_offset()) *
-                            bitmap.resolution[0] +
-                        MARGIN;
-      uvbounds_i.ymax = (uvbounds.ymax - bitmap.image_tile.get_tile_y_offset()) *
-                            bitmap.resolution[1] +
-                        MARGIN;
-
-      fix_unconnected_seam(*pbvh, bitmap, uvbounds_i, *luv_1, *luv_2);
-    }
-  }
-
   for (const BMLoop *unconnected_loop : unconnected) {
     // determine bounding rect in uv space + margin of 1;
     rctf uvbounds;
@@ -370,9 +450,40 @@ void BKE_pbvh_pixels_rebuild_seams(
                             bitmap.resolution[1] +
                         MARGIN;
 
-      fix_unconnected_seam(*pbvh, bitmap, uvbounds_i, *luv_1, *luv_2);
+      build_fixes(pbvh, bitmap, uvbounds_i, *luv_1, *luv_2);
     }
   }
+}
+
+/** \} */
+
+void BKE_pbvh_pixels_rebuild_seams(
+    PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user, int cd_loop_uv_offset)
+{
+  const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(mesh);
+
+  BMeshCreateParams bmesh_create_params{};
+  bmesh_create_params.use_toolflags = true;
+  BMesh *bm = BM_mesh_create(&allocsize, &bmesh_create_params);
+
+  BMeshFromMeshParams from_mesh_params{};
+  from_mesh_params.calc_face_normal = false;
+  from_mesh_params.calc_vert_normal = false;
+  BM_mesh_bm_from_me(bm, mesh, &from_mesh_params);
+
+  // find seams.
+  // for each edge
+  Vector<BMLoopConnection> connected;
+  Vector<BMLoop *> unconnected;
+  find_connected_loops(bm, cd_loop_uv_offset, connected, unconnected);
+
+  // Make a bitmap per tile indicating pixels that have already been assigned to a PBVHNode.
+  Bitmaps bitmaps = create_tile_bitmap(*pbvh, *image, *image_user);
+
+  pbvh_pixels_clear_seams(pbvh);
+  /* Fix connected edges before unconnected to improve quality. */
+  build_fixes(*pbvh, connected, bitmaps, cd_loop_uv_offset);
+  build_fixes(*pbvh, unconnected, bitmaps, cd_loop_uv_offset);
 
   BM_mesh_free(bm);
 }
@@ -412,7 +523,7 @@ void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_us
     }
 
     /* TODO: should be narrowed to the part of the image that needs to be updated. Requires
-     * access to the image tile. */
+     * access to the image tile. can be stored in the UDIMSeamFixes struct.  */
     BKE_image_partial_update_mark_full_update(image);
     BKE_image_release_ibuf(image, src_image_buffer, nullptr);
     BKE_image_release_ibuf(image, dst_image_buffer, nullptr);
