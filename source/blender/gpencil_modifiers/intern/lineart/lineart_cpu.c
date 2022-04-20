@@ -3953,6 +3953,16 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
   }
 }
 
+static void lineart_end_bounding_area_recursive(LineartBoundingArea *ba)
+{
+  BLI_spin_end(&ba->lock);
+  if (ba->child) {
+    for (int i = 0; i < 4; i++) {
+      lineart_end_bounding_area_recursive(&ba->child[i]);
+    }
+  }
+}
+
 static void lineart_destroy_render_data_keep_init(LineartRenderBuffer *rb)
 {
   if (rb == NULL) {
@@ -3969,8 +3979,14 @@ static void lineart_destroy_render_data_keep_init(LineartRenderBuffer *rb)
   if (rb->pending_edges.array) {
     MEM_freeN(rb->pending_edges.array);
   }
+
+  for (int i = 0; i < rb->bounding_area_initial_count; i++) {
+    lineart_end_bounding_area_recursive(&rb->initial_bounding_areas[i]);
+  }
+
   lineart_mem_destroy(&rb->render_data_pool);
 }
+
 static void lineart_destroy_render_data(LineartRenderBuffer *rb)
 {
   if (rb == NULL) {
@@ -3980,10 +3996,6 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   BLI_spin_end(&rb->lock_task);
   BLI_spin_end(&rb->lock_cuts);
   BLI_spin_end(&rb->render_data_pool.lock_mem);
-
-  for (int i = 0; i < rb->bounding_area_initial_count; i++) {
-    BLI_spin_end(&rb->lock_bounding_areas[i]);
-  }
 
   lineart_destroy_render_data_keep_init(rb);
 }
@@ -4189,10 +4201,8 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
   rb->bounding_area_initial_count = sp_w * sp_h;
   rb->initial_bounding_areas = lineart_mem_acquire(
       &rb->render_data_pool, sizeof(LineartBoundingArea) * rb->bounding_area_initial_count);
-  rb->lock_bounding_areas = lineart_mem_acquire(
-      &rb->render_data_pool, sizeof(SpinLock) * rb->bounding_area_initial_count);
   for (int i = 0; i < rb->bounding_area_initial_count; i++) {
-    BLI_spin_init(&rb->lock_bounding_areas[i]);
+    BLI_spin_init(&rb->initial_bounding_areas[i].lock);
   }
 
   int i_ba = 0;
@@ -4220,7 +4230,7 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
                                              sizeof(LineartEdge *) * ba->max_line_count);
 
       /* Spatial lock assignment. */
-      ba->lock = &rb->lock_bounding_areas[i_ba % rb->bounding_area_initial_count];
+      BLI_spin_init(&ba->lock);
       i_ba++;
 
       /* Link adjacent ones. */
@@ -4593,7 +4603,7 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
    * bounding area r/w access for now, so whether we split or do anything inside the bounding area,
    * it's not relevant to other threads. */
   if (do_lock) {
-    BLI_spin_lock(root_ba->lock);
+    BLI_spin_lock(&root_ba->lock);
   }
 
   if (root_ba->child == NULL) {
@@ -4640,7 +4650,7 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
   }
 
   if (do_lock) {
-    BLI_spin_unlock(root_ba->lock);
+    BLI_spin_unlock(&root_ba->lock);
   }
 }
 

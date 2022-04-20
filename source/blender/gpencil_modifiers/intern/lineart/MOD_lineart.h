@@ -290,9 +290,6 @@ typedef struct LineartRenderBuffer {
   struct LineartBoundingArea *initial_bounding_areas;
   unsigned int bounding_area_initial_count;
 
-  /* Array of thread_count length for spatial locks. */
-  SpinLock *lock_bounding_areas;
-
   /* When splitting bounding areas, if there's an ortho camera placed at a straight angle, there
    * will be a lot of triangles aligned in line which can not be separated by continue subdividing
    * the tile. So we set a strict limit when using ortho camera. See eLineArtTileRecursiveLimit. */
@@ -572,7 +569,7 @@ typedef struct LineartBoundingArea {
   /** 1,2,3,4 quadrant */
   struct LineartBoundingArea *child;
 
-  SpinLock *lock;
+  SpinLock lock;
 
   ListBase lp;
   ListBase rp;
