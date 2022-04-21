@@ -115,6 +115,7 @@ set(SRC
   nodes/node_geo_proximity.cc
   nodes/node_geo_raycast.cc
   nodes/node_geo_realize_instances.cc
+  nodes/node_geo_remesh_voxel.cc
   nodes/node_geo_remove_attribute.cc
   nodes/node_geo_rotate_instances.cc
   nodes/node_geo_scale_elements.cc

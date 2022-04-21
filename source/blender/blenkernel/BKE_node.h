@@ -1487,7 +1487,7 @@ struct TexResult;
 #define GEO_NODE_STORE_NAMED_ATTRIBUTE 1156
 #define GEO_NODE_INPUT_NAMED_ATTRIBUTE 1157
 #define GEO_NODE_REMOVE_ATTRIBUTE 1158
-
+#define GEO_NODE_REMESH_VOXEL 1159
 /** \} */
 
 /* -------------------------------------------------------------------- */
