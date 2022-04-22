@@ -49,9 +49,7 @@ void find_connected_loops(BMesh *bm,
       else {
         connection_found = true;
         if (!BM_loop_uv_share_edge_check(l_first, l, cd_loop_uv_offset)) {
-          // This is an edge which is connected in 3d space, but not connected in uv space so fixes
-          // are needed.
-
+          /* Edge detected that is connected in 3d space, but not in uv space. */
           r_connected.append(BMLoopConnection(l_first, l));
           r_connected.append(BMLoopConnection(l, l_first));
           break;
@@ -274,7 +272,7 @@ static void build_fixes(PBVH &pbvh,
 
       /* Distance to the edge in pixel space. */
       float distance_to_edge = len_v2v2(closest_coord, uv_coord);
-      if (distance_to_edge > 3.5f) {
+      if (distance_to_edge > 3.0f) {
         continue;
       }
 
@@ -290,18 +288,27 @@ static void build_fixes(PBVH &pbvh,
       normalize_v2(perpedicular_b);
       perpedicular_b.x /= bitmap.resolution.x;
       perpedicular_b.y /= bitmap.resolution.y;
-      float2 projected_coord = other_closest_point +
-                               perpedicular_b * distance_to_edge * scale_factor;
-      projected_coord.x *= bitmap.resolution.x;
-      projected_coord.y *= bitmap.resolution.y;
-
-      int2 source_pixel = find_source_pixel(bitmap, projected_coord);
-      int2 destination_pixel(u, v);
-
+      float2 projected_coord_a = other_closest_point +
+                                 perpedicular_b * distance_to_edge * scale_factor;
+      projected_coord_a.x *= bitmap.resolution.x;
+      projected_coord_a.y *= bitmap.resolution.y;
+      int2 source_pixel = find_source_pixel(bitmap, projected_coord_a);
       PixelInfo src_pixel_info = bitmap.get_pixel_info(source_pixel);
+
+      if (!src_pixel_info.is_extracted()) {
+        float2 projected_coord_b = other_closest_point -
+                                   perpedicular_b * distance_to_edge * scale_factor;
+        projected_coord_b.x *= bitmap.resolution.x;
+        projected_coord_b.y *= bitmap.resolution.y;
+        source_pixel = find_source_pixel(bitmap, projected_coord_b);
+        src_pixel_info = bitmap.get_pixel_info(source_pixel);
+      }
+
       if (!src_pixel_info.is_extracted()) {
         continue;
       }
+
+      int2 destination_pixel(u, v);
       int src_node = src_pixel_info.get_node_index();
 
       PBVHNode &node = pbvh.nodes[src_node];
@@ -394,7 +401,7 @@ static void build_fixes(
       float2 closest_coord(closest_point.x * bitmap.resolution.x,
                            closest_point.y * bitmap.resolution.y);
       float distance_to_edge = len_v2v2(uv_coord, closest_coord);
-      if (distance_to_edge > 2.5f) {
+      if (distance_to_edge > 3.0f) {
         continue;
       }
 
