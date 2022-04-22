@@ -40,7 +40,7 @@ namespace curves::nurbs {
 struct BasisCache {
   /**
    * For each evaluated point, the weight for all control points that influences it.
-   * The vector's size is the evaluated point count multiplied by the spline's order.
+   * The vector's size is the evaluated point count multiplied by the curve's order.
    */
   Vector<float> weights;
   /**
@@ -61,7 +61,7 @@ class CurvesGeometryRuntime {
  public:
   /**
    * Cache of offsets into the evaluated array for each curve, accounting for all previous
-   * evaluated points, Bezier curve vector segments, different resolutions per spline, etc.
+   * evaluated points, Bezier curve vector segments, different resolutions per curve, etc.
    */
   mutable Vector<int> evaluated_offsets_cache;
   mutable Vector<int> bezier_evaluated_offsets;
@@ -76,6 +76,11 @@ class CurvesGeometryRuntime {
   mutable Vector<float3> evaluated_position_cache;
   mutable std::mutex position_cache_mutex;
   mutable bool position_cache_dirty = true;
+  /**
+   * The evaluated positions result, using a separate span in case all curves are poly curves,
+   * in which case a separate array of evaluated positions is unnecessary.
+   */
+  mutable Span<float3> evaluated_positions_span;
 
   /**
    * Cache of lengths along each evaluated curve for for each evaluated point. If a curve is
@@ -86,13 +91,13 @@ class CurvesGeometryRuntime {
   mutable std::mutex length_cache_mutex;
   mutable bool length_cache_dirty = true;
 
-  /** Direction of the spline at each evaluated point. */
-  mutable Vector<float3> evaluated_tangents_cache;
+  /** Direction of the curve at each evaluated point. */
+  mutable Vector<float3> evaluated_tangent_cache;
   mutable std::mutex tangent_cache_mutex;
   mutable bool tangent_cache_dirty = true;
 
   /** Normal direction vectors for each evaluated point. */
-  mutable Vector<float3> evaluated_normals_cache;
+  mutable Vector<float3> evaluated_normal_cache;
   mutable std::mutex normal_cache_mutex;
   mutable bool normal_cache_dirty = true;
 };
@@ -141,7 +146,7 @@ class CurvesGeometry : public ::CurvesGeometry {
    * number of curves. Consider using #points_for_curve rather than using the offsets directly.
    */
   Span<int> offsets() const;
-  MutableSpan<int> offsets();
+  MutableSpan<int> offsets_for_write();
 
   /**
    * Access a range of indices of point data for a specific curve.
@@ -152,19 +157,22 @@ class CurvesGeometry : public ::CurvesGeometry {
   /** The type (#CurveType) of each curve, or potentially a single if all are the same type. */
   VArray<int8_t> curve_types() const;
   /** Mutable access to curve types. Call #tag_topology_changed after changing any type. */
-  MutableSpan<int8_t> curve_types();
+  MutableSpan<int8_t> curve_types_for_write();
 
   bool has_curve_with_type(const CurveType type) const;
   /** Return the number of curves with each type. */
   std::array<int, CURVE_TYPES_NUM> count_curve_types() const;
 
-  MutableSpan<float3> positions();
+  /** Return true if all of the curves have the provided type. */
+  bool is_single_type(CurveType type) const;
+
   Span<float3> positions() const;
+  MutableSpan<float3> positions_for_write();
 
   /** Whether the curve loops around to connect to itself, on the curve domain. */
   VArray<bool> cyclic() const;
   /** Mutable access to curve cyclic values. Call #tag_topology_changed after changes. */
-  MutableSpan<bool> cyclic();
+  MutableSpan<bool> cyclic_for_write();
 
   /**
    * How many evaluated points to create for each segment when evaluating Bezier,
@@ -172,15 +180,22 @@ class CurvesGeometry : public ::CurvesGeometry {
    */
   VArray<int> resolution() const;
   /** Mutable access to curve resolution. Call #tag_topology_changed after changes. */
-  MutableSpan<int> resolution();
+  MutableSpan<int> resolution_for_write();
+
+  /**
+   * Which method to use for calculating the normals of evaluated points (#NormalMode).
+   * Call #tag_normals_changed after changes.
+   */
+  VArray<int8_t> normal_mode() const;
+  MutableSpan<int8_t> normal_mode_for_write();
 
   /**
    * Handle types for Bezier control points. Call #tag_topology_changed after changes.
    */
   VArray<int8_t> handle_types_left() const;
-  MutableSpan<int8_t> handle_types_left();
+  MutableSpan<int8_t> handle_types_left_for_write();
   VArray<int8_t> handle_types_right() const;
-  MutableSpan<int8_t> handle_types_right();
+  MutableSpan<int8_t> handle_types_right_for_write();
 
   /**
    * The positions of Bezier curve handles. Though these are really control points for the Bezier
@@ -189,36 +204,36 @@ class CurvesGeometry : public ::CurvesGeometry {
    * after changes.
    */
   Span<float3> handle_positions_left() const;
-  MutableSpan<float3> handle_positions_left();
+  MutableSpan<float3> handle_positions_left_for_write();
   Span<float3> handle_positions_right() const;
-  MutableSpan<float3> handle_positions_right();
+  MutableSpan<float3> handle_positions_right_for_write();
 
   /**
    * The order (degree plus one) of each NURBS curve, on the curve domain.
    * Call #tag_topology_changed after changes.
    */
   VArray<int8_t> nurbs_orders() const;
-  MutableSpan<int8_t> nurbs_orders();
+  MutableSpan<int8_t> nurbs_orders_for_write();
 
   /**
    * The automatic generation mode for each NURBS curve's knots vector, on the curve domain.
    * Call #tag_topology_changed after changes.
    */
   VArray<int8_t> nurbs_knots_modes() const;
-  MutableSpan<int8_t> nurbs_knots_modes();
+  MutableSpan<int8_t> nurbs_knots_modes_for_write();
 
   /**
    * The weight for each control point for NURBS curves. Call #tag_positions_changed after changes.
    */
   Span<float> nurbs_weights() const;
-  MutableSpan<float> nurbs_weights();
+  MutableSpan<float> nurbs_weights_for_write();
 
   /**
    * The index of a triangle (#MLoopTri) that a curve is attached to.
    * The index is -1, if the curve is not attached.
    */
   VArray<int> surface_triangle_indices() const;
-  MutableSpan<int> surface_triangle_indices();
+  MutableSpan<int> surface_triangle_indices_for_write();
 
   /**
    * Barycentric coordinates of the attachment point within a triangle.
@@ -229,7 +244,7 @@ class CurvesGeometry : public ::CurvesGeometry {
    * The span can be empty, when all triangle indices are -1.
    */
   Span<float2> surface_triangle_coords() const;
-  MutableSpan<float2> surface_triangle_coords();
+  MutableSpan<float2> surface_triangle_coords_for_write();
 
   /**
    * Calculate the largest and smallest position values, only including control points
@@ -280,6 +295,8 @@ class CurvesGeometry : public ::CurvesGeometry {
   Span<int> bezier_evaluated_offsets_for_curve(int curve_index) const;
 
   Span<float3> evaluated_positions() const;
+  Span<float3> evaluated_tangents() const;
+  Span<float3> evaluated_normals() const;
 
   /**
    * Return a cache of accumulated lengths along the curve. Each item is the length of the
@@ -365,8 +382,45 @@ namespace curves {
  */
 inline int curve_segment_size(const int points_num, const bool cyclic)
 {
+  BLI_assert(points_num > 0);
   return cyclic ? points_num : points_num - 1;
 }
+
+inline float2 encode_surface_bary_coord(const float3 &v)
+{
+  BLI_assert(std::abs(v.x + v.y + v.z - 1.0f) < 0.00001f);
+  return {v.x, v.y};
+}
+
+inline float3 decode_surface_bary_coord(const float2 &v)
+{
+  return {v.x, v.y, 1.0f - v.x - v.y};
+}
+
+namespace poly {
+
+/**
+ * Calculate the direction at every point, defined as the normalized average of the two neighboring
+ * segments (and if non-cyclic, the direction of the first and last segments). This is different
+ * than evaluating the derivative of the basis functions for curve types like NURBS, Bezier, or
+ * Catmull Rom, though the results may be similar.
+ */
+void calculate_tangents(Span<float3> positions, bool is_cyclic, MutableSpan<float3> tangents);
+
+/**
+ * Calculate directions perpendicular to the tangent at every point by rotating an arbitrary
+ * starting vector by the same rotation of each tangent. If the curve is cylic, propagate a
+ * correction through the entire to make sure the first and last normal align.
+ */
+void calculate_normals_minimum(Span<float3> tangents, bool cyclic, MutableSpan<float3> normals);
+
+/**
+ * Calculate a vector perpendicular to every tangent on the X-Y plane (unless the tangent is
+ * vertical, in that case use the X direction).
+ */
+void calculate_normals_z_up(Span<float3> tangents, MutableSpan<float3> normals);
+
+}  // namespace poly
 
 namespace bezier {
 
@@ -504,7 +558,7 @@ int calculate_evaluated_size(
 int knots_size(int points_num, int8_t order, bool cyclic);
 
 /**
- * Calculate the knots for a spline given its properties, based on built-in standards defined by
+ * Calculate the knots for a curve given its properties, based on built-in standards defined by
  * #KnotsMode.
  *
  * \note Theoretically any sorted values can be used for NURBS knots, but calculating based
@@ -575,6 +629,11 @@ inline IndexRange CurvesGeometry::curves_range() const
   return IndexRange(this->curves_num());
 }
 
+inline bool CurvesGeometry::is_single_type(const CurveType type) const
+{
+  return this->count_curve_types()[type] == this->curves_num();
+}
+
 inline IndexRange CurvesGeometry::points_for_curve(const int index) const
 {
   /* Offsets are not allocated when there are no curves. */
@@ -628,8 +687,7 @@ inline IndexRange CurvesGeometry::lengths_range_for_curve(const int curve_index,
   BLI_assert(cyclic == this->cyclic()[curve_index]);
   const IndexRange points = this->evaluated_points_for_curve(curve_index);
   const int start = points.start() + curve_index;
-  const int size = curves::curve_segment_size(points.size(), cyclic);
-  return {start, size};
+  return {start, points.is_empty() ? 0 : curves::curve_segment_size(points.size(), cyclic)};
 }
 
 inline Span<float> CurvesGeometry::evaluated_lengths_for_curve(const int curve_index,
@@ -643,7 +701,9 @@ inline Span<float> CurvesGeometry::evaluated_lengths_for_curve(const int curve_i
 inline float CurvesGeometry::evaluated_length_total_for_curve(const int curve_index,
                                                               const bool cyclic) const
 {
-  return this->evaluated_lengths_for_curve(curve_index, cyclic).last();
+  const Span<float> lengths = this->evaluated_lengths_for_curve(curve_index, cyclic);
+  /* Check for curves that have no evaluated segments. */
+  return lengths.is_empty() ? 0.0f : lengths.last();
 }
 
 /** \} */

@@ -12,6 +12,8 @@
 #include "DNA_brush_enums.h"
 #include "DNA_object_enums.h"
 
+#include "BKE_attribute.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,6 +42,7 @@ struct Object;
 struct PBVH;
 struct Paint;
 struct PaintCurve;
+struct PaintModeSettings;
 struct Palette;
 struct PaletteColor;
 struct Scene;
@@ -493,6 +496,11 @@ typedef struct SculptSession {
 
   struct KeyBlock *shapekey_active;
   struct MPropCol *vcol;
+  struct MLoopCol *mcol;
+
+  AttributeDomain vcol_domain;
+  CustomDataType vcol_type;
+
   float *vmask;
 
   /* Mesh connectivity maps. */
@@ -634,6 +642,14 @@ typedef struct SculptSession {
    */
   char needs_flush_to_id;
 
+  /**
+   * Some tools follows the shading chosen by the last used tool canvas.
+   * When not set the viewport shading color would be used.
+   *
+   * NOTE: This setting is temporarily until paint mode is added.
+   */
+  bool sticky_shading_color;
+
 } SculptSession;
 
 void BKE_sculptsession_free(struct Object *ob);
@@ -709,6 +725,12 @@ enum {
   SCULPT_MASK_LAYER_CALC_VERT = (1 << 0),
   SCULPT_MASK_LAYER_CALC_LOOP = (1 << 1),
 };
+
+/* paint_canvas.cc */
+struct Image *BKE_paint_canvas_image_get(const struct PaintModeSettings *settings,
+                                         struct Object *ob);
+int BKE_paint_canvas_uvmap_layer_index_get(const struct PaintModeSettings *settings,
+                                           struct Object *ob);
 
 #ifdef __cplusplus
 }

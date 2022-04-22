@@ -218,7 +218,7 @@ static void mesh_blend_write(BlendWriter *writer, ID *id, const void *id_address
   mesh->mface = nullptr;
   mesh->totface = 0;
   memset(&mesh->fdata, 0, sizeof(mesh->fdata));
-  memset(&mesh->runtime, 0, sizeof(mesh->runtime));
+  mesh->runtime = blender::dna::shallow_zero_initialize();
   flayers = flayers_buff;
 
   /* Do not store actual geometry data in case this is a library override ID. */
@@ -329,7 +329,7 @@ static void mesh_blend_read_data(BlendDataReader *reader, ID *id)
   mesh->texflag &= ~ME_AUTOSPACE_EVALUATED;
   mesh->edit_mesh = nullptr;
 
-  memset(&mesh->runtime, 0, sizeof(mesh->runtime));
+  mesh->runtime = blender::dna::shallow_zero_initialize();
   BKE_mesh_runtime_init_data(mesh);
 
   /* happens with old files */
@@ -433,7 +433,7 @@ static const char *cmpcode_to_str(int code)
     case MESHCMP_DVERT_TOTGROUPMISMATCH:
       return "Vertex Doesn't Belong To Same Number Of Groups";
     case MESHCMP_LOOPCOLMISMATCH:
-      return "Vertex Color Mismatch";
+      return "Color Attribute Mismatch";
     case MESHCMP_LOOPUVMISMATCH:
       return "UV Mismatch";
     case MESHCMP_LOOPMISMATCH:

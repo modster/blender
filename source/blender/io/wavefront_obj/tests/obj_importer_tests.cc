@@ -82,7 +82,7 @@ class obj_importer_test : public BlendfileLoadingBaseTest {
         EXPECT_V3_NEAR(object->rot, float3(M_PI_2, 0, 0), 0.0001f);
       }
       EXPECT_V3_NEAR(object->scale, float3(1, 1, 1), 0.0001f);
-      if (object->type == OB_MESH || object->type == OB_SURF) {
+      if (object->type == OB_MESH) {
         Mesh *mesh = BKE_object_get_evaluated_mesh(object);
         EXPECT_EQ(mesh->totvert, exp.totvert);
         EXPECT_EQ(mesh->totedge, exp.mesh_totedge_or_curve_endp);
@@ -338,8 +338,8 @@ TEST_F(obj_importer_test, import_invalid_syntax)
        3,
        float3(1, 2, 3),
        float3(10, 11, 12),
-       float3(0.4082f, -0.8165f, 0.4082f),
-       float2(0, 0)},
+       float3(0, 1, 0),
+       float2(0.5f, 0.25f)},
   };
   import_and_check("invalid_syntax.obj", expect, std::size(expect), 0);
 }
@@ -387,15 +387,15 @@ TEST_F(obj_importer_test, import_all_objects)
        float3(28, 1, -1),
        float3(26, 1, 1),
        float3(-1, 0, 0)},
-      {"OBSubSurfCube",
+      {"OBTaperCube",
        OB_MESH,
        106,
        208,
        104,
        416,
-       float3(24.444445f, 0.444444f, -0.666667f),
-       float3(23.790743f, 0.490725f, -0.816819f),
-       float3(0.1697f, 0.1697f, 0.9708f)},
+       float3(24.444445f, 0.502543f, -0.753814f),
+       float3(23.790743f, 0.460522f, -0.766546f),
+       float3(-0.0546f, 0.1716f, 0.9837f)},
       {"OBParticleCube",
        OB_MESH,
        8,

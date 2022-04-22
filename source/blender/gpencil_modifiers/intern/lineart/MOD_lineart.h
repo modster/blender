@@ -171,8 +171,6 @@ typedef enum eLineArtVertFlags {
 typedef struct LineartEdge {
   struct LineartVert *v1, *v2;
 
-  /** These two variables are also used to specify original edge and segment during 3rd stage
-   * reprojection, So we can easily find out the line which results come from. */
   struct LineartTriangle *t1, *t2;
 
   ListBase segments;

@@ -1687,6 +1687,7 @@ static int sequencer_add_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
       SEQ_select_active_set(scene, seq);
     }
     seq->flag &= ~(SEQ_LEFTSEL + SEQ_RIGHTSEL + SEQ_LOCK);
+    seq->flag |= SEQ_IGNORE_CHANNEL_LOCK;
     SEQ_animation_duplicate(scene, seq, &fcurves_original_backup);
     SEQ_ensure_unique_name(seq, scene);
   }
@@ -2457,6 +2458,9 @@ static void sequencer_copy_animation(Scene *scene, Sequence *seq)
   }
 
   GSet *fcurves = SEQ_fcurves_by_strip_get(seq, &scene->adt->action->curves);
+  if (fcurves == NULL) {
+    return;
+  }
 
   GSET_FOREACH_BEGIN (FCurve *, fcu, fcurves) {
     BLI_addtail(&fcurves_clipboard, BKE_fcurve_copy(fcu));

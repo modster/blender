@@ -378,6 +378,7 @@
     .mat_nr = -1, \
     .thickness = 1.0f, \
     .strength = 1.0f, \
+    .skip = 0, \
   }
 
 
