@@ -210,7 +210,7 @@ NodeData &BKE_pbvh_pixels_node_data_get(PBVHNode &node);
 void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &image_user);
 
 void BKE_pbvh_pixels_rebuild_seams(
-    PBVH *pbvh, Mesh *me, Image *image, ImageUser *image_user, int cd_loop_uv_offset);
+    PBVH *pbvh, const Mesh *me, Image *image, ImageUser *image_user, const MLoopUV *ldata_uv);
 void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_user);
 
 }  // namespace blender::bke::pbvh::pixels

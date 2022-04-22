@@ -323,8 +323,7 @@ static void update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image
   BKE_pbvh_parallel_range_settings(&settings, true, nodes_to_update.size());
   BLI_task_parallel_range(0, nodes_to_update.size(), &user_data, do_encode_pixels, &settings);
 
-  int cd_loop_uv_offset = CustomData_get_offset(&mesh->ldata, CD_MLOOPUV);
-  BKE_pbvh_pixels_rebuild_seams(pbvh, mesh, image, image_user, cd_loop_uv_offset);
+  BKE_pbvh_pixels_rebuild_seams(pbvh, mesh, image, image_user, ldata_uv);
 
   if (USE_WATERTIGHT_CHECK) {
     apply_watertight_check(pbvh, image, image_user);

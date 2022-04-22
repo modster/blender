@@ -11,56 +11,105 @@
 #include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
 
+#include "BLI_edgehash.h"
 #include "BLI_vector.hh"
-
-#include "bmesh.h"
 
 #include "pbvh_intern.h"
 
-using BMLoopConnection = std::pair<BMLoop *, BMLoop *>;
-
 namespace blender::bke::pbvh::pixels {
 
-/**
- * Find loops that are connected in 3d space, but not in uv space. Or loops that don't have any
- * connection at all.
- *
- * TODO better name would be to find loops that need uv seam fixes.
- */
-void find_connected_loops(BMesh *bm,
-                          const int cd_loop_uv_offset,
-                          Vector<BMLoopConnection> &r_connected,
-                          Vector<BMLoop *> &r_unconnected)
-{
-  BMEdge *e;
-  BMIter eiter;
-  BMLoop *l;
-  BMIter liter;
-  BM_ITER_MESH (e, &eiter, bm, BM_EDGES_OF_MESH) {
-    bool first = true;
-    bool connection_found = false;
-    BMLoop *l_first;
+struct EdgeLoop {
+  /** Loop indexes that form an edge. */
+  int l[2];
+};
 
-    BM_ITER_ELEM (l, &liter, e, BM_LOOPS_OF_EDGE) {
-      if (first) {
-        l_first = l;
-        first = false;
+enum class EdgeCheckFlag {
+  /** No connecting edge loop found. */
+  Unconnected,
+  /** A connecting edge loop found. */
+  Connected,
+};
+
+struct EdgeCheck {
+  EdgeCheckFlag flag;
+  EdgeLoop first;
+  EdgeLoop second;
+};
+
+/** Do the two given EdgeLoops share the same uv coordinates. */
+bool share_uv(const MLoopUV *ldata_uvs, EdgeLoop &edge1, EdgeLoop &edge2)
+{
+  const float2 &uv_1_a = ldata_uvs[edge1.l[0]].uv;
+  const float2 &uv_1_b = ldata_uvs[edge1.l[1]].uv;
+  const float2 &uv_2_a = ldata_uvs[edge2.l[0]].uv;
+  const float2 &uv_2_b = ldata_uvs[edge2.l[1]].uv;
+  const float limit = 0.0001f;
+
+  return (compare_v2v2(uv_1_a, uv_2_a, limit) && compare_v2v2(uv_1_b, uv_2_b, limit)) ||
+         (compare_v2v2(uv_1_a, uv_2_b, limit) && compare_v2v2(uv_1_b, uv_2_a, limit));
+}
+
+/** Make a list of connected and unconnected edgeloops that require UV Seam fixes. */
+void find_edges_that_need_fixing(const Mesh *mesh,
+                                 const MLoopUV *ldata_uvs,
+                                 Vector<std::pair<EdgeLoop, EdgeLoop>> &r_connected,
+                                 Vector<EdgeLoop> &r_unconnected)
+{
+  EdgeHash *eh = BLI_edgehash_new_ex(__func__, BLI_EDGEHASH_SIZE_GUESS_FROM_POLYS(mesh->totpoly));
+
+  for (int p = 0; p < mesh->totpoly; p++) {
+    MPoly &mpoly = mesh->mpoly[p];
+    int prev_l = mpoly.loopstart + mpoly.totloop - 1;
+    for (int l = 0; l < mpoly.totloop; l++) {
+      MLoop &prev_mloop = mesh->mloop[prev_l];
+      int current_l = mpoly.loopstart + l;
+      MLoop &mloop = mesh->mloop[current_l];
+
+      void **value_ptr;
+
+      if (!BLI_edgehash_ensure_p(eh, prev_mloop.v, mloop.v, &value_ptr)) {
+        EdgeCheck *value = MEM_cnew<EdgeCheck>(__func__);
+        value->flag = EdgeCheckFlag::Unconnected;
+        value->first.l[0] = min_ii(prev_l, current_l);
+        value->first.l[1] = max_ii(prev_l, current_l);
+        *value_ptr = value;
       }
       else {
-        connection_found = true;
-        if (!BM_loop_uv_share_edge_check(l_first, l, cd_loop_uv_offset)) {
-          /* Edge detected that is connected in 3d space, but not in uv space. */
-          r_connected.append(BMLoopConnection(l_first, l));
-          r_connected.append(BMLoopConnection(l, l_first));
-          break;
+        EdgeCheck *value = static_cast<EdgeCheck *>(*value_ptr);
+        if (value->flag == EdgeCheckFlag::Unconnected) {
+          value->flag = EdgeCheckFlag::Connected;
+          value->second.l[0] = min_ii(prev_l, current_l);
+          value->second.l[1] = max_ii(prev_l, current_l);
         }
       }
-    }
-    if (!connection_found) {
-      BLI_assert(!first);
-      r_unconnected.append(l_first);
+
+      prev_l = current_l;
     }
   }
+
+  EdgeHashIterator iter;
+  BLI_edgehashIterator_init(&iter, eh);
+  while (!BLI_edgehashIterator_isDone(&iter)) {
+    EdgeCheck *value = static_cast<EdgeCheck *>(BLI_edgehashIterator_getValue(&iter));
+    switch (value->flag) {
+      case EdgeCheckFlag::Unconnected: {
+        r_unconnected.append(value->first);
+        break;
+      }
+      case EdgeCheckFlag::Connected: {
+        // check for uv space to add to r_connected
+        if (!share_uv(ldata_uvs, value->first, value->second)) {
+          r_connected.append(std::pair<EdgeLoop, EdgeLoop>(value->first, value->second));
+          r_connected.append(std::pair<EdgeLoop, EdgeLoop>(value->second, value->first));
+        }
+        break;
+      }
+    }
+
+    BLI_edgehashIterator_step(&iter);
+  }
+
+  BLI_edgehash_free(eh, MEM_freeN);
 }
 
 struct PixelInfo {
@@ -239,7 +288,6 @@ static void add_seam_fix(PBVHNode &node,
 
 /** \name Build fixes for connected edges.
  * \{ */
-
 static void build_fixes(PBVH &pbvh,
                         Bitmap &bitmap,
                         const rcti &uvbounds,
@@ -281,7 +329,7 @@ static void build_fixes(PBVH &pbvh,
        * difference.
        */
       float2 other_closest_point;
-      interp_v2_v2v2(other_closest_point, luv_b_2.uv, luv_b_1.uv, lambda);
+      interp_v2_v2v2(other_closest_point, luv_b_1.uv, luv_b_2.uv, lambda);
       float2 direction_b;
       sub_v2_v2v2(direction_b, luv_b_2.uv, luv_b_1.uv);
       float2 perpedicular_b(direction_b.y, -direction_b.x);
@@ -323,28 +371,23 @@ static void build_fixes(PBVH &pbvh,
 }
 
 static void build_fixes(PBVH &pbvh,
-                        const Vector<BMLoopConnection> &connected,
+                        const Vector<std::pair<EdgeLoop, EdgeLoop>> &connected,
                         Bitmaps &bitmaps,
-                        const int cd_loop_uv_offset)
+                        const MLoopUV *ldata_uvs)
 {
-  for (const BMLoopConnection &pair : connected) {
+  for (const std::pair<EdgeLoop, EdgeLoop> &pair : connected) {
     // determine bounding rect in uv space + margin of 1;
     rctf uvbounds;
     BLI_rctf_init_minmax(&uvbounds);
-    MLoopUV *luv_a_1 = static_cast<MLoopUV *>(
-        BM_ELEM_CD_GET_VOID_P(pair.first, cd_loop_uv_offset));
-    MLoopUV *luv_a_2 = static_cast<MLoopUV *>(
-        BM_ELEM_CD_GET_VOID_P(pair.first->next, cd_loop_uv_offset));
-    BLI_rctf_do_minmax_v(&uvbounds, luv_a_1->uv);
-    BLI_rctf_do_minmax_v(&uvbounds, luv_a_2->uv);
+    const MLoopUV &luv_a_1 = ldata_uvs[pair.first.l[0]];
+    const MLoopUV &luv_a_2 = ldata_uvs[pair.first.l[1]];
+    BLI_rctf_do_minmax_v(&uvbounds, luv_a_1.uv);
+    BLI_rctf_do_minmax_v(&uvbounds, luv_a_2.uv);
 
-    MLoopUV *luv_b_1 = static_cast<MLoopUV *>(
-        BM_ELEM_CD_GET_VOID_P(pair.second, cd_loop_uv_offset));
-    MLoopUV *luv_b_2 = static_cast<MLoopUV *>(
-        BM_ELEM_CD_GET_VOID_P(pair.second->next, cd_loop_uv_offset));
+    const MLoopUV &luv_b_1 = ldata_uvs[pair.second.l[0]];
+    const MLoopUV &luv_b_2 = ldata_uvs[pair.second.l[1]];
 
-    const float scale_factor = len_v2v2(luv_b_1->uv, luv_b_2->uv) /
-                               len_v2v2(luv_a_1->uv, luv_a_2->uv);
+    const float scale_factor = len_v2v2(luv_b_1.uv, luv_b_2.uv) / len_v2v2(luv_a_1.uv, luv_a_2.uv);
 
     for (Bitmap &bitmap : bitmaps.bitmaps) {
       rcti uvbounds_i;
@@ -362,7 +405,7 @@ static void build_fixes(PBVH &pbvh,
                             bitmap.resolution[1] +
                         MARGIN;
 
-      build_fixes(pbvh, bitmap, uvbounds_i, *luv_a_1, *luv_a_2, *luv_b_1, *luv_b_2, scale_factor);
+      build_fixes(pbvh, bitmap, uvbounds_i, luv_a_1, luv_a_2, luv_b_1, luv_b_2, scale_factor);
     }
   }
 }
@@ -426,20 +469,18 @@ static void build_fixes(
 }
 
 static void build_fixes(PBVH &pbvh,
-                        const Vector<BMLoop *> &unconnected,
+                        const Vector<EdgeLoop> &unconnected,
                         Bitmaps &bitmaps,
-                        const int cd_loop_uv_offset)
+                        const MLoopUV *ldata_uv)
 {
-  for (const BMLoop *unconnected_loop : unconnected) {
+  for (const EdgeLoop &unconnected_loop : unconnected) {
     // determine bounding rect in uv space + margin of 1;
     rctf uvbounds;
     BLI_rctf_init_minmax(&uvbounds);
-    MLoopUV *luv_1 = static_cast<MLoopUV *>(
-        BM_ELEM_CD_GET_VOID_P(unconnected_loop, cd_loop_uv_offset));
-    MLoopUV *luv_2 = static_cast<MLoopUV *>(
-        BM_ELEM_CD_GET_VOID_P(unconnected_loop->next, cd_loop_uv_offset));
-    BLI_rctf_do_minmax_v(&uvbounds, luv_1->uv);
-    BLI_rctf_do_minmax_v(&uvbounds, luv_2->uv);
+    const MLoopUV &luv_1 = ldata_uv[unconnected_loop.l[0]];
+    const MLoopUV &luv_2 = ldata_uv[unconnected_loop.l[1]];
+    BLI_rctf_do_minmax_v(&uvbounds, luv_1.uv);
+    BLI_rctf_do_minmax_v(&uvbounds, luv_2.uv);
 
     for (Bitmap &bitmap : bitmaps.bitmaps) {
       rcti uvbounds_i;
@@ -457,7 +498,7 @@ static void build_fixes(PBVH &pbvh,
                             bitmap.resolution[1] +
                         MARGIN;
 
-      build_fixes(pbvh, bitmap, uvbounds_i, *luv_1, *luv_2);
+      build_fixes(pbvh, bitmap, uvbounds_i, luv_1, luv_2);
     }
   }
 }
@@ -465,34 +506,22 @@ static void build_fixes(PBVH &pbvh,
 /** \} */
 
 void BKE_pbvh_pixels_rebuild_seams(
-    PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user, int cd_loop_uv_offset)
+    PBVH *pbvh, const Mesh *mesh, Image *image, ImageUser *image_user, const MLoopUV *ldata_uv)
 {
-  const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(mesh);
-
-  BMeshCreateParams bmesh_create_params{};
-  bmesh_create_params.use_toolflags = true;
-  BMesh *bm = BM_mesh_create(&allocsize, &bmesh_create_params);
-
-  BMeshFromMeshParams from_mesh_params{};
-  from_mesh_params.calc_face_normal = false;
-  from_mesh_params.calc_vert_normal = false;
-  BM_mesh_bm_from_me(bm, mesh, &from_mesh_params);
 
   // find seams.
   // for each edge
-  Vector<BMLoopConnection> connected;
-  Vector<BMLoop *> unconnected;
-  find_connected_loops(bm, cd_loop_uv_offset, connected, unconnected);
+  Vector<std::pair<EdgeLoop, EdgeLoop>> connected;
+  Vector<EdgeLoop> unconnected;
+  find_edges_that_need_fixing(mesh, ldata_uv, connected, unconnected);
 
   // Make a bitmap per tile indicating pixels that have already been assigned to a PBVHNode.
   Bitmaps bitmaps = create_tile_bitmap(*pbvh, *image, *image_user);
 
   pbvh_pixels_clear_seams(pbvh);
   /* Fix connected edges before unconnected to improve quality. */
-  build_fixes(*pbvh, connected, bitmaps, cd_loop_uv_offset);
-  build_fixes(*pbvh, unconnected, bitmaps, cd_loop_uv_offset);
-
-  BM_mesh_free(bm);
+  build_fixes(*pbvh, connected, bitmaps, ldata_uv);
+  build_fixes(*pbvh, unconnected, bitmaps, ldata_uv);
 }
 
 void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_user)
