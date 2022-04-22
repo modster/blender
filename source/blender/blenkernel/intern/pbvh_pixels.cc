@@ -259,14 +259,33 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
                            pixel_row.start_image_coordinate.x;
         for (int x = 0; x < pixel_row.num_pixels; x++) {
           if (image_buffer->rect_float) {
-            copy_v4_fl(&image_buffer->rect_float[pixel_offset * 4], 1.0);
+            copy_v4_fl4(&image_buffer->rect_float[pixel_offset * 4], 0.0f, 0.5f, 0.0f, 1.0f);
           }
           if (image_buffer->rect) {
             uint8_t *dest = static_cast<uint8_t *>(
                 static_cast<void *>(&image_buffer->rect[pixel_offset]));
-            copy_v4_uchar(dest, 255);
+            static uint8_t color[] = {0, 128, 0, 255};
+            copy_v4_v4_uchar(dest, color);
           }
           pixel_offset += 1;
+        }
+      }
+
+      for (UDIMSeamFixes &fixes : node_data->seams) {
+        if (fixes.dst_tile_number != image_tile.get_tile_number()) {
+          continue;
+        }
+        for (SeamFix &fix : fixes.pixels) {
+          int pixel_offset = fix.dst_pixel.y * image_buffer->x + fix.dst_pixel.x;
+          if (image_buffer->rect_float != nullptr) {
+            copy_v4_fl4(&image_buffer->rect_float[pixel_offset * 4], 1.0f, 0.0f, 0.0f, 1.0f);
+          }
+          else if (image_buffer->rect != nullptr) {
+            uint8_t *dest = static_cast<uint8_t *>(
+                static_cast<void *>(&image_buffer->rect[pixel_offset]));
+            static uint8_t seam_color[] = {255, 0, 0, 255};
+            copy_v4_v4_uchar(dest, seam_color);
+          }
         }
       }
     }
@@ -303,12 +322,13 @@ static void update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image
   TaskParallelSettings settings;
   BKE_pbvh_parallel_range_settings(&settings, true, nodes_to_update.size());
   BLI_task_parallel_range(0, nodes_to_update.size(), &user_data, do_encode_pixels, &settings);
-  if (USE_WATERTIGHT_CHECK) {
-    apply_watertight_check(pbvh, image, image_user);
-  }
 
   int cd_loop_uv_offset = CustomData_get_offset(&mesh->ldata, CD_MLOOPUV);
   BKE_pbvh_pixels_rebuild_seams(pbvh, mesh, image, image_user, cd_loop_uv_offset);
+
+  if (USE_WATERTIGHT_CHECK) {
+    apply_watertight_check(pbvh, image, image_user);
+  }
 
   /* Clear the UpdatePixels flag. */
   for (PBVHNode *node : nodes_to_update) {

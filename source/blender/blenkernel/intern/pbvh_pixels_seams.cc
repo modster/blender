@@ -234,7 +234,6 @@ static void add_seam_fix(PBVHNode &node,
 {
   NodeData &node_data = BKE_pbvh_pixels_node_data_get(node);
   UDIMSeamFixes &seam_fixes = node_data.ensure_seam_fixes(src_tile_number, dst_tile_number);
-  BLI_rcti_do_minmax_v(&seam_fixes.dst_partial_region, dst_pixel);
   seam_fixes.pixels.append(SeamFix{src_pixel, dst_pixel});
 }
 
@@ -275,7 +274,7 @@ static void build_fixes(PBVH &pbvh,
 
       /* Distance to the edge in pixel space. */
       float distance_to_edge = len_v2v2(closest_coord, uv_coord);
-      if (distance_to_edge > 2.5f) {
+      if (distance_to_edge > 3.5f) {
         continue;
       }
 
@@ -342,7 +341,7 @@ static void build_fixes(PBVH &pbvh,
 
     for (Bitmap &bitmap : bitmaps.bitmaps) {
       rcti uvbounds_i;
-      const int MARGIN = 1;
+      const int MARGIN = 2;
       uvbounds_i.xmin = (uvbounds.xmin - bitmap.image_tile.get_tile_x_offset()) *
                             bitmap.resolution[0] -
                         MARGIN;
@@ -507,10 +506,20 @@ void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_us
       continue;
     }
 
+    /** Determine the region to update by checking actual changes. */
+    rcti region_to_update;
+    BLI_rcti_init_minmax(&region_to_update);
+
     if (src_image_buffer->rect_float != nullptr && dst_image_buffer->rect_float != nullptr) {
       for (SeamFix &fix : fixes.pixels) {
         int src_offset = fix.src_pixel.y * src_image_buffer->x + fix.src_pixel.x;
         int dst_offset = fix.dst_pixel.y * dst_image_buffer->x + fix.dst_pixel.x;
+
+        if (equals_v4v4(&dst_image_buffer->rect_float[dst_offset * 4],
+                        &src_image_buffer->rect_float[src_offset * 4])) {
+          continue;
+        }
+        BLI_rcti_do_minmax_v(&region_to_update, fix.dst_pixel);
         copy_v4_v4(&dst_image_buffer->rect_float[dst_offset * 4],
                    &src_image_buffer->rect_float[src_offset * 4]);
       }
@@ -519,19 +528,25 @@ void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_us
       for (SeamFix &fix : fixes.pixels) {
         int src_offset = fix.src_pixel.y * src_image_buffer->x + fix.src_pixel.x;
         int dst_offset = fix.dst_pixel.y * dst_image_buffer->x + fix.dst_pixel.x;
+        if (dst_image_buffer->rect[dst_offset] == src_image_buffer->rect[src_offset]) {
+          continue;
+        }
+        BLI_rcti_do_minmax_v(&region_to_update, fix.dst_pixel);
         dst_image_buffer->rect[dst_offset] = src_image_buffer->rect[src_offset];
       }
     }
 
     /* Mark dst_image_buffer region dirty covering each dst_pixel. */
-    LISTBASE_FOREACH (ImageTile *, image_tile, &image->tiles) {
-      if (image_tile->tile_number != fixes.dst_tile_number) {
-        continue;
-      }
+    if (BLI_rcti_is_valid(&region_to_update)) {
+      LISTBASE_FOREACH (ImageTile *, image_tile, &image->tiles) {
+        if (image_tile->tile_number != fixes.dst_tile_number) {
+          continue;
+        }
 
-      BKE_image_partial_update_mark_region(
-          image, image_tile, dst_image_buffer, &fixes.dst_partial_region);
-      break;
+        BKE_image_partial_update_mark_region(
+            image, image_tile, dst_image_buffer, &region_to_update);
+        break;
+      }
     }
     BKE_image_release_ibuf(image, src_image_buffer, nullptr);
     BKE_image_release_ibuf(image, dst_image_buffer, nullptr);
