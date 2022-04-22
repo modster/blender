@@ -4304,7 +4304,7 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
         &rb->render_data_pool, sizeof(LineartTriangle *) * LRT_TILE_SPLITTING_TRIANGLE_LIMIT);
     ba[i].linked_lines = lineart_mem_acquire_thread(
         &rb->render_data_pool, sizeof(LineartEdge *) * LRT_TILE_EDGE_COUNT_INITIAL);
-    ba[i].lock = root->lock;
+    BLI_spin_init(&ba[i].lock);
   }
 
   for (int i = 0; i < root->triangle_count; i++) {
@@ -4449,8 +4449,14 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
     if (recursive && do_intersection && rb->use_intersections) {
       lineart_triangle_intersect_in_bounding_area(rb, tri, root_ba, th);
     }
+    if (do_lock) {
+      BLI_spin_unlock(&root_ba->lock);
+    }
   }
   else {
+    if (do_lock) {
+      BLI_spin_unlock(&root_ba->lock);
+    }
     LineartBoundingArea *ba = root_ba->child;
     double *B1 = LRUB;
     double b[4];
@@ -4463,24 +4469,20 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
     }
     if (LRT_BOUND_AREA_CROSSES(B1, &ba[0].l)) {
       lineart_bounding_area_link_triangle(
-          rb, &ba[0], tri, B1, recursive, recursive_level + 1, do_intersection, false, th);
+          rb, &ba[0], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
     }
     if (LRT_BOUND_AREA_CROSSES(B1, &ba[1].l)) {
       lineart_bounding_area_link_triangle(
-          rb, &ba[1], tri, B1, recursive, recursive_level + 1, do_intersection, false, th);
+          rb, &ba[1], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
     }
     if (LRT_BOUND_AREA_CROSSES(B1, &ba[2].l)) {
       lineart_bounding_area_link_triangle(
-          rb, &ba[2], tri, B1, recursive, recursive_level + 1, do_intersection, false, th);
+          rb, &ba[2], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
     }
     if (LRT_BOUND_AREA_CROSSES(B1, &ba[3].l)) {
       lineart_bounding_area_link_triangle(
-          rb, &ba[3], tri, B1, recursive, recursive_level + 1, do_intersection, false, th);
+          rb, &ba[3], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
     }
-  }
-
-  if (do_lock) {
-    BLI_spin_unlock(&root_ba->lock);
   }
 }
 
