@@ -37,12 +37,12 @@ struct EdgeCheck {
 };
 
 /** Do the two given EdgeLoops share the same uv coordinates. */
-bool share_uv(const MLoopUV *ldata_uvs, EdgeLoop &edge1, EdgeLoop &edge2)
+bool share_uv(const MLoopUV *ldata_uv, EdgeLoop &edge1, EdgeLoop &edge2)
 {
-  const float2 &uv_1_a = ldata_uvs[edge1.l[0]].uv;
-  const float2 &uv_1_b = ldata_uvs[edge1.l[1]].uv;
-  const float2 &uv_2_a = ldata_uvs[edge2.l[0]].uv;
-  const float2 &uv_2_b = ldata_uvs[edge2.l[1]].uv;
+  const float2 &uv_1_a = ldata_uv[edge1.l[0]].uv;
+  const float2 &uv_1_b = ldata_uv[edge1.l[1]].uv;
+  const float2 &uv_2_a = ldata_uv[edge2.l[0]].uv;
+  const float2 &uv_2_b = ldata_uv[edge2.l[1]].uv;
   const float limit = 0.0001f;
 
   return (compare_v2v2(uv_1_a, uv_2_a, limit) && compare_v2v2(uv_1_b, uv_2_b, limit)) ||
@@ -51,7 +51,7 @@ bool share_uv(const MLoopUV *ldata_uvs, EdgeLoop &edge1, EdgeLoop &edge2)
 
 /** Make a list of connected and unconnected edgeloops that require UV Seam fixes. */
 void find_edges_that_need_fixing(const Mesh *mesh,
-                                 const MLoopUV *ldata_uvs,
+                                 const MLoopUV *ldata_uv,
                                  Vector<std::pair<EdgeLoop, EdgeLoop>> &r_connected,
                                  Vector<EdgeLoop> &r_unconnected)
 {
@@ -98,7 +98,7 @@ void find_edges_that_need_fixing(const Mesh *mesh,
       }
       case EdgeCheckFlag::Connected: {
         // check for uv space to add to r_connected
-        if (!share_uv(ldata_uvs, value->first, value->second)) {
+        if (!share_uv(ldata_uv, value->first, value->second)) {
           r_connected.append(std::pair<EdgeLoop, EdgeLoop>(value->first, value->second));
           r_connected.append(std::pair<EdgeLoop, EdgeLoop>(value->second, value->first));
         }
@@ -373,19 +373,19 @@ static void build_fixes(PBVH &pbvh,
 static void build_fixes(PBVH &pbvh,
                         const Vector<std::pair<EdgeLoop, EdgeLoop>> &connected,
                         Bitmaps &bitmaps,
-                        const MLoopUV *ldata_uvs)
+                        const MLoopUV *ldata_uv)
 {
   for (const std::pair<EdgeLoop, EdgeLoop> &pair : connected) {
     // determine bounding rect in uv space + margin of 1;
     rctf uvbounds;
     BLI_rctf_init_minmax(&uvbounds);
-    const MLoopUV &luv_a_1 = ldata_uvs[pair.first.l[0]];
-    const MLoopUV &luv_a_2 = ldata_uvs[pair.first.l[1]];
+    const MLoopUV &luv_a_1 = ldata_uv[pair.first.l[0]];
+    const MLoopUV &luv_a_2 = ldata_uv[pair.first.l[1]];
     BLI_rctf_do_minmax_v(&uvbounds, luv_a_1.uv);
     BLI_rctf_do_minmax_v(&uvbounds, luv_a_2.uv);
 
-    const MLoopUV &luv_b_1 = ldata_uvs[pair.second.l[0]];
-    const MLoopUV &luv_b_2 = ldata_uvs[pair.second.l[1]];
+    const MLoopUV &luv_b_1 = ldata_uv[pair.second.l[0]];
+    const MLoopUV &luv_b_2 = ldata_uv[pair.second.l[1]];
 
     const float scale_factor = len_v2v2(luv_b_1.uv, luv_b_2.uv) / len_v2v2(luv_a_1.uv, luv_a_2.uv);
 
