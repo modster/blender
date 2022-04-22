@@ -5504,7 +5504,7 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb,
       BLI_addtail(&ssc[i].shadow_segments, &ss[i * 2 + 1]);
 
       if (e->flags & LRT_EDGE_FLAG_LIGHT_CONTOUR) {
-        ssc[i].e_ref = e->t1;
+        ssc[i].e_ref = (LineartEdge *)e->t1;
         ssc[i].e_ref_light_contour = e;
         /* Restore original edge flag. */
         e->flags &= (~LRT_EDGE_FLAG_CONTOUR);
