@@ -4715,7 +4715,6 @@ static void lineart_add_triangles_worker(TaskPool *__restrict UNUSED(pool), Line
     int x1, x2, y1, y2;
     int r, co;
     LineartRenderBuffer *rb = th->rb;
-    int _dir_control = 0;
 
     for (i = 0; i < lim; i++) {
       if ((tri->flags & LRT_CULL_USED) || (tri->flags & LRT_CULL_DISCARD)) {
@@ -4723,26 +4722,17 @@ static void lineart_add_triangles_worker(TaskPool *__restrict UNUSED(pool), Line
         continue;
       }
       if (lineart_get_triangle_bounding_areas(rb, tri, &y1, &y2, &x1, &x2)) {
-        _dir_control++;
         for (co = x1; co <= x2; co++) {
           for (r = y1; r <= y2; r++) {
-            int col = co, row = r;
-            if (_dir_control % 2) {
-              col = x2 - (co - x1);
-            }
-            if ((_dir_control / 2) % 2) {
-              row = y2 - (r - y1);
-            }
-            lineart_bounding_area_link_triangle(
-                rb,
-                &rb->initial_bounding_areas[row * LRT_BA_ROWS + col],
-                tri,
-                0,
-                1,
-                0,
-                (!(tri->flags & LRT_TRIANGLE_NO_INTERSECTION)),
-                true,
-                th);
+            lineart_bounding_area_link_triangle(rb,
+                                                &rb->initial_bounding_areas[r * LRT_BA_ROWS + co],
+                                                tri,
+                                                0,
+                                                1,
+                                                0,
+                                                (!(tri->flags & LRT_TRIANGLE_NO_INTERSECTION)),
+                                                true,
+                                                th);
           }
         }
       } /* Else throw away. */
