@@ -177,10 +177,33 @@ struct Bitmap {
     int offset = image_coordinate.y * resolution.x + image_coordinate.x;
     return bitmap[offset];
   }
+
+  bool contains(const float2 &uv) const
+  {
+    int2 tile_offset = image_tile.get_tile_offset();
+    float2 tile_uv(uv.x - tile_offset.x, uv.y - tile_offset.y);
+    if (tile_uv.x < 0.0f || tile_uv.x >= 1.0f) {
+      return false;
+    }
+    if (tile_uv.y < 0.0f || tile_uv.y >= 1.0f) {
+      return false;
+    }
+    return true;
+  }
 };
 
 struct Bitmaps {
   Vector<Bitmap> bitmaps;
+
+  const Bitmap *find_containing_uv(float2 uv) const
+  {
+    for (const Bitmap &bitmap : bitmaps) {
+      if (bitmap.contains(uv)) {
+        return &bitmap;
+      }
+    }
+    return nullptr;
+  }
 };
 
 Vector<PixelInfo> create_tile_bitmap(const PBVH &pbvh,
@@ -232,9 +255,8 @@ Bitmaps create_tile_bitmap(const PBVH &pbvh, Image &image, ImageUser &image_user
   return result;
 }
 
-int2 find_source_pixel(Bitmap &bitmap, float2 near_image_coord)
+int2 find_source_pixel(const Bitmap &bitmap, float2 near_image_coord)
 {
-  // TODO: We should take lambda into account.
   const int SEARCH_RADIUS = 2;
   float min_distance = FLT_MAX;
   int2 result(0, 0);
@@ -291,7 +313,9 @@ static void add_seam_fix(PBVHNode &node,
 
 /** \name Build fixes for connected edges.
  * \{ */
+
 static void build_fixes(PBVH &pbvh,
+                        Bitmaps &bitmaps,
                         Bitmap &bitmap,
                         const rcti &uvbounds,
                         const MLoopUV &luv_a_1,
@@ -302,22 +326,27 @@ static void build_fixes(PBVH &pbvh,
 {
   for (int v = uvbounds.ymin; v <= uvbounds.ymax; v++) {
     for (int u = uvbounds.xmin; u <= uvbounds.xmax; u++) {
-      if (u < 0 || u >= bitmap.resolution[0] || v < 0 || v >= bitmap.resolution[1]) {
+      if (u < 0 || u >= bitmap.resolution.x || v < 0 || v >= bitmap.resolution.y) {
         /** Pixel not part of this tile. */
         continue;
       }
-      int pixel_offset = v * bitmap.resolution[0] + u;
+
+      int pixel_offset = v * bitmap.resolution.x + u;
       PixelInfo &pixel_info = bitmap.bitmap[pixel_offset];
       if (pixel_info.is_extracted() || pixel_info.is_seam_fix()) {
         /* Skip this pixel as it already has a solution. */
         continue;
       }
+
+      float2 dst_uv_offset(bitmap.image_tile.get_tile_x_offset(),
+                           bitmap.image_tile.get_tile_y_offset());
       float2 uv_coord(u, v);
-      // What is the distance to the edge.
       float2 uv(uv_coord.x / bitmap.resolution.x, uv_coord.y / bitmap.resolution.y);
       float2 closest_point;
-      // TODO: Should we use lambda to reduce artifacts?
-      const float lambda = closest_to_line_v2(closest_point, uv, luv_a_1.uv, luv_a_2.uv);
+      const float lambda = closest_to_line_v2(closest_point,
+                                              uv,
+                                              float2(luv_a_1.uv) - dst_uv_offset,
+                                              float2(luv_a_2.uv) - dst_uv_offset);
       float2 closest_coord(closest_point.x * bitmap.resolution.x,
                            closest_point.y * bitmap.resolution.y);
 
@@ -333,29 +362,48 @@ static void build_fixes(PBVH &pbvh,
        */
       float2 other_closest_point;
       interp_v2_v2v2(other_closest_point, luv_b_1.uv, luv_b_2.uv, lambda);
+
+      /*
+       * Find the bitmap containing the information of the tile containing the
+       * 'other_closest_point`. This will fail for edges that are part of multiple tiles, but that
+       * should already be a problem during rendering.
+       */
+      const Bitmap *src_bitmap = bitmaps.find_containing_uv(other_closest_point);
+      if (src_bitmap == nullptr) {
+        continue;
+      }
+
+      other_closest_point.x -= src_bitmap->image_tile.get_tile_x_offset();
+      other_closest_point.y -= src_bitmap->image_tile.get_tile_y_offset();
+
       float2 direction_b;
       sub_v2_v2v2(direction_b, luv_b_2.uv, luv_b_1.uv);
+
+      int2 source_pixel(0, 0);
+      PixelInfo src_pixel_info;
       float2 perpedicular_b(direction_b.y, -direction_b.x);
       normalize_v2(perpedicular_b);
-      perpedicular_b.x /= bitmap.resolution.x;
-      perpedicular_b.y /= bitmap.resolution.y;
+      perpedicular_b.x /= src_bitmap->resolution.x;
+      perpedicular_b.y /= src_bitmap->resolution.y;
       float2 projected_coord_a = other_closest_point +
                                  perpedicular_b * distance_to_edge * scale_factor;
-      projected_coord_a.x *= bitmap.resolution.x;
-      projected_coord_a.y *= bitmap.resolution.y;
-      int2 source_pixel = find_source_pixel(bitmap, projected_coord_a);
-      PixelInfo src_pixel_info = bitmap.get_pixel_info(source_pixel);
+      projected_coord_a.x *= src_bitmap->resolution.x;
+      projected_coord_a.y *= src_bitmap->resolution.y;
+      source_pixel = find_source_pixel(*src_bitmap, projected_coord_a);
+      src_pixel_info = src_bitmap->get_pixel_info(source_pixel);
 
+      /* When no solution found check the other winding order. */
       if (!src_pixel_info.is_extracted()) {
         float2 projected_coord_b = other_closest_point -
                                    perpedicular_b * distance_to_edge * scale_factor;
-        projected_coord_b.x *= bitmap.resolution.x;
-        projected_coord_b.y *= bitmap.resolution.y;
-        source_pixel = find_source_pixel(bitmap, projected_coord_b);
-        src_pixel_info = bitmap.get_pixel_info(source_pixel);
+        projected_coord_b.x *= src_bitmap->resolution.x;
+        projected_coord_b.y *= src_bitmap->resolution.y;
+        source_pixel = find_source_pixel(*src_bitmap, projected_coord_b);
+        src_pixel_info = src_bitmap->get_pixel_info(source_pixel);
       }
 
       if (!src_pixel_info.is_extracted()) {
+        /* No solution found skip this pixel. */
         continue;
       }
 
@@ -364,7 +412,7 @@ static void build_fixes(PBVH &pbvh,
 
       PBVHNode &node = pbvh.nodes[src_node];
       add_seam_fix(node,
-                   bitmap.image_tile.get_tile_number(),
+                   src_bitmap->image_tile.get_tile_number(),
                    source_pixel,
                    bitmap.image_tile.get_tile_number(),
                    destination_pixel);
@@ -408,7 +456,8 @@ static void build_fixes(PBVH &pbvh,
                             bitmap.resolution[1] +
                         MARGIN;
 
-      build_fixes(pbvh, bitmap, uvbounds_i, luv_a_1, luv_a_2, luv_b_1, luv_b_2, scale_factor);
+      build_fixes(
+          pbvh, bitmaps, bitmap, uvbounds_i, luv_a_1, luv_a_2, luv_b_1, luv_b_2, scale_factor);
     }
   }
 }
@@ -436,11 +485,12 @@ static void build_fixes(
         continue;
       }
 
-      // What is the distance to the edge.
+      float2 dst_uv_offset(bitmap.image_tile.get_tile_x_offset(),
+                           bitmap.image_tile.get_tile_y_offset());
       float2 uv(float(u) / bitmap.resolution[0], float(v) / bitmap.resolution[1]);
       float2 closest_point;
-      // TODO: Should we use lambda to reduce artifacts?
-      closest_to_line_v2(closest_point, uv, luv_1.uv, luv_2.uv);
+      closest_to_line_v2(
+          closest_point, uv, float2(luv_1.uv) - dst_uv_offset, float2(luv_2.uv) - dst_uv_offset);
 
       /* Calculate the distance in pixel space. */
       float2 uv_coord(u, v);
