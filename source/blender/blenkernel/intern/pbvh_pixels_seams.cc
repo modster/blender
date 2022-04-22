@@ -18,6 +18,9 @@
 
 namespace blender::bke::pbvh::pixels {
 
+/* Distance between a pixel and its edge that will be fixed. Value is in pixels space. */
+constexpr float SEAMFIX_EDGE_DISTANCE = 3.5f;
+
 struct EdgeLoop {
   /** Loop indexes that form an edge. */
   int l[2];
@@ -320,7 +323,7 @@ static void build_fixes(PBVH &pbvh,
 
       /* Distance to the edge in pixel space. */
       float distance_to_edge = len_v2v2(closest_coord, uv_coord);
-      if (distance_to_edge > 3.0f) {
+      if (distance_to_edge > SEAMFIX_EDGE_DISTANCE) {
         continue;
       }
 
@@ -444,7 +447,7 @@ static void build_fixes(
       float2 closest_coord(closest_point.x * bitmap.resolution.x,
                            closest_point.y * bitmap.resolution.y);
       float distance_to_edge = len_v2v2(uv_coord, closest_coord);
-      if (distance_to_edge > 3.0f) {
+      if (distance_to_edge > SEAMFIX_EDGE_DISTANCE) {
         continue;
       }
 
