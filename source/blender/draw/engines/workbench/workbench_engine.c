@@ -325,7 +325,23 @@ static eV3DShadingColorType workbench_color_type_get(WORKBENCH_PrivateData *wpd,
 
   if (is_sculpt_pbvh && color_type == V3D_SHADING_TEXTURE_COLOR) {
     /* Force use of material color for sculpt. */
+    color_type = V3D_SHADING_MATERIAL_COLOR;
+  }
+
+  if (is_sculpt_pbvh) {
+    /* Bad call C is required to access the tool system that is context aware. Cast to non-const
+     * due to current API. */
+    bContext *C = (bContext *)DRW_context_state_get()->evil_C;
+    if (C != NULL) {
+      color_type = ED_paint_shading_color_override(
+          C, &wpd->scene->toolsettings->paint_mode, ob, color_type);
+    }
+  }
+
+  if (r_draw_shadow) {
+    *r_draw_shadow = (ob->dtx & OB_DRAW_NO_SHADOW_CAST) == 0 && SHADOW_ENABLED(wpd);
     /* Currently unsupported in sculpt mode. We could revert to the slow
+     * method in this case but I'm not sure if it's a good idea given that
      * sculpted meshes are heavy to begin with. */
     if (is_sculpt_pbvh) {
       *r_draw_shadow = false;
