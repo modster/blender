@@ -1452,12 +1452,6 @@ static void lineart_vert_transform_me(
   mul_v4_m4v3_db(vt->fbcoord, mvp_mat, co);
 }
 
-typedef struct LineartAdjacentItem {
-  unsigned int v1;
-  unsigned int v2;
-  unsigned int e;
-} LineartAdjacentItem;
-
 typedef struct LineartEdgeNeighbor {
   int e;
   short flags;
@@ -1517,7 +1511,6 @@ typedef struct EdgeFeatData {
   LineartTriangle *tri_array;
   LineartVert *v_array;
   float crease_threshold;
-  float **poly_normals;
   bool use_auto_smooth;
   bool use_freestyle_face;
   int freestyle_face_index;
@@ -1537,8 +1530,9 @@ static void feat_data_sum_reduce(const void *__restrict UNUSED(userdata),
   feat_chunk_join->feat_edges += feat_chunk->feat_edges;
 }
 
-__attribute__((optimize("O0"))) static void lineart_identify_mlooptri_feature_edges(
-    void *__restrict userdata, const int i, const TaskParallelTLS *__restrict tls)
+static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
+                                                    const int i,
+                                                    const TaskParallelTLS *__restrict tls)
 {
   EdgeFeatData *e_feat_data = (EdgeFeatData *)userdata;
   EdgeFeatReduceData *reduce_data = (EdgeFeatReduceData *)tls->userdata_chunk;
@@ -1698,18 +1692,16 @@ static uint16_t lineart_identify_medge_feature_edges(
   return edge_flag_result;
 }
 
-__attribute__((optimize("O0"))) static uint16_t lineart_identify_feature_line_me(
-    LineartRenderBuffer *rb,
-    int eindex,
-    LineartTriangle *rt_array,
-    LineartVert *rv_array,
-    float crease_threshold,
-    bool use_auto_smooth,
-    bool use_freestyle_edge,
-    bool use_freestyle_face,
-    Mesh *me,
-    LineartEdgeNeighbor *en,
-    float (*normals)[3])
+static uint16_t lineart_identify_feature_line_me(LineartRenderBuffer *rb,
+                                                 int eindex,
+                                                 LineartTriangle *rt_array,
+                                                 LineartVert *rv_array,
+                                                 float crease_threshold,
+                                                 bool use_auto_smooth,
+                                                 bool use_freestyle_edge,
+                                                 bool use_freestyle_face,
+                                                 Mesh *me,
+                                                 LineartEdgeNeighbor *en)
 {
 
   MPoly *ll = NULL, *lr = NULL;
@@ -1980,14 +1972,6 @@ static void lineart_load_tri_task(void *__restrict userdata,
   tri->intersecting_verts = (void *)&tri_task_data->tri_adj[i];
 }
 
-static int cmp_adjacent_items(const void *ps1, const void *ps2)
-{
-  LineartAdjacentItem *p1 = (LineartAdjacentItem *)ps1;
-  LineartAdjacentItem *p2 = (LineartAdjacentItem *)ps2;
-  int a = (int)p1->v1 - (int)p2->v1;
-  int b = (int)p1->v2 - (int)p2->v2;
-  return a ? a : b;
-}
 static LineartEdgeNeighbor *lineart_build_edge_neighbor(Mesh *me, int total_edges)
 {
   /* Because the mesh is traingulated, so me->totedge should be reliable? */
@@ -2011,7 +1995,8 @@ static LineartEdgeNeighbor *lineart_build_edge_neighbor(Mesh *me, int total_edge
     en[i].v2 = ai[i].v2;
   }
 
-  qsort(ai, total_edges, sizeof(LineartAdjacentItem), cmp_adjacent_items);
+  lineart_sort_adjacent_items(ai, total_edges);
+  // qsort(ai, total_edges, sizeof(LineartAdjacentItem), cmp_adjacent_items);
 
   if (0) {
     printf("Edge Adjacent tuples ");
@@ -2032,8 +2017,8 @@ static LineartEdgeNeighbor *lineart_build_edge_neighbor(Mesh *me, int total_edge
   return en;
 }
 
-__attribute__((optimize("O0"))) static void lineart_geometry_object_load_no_bmesh(
-    LineartObjectInfo *ob_info, LineartRenderBuffer *re_buf)
+static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
+                                                  LineartRenderBuffer *re_buf)
 {
   LineartElementLinkNode *elem_link_node;
   LineartVert *la_v_arr;
@@ -2322,7 +2307,6 @@ static void lineart_geometry_object_load_edge_neighbor(LineartObjectInfo *obi,
   Mesh *me = obi->original_me;
 
   BKE_mesh_runtime_looptri_ensure(me);
-  float(*poly_normals)[3] = BKE_mesh_poly_normals_ensure(me);
   const int tot_tri = me->runtime.looptris.len;
 
   unsigned int total_edges = me->runtime.looptris.len * 3;
@@ -2459,7 +2443,7 @@ static void lineart_geometry_object_load_edge_neighbor(LineartObjectInfo *obi,
 
     /* Because e->head.hflag is char, so line type flags should not exceed positive 7 bits. */
     uint16_t eflag = lineart_identify_feature_line_me(
-        rb, i, ort, orv, use_crease, use_auto_smooth, false, false, me, en, poly_normals);
+        rb, i, ort, orv, use_crease, use_auto_smooth, false, false, me, en);
     if (eflag) {
       /* Only allocate for feature lines (instead of all lines) to save memory.
        * If allow duplicated edges, one edge gets added multiple times if it has multiple types.
