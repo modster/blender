@@ -222,11 +222,8 @@ typedef struct LineartRenderBuffer {
 
   float overscan;
 
-  struct LineartBoundingArea **initial_bounding_areas;
-  unsigned int bounding_area_initial_count;
-
-  /* Array of thread_count length for spatial locks. */
-  SpinLock *lock_bounding_areas;
+  struct LineartBoundingArea *initial_bounding_areas;
+  unsigned int bounding_area_count;
 
   /* When splitting bounding areas, if there's an ortho camera placed at a straight angle, there
    * will be a lot of triangles aligned in line which can not be separated by continue subdividing
@@ -443,7 +440,7 @@ typedef struct LineartBoundingArea {
   double cx, cy;
 
   /** 1,2,3,4 quadrant */
-  struct LineartBoundingArea *child[4];
+  struct LineartBoundingArea *child;
 
   ListBase lp;
   ListBase rp;
