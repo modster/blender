@@ -197,6 +197,12 @@ typedef struct LineartChainRegisterEntry {
   char is_left;
 } LineartChainRegisterEntry;
 
+typedef struct LineartAdjacentItem {
+  unsigned int v1;
+  unsigned int v2;
+  unsigned int e;
+} LineartAdjacentItem;
+
 enum eLineArtTileRecursiveLimit {
   /* If tile gets this small, it's already much smaller than a pixel. No need to continue
    * splitting. */
