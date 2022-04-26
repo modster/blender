@@ -764,12 +764,15 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     -DONEAPI_EXPORT)
 
     if(sycl_compiler_compiler_name MATCHES "dpcpp")
+      # The oneAPI distribution calls the compiler "dpcpp" and comes with a script that sets environment variables.
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
         COMMAND "${sycl_compiler_root}/../../env/vars.bat"
         COMMAND ${SYCL_COMPILER} ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     else()
+      # The open source SYCL compiler just goes by clang++ and does not have such a script.
+      # Set the variables manually.
       string(REPLACE /Redist/ /Tools/ MSVC_TOOLS_DIR ${MSVC_REDIST_DIR})
       list(APPEND sycl_compiler_flags
 	      -L "${MSVC_TOOLS_DIR}/lib/x64"
@@ -777,18 +780,29 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
 	      -L "${WINDOWS_KITS_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/ucrt/x64")
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
-	COMMAND ${CMAKE_COMMAND} -E env
-	        "LIB=${sycl_compiler_root}/../lib;${LIB}"
-		"PATH=${sycl_compiler_root}/../lib/ocloc;${sycl_compiler_root};${PATH}"
+	      COMMAND ${CMAKE_COMMAND} -E env
+	              "LIB=${sycl_compiler_root}/../lib;${LIB}"
+		            "PATH=${sycl_compiler_root}/../lib/ocloc;${sycl_compiler_root};${PATH}"
                 ${SYCL_COMPILER} ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
   else()
     list(APPEND sycl_compiler_flags -fPIC)
-    add_custom_command(
-      OUTPUT ${cycles_kernel_oneapi_lib}
-      COMMAND bash -c \"source ${sycl_compiler_root}/../../env/vars.sh&&${SYCL_COMPILER} ${sycl_compiler_flags}\"
-      DEPENDS ${cycles_oneapi_kernel_sources})
+    # The oneAPI distribution calls the compiler "dpcpp" and comes with a script that sets environment variables.
+    if(sycl_compiler_compiler_name MATCHES "dpcpp")
+      add_custom_command(
+        OUTPUT ${cycles_kernel_oneapi_lib}
+        COMMAND bash -c \"source ${sycl_compiler_root}/../../env/vars.sh&&${SYCL_COMPILER} ${sycl_compiler_flags}\"
+        DEPENDS ${cycles_oneapi_kernel_sources})
+    else()
+      # The open source SYCL compiler just goes by clang++ and does not have such a script.
+      # Set the variables manually.
+      add_custom_command(
+        OUTPUT ${cycles_kernel_oneapi_lib}
+        COMMAND ${CMAKE_COMMAND} -E env LD_LIBRARY_DIR="${sycl_compiler_root}/lib:${LD_LIBRARY_DIR}"
+                ${SYCL_COMPILER} ${sycl_compiler_flags}
+        DEPENDS ${cycles_oneapi_kernel_sources})
+    endif()
   endif()
 
   delayed_install("${CMAKE_CURRENT_BINARY_DIR}" "${cycles_kernel_oneapi_lib}" ${CYCLES_INSTALL_PATH}/lib)
