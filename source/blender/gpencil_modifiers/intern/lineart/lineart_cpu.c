@@ -1621,19 +1621,39 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
     double *view_vector = vv;
     double dot_1 = 0, dot_2 = 0;
     double result;
+    bool material_back_face = ((tri1->flags | tri2->flags) & LRT_TRIANGLE_MAT_BACK_FACE_CULLING);
 
-    if (rb->cam_is_persp) {
-      sub_v3_v3v3_db(view_vector, vert->gloc, rb->camera_pos);
-    }
-    else {
-      view_vector = rb->view_vector;
-    }
+    if (rb->use_contour || rb->use_back_face_culling || material_back_face) {
+      if (rb->cam_is_persp) {
+        sub_v3_v3v3_db(view_vector, rb->camera_pos, vert->gloc);
+      }
+      else {
+        view_vector = rb->view_vector;
+      }
 
-    dot_1 = dot_v3v3_db(view_vector, tri1->gn);
-    dot_2 = dot_v3v3_db(view_vector, tri2->gn);
+      dot_1 = dot_v3v3_db(view_vector, tri1->gn);
+      dot_2 = dot_v3v3_db(view_vector, tri2->gn);
 
-    if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
-      edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
+      if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+        edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
+      }
+
+      if (rb->use_back_face_culling) {
+        if (dot_1 < 0) {
+          tri1->flags |= LRT_CULL_DISCARD;
+        }
+        if (dot_2 < 0) {
+          tri2->flags |= LRT_CULL_DISCARD;
+        }
+      }
+      if (material_back_face) {
+        if (tri1->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_1 < 0) {
+          tri1->flags |= LRT_CULL_DISCARD;
+        }
+        if (tri2->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_2 < 0) {
+          tri2->flags |= LRT_CULL_DISCARD;
+        }
+      }
     }
 
     if (!only_contour) {
@@ -1831,6 +1851,9 @@ static void lineart_load_tri_task(void *__restrict userdata,
                                   mat->lineart.material_mask_bits :
                                   0);
   tri->mat_occlusion |= (mat ? mat->lineart.mat_occlusion : 1);
+  tri->flags |= (mat && (mat->blend_flag & MA_BL_CULL_BACKFACE)) ?
+                    LRT_TRIANGLE_MAT_BACK_FACE_CULLING :
+                    0;
 
   tri->intersection_mask = ob_info->override_intersection_mask;
 
