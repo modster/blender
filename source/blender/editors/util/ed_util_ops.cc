@@ -329,8 +329,7 @@ static void ED_OT_lib_id_override_editable_toggle(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Toggle Library Override Editable";
-  ot->description =
-      "Set if this linked data-block can be changed in the UI through library overrides";
+  ot->description = "Set if this library override data-block can be edited";
   ot->idname = "ED_OT_lib_id_override_editable_toggle";
 
   /* api callbacks */

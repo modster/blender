@@ -324,11 +324,13 @@ float outliner_right_columns_width(const SpaceOutliner *space_outliner)
     case SO_LIBRARIES:
       return 0.0f;
     case SO_OVERRIDES_LIBRARY:
-      if (space_outliner->lib_override_view_mode == SO_LIB_OVERRIDE_VIEW_PROPERTIES) {
-        num_columns = OL_RNA_COL_SIZEX / UI_UNIT_X;
-      }
-      else if (space_outliner->lib_override_view_mode == SO_LIB_OVERRIDE_VIEW_HIERARCHIES) {
-        num_columns = 1;
+      switch ((eSpaceOutliner_LibOverrideViewMode)space_outliner->lib_override_view_mode) {
+        case SO_LIB_OVERRIDE_VIEW_PROPERTIES:
+          num_columns = OL_RNA_COL_SIZEX / UI_UNIT_X;
+          break;
+        case SO_LIB_OVERRIDE_VIEW_HIERARCHIES:
+          num_columns = 1;
+          break;
       }
       break;
     case SO_ID_ORPHANS:
