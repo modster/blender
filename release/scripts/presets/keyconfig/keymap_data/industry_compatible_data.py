@@ -1866,6 +1866,7 @@ def km_sequencerpreview(params):
         ("wm.search_menu", {"type": 'TAB', "value": 'PRESS'}, None),
         ("sequencer.view_all_preview", {"type": 'A', "value": 'PRESS'}, None),
         ("sequencer.view_all_preview", {"type": 'NDOF_BUTTON_FIT', "value": 'PRESS'}, None),
+        ("sequencer.view_selected", {"type": 'F', "value": 'PRESS'}, None),
         ("sequencer.view_ghost_border", {"type": 'O', "value": 'PRESS'}, None),
         ("sequencer.view_zoom_ratio", {"type": 'NUMPAD_1', "value": 'PRESS'},
          {"properties": [("ratio", 1.0)]}),
@@ -3238,9 +3239,11 @@ def _template_paint_radial_control(paint, rotation=False, secondary_rotation=Fal
 
     items.extend([
         ("wm.radial_control", {"type": 'S', "value": 'PRESS'},
-         radial_control_properties(paint, 'size', 'use_unified_size', secondary_rotation=secondary_rotation, color=color, zoom=zoom)),
+         radial_control_properties(
+             paint, 'size', 'use_unified_size', secondary_rotation=secondary_rotation, color=color, zoom=zoom)),
         ("wm.radial_control", {"type": 'U', "value": 'PRESS'},
-         radial_control_properties(paint, 'strength', 'use_unified_strength', secondary_rotation=secondary_rotation, color=color)),
+         radial_control_properties(
+             paint, 'strength', 'use_unified_strength', secondary_rotation=secondary_rotation, color=color)),
     ])
 
     if rotation:
@@ -3252,7 +3255,8 @@ def _template_paint_radial_control(paint, rotation=False, secondary_rotation=Fal
     if secondary_rotation:
         items.extend([
             ("wm.radial_control", {"type": 'F', "value": 'PRESS', "ctrl": True, "alt": True},
-             radial_control_properties(paint, 'mask_texture_slot.angle', None, secondary_rotation=secondary_rotation, color=color)),
+             radial_control_properties(
+                 paint, 'mask_texture_slot.angle', None, secondary_rotation=secondary_rotation, color=color)),
         ])
 
     return items
