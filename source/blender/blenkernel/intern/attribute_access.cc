@@ -70,11 +70,11 @@ static int attribute_data_type_complexity(const CustomDataType data_type)
       return 4;
     case CD_PROP_FLOAT3:
       return 5;
-    case CD_PROP_COLOR:
+    case CD_PROP_BYTE_COLOR:
       return 6;
+    case CD_PROP_COLOR:
+      return 7;
 #if 0 /* These attribute types are not supported yet. */
-    case CD_MLOOPCOL:
-      return 3;
     case CD_PROP_STRING:
       return 6;
 #endif
@@ -746,15 +746,14 @@ bool CustomDataAttributes::create_by_move(const AttributeIDRef &attribute_id,
 
 bool CustomDataAttributes::remove(const AttributeIDRef &attribute_id)
 {
-  bool result = false;
   for (const int i : IndexRange(data.totlayer)) {
     const CustomDataLayer &layer = data.layers[i];
     if (custom_data_layer_matches_attribute_id(layer, attribute_id)) {
       CustomData_free_layer(&data, layer.type, size_, i);
-      result = true;
+      return true;
     }
   }
-  return result;
+  return false;
 }
 
 void CustomDataAttributes::reallocate(const int size)
@@ -938,6 +937,9 @@ bool GeometryComponent::attribute_try_create(const AttributeIDRef &attribute_id,
   }
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
   if (providers == nullptr) {
+    return false;
+  }
+  if (this->attribute_exists(attribute_id)) {
     return false;
   }
   if (attribute_id.is_named()) {

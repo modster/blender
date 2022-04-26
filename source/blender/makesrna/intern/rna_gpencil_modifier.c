@@ -754,11 +754,13 @@ static char *rna_DashGpencilModifierSegment_path(PointerRNA *ptr)
 
   BLI_assert(dmd != NULL);
 
-  char name_esc[sizeof(dmd->modifier.name) * 2 + 1];
-
+  char name_esc[sizeof(dmd->modifier.name) * 2];
   BLI_str_escape(name_esc, dmd->modifier.name, sizeof(name_esc));
 
-  return BLI_sprintfN("grease_pencil_modifiers[\"%s\"].segments[\"%s\"]", name_esc, ds->name);
+  char ds_name_esc[sizeof(ds->name) * 2];
+  BLI_str_escape(ds_name_esc, ds->name, sizeof(ds_name_esc));
+
+  return BLI_sprintfN("grease_pencil_modifiers[\"%s\"].segments[\"%s\"]", name_esc, ds_name_esc);
 }
 
 static bool dash_segment_name_exists_fn(void *arg, const char *name)
@@ -785,8 +787,11 @@ static void rna_DashGpencilModifierSegment_name_set(PointerRNA *ptr, const char 
   BLI_uniquename_cb(
       dash_segment_name_exists_fn, ds->dmd, "Segment", '.', ds->name, sizeof(ds->name));
 
-  char prefix[256];
-  sprintf(prefix, "grease_pencil_modifiers[\"%s\"].segments", ds->dmd->modifier.name);
+  char name_esc[sizeof(ds->dmd->modifier.name) * 2];
+  BLI_str_escape(name_esc, ds->dmd->modifier.name, sizeof(name_esc));
+
+  char prefix[36 + sizeof(name_esc) + 1];
+  SNPRINTF(prefix, "grease_pencil_modifiers[\"%s\"].segments", name_esc);
 
   /* Fix all the animation data which may link to this. */
   BKE_animdata_fix_paths_rename_all(NULL, prefix, oldname, ds->name);
@@ -3259,12 +3264,6 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       prop, "Smooth Tolerance", "Strength of smoothing applied on jagged chains");
   RNA_def_property_ui_range(prop, 0.0f, 0.1f, 0.05f, 4);
   RNA_def_property_range(prop, 0.0f, 30.0f);
-  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
-
-  prop = RNA_def_property(srna, "use_remove_doubles", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_REMOVE_DOUBLES);
-  RNA_def_property_ui_text(
-      prop, "Remove Doubles", "Remove doubles from the source geometry before generating stokes");
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_loose_as_contour", PROP_BOOLEAN, PROP_NONE);

@@ -424,7 +424,7 @@ static const EnumPropertyItem rna_enum_shading_color_type_items[] = {
     {V3D_SHADING_SINGLE_COLOR, "SINGLE", 0, "Single", "Show scene in a single color"},
     {V3D_SHADING_OBJECT_COLOR, "OBJECT", 0, "Object", "Show object color"},
     {V3D_SHADING_RANDOM_COLOR, "RANDOM", 0, "Random", "Show random object color"},
-    {V3D_SHADING_VERTEX_COLOR, "VERTEX", 0, "Color", "Show active color attribute"},
+    {V3D_SHADING_VERTEX_COLOR, "VERTEX", 0, "Attribute", "Show active color attribute"},
     {V3D_SHADING_TEXTURE_COLOR, "TEXTURE", 0, "Texture", "Show texture"},
     {0, NULL, 0, NULL, NULL},
 };
@@ -7143,6 +7143,13 @@ static void rna_def_space_node_overlay(BlenderRNA *brna)
   RNA_def_property_boolean_default(prop, true);
   RNA_def_property_ui_text(prop, "Show Tree Path", "Display breadcrumbs for the editor's context");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE, NULL);
+
+  prop = RNA_def_property(srna, "show_named_attributes", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "overlay.flag", SN_OVERLAY_SHOW_NAMED_ATTRIBUTES);
+  RNA_def_property_boolean_default(prop, true);
+  RNA_def_property_ui_text(
+      prop, "Show Named Attributes", "Show when nodes are using named attributes");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE, NULL);
 }
 
 static void rna_def_space_node(BlenderRNA *brna)
@@ -7743,6 +7750,12 @@ static void rna_def_spreadsheet_row_filter(BlenderRNA *brna)
   prop = RNA_def_property(srna, "value_color", PROP_FLOAT, PROP_NONE);
   RNA_def_property_array(prop, 4);
   RNA_def_property_ui_text(prop, "Color Value", "");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
+
+  prop = RNA_def_property(srna, "value_byte_color", PROP_INT, PROP_NONE);
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_range(prop, 0, 255);
+  RNA_def_property_ui_text(prop, "Byte Color Value", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
 
   prop = RNA_def_property(srna, "value_string", PROP_STRING, PROP_NONE);

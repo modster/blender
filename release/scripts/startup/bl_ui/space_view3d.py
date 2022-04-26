@@ -514,9 +514,9 @@ class _draw_tool_settings_context_mode:
             layout.prop(brush, "use_frontface")
             layout.prop(brush, "falloff_shape", expand=True)
             layout.prop(brush.curves_sculpt_settings, "add_amount")
-            layout.prop(tool_settings.curves_sculpt, "curve_length")
-            layout.prop(tool_settings.curves_sculpt, "interpolate_length")
-            layout.prop(tool_settings.curves_sculpt, "interpolate_shape")
+            layout.prop(brush.curves_sculpt_settings, "curve_length")
+            layout.prop(brush.curves_sculpt_settings, "interpolate_length")
+            layout.prop(brush.curves_sculpt_settings, "interpolate_shape")
 
         if brush.curves_sculpt_tool == 'GROW_SHRINK':
             layout.prop(brush, "direction", expand=True, text="")
@@ -528,9 +528,6 @@ class _draw_tool_settings_context_mode:
         if brush.curves_sculpt_tool == 'SNAKE_HOOK':
             layout.prop(brush, "falloff_shape", expand=True)
             layout.prop(brush, "curve_preset")
-
-        if brush.curves_sculpt_tool == 'TEST1':
-            layout.prop(tool_settings.curves_sculpt, "distance")
 
 
 class VIEW3D_HT_header(Header):
@@ -2722,6 +2719,9 @@ class VIEW3D_MT_object_apply(Menu):
             text_ctxt=i18n_contexts.default,
         ).target = 'MESH'
         layout.operator("object.duplicates_make_real")
+        layout.operator("object.parent_inverse_apply",
+                        text="Parent Inverse",
+                        text_ctxt=i18n_contexts.default)
 
 
 class VIEW3D_MT_object_parent(Menu):
@@ -2831,6 +2831,7 @@ class VIEW3D_MT_object_cleanup(Menu):
         layout.separator()
 
         layout.operator("object.material_slot_remove_unused", text="Remove Unused Material Slots")
+
 
 class VIEW3D_MT_object_asset(Menu):
     bl_label = "Asset"
@@ -3176,19 +3177,15 @@ class VIEW3D_MT_mask(Menu):
 
         props = layout.operator("sculpt.mask_filter", text='Smooth Mask')
         props.filter_type = 'SMOOTH'
-        props.auto_iteration_count = True
 
         props = layout.operator("sculpt.mask_filter", text='Sharpen Mask')
         props.filter_type = 'SHARPEN'
-        props.auto_iteration_count = True
 
         props = layout.operator("sculpt.mask_filter", text='Grow Mask')
         props.filter_type = 'GROW'
-        props.auto_iteration_count = True
 
         props = layout.operator("sculpt.mask_filter", text='Shrink Mask')
         props.filter_type = 'SHRINK'
-        props.auto_iteration_count = True
 
         props = layout.operator("sculpt.mask_filter", text='Increase Contrast')
         props.filter_type = 'CONTRAST_INCREASE'
@@ -5391,16 +5388,12 @@ class VIEW3D_MT_sculpt_mask_edit_pie(Menu):
         op.value = 0.0
         op = pie.operator("sculpt.mask_filter", text='Smooth Mask')
         op.filter_type = 'SMOOTH'
-        op.auto_iteration_count = True
         op = pie.operator("sculpt.mask_filter", text='Sharpen Mask')
         op.filter_type = 'SHARPEN'
-        op.auto_iteration_count = True
         op = pie.operator("sculpt.mask_filter", text='Grow Mask')
         op.filter_type = 'GROW'
-        op.auto_iteration_count = True
         op = pie.operator("sculpt.mask_filter", text='Shrink Mask')
         op.filter_type = 'SHRINK'
-        op.auto_iteration_count = True
         op = pie.operator("sculpt.mask_filter", text='Increase Contrast')
         op.filter_type = 'CONTRAST_INCREASE'
         op.auto_iteration_count = False
@@ -6495,7 +6488,6 @@ class VIEW3D_PT_overlay_edit_mesh_normals(Panel):
             sub.prop(overlay, "normals_length", text="Size")
 
         row.prop(overlay, "use_normals_constant_screen_size", text="", icon='FIXED_SIZE')
-
 
 
 class VIEW3D_PT_overlay_edit_mesh_freestyle(Panel):

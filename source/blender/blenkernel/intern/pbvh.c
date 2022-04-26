@@ -686,6 +686,8 @@ void BKE_pbvh_free(PBVH *pbvh)
       if (node->bm_other_verts) {
         BLI_gset_free(node->bm_other_verts, NULL);
       }
+
+      pbvh_pixels_free(node);
     }
   }
 
@@ -1265,7 +1267,7 @@ bool BKE_pbvh_get_color_layer(const Mesh *me, CustomDataLayer **r_layer, Attribu
 {
   CustomDataLayer *layer = BKE_id_attributes_active_color_get((ID *)me);
 
-  if (!layer || !ELEM(layer->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
+  if (!layer || !ELEM(layer->type, CD_PROP_COLOR, CD_PROP_BYTE_COLOR)) {
     *r_layer = NULL;
     *r_attr = ATTR_DOMAIN_NUM;
     return false;
@@ -1769,7 +1771,7 @@ BMesh *BKE_pbvh_get_bmesh(PBVH *pbvh)
 void BKE_pbvh_node_mark_update(PBVHNode *node)
 {
   node->flag |= PBVH_UpdateNormals | PBVH_UpdateBB | PBVH_UpdateOriginalBB |
-                PBVH_UpdateDrawBuffers | PBVH_UpdateRedraw;
+                PBVH_UpdateDrawBuffers | PBVH_UpdateRedraw | PBVH_RebuildPixels;
 }
 
 void BKE_pbvh_node_mark_update_mask(PBVHNode *node)
@@ -1780,6 +1782,16 @@ void BKE_pbvh_node_mark_update_mask(PBVHNode *node)
 void BKE_pbvh_node_mark_update_color(PBVHNode *node)
 {
   node->flag |= PBVH_UpdateColor | PBVH_UpdateDrawBuffers | PBVH_UpdateRedraw;
+}
+
+void BKE_pbvh_mark_rebuild_pixels(PBVH *pbvh)
+{
+  for (int n = 0; n < pbvh->totnode; n++) {
+    PBVHNode *node = &pbvh->nodes[n];
+    if (node->flag & PBVH_Leaf) {
+      node->flag |= PBVH_RebuildPixels;
+    }
+  }
 }
 
 void BKE_pbvh_node_mark_update_visibility(PBVHNode *node)

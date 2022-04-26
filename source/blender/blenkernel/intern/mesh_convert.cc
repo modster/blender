@@ -25,6 +25,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_DerivedMesh.h"
+#include "BKE_curves.hh"
 #include "BKE_deform.h"
 #include "BKE_displist.h"
 #include "BKE_editmesh.h"
@@ -119,9 +120,6 @@ void BKE_mesh_from_metaball(ListBase *lb, Mesh *me)
     }
 
     BKE_mesh_update_customdata_pointers(me, true);
-
-    BKE_mesh_normals_tag_dirty(me);
-
     BKE_mesh_calc_edges(me, true, false);
   }
 }
@@ -513,7 +511,6 @@ Mesh *BKE_mesh_new_nomain_from_curve_displist(const Object *ob, const ListBase *
   }
 
   mesh = BKE_mesh_new_nomain(totvert, totedge, 0, totloop, totpoly);
-  BKE_mesh_normals_tag_dirty(mesh);
 
   if (totvert != 0) {
     memcpy(mesh->mvert, allvert, totvert * sizeof(MVert));
@@ -970,8 +967,7 @@ static Mesh *mesh_new_from_evaluated_curve_type_object(const Object *evaluated_o
   }
   const Curves *curves = get_evaluated_curves_from_object(evaluated_object);
   if (curves) {
-    std::unique_ptr<CurveEval> curve = curves_to_curve_eval(*curves);
-    return blender::bke::curve_to_wire_mesh(*curve);
+    return blender::bke::curve_to_wire_mesh(blender::bke::CurvesGeometry::wrap(curves->geometry));
   }
   return nullptr;
 }

@@ -94,6 +94,7 @@ set(SRC
   intern/math_interp.c
   intern/math_matrix.c
   intern/math_rotation.c
+  intern/math_rotation.cc
   intern/math_solvers.c
   intern/math_statistics.c
   intern/math_time.c
@@ -170,6 +171,7 @@ set(SRC
   BLI_boxpack_2d.h
   BLI_buffer.h
   BLI_color.hh
+  BLI_color_mix.hh
   BLI_compiler_attrs.h
   BLI_compiler_compat.h
   BLI_compiler_typecheck.h
@@ -251,6 +253,7 @@ set(SRC
   BLI_math_matrix.h
   BLI_math_mpq.hh
   BLI_math_rotation.h
+  BLI_math_rotation.hh
   BLI_math_solvers.h
   BLI_math_statistics.h
   BLI_math_time.h
