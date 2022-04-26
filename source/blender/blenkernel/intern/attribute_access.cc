@@ -70,11 +70,11 @@ static int attribute_data_type_complexity(const CustomDataType data_type)
       return 4;
     case CD_PROP_FLOAT3:
       return 5;
-    case CD_PROP_COLOR:
+    case CD_PROP_BYTE_COLOR:
       return 6;
+    case CD_PROP_COLOR:
+      return 7;
 #if 0 /* These attribute types are not supported yet. */
-    case CD_MLOOPCOL:
-      return 3;
     case CD_PROP_STRING:
       return 6;
 #endif
@@ -926,6 +926,21 @@ bool GeometryComponent::attribute_try_delete(const AttributeIDRef &attribute_id)
   return success;
 }
 
+void GeometryComponent::attributes_remove_anonymous()
+{
+  using namespace blender;
+  Vector<const AnonymousAttributeID *> anonymous_ids;
+  for (const AttributeIDRef &id : this->attribute_ids()) {
+    if (id.is_anonymous()) {
+      anonymous_ids.append(&id.anonymous_id());
+    }
+  }
+
+  while (!anonymous_ids.is_empty()) {
+    this->attribute_try_delete(anonymous_ids.pop_last());
+  }
+}
+
 bool GeometryComponent::attribute_try_create(const AttributeIDRef &attribute_id,
                                              const AttributeDomain domain,
                                              const CustomDataType data_type,
@@ -937,6 +952,9 @@ bool GeometryComponent::attribute_try_create(const AttributeIDRef &attribute_id,
   }
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
   if (providers == nullptr) {
+    return false;
+  }
+  if (this->attribute_exists(attribute_id)) {
     return false;
   }
   if (attribute_id.is_named()) {
