@@ -10,6 +10,7 @@
 #include "DNA_ID.h"
 #include "DNA_customdata_types.h"
 #include "DNA_defs.h"
+#include "DNA_session_uuid_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -120,11 +121,12 @@ typedef struct Mesh_Runtime {
    */
   char wrapper_type_finalize;
 
-  int subsurf_resolution;
   /**
    * Settings for lazily evaluating the subdivision on the CPU if needed. These are
    * set in the modifier when GPU subdivision can be performed.
    */
+  SessionUUID subsurf_session_uuid;
+  int subsurf_resolution;
   char subsurf_apply_render;
   char subsurf_use_optimal_display;
 
@@ -138,7 +140,11 @@ typedef struct Mesh_Runtime {
   float (*vert_normals)[3];
   float (*poly_normals)[3];
 
-  void *_pad2;
+  /**
+   * A #BLI_bitmap containing tags for the center vertices of subdivided polygons, set by the
+   * subdivision surface modifier and used by drawing code instead of polygon center face dots.
+   */
+  uint32_t *subsurf_face_dot_tags;
 } Mesh_Runtime;
 
 typedef struct Mesh {
@@ -217,7 +223,7 @@ typedef struct Mesh {
   /**
    * The active vertex corner color layer, if it exists. Also called "Vertex Color" in Blender's
    * UI, even though it is stored per face corner.
-   * \note This pointer is for convenient access to the #CD_MLOOPCOL layer in #ldata.
+   * \note This pointer is for convenient access to the #CD_PROP_BYTE_COLOR layer in #ldata.
    */
   struct MLoopCol *mloopcol;
 

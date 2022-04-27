@@ -1610,11 +1610,6 @@ void do_versions_after_linking_280(Main *bmain, ReportList *UNUSED(reports))
 
       /* Deprecated, only kept for conversion. */
       BKE_mesh_tessface_clear(me);
-
-      /* Moved from do_versions because we need updated polygons for calculating normals. */
-      if (!MAIN_VERSION_ATLEAST(bmain, 256, 6)) {
-        BKE_mesh_calc_normals(me);
-      }
     }
   }
 
@@ -1921,7 +1916,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
       }
 
-      /* Grease pencil multiframe falloff curve */
+      /* Grease pencil multi-frame falloff curve. */
       if (!DNA_struct_elem_find(
               fd->filesdna, "GP_Sculpt_Settings", "CurveMapping", "cur_falloff")) {
         for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {

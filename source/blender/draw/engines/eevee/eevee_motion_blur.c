@@ -292,7 +292,7 @@ void EEVEE_motion_blur_curves_cache_populate(EEVEE_ViewLayerData *UNUSED(sldata)
   /* Store transform. */
   copy_m4_m4(mb_data->obmat[mb_step], ob->obmat);
 
-  EEVEE_HairMotionData *mb_curves = EEVEE_motion_blur_curves_data_get(mb_data, ob);
+  EEVEE_HairMotionData *mb_curves = EEVEE_motion_blur_curves_data_get(mb_data);
 
   if (mb_step == MB_CURR) {
     /* Fill missing matrices if the object was hidden in previous or next frame. */
@@ -440,9 +440,9 @@ void EEVEE_motion_blur_cache_finish(EEVEE_Data *vedata)
     DRW_render_instance_buffer_finish();
 
     /* Need to be called after #DRW_render_instance_buffer_finish() */
-    /* Also we weed to have a correct FBO bound for #DRW_hair_update. */
+    /* Also we weed to have a correct FBO bound for #DRW_curves_update. */
     GPU_framebuffer_bind(vedata->fbl->main_fb);
-    DRW_hair_update();
+    DRW_curves_update();
 
     DRW_cache_restart();
   }
