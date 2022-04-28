@@ -754,6 +754,21 @@ static void rna_def_material_lineart(BlenderRNA *brna)
       "Effectiveness",
       "Faces with this material will behave as if it has set number of layers in occlusion");
   RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
+
+  prop = RNA_def_property(srna, "mat_silhouette_group", PROP_INT, PROP_NONE);
+  RNA_def_property_range(prop, 0, 255);
+  RNA_def_property_ui_text(
+      prop,
+      "Silouette Group",
+      "Faces with the same silhouette group numbers will be drawn as a continuous shape");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
+
+  prop = RNA_def_property(srna, "use_silhouette_group_override", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_default(prop, 0);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_MATERIAL_CUSTOM_SILHOUETTE_GROUP);
+  RNA_def_property_ui_text(
+      prop, "Use Silhouette Group", "Override object and collection silhouette group value");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
 }
 
 void RNA_def_material(BlenderRNA *brna)

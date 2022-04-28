@@ -94,6 +94,7 @@ static LineartEdgeChainItem *lineart_chain_append_point(LineartRenderBuffer *rb,
                                                         int level,
                                                         unsigned char material_mask_bits,
                                                         unsigned char shadow_mask_bits,
+                                                        unsigned char silhouette_group,
                                                         size_t index)
 {
   LineartEdgeChainItem *eci;
@@ -107,6 +108,7 @@ static LineartEdgeChainItem *lineart_chain_append_point(LineartRenderBuffer *rb,
     old_eci->occlusion = level;
     old_eci->material_mask_bits = material_mask_bits;
     old_eci->shadow_mask_bits = shadow_mask_bits;
+    old_eci->silhouette_group = silhouette_group;
     return old_eci;
   }
 
@@ -120,6 +122,7 @@ static LineartEdgeChainItem *lineart_chain_append_point(LineartRenderBuffer *rb,
   eci->occlusion = level;
   eci->material_mask_bits = material_mask_bits;
   eci->shadow_mask_bits = shadow_mask_bits;
+  eci->silhouette_group = silhouette_group;
   BLI_addtail(&ec->chain, eci);
 
   return eci;
@@ -134,6 +137,7 @@ static LineartEdgeChainItem *lineart_chain_prepend_point(LineartRenderBuffer *rb
                                                          int level,
                                                          unsigned char material_mask_bits,
                                                          unsigned char shadow_mask_bits,
+                                                         unsigned char silhouette_group,
                                                          size_t index)
 {
   LineartEdgeChainItem *eci;
@@ -152,6 +156,7 @@ static LineartEdgeChainItem *lineart_chain_prepend_point(LineartRenderBuffer *rb
   eci->occlusion = level;
   eci->material_mask_bits = material_mask_bits;
   eci->shadow_mask_bits = shadow_mask_bits;
+  eci->silhouette_group = silhouette_group;
   BLI_addhead(&ec->chain, eci);
 
   return eci;
@@ -166,6 +171,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
   int last_occlusion;
   unsigned char last_transparency;
   unsigned char last_shadow;
+  unsigned char last_silhouette;
   /* Used when converting from double. */
   float use_fbcoord[4];
   float use_gpos[3];
@@ -226,6 +232,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                 es->occlusion,
                                 es->material_mask_bits,
                                 es->shadow_mask_bits,
+                                es->silhouette_group,
                                 e->v1->index);
     while (ba && (new_e = lineart_line_get_connected(
                       ba, new_vt, &new_vt, e->flags, ec->intersection_mask))) {
@@ -264,10 +271,12 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                       es->occlusion,
                                       es->material_mask_bits,
                                       es->shadow_mask_bits,
+                                      es->silhouette_group,
                                       new_e->v1->index);
           last_occlusion = es->occlusion;
           last_transparency = es->material_mask_bits;
           last_shadow = es->shadow_mask_bits;
+          last_silhouette = es->silhouette_group;
         }
       }
       else if (new_vt == new_e->v2) {
@@ -275,6 +284,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
         last_occlusion = es->occlusion;
         last_transparency = es->material_mask_bits;
         last_shadow = es->shadow_mask_bits;
+        last_silhouette = es->silhouette_group;
         es = es->next;
         for (; es; es = es->next) {
           double gpos[3], lpos[3];
@@ -293,10 +303,12 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                       last_occlusion,
                                       last_transparency,
                                       last_shadow,
+                                      last_silhouette,
                                       new_e->v2->index);
           last_occlusion = es->occlusion;
           last_transparency = es->material_mask_bits;
           last_shadow = es->shadow_mask_bits;
+          last_silhouette = es->silhouette_group;
         }
         VERT_COORD_TO_FLOAT(new_e->v2);
         lineart_chain_prepend_point(rb,
@@ -308,6 +320,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                     last_occlusion,
                                     last_transparency,
                                     last_shadow,
+                                    last_silhouette,
                                     new_e->v2->index);
       }
       ba = MOD_lineart_get_bounding_area(rb, new_vt->fbcoord[0], new_vt->fbcoord[1]);
@@ -331,9 +344,10 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     /*  Step 2: Adding all cuts from the given line, so we can continue connecting the right side
      * of the line. */
     es = e->segments.first;
-    last_occlusion = ((LineartEdgeSegment *)es)->occlusion;
-    last_transparency = ((LineartEdgeSegment *)es)->material_mask_bits;
-    last_shadow = ((LineartEdgeSegment *)es)->shadow_mask_bits;
+    last_occlusion = es->occlusion;
+    last_transparency = es->material_mask_bits;
+    last_shadow = es->shadow_mask_bits;
+    last_silhouette = es->silhouette_group;
     for (es = es->next; es; es = es->next) {
       double gpos[3], lpos[3];
       double *lfb = e->v1->fbcoord, *rfb = e->v2->fbcoord;
@@ -351,10 +365,12 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                  es->occlusion,
                                  es->material_mask_bits,
                                  es->shadow_mask_bits,
+                                 es->silhouette_group,
                                  e->v1->index);
       last_occlusion = es->occlusion;
       last_transparency = es->material_mask_bits;
       last_shadow = es->shadow_mask_bits;
+      last_silhouette = es->silhouette_group;
     }
     VERT_COORD_TO_FLOAT(e->v2)
     lineart_chain_append_point(rb,
@@ -366,6 +382,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                last_occlusion,
                                last_transparency,
                                last_shadow,
+                               last_silhouette,
                                e->v2->index);
 
     /*  Step 3: grow right. */
@@ -399,10 +416,12 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
         last_occlusion = es->occlusion;
         last_transparency = es->material_mask_bits;
         last_shadow = es->shadow_mask_bits;
+        last_silhouette = es->silhouette_group;
         /* Fix leading vertex occlusion. */
         eci->occlusion = last_occlusion;
         eci->material_mask_bits = last_transparency;
         eci->shadow_mask_bits = last_shadow;
+        eci->silhouette_group = last_silhouette;
         for (es = new_e->segments.last; es; es = es->prev) {
           double gpos[3], lpos[3];
           double *lfb = new_e->v1->fbcoord, *rfb = new_e->v2->fbcoord;
@@ -413,6 +432,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
           last_occlusion = es->prev ? es->prev->occlusion : last_occlusion;
           last_transparency = es->prev ? es->prev->material_mask_bits : last_transparency;
           last_shadow = es->prev ? es->prev->shadow_mask_bits : last_shadow;
+          last_silhouette = es->prev ? es->prev->silhouette_group : last_silhouette;
           POS_TO_FLOAT(lpos, gpos)
           lineart_chain_append_point(rb,
                                      ec,
@@ -423,6 +443,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                      last_occlusion,
                                      last_transparency,
                                      last_shadow,
+                                     last_silhouette,
                                      new_e->v1->index);
         }
       }
@@ -431,9 +452,11 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
         last_occlusion = es->occlusion;
         last_transparency = es->material_mask_bits;
         last_shadow = es->shadow_mask_bits;
+        last_silhouette = es->silhouette_group;
         eci->occlusion = last_occlusion;
         eci->material_mask_bits = last_transparency;
         eci->shadow_mask_bits = last_shadow;
+        eci->silhouette_group = last_silhouette;
         es = es->next;
         for (; es; es = es->next) {
           double gpos[3], lpos[3];
@@ -452,10 +475,12 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                      es->occlusion,
                                      es->material_mask_bits,
                                      es->shadow_mask_bits,
+                                     es->silhouette_group,
                                      new_e->v2->index);
           last_occlusion = es->occlusion;
           last_transparency = es->material_mask_bits;
           last_shadow = es->shadow_mask_bits;
+          last_silhouette = es->silhouette_group;
         }
         VERT_COORD_TO_FLOAT(new_e->v2)
         lineart_chain_append_point(rb,
@@ -467,6 +492,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                    last_occlusion,
                                    last_transparency,
                                    last_shadow,
+                                   last_silhouette,
                                    new_e->v2->index);
       }
       ba = MOD_lineart_get_bounding_area(rb, new_vt->fbcoord[0], new_vt->fbcoord[1]);
@@ -592,6 +618,7 @@ static bool lineart_chain_fix_ambiguous_segments(LineartEdgeChain *ec,
   int fixed_occ = last_matching_eci->occlusion;
   unsigned char fixed_mask = last_matching_eci->material_mask_bits;
   unsigned char fixed_shadow = last_matching_eci->shadow_mask_bits;
+  unsigned char fixed_silhouette = last_matching_eci->silhouette_group;
 
   LineartEdgeChainItem *can_skip_to = NULL;
   LineartEdgeChainItem *last_eci = last_matching_eci;
@@ -607,7 +634,7 @@ static bool lineart_chain_fix_ambiguous_segments(LineartEdgeChain *ec,
       break;
     }
     if (eci->material_mask_bits == fixed_mask && eci->occlusion == fixed_occ &&
-        eci->shadow_mask_bits == fixed_shadow) {
+        eci->shadow_mask_bits == fixed_shadow && eci->silhouette_group == fixed_silhouette) {
       can_skip_to = eci;
     }
   }
@@ -618,13 +645,14 @@ static bool lineart_chain_fix_ambiguous_segments(LineartEdgeChain *ec,
     for (LineartEdgeChainItem *eci = last_matching_eci->next; eci != can_skip_to; eci = next_eci) {
       next_eci = eci->next;
       if (eci->material_mask_bits == fixed_mask && eci->occlusion == fixed_occ &&
-          eci->shadow_mask_bits == fixed_shadow) {
+          eci->shadow_mask_bits == fixed_shadow && eci->silhouette_group == fixed_silhouette) {
         continue;
       }
       if (preserve_details) {
         eci->material_mask_bits = fixed_mask;
         eci->occlusion = fixed_occ;
         eci->shadow_mask_bits = fixed_shadow;
+        eci->silhouette_group = fixed_silhouette;
       }
       else {
         BLI_remlink(&ec->chain, eci);
@@ -659,13 +687,15 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
     int fixed_occ = first_eci->occlusion;
     unsigned char fixed_mask = first_eci->material_mask_bits;
     unsigned char fixed_shadow = first_eci->shadow_mask_bits;
+    unsigned char fixed_silhouette = first_eci->silhouette_group;
     ec->level = fixed_occ;
     ec->material_mask_bits = fixed_mask;
     ec->shadow_mask_bits = fixed_shadow;
+    ec->silhouette_group = fixed_silhouette;
     for (eci = first_eci->next; eci; eci = next_eci) {
       next_eci = eci->next;
       if (eci->occlusion != fixed_occ || eci->material_mask_bits != fixed_mask ||
-          eci->shadow_mask_bits != fixed_shadow) {
+          eci->shadow_mask_bits != fixed_shadow || eci->silhouette_group != fixed_silhouette) {
         if (next_eci) {
           if (lineart_point_overlapping(next_eci, eci->pos[0], eci->pos[1], 1e-5)) {
             continue;
@@ -684,6 +714,7 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
           eci->occlusion = fixed_occ;
           eci->shadow_mask_bits = fixed_shadow;
           eci->material_mask_bits = fixed_mask;
+          eci->silhouette_group = fixed_silhouette;
           /* No need to split at the last point anyway. */
           break;
         }
@@ -705,6 +736,7 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
                                    fixed_occ,
                                    fixed_mask,
                                    fixed_shadow,
+                                   fixed_silhouette,
                                    eci->index);
         new_ec->object_ref = ec->object_ref;
         new_ec->type = ec->type;
@@ -713,9 +745,11 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
         fixed_occ = eci->occlusion;
         fixed_mask = eci->material_mask_bits;
         fixed_shadow = eci->shadow_mask_bits;
+        fixed_silhouette = eci->silhouette_group;
         ec->level = fixed_occ;
         ec->material_mask_bits = fixed_mask;
         ec->shadow_mask_bits = fixed_shadow;
+        ec->silhouette_group = fixed_silhouette;
       }
     }
   }
@@ -787,6 +821,7 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
                                                                 unsigned char material_mask_bits,
                                                                 unsigned char isec_mask,
                                                                 unsigned char shadow_mask,
+                                                                unsigned char silhouette_group,
                                                                 int loop_id,
                                                                 float dist,
                                                                 float *result_new_len,
@@ -817,7 +852,8 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
     }
     if (cre->ec == ec || (!cre->ec->chain.first) || (cre->ec->level != occlusion) ||
         (cre->ec->material_mask_bits != material_mask_bits) ||
-        (cre->ec->intersection_mask != isec_mask) || (cre->ec->shadow_mask_bits != shadow_mask)) {
+        (cre->ec->intersection_mask != isec_mask) || (cre->ec->shadow_mask_bits != shadow_mask) ||
+        (cre->ec->silhouette_group != silhouette_group)) {
       continue;
     }
     if (!rb->fuzzy_everything) {
@@ -864,6 +900,7 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
                                                        material_mask_bits, \
                                                        isec_mask, \
                                                        shadow_mask, \
+                                                       silhouette_group, \
                                                        loop_id, \
                                                        dist, \
                                                        &adjacent_new_len, \
@@ -895,7 +932,7 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
   float dist = rb->chaining_image_threshold;
   float dist_l, dist_r;
   int occlusion, reverse_main, loop_id;
-  unsigned char material_mask_bits, isec_mask, shadow_mask;
+  unsigned char material_mask_bits, isec_mask, shadow_mask, silhouette_group;
   ListBase swap = {0};
 
   if (rb->chaining_image_threshold < 0.0001) {
@@ -923,6 +960,7 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
     material_mask_bits = ec->material_mask_bits;
     isec_mask = ec->intersection_mask;
     shadow_mask = ec->shadow_mask_bits;
+    silhouette_group = ec->shadow_mask_bits;
 
     eci_l = ec->chain.first;
     eci_r = ec->chain.last;
@@ -936,6 +974,7 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
                                                     material_mask_bits,
                                                     isec_mask,
                                                     shadow_mask,
+                                                    silhouette_group,
                                                     loop_id,
                                                     dist,
                                                     &dist_l,
@@ -948,6 +987,7 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
                                                     material_mask_bits,
                                                     isec_mask,
                                                     shadow_mask,
+                                                    silhouette_group,
                                                     loop_id,
                                                     dist,
                                                     &dist_r,
@@ -1247,6 +1287,7 @@ void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshol
                                    ec->level,
                                    eci->material_mask_bits,
                                    eci->shadow_mask_bits,
+                                   eci->silhouette_group,
                                    eci->index);
         new_ec->object_ref = ec->object_ref;
         new_ec->type = ec->type;
@@ -1255,6 +1296,7 @@ void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshol
         new_ec->intersection_mask = ec->intersection_mask;
         new_ec->material_mask_bits = ec->material_mask_bits;
         new_ec->shadow_mask_bits = ec->shadow_mask_bits;
+        new_ec->silhouette_group = ec->silhouette_group;
         ec = new_ec;
       }
     }

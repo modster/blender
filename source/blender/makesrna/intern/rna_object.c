@@ -2927,6 +2927,21 @@ static void rna_def_object_lineart(BlenderRNA *brna)
   RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(180.0f), 0.01f, 1);
   RNA_def_property_ui_text(prop, "Crease", "Angles smaller than this will be treated as creases");
   RNA_def_property_update(prop, 0, "rna_object_lineart_update");
+
+  prop = RNA_def_property(srna, "use_silhouette_group_override", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", OBJECT_LRT_OWN_SILHOUETTE_GROUP);
+  RNA_def_property_ui_text(prop,
+                           "Use Silhouette Group",
+                           "Use this object's silhouette group to override collection setting");
+  RNA_def_property_update(prop, 0, "rna_object_lineart_update");
+
+  prop = RNA_def_property(srna, "silhouette_group", PROP_INT, PROP_NONE);
+  RNA_def_property_range(prop, 0, 255);
+  RNA_def_property_ui_text(
+      prop,
+      "Silhouette Group",
+      "Objects with the same silhouette group numbers will be drawn as a continuous shape");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_object_lineart_update");
 }
 
 static void rna_def_object_visibility(StructRNA *srna)

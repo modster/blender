@@ -318,6 +318,12 @@ class OBJECT_PT_lineart(ObjectButtonsPanel, Panel):
         subrow = row.row()
         subrow.active = lineart.use_crease_override
         subrow.prop(lineart, "crease_threshold", slider=True, text="")
+        
+        row = layout.row(heading="Silouette Group")
+        row.prop(lineart, "use_silhouette_group_override", text="")
+        subrow = row.row()
+        subrow.active = lineart.use_silhouette_group_override
+        subrow.prop(lineart, "silhouette_group", text="")
 
 
 class OBJECT_PT_motion_paths(MotionPathButtonsPanel, Panel):

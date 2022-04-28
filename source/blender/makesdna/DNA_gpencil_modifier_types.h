@@ -997,6 +997,12 @@ typedef enum eLineartGpencilModifierShadowFilter {
   LRT_SHADOW_FILTER_SHADED = 2,
 } eLineartGpencilModifierShadowFilter;
 
+typedef enum eLineartGpencilModifierSilhouetteFilter {
+  LRT_SILHOUETTE_FILTER_NONE = 0,
+  LRT_SILHOUETTE_FILTER_SILHOUETTE = 1,
+  LRT_SILHOUETTE_FILTER_ANTI_SILHOUETTE = 2,
+} eLineartGpencilModifierSilhouetteFilter;
+
 /* This enum is for modifier internal state only. */
 typedef enum eLineArtGPencilModifierFlags {
   /* These two moved to #eLineartMainFlags to keep consistent with flag variable purpose. */
@@ -1069,9 +1075,9 @@ typedef struct LineartGpencilModifierData {
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
 
-  char shadow_selection;
-
-  char _pad[2];
+  unsigned char shadow_selection;
+  unsigned char silhouette_selection;
+  unsigned char use_silhouette_group;
 
   /** `0..1` range for cosine angle */
   float crease_threshold;
@@ -1103,8 +1109,9 @@ typedef struct LineartGpencilModifierData {
   char level_end_override;
   short edge_types_override;
   char shadow_selection_override;
+  char shadow_use_silhouette_override;
 
-  char _pad2[7];
+  char _pad2[6];
 
   struct LineartCache *cache;
   /* Keep a pointer to the render buffer so we can call destroy from ModifierData. */

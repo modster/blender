@@ -79,6 +79,13 @@ class COLLECTION_PT_lineart_collection(CollectionButtonsPanel, Panel):
             row.prop(collection, "lineart_intersection_mask", index=i, text=" ", toggle=True)
             if i == 3:
                 row = col.row(align=True)
+                
+            
+        row = layout.row(heading="Silouette Group")
+        row.prop(collection, "use_lineart_silhouette_group", text="")
+        subrow = row.row()
+        subrow.active = collection.use_lineart_silhouette_group
+        subrow.prop(collection, "lineart_silhouette_group", text="")
 
 
 classes = (

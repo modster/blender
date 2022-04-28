@@ -173,6 +173,7 @@ static LineartEdgeSegment *lineart_give_segment(LineartRenderBuffer *rb)
 #define LRT_SHADOW_MASK_SHADED (1 << 1)
 #define LRT_SHADOW_MASK_ENCLOSED_SHAPE (1 << 2)
 #define LRT_SHADOW_MASK_INHIBITED (1 << 3)
+#define LRT_SHADOW_SILHOUETTE_ERASED (1 << 4)
 
 /**
  * Cuts the edge in image space and mark occlusion level for each segment.
@@ -260,6 +261,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
   /* When we still can't find any existing cut in the line, we allocate new ones. */
   if (ns == NULL) {
     ns = lineart_give_segment(rb);
+    ns->silhouette_group = e->silhouette_group;
   }
   if (ns2 == NULL) {
     if (untouched) {
@@ -268,6 +270,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
     }
     else {
       ns2 = lineart_give_segment(rb);
+      ns2->silhouette_group = e->silhouette_group;
     }
   }
 
@@ -324,7 +327,8 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
   for (es = ns; es && es != ns2; es = es->next) {
     es->occlusion += mat_occlusion;
     es->material_mask_bits |= material_mask_bits;
-    /* Currently only register lit/shade, see LineartEdgeSegment::shadow_mask_bits for details. */
+    /* Currently only register lit/shade, see
+       LineartEdgeSegment::shadow_mask_bits for details. */
     if (shadow_bits == LRT_SHADOW_MASK_ENCLOSED_SHAPE) {
       if (es->shadow_mask_bits == LRT_SHADOW_MASK_LIT || e->flags & LRT_EDGE_FLAG_LIGHT_CONTOUR) {
         es->shadow_mask_bits = LRT_SHADOW_MASK_INHIBITED;
@@ -346,7 +350,8 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
 
     if (prev_es && prev_es->occlusion == es->occlusion &&
         prev_es->material_mask_bits == es->material_mask_bits &&
-        prev_es->shadow_mask_bits == es->shadow_mask_bits) {
+        prev_es->shadow_mask_bits == es->shadow_mask_bits &&
+        prev_es->silhouette_group == es->silhouette_group) {
       BLI_remlink(&e->segments, es);
       /* This puts the node back to the render buffer, if more cut happens, these unused nodes get
        * picked first. */
@@ -1893,6 +1898,9 @@ static void lineart_load_tri_task(void *__restrict userdata,
                                   mat->lineart.material_mask_bits :
                                   0);
   tri->mat_occlusion |= (mat ? mat->lineart.mat_occlusion : 1);
+  tri->silhouette_group = ((mat && (mat->lineart.flags & LRT_MATERIAL_CUSTOM_SILHOUETTE_GROUP)) ?
+                               mat->lineart.mat_silhouette_group :
+                               ob_info->silhouette_group);
   tri->flags |= (mat && (mat->blend_flag & MA_BL_CULL_BACKFACE)) ?
                     LRT_TRIANGLE_MAT_BACK_FACE_CULLING :
                     0;
@@ -2250,6 +2258,13 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
       la_edge->flags = use_type;
       la_edge->object_ref = orig_ob;
       la_edge->from_shadow = (LineartEdge *)LRT_EDGE_IDENTIFIER(ob_info, la_edge);
+      la_edge->silhouette_group = (re_buf->shadow_use_silhouette &&
+                                   (la_edge->t1 || (la_edge->t1 && la_edge->t2 &&
+                                                    la_edge->t1->silhouette_group ==
+                                                        la_edge->t2->silhouette_group))) ?
+                                      la_edge->t1->silhouette_group :
+                                      0;
+      la_seg->silhouette_group = la_edge->silhouette_group;
       BLI_addtail(&la_edge->segments, la_seg);
 
       if (shadow_eln) {
@@ -2333,6 +2348,25 @@ static uchar lineart_intersection_mask_check(Collection *c, Object *ob)
     }
   }
 
+  return 0;
+}
+static uchar lineart_silhouette_group_check(Collection *c, Object *ob)
+{
+  if (ob->lineart.flags & OBJECT_LRT_OWN_SILHOUETTE_GROUP) {
+    return ob->lineart.silhouette_group;
+  }
+
+  LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
+    uchar result = lineart_intersection_mask_check(cc->collection, ob);
+    if (result) {
+      return result;
+    }
+  }
+  if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
+    if (c->lineart_flags & COLLECTION_LRT_USE_SILHOUETTE_GROUP) {
+      return c->lineart_silhouette_group;
+    }
+  }
   return 0;
 }
 
@@ -2524,6 +2558,8 @@ static void lineart_main_load_geometries(
     obi->usage = lineart_usage_check(scene->master_collection, ob, is_render);
     obi->override_intersection_mask = lineart_intersection_mask_check(scene->master_collection,
                                                                       ob);
+    obi->silhouette_group = lineart_silhouette_group_check(scene->master_collection, ob);
+
     Object *use_ob = DEG_get_evaluated_object(depsgraph, ob);
     Mesh *use_mesh;
 
@@ -2673,7 +2709,7 @@ static bool lineart_edge_from_triangle(const LineartTriangle *tri,
                                        bool allow_overlapping_edges)
 {
   /* Normally we just determine from the pointer address. */
-  if (e->t1 && e->t1->target_reference == tri->target_reference ||
+  if ((e->t1 && e->t1->target_reference == tri->target_reference) ||
       (e->t2 && e->t2->target_reference == tri->target_reference)) {
     return true;
   }
@@ -3612,6 +3648,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
 
   rb->shadow_selection = lmd->shadow_selection_override;
   rb->shadow_enclose_shapes = (lmd->calculation_flags & LRT_SHADOW_ENCLOSED_SHAPES) != 0;
+  rb->shadow_use_silhouette = lmd->shadow_use_silhouette_override != 0;
 
   rb->use_back_face_culling = (lmd->calculation_flags & LRT_USE_BACK_FACE_CULLING) != 0;
 
@@ -4871,7 +4908,8 @@ static bool lineart_do_closest_segment(bool is_persp,
 }
 
 static void lineart_shadow_create_container_array(LineartRenderBuffer *rb,
-                                                  bool transform_edge_cuts)
+                                                  bool transform_edge_cuts,
+                                                  bool do_light_contour)
 {
 #define DISCARD_NONSENSE_SEGMENTS \
   if (es->occlusion != 0 || \
@@ -4889,7 +4927,7 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb,
           (LRT_EDGE_FLAG_CONTOUR | LRT_EDGE_FLAG_LOOSE | LRT_EDGE_FLAG_LIGHT_CONTOUR))) {
       continue;
     }
-    if (e->flags == LRT_EDGE_FLAG_LIGHT_CONTOUR) {
+    if (do_light_contour && e->flags == LRT_EDGE_FLAG_LIGHT_CONTOUR) {
       /* Only reproject light contours that also doubles as a view contour. */
       LineartEdge *orig_e = (LineartEdge *)e->t1;
       if (!orig_e->t2) {
@@ -5013,7 +5051,8 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
                                     double *start_fbc,
                                     double *end_fbc,
                                     bool facing_light,
-                                    int target_reference)
+                                    int target_reference,
+                                    uint8_t silhouette_group)
 {
   LineartShadowSegment *es, *ies;
   LineartShadowSegment *cut_start_after = e->shadow_segments.first,
@@ -5149,6 +5188,7 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
         /* Need to restore the flag for next segment's reference. */
         sr->flag = es->flag;
         sr->target_reference = es->target_reference;
+        sr->silhouette_group = es->silhouette_group;
       }
     }
 
@@ -5179,6 +5219,7 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
                             (LRT_SHADOW_CASTED | (facing_light ? LRT_SHADOW_FACING_LIGHT : 0)) :
                             LRT_SHADOW_CASTED;
       ss_middle->target_reference = (is_side_2r ? (target_reference) : sl->target_reference);
+      ss_middle->silhouette_group = (is_side_2r ? (silhouette_group) : sl->silhouette_group);
       copy_v3_v3_db(ss_middle->g1, r_new_in_the_middle_global);
       copy_v3_v3_db(ss_middle->g2, r_new_in_the_middle_global);
       copy_v4_v4_db(ss_middle->fbc1, r_new_in_the_middle);
@@ -5195,11 +5236,13 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
       sl->flag = LRT_SHADOW_CASTED |
                  (is_side_2r ? 0 : (facing_light ? LRT_SHADOW_FACING_LIGHT : 0));
       sl->target_reference = is_side_2r ? es->target_reference : target_reference;
+      sl->silhouette_group = is_side_2r ? es->silhouette_group : silhouette_group;
     }
     else {
       sl->flag = LRT_SHADOW_CASTED |
                  (is_side_2r ? (facing_light ? LRT_SHADOW_FACING_LIGHT : 0) : 0);
-      sl->target_reference = (use_new_ref ? target_reference : es->target_reference);
+      sl->target_reference = use_new_ref ? target_reference : es->target_reference;
+      sl->silhouette_group = use_new_ref ? silhouette_group : es->silhouette_group;
     }
 
     copy_v4_v4_db(tfbc1, tfbc2);
@@ -5371,7 +5414,9 @@ static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
   return true;
 }
 
-static void lineart_shadow_cast(LineartRenderBuffer *rb, bool transform_edge_cuts)
+static void lineart_shadow_cast(LineartRenderBuffer *rb,
+                                bool transform_edge_cuts,
+                                bool do_light_contour)
 {
   LineartTriangleThread *tri;
   double at_l, at_r;
@@ -5379,7 +5424,7 @@ static void lineart_shadow_cast(LineartRenderBuffer *rb, bool transform_edge_cut
   double global_l[3], global_r[3];
   bool facing_light;
 
-  lineart_shadow_create_container_array(rb, transform_edge_cuts);
+  lineart_shadow_create_container_array(rb, transform_edge_cuts, do_light_contour);
 
   LISTBASE_FOREACH (LineartShadowSegmentContainer *, ssc, &rb->shadow_containers) {
     LRT_EDGE_BA_MARCHING_BEGIN(ssc->fbc1, ssc->fbc2)
@@ -5412,7 +5457,8 @@ static void lineart_shadow_cast(LineartRenderBuffer *rb, bool transform_edge_cut
                                   fb_l,
                                   fb_r,
                                   facing_light,
-                                  tri->base.target_reference);
+                                  tri->base.target_reference,
+                                  tri->base.silhouette_group);
         }
       }
       LRT_EDGE_BA_MARCHING_NEXT(ssc->fbc1, ssc->fbc2);
@@ -5487,6 +5533,7 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
       e->t2 = (LineartTriangle *)(ssc->e_ref_light_contour ? ssc->e_ref_light_contour :
                                                              ssc->e_ref);
       e->target_reference = ss->target_reference;
+      e->silhouette_group = ss->silhouette_group;
       e->flags = (LRT_EDGE_FLAG_PROJECTED_SHADOW |
                   ((ss->flag & LRT_SHADOW_FACING_LIGHT) ? LRT_EDGE_FLAG_SHADOW_FACING_LIGHT : 0));
       i++;
@@ -5508,6 +5555,34 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
     }
   }
   return true;
+}
+
+static void lineart_shadow_register_silhouette(LineartRenderBuffer *rb)
+{
+  LISTBASE_FOREACH (LineartShadowSegmentContainer *, ssc, &rb->shadow_containers) {
+    LineartEdge *e = ssc->e_ref;
+    LineartEdgeSegment *es = ssc->es_ref;
+    double es_start = es->at, es_end = es->next ? es->next->at : 1.0f;
+    LISTBASE_FOREACH (LineartShadowSegment *, ss, &ssc->shadow_segments) {
+      if (!(ss->flag & LRT_SHADOW_CASTED)) {
+        continue;
+      }
+      if (!ss->next) {
+        break;
+      }
+      /* If the edge is a mesh border or a material border, it can't be erased with silhouette
+       * projection. */
+      if ((e->t1 && e->t2 && e->t1->silhouette_group != e->t2->silhouette_group)) {
+        continue;
+      }
+      if (e->silhouette_group != ss->silhouette_group) {
+        continue;
+      }
+      double at_start = interpd(es_end, es_start, ss->at);
+      double at_end = interpd(es_end, es_start, ss->next->at);
+      lineart_edge_cut(rb, e, at_start, at_end, 0, 0, LRT_SHADOW_SILHOUETTE_ERASED);
+    }
+  }
 }
 
 static void lineart_shadow_register_enclosed_shapes(LineartRenderBuffer *rb,
@@ -5576,8 +5651,9 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
                                              ListBase *r_calculated_edges_eln_list,
                                              LineartRenderBuffer **r_shadow_rb_if_reproject)
 {
-  if (!original_rb->use_shadow && !original_rb->use_light_contour &&
-      !original_rb->shadow_selection && !lmd->light_contour_object) {
+  if ((!original_rb->use_shadow && !original_rb->use_light_contour &&
+       !original_rb->shadow_selection) ||
+      (!lmd->light_contour_object)) {
     return false;
   }
 
@@ -5687,7 +5763,7 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   lineart_main_occlusion_begin(rb);
 
   /* Do shadow cast stuff then get generated vert/edge data. */
-  lineart_shadow_cast(rb, true);
+  lineart_shadow_cast(rb, true, false);
   bool any_generated = lineart_shadow_cast_generate_edges(rb, true, r_veln, r_eeln);
 
   if (rb->shadow_selection) {
@@ -5725,6 +5801,13 @@ static void lineart_transform_and_add_shadow(LineartRenderBuffer *rb,
 
 static void lineart_make_enclosed_shapes(LineartRenderBuffer *rb, LineartRenderBuffer *shadow_rb)
 {
+  if (shadow_rb || rb->shadow_use_silhouette) {
+    lineart_shadow_cast(rb, false, shadow_rb ? true : false);
+    if (rb->shadow_use_silhouette) {
+      lineart_shadow_register_silhouette(rb);
+    }
+  }
+
   if (!shadow_rb) {
     return;
   }
@@ -5739,7 +5822,6 @@ static void lineart_make_enclosed_shapes(LineartRenderBuffer *rb, LineartRenderB
 
   LineartElementLinkNode *shadow_veln, *shadow_eeln;
 
-  lineart_shadow_cast(rb, false);
   bool any_generated = lineart_shadow_cast_generate_edges(rb, false, &shadow_veln, &shadow_eeln);
 
   if (!any_generated) {
@@ -5990,6 +6072,8 @@ static void lineart_gpencil_generate(LineartCache *cache,
                                      short thickness,
                                      float opacity,
                                      uchar shaodow_selection,
+                                     uchar silhouette_mode,
+                                     uchar silhouette_group,
                                      const char *source_vgname,
                                      const char *vgname,
                                      int modifier_flags)
@@ -6081,6 +6165,19 @@ static void lineart_gpencil_generate(LineartCache *cache,
              ec->shadow_mask_bits != LRT_SHADOW_MASK_SHADED)) {
           continue;
         }
+      }
+    }
+    if (silhouette_mode && (ec->type & (LRT_EDGE_FLAG_CONTOUR))) {
+      if (ec->silhouette_group != silhouette_group) {
+        continue;
+      }
+      if (silhouette_mode == LRT_SILHOUETTE_FILTER_SILHOUETTE &&
+          (ec->shadow_mask_bits & LRT_SHADOW_SILHOUETTE_ERASED)) {
+        continue;
+      }
+      if (silhouette_mode == LRT_SILHOUETTE_FILTER_ANTI_SILHOUETTE &&
+          (!(ec->shadow_mask_bits & LRT_SHADOW_SILHOUETTE_ERASED))) {
+        continue;
       }
     }
 
@@ -6176,6 +6273,8 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   short thickness,
                                   float opacity,
                                   uchar shadow_selection,
+                                  uchar silhouette_mode,
+                                  uchar silhouette_group,
                                   const char *source_vgname,
                                   const char *vgname,
                                   int modifier_flags)
@@ -6221,6 +6320,8 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                            thickness,
                            opacity,
                            shadow_selection,
+                           silhouette_mode,
+                           silhouette_group,
                            source_vgname,
                            vgname,
                            modifier_flags);

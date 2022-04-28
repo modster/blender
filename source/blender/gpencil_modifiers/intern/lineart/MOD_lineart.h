@@ -53,10 +53,12 @@ typedef struct LineartTriangle {
   /*        higher 12 bits-------^         ^-----index in object, lower 20 bits */
   int target_reference;
 
+  unsigned char silhouette_group;
+
   /**
    * Only use single link list, because we don't need to go back in order.
-   * This variable is also reused to store the pointer to adjacent lines of this triangle before
-   * intersection stage.
+   * This variable is also reused to store the pointer to adjacent lines of this triangle
+   * before intersection stage.
    */
   struct LinkNode *intersecting_verts;
 } LineartTriangle;
@@ -108,6 +110,7 @@ typedef struct LineartEdgeSegment {
    * TODO(Yiming): Transfer material masks from shadow results
    * onto here so then we can even filter transparent shadows. */
   unsigned char shadow_mask_bits;
+  unsigned char silhouette_group;
 } LineartEdgeSegment;
 
 typedef struct LineartShadowSegmentContainer {
@@ -138,6 +141,7 @@ typedef struct LineartShadowSegment {
   /* Global position. */
   double g1[4], g2[4];
   int target_reference;
+  uint8_t silhouette_group;
 } LineartShadowSegment;
 
 typedef struct LineartVert {
@@ -191,12 +195,14 @@ typedef struct LineartEdge {
   struct LineartEdge *from_shadow;
   int target_reference;
 
+  uint8_t silhouette_group;
+
   /**
    * Still need this entry because culled lines will not add to object
    * #LineartElementLinkNode node (known as `eln` internally).
    *
-   * TODO: If really need more savings, we can allocate this in a "extended" way too, but we need
-   * another bit in flags to be able to show the difference.
+   * TODO: If really need more savings, we can allocate this in a "extended" way too, but we
+   * need another bit in flags to be able to show the difference.
    */
   struct Object *object_ref;
 } LineartEdge;
@@ -219,6 +225,7 @@ typedef struct LineartEdgeChain {
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
   unsigned char shadow_mask_bits;
+  unsigned char silhouette_group;
 
   struct Object *object_ref;
 } LineartEdgeChain;
@@ -235,6 +242,7 @@ typedef struct LineartEdgeChainItem {
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
   unsigned char shadow_mask_bits;
+  unsigned char silhouette_group;
   size_t index;
 } LineartEdgeChainItem;
 
@@ -379,6 +387,7 @@ typedef struct LineartRenderBuffer {
 
   int shadow_selection; /* Needs to be numeric because it's not just on/off. */
   bool shadow_enclose_shapes;
+  bool shadow_use_silhouette;
 
   bool fuzzy_intersections;
   bool fuzzy_everything;
@@ -511,6 +520,7 @@ typedef struct LineartObjectInfo {
   LineartElementLinkNode *eln;
   int usage;
   uint8_t override_intersection_mask;
+  uint8_t silhouette_group;
   int global_i_offset;
 
   /* Shifted LRT_OBINDEX_SHIFT bits to be combined with object triangle index. */
@@ -937,6 +947,8 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   short thickness,
                                   float opacity,
                                   unsigned char shadow_selection,
+                                  unsigned char silhouette_mode,
+                                  unsigned char silhouette_group,
                                   const char *source_vgname,
                                   const char *vgname,
                                   int modifier_flags);

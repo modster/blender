@@ -3191,6 +3191,13 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem modifier_lineart_silhouette_filtering[] = {
+      {LRT_SILHOUETTE_FILTER_NONE, "NONE", 0, "Contour", ""},
+      {LRT_SILHOUETTE_FILTER_SILHOUETTE, "SILHOUETTE", 0, "Silhouette", ""},
+      {LRT_SILHOUETTE_FILTER_ANTI_SILHOUETTE, "ANTI_SILHOUETTE", 0, "Anti Silhouette", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "LineartGpencilModifier", "GpencilModifier");
   RNA_def_struct_ui_text(
       srna, "Line Art Modifier", "Generate line art strokes from selected source");
@@ -3448,6 +3455,17 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Shadow Enclosed Shapes",
                            "Reproject visible lines again to get enclosed shadow shapes");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "silhouette_filtering", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "silhouette_selection");
+  RNA_def_property_enum_items(prop, modifier_lineart_silhouette_filtering);
+  RNA_def_property_ui_text(prop, "Silhouette Filtering", "Select contour or silhouette");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_dependency_update");
+
+  prop = RNA_def_property(srna, "use_silhouette_group", PROP_INT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Silhouette Group", "Select contour/silhouette from this group");
+  RNA_def_property_range(prop, 0, 255);
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_multiple_levels", PROP_BOOLEAN, PROP_NONE);

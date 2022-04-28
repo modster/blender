@@ -288,6 +288,12 @@ class MATERIAL_PT_lineart(MaterialButtonsPanel, Panel):
 
         row = layout.row(align=True, heading="Custom Occlusion")
         row.prop(lineart, "mat_occlusion", text="Levels")
+            
+        row = layout.row(heading="Silouette Group")
+        row.prop(lineart, "use_silhouette_group_override", text="")
+        subrow = row.row()
+        subrow.active = lineart.use_silhouette_group_override
+        subrow.prop(lineart, "mat_silhouette_group", text="")
 
 
 classes = (

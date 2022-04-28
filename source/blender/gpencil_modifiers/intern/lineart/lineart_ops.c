@@ -133,6 +133,8 @@ static bool bake_strokes(Object *ob,
       lmd->thickness,
       lmd->opacity,
       lmd->shadow_selection,
+      lmd->silhouette_selection,
+      lmd->use_silhouette_group,
       lmd->source_vertex_group,
       lmd->vgname,
       lmd->flags);
