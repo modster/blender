@@ -735,15 +735,23 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       ${LEVEL_ZERO_LIBRARY}
       ${ONEAPI_DPCPP_FLAGS}
       )
+
   if (WITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED)
     list(APPEND sycl_compiler_flags -DWITH_ONEAPI_SYCL_HOST_ENABLED)
   endif()
+
+  set (CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS "-internal_options '-ze-opt-large-register-file -ze-opt-regular-grf-kernel integrator_intersect'")
   if (WITH_CYCLES_ONEAPI_BINARIES)
-    set (CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS "-internal_options '-ze-opt-large-register-file -ze-opt-regular-grf-kernel integrator_intersect'")
     list(APPEND sycl_compiler_flags
-      -fsycl-targets=spir64_gen
+      -fsycl-targets=spir64,spir64_gen
+      -Xsycl-target-backend=spir64 "${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}"
       -Xsycl-target-backend=spir64_gen "-device ${CYCLES_ONEAPI_AOT_TARGETS} ${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}")
+  else()
+    list(APPEND sycl_compiler_flags
+      -fsycl-targets=spir64
+      -Xsycl-target-backend=spir64 "${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}")
   endif()
+
   if(WITH_NANOVDB)
     list(APPEND sycl_compiler_flags
       -DWITH_NANOVDB
