@@ -24,6 +24,7 @@
 #include "BKE_object.h"
 #include "BKE_paint.h"
 #include "BKE_pbvh.h"
+#include "BKE_report.h"
 #include "BKE_scene.h"
 
 #include "IMB_colormanagement.h"
@@ -130,7 +131,7 @@ static void color_filter_task_cb(void *__restrict userdata,
       case COLOR_FILTER_SATURATION:
         rgb_to_hsv_v(orig_color, hsv_color);
 
-        if (hsv_color[1] != 0.0f) {
+        if (hsv_color[1] > 0.001f) {
           hsv_color[1] = clamp_f(hsv_color[1] + fade, 0.0f, 1.0f);
           hsv_to_rgb_v(hsv_color, final_color);
         }
@@ -342,10 +343,7 @@ static int sculpt_color_filter_invoke(bContext *C, wmOperator *op, const wmEvent
   }
 
   /* Disable for multires and dyntopo for now */
-  if (!ss->pbvh) {
-    return OPERATOR_CANCELLED;
-  }
-  if (BKE_pbvh_type(pbvh) != PBVH_FACES) {
+  if (!ss->pbvh || !SCULPT_handles_colors_report(ss, op->reports)) {
     return OPERATOR_CANCELLED;
   }
 

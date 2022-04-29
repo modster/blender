@@ -2263,7 +2263,6 @@ class USERPREF_PT_experimental_new_features(ExperimentalPanel, Panel):
                 ({"property": "use_sculpt_texture_paint"}, "T96225"),
                 ({"property": "use_extended_asset_browser"}, ("project/view/130/", "Project Page")),
                 ({"property": "use_override_templates"}, ("T73318", "Milestone 4")),
-                ({"property": "use_named_attribute_nodes"}, ("T91742")),
             ),
         )
 
@@ -2281,6 +2280,7 @@ class USERPREF_PT_experimental_prototypes(ExperimentalPanel, Panel):
             ),
         )
 
+
 # Keep this as tweaks can be useful to restore.
 """
 class USERPREF_PT_experimental_tweaks(ExperimentalPanel, Panel):
@@ -2294,6 +2294,7 @@ class USERPREF_PT_experimental_tweaks(ExperimentalPanel, Panel):
         )
 
 """
+
 
 class USERPREF_PT_experimental_debugging(ExperimentalPanel, Panel):
     bl_label = "Debugging"
