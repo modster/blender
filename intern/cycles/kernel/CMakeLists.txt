@@ -761,6 +761,8 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     -D_MBCS
     -DWIN32
     -D_WINDOWS
+    -D_CRT_NONSTDC_NO_DEPRECATE
+    -D_CRT_SECURE_NO_DEPRECATE
     -DONEAPI_EXPORT)
 
     if(sycl_compiler_compiler_name MATCHES "dpcpp")

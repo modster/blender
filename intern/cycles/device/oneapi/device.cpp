@@ -88,8 +88,8 @@ bool device_oneapi_init()
   // right now this cache policy is controlled by env. variables
   VLOG(1) << "Enable oneAPI persistent cache via environment variables";
 #  ifdef _WIN32
-  (void)putenv("SYCL_CACHE_PERSISTENT=1");
-  (void)putenv("SYCL_CACHE_THRESHOLD=0");
+  _putenv_s("SYCL_CACHE_PERSISTENT", "1");
+  _putenv_s("SYCL_CACHE_THRESHOLD", "0");
   VLOG(1) << "Enabled oneAPI JIT caching on Windows platform";
 #  elif __linux__
   setenv("SYCL_CACHE_PERSISTENT", "1", true);

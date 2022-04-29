@@ -108,8 +108,6 @@ ccl_device_inline float atomic_compare_and_swap_float(volatile ccl_global float 
 
 #  ifdef __KERNEL_ONEAPI__
 
-#    define atomic_ref ext::oneapi::atomic_ref
-
 ccl_device_inline float atomic_add_and_fetch_float(ccl_global float *p, float x)
 {
   sycl::atomic_ref<float,

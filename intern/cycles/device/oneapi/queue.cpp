@@ -87,7 +87,7 @@ OneapiDeviceQueue::OneapiDeviceQueue(OneapiDevice *device)
       oneapi_dll_(device->oneapi_dll_object()),
       kernel_context_(nullptr)
 {
-  if (getenv("CYCLES_ONEAPI_KERNEL_STATS") && VLOG_IS_ON(1)) {
+  if (getenv("CYCLES_ONEAPI_KERNEL_STATS") != nullptr && VLOG_IS_ON(1)) {
     with_kernel_statistics_ = true;
   }
   else {

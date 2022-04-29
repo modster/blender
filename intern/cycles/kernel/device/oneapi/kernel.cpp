@@ -744,7 +744,7 @@ static std::vector<sycl::device> oneapi_available_devices(
     std::map<std::string, std::string> *proper_names_map)
 {
   bool allow_all_devices = false;
-  if (getenv("CYCLES_ONEAPI_ALL_DEVICES"))
+  if (getenv("CYCLES_ONEAPI_ALL_DEVICES") != nullptr)
     allow_all_devices = true;
 
   bool allow_host = false;
