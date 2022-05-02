@@ -37,6 +37,8 @@ struct EdgeCheck {
   EdgeCheckFlag flag;
   EdgeLoop first;
   EdgeLoop second;
+  /* First vertex index of the first edge loop to determine winding order switching. */
+  int first_v;
 };
 
 /** Do the two given EdgeLoops share the same uv coordinates. */
@@ -72,16 +74,24 @@ void find_edges_that_need_fixing(const Mesh *mesh,
       if (!BLI_edgehash_ensure_p(eh, prev_mloop.v, mloop.v, &value_ptr)) {
         EdgeCheck *value = MEM_cnew<EdgeCheck>(__func__);
         value->flag = EdgeCheckFlag::Unconnected;
-        value->first.l[0] = min_ii(prev_l, current_l);
-        value->first.l[1] = max_ii(prev_l, current_l);
+        value->first.l[0] = prev_l;
+        value->first.l[1] = current_l;
+        value->first_v = prev_mloop.v;
         *value_ptr = value;
       }
       else {
         EdgeCheck *value = static_cast<EdgeCheck *>(*value_ptr);
         if (value->flag == EdgeCheckFlag::Unconnected) {
           value->flag = EdgeCheckFlag::Connected;
-          value->second.l[0] = min_ii(prev_l, current_l);
-          value->second.l[1] = max_ii(prev_l, current_l);
+          /* Switch winding order to match the first edge. */
+          if (prev_mloop.v == value->first_v) {
+            value->second.l[0] = prev_l;
+            value->second.l[1] = current_l;
+          }
+          else {
+            value->second.l[0] = current_l;
+            value->second.l[1] = prev_l;
+          }
         }
       }
 
@@ -99,7 +109,6 @@ void find_edges_that_need_fixing(const Mesh *mesh,
         break;
       }
       case EdgeCheckFlag::Connected: {
-        // check for uv space to add to r_connected
         if (!share_uv(ldata_uv, value->first, value->second)) {
           r_connected.append(std::pair<EdgeLoop, EdgeLoop>(value->first, value->second));
           r_connected.append(std::pair<EdgeLoop, EdgeLoop>(value->second, value->first));
@@ -407,7 +416,7 @@ static void build_fixes(PBVH &pbvh,
           bitmaps, distance_to_edge, lambda, luv_b_1, luv_b_2, scale_factor, solution);
       if (!solution.is_valid) {
         find_projection_source(
-            bitmaps, distance_to_edge, lambda, luv_b_1, luv_b_2, scale_factor, solution);
+            bitmaps, distance_to_edge, 1.0f - lambda, luv_b_2, luv_b_1, scale_factor, solution);
       }
       if (!solution.is_valid) {
         /* No solution found skip this pixel. */
