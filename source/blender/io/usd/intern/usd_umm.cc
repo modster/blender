@@ -74,7 +74,7 @@ static std::string anchor_relative_path(pxr::UsdStagePtr stage, const std::strin
   }
 
 #if PXR_VERSION >= 2111
-  return pxr::ArGetResolver().CreateIdentifier(asset_path, ArResolvedPath(stage_path));
+  return pxr::ArGetResolver().CreateIdentifier(asset_path, pxr::ArResolvedPath(stage_path));
 #else
   return pxr::ArGetResolver().AnchorRelativePath(stage_path, asset_path);
 #endif
