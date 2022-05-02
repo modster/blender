@@ -313,6 +313,53 @@ static void add_seam_fix(PBVHNode &node,
 /** \name Build fixes for connected edges.
  * \{ */
 
+struct Projection {
+  const Bitmap *bitmap;
+  int2 pixel;
+  PixelInfo pixel_info;
+  bool is_valid;
+};
+
+/*
+ * Project the point over onto the connected UV space. Taking into account the scale
+ * difference.
+ */
+static void find_projection_source(const Bitmaps &bitmaps,
+                                   const float distance_to_edge,
+                                   const float lambda,
+                                   const MLoopUV &uv1,
+                                   const MLoopUV &uv2,
+                                   const float scale_factor,
+                                   Projection &r_projection)
+{
+  r_projection.is_valid = false;
+
+  float2 closest_point;
+  interp_v2_v2v2(closest_point, uv1.uv, uv2.uv, lambda);
+
+  r_projection.bitmap = bitmaps.find_containing_uv(closest_point);
+  if (r_projection.bitmap == nullptr) {
+    return;
+  }
+
+  closest_point.x -= r_projection.bitmap->image_tile.get_tile_x_offset();
+  closest_point.y -= r_projection.bitmap->image_tile.get_tile_y_offset();
+
+  float2 direction;
+  sub_v2_v2v2(direction, uv2.uv, uv1.uv);
+
+  float2 perpedicular(direction.y, -direction.x);
+  normalize_v2(perpedicular);
+  perpedicular.x /= r_projection.bitmap->resolution.x;
+  perpedicular.y /= r_projection.bitmap->resolution.y;
+  float2 projected_coord = closest_point + perpedicular * distance_to_edge * scale_factor;
+  projected_coord.x *= r_projection.bitmap->resolution.x;
+  projected_coord.y *= r_projection.bitmap->resolution.y;
+  r_projection.pixel = find_source_pixel(*r_projection.bitmap, projected_coord);
+  r_projection.pixel_info = r_projection.bitmap->get_pixel_info(r_projection.pixel);
+  r_projection.is_valid = r_projection.pixel_info.is_extracted();
+}
+
 static void build_fixes(PBVH &pbvh,
                         Bitmaps &bitmaps,
                         Bitmap &bitmap,
@@ -355,65 +402,25 @@ static void build_fixes(PBVH &pbvh,
         continue;
       }
 
-      /*
-       * Project the point over onto the connected UV space. Taking into account the scale
-       * difference.
-       */
-      float2 other_closest_point;
-      // How should we handle the winding order...
-      interp_v2_v2v2(other_closest_point, luv_b_2.uv, luv_b_1.uv, lambda);
-
-      /*
-       * Find the bitmap containing the information of the tile containing the
-       * 'other_closest_point`. This will fail for edges that are part of multiple tiles, but that
-       * should already be a problem during rendering.
-       */
-      const Bitmap *src_bitmap = bitmaps.find_containing_uv(other_closest_point);
-      if (src_bitmap == nullptr) {
-        continue;
+      Projection solution;
+      find_projection_source(
+          bitmaps, distance_to_edge, lambda, luv_b_1, luv_b_2, scale_factor, solution);
+      if (!solution.is_valid) {
+        find_projection_source(
+            bitmaps, distance_to_edge, lambda, luv_b_1, luv_b_2, scale_factor, solution);
       }
-
-      other_closest_point.x -= src_bitmap->image_tile.get_tile_x_offset();
-      other_closest_point.y -= src_bitmap->image_tile.get_tile_y_offset();
-
-      float2 direction_b;
-      sub_v2_v2v2(direction_b, luv_b_2.uv, luv_b_1.uv);
-
-      int2 source_pixel(0, 0);
-      PixelInfo src_pixel_info;
-      float2 perpedicular_b(direction_b.y, -direction_b.x);
-      normalize_v2(perpedicular_b);
-      perpedicular_b.x /= src_bitmap->resolution.x;
-      perpedicular_b.y /= src_bitmap->resolution.y;
-      float2 projected_coord_a = other_closest_point +
-                                 perpedicular_b * distance_to_edge * scale_factor;
-      projected_coord_a.x *= src_bitmap->resolution.x;
-      projected_coord_a.y *= src_bitmap->resolution.y;
-      source_pixel = find_source_pixel(*src_bitmap, projected_coord_a);
-      src_pixel_info = src_bitmap->get_pixel_info(source_pixel);
-
-      /* When no solution found check the other winding order. */
-      if (!src_pixel_info.is_extracted()) {
-        float2 projected_coord_b = other_closest_point -
-                                   perpedicular_b * distance_to_edge * scale_factor;
-        projected_coord_b.x *= src_bitmap->resolution.x;
-        projected_coord_b.y *= src_bitmap->resolution.y;
-        source_pixel = find_source_pixel(*src_bitmap, projected_coord_b);
-        src_pixel_info = src_bitmap->get_pixel_info(source_pixel);
-      }
-
-      if (!src_pixel_info.is_extracted()) {
+      if (!solution.is_valid) {
         /* No solution found skip this pixel. */
         continue;
       }
 
       int2 destination_pixel(u, v);
-      int src_node = src_pixel_info.get_node_index();
+      int src_node = solution.pixel_info.get_node_index();
 
       PBVHNode &node = pbvh.nodes[src_node];
       add_seam_fix(node,
-                   src_bitmap->image_tile.get_tile_number(),
-                   source_pixel,
+                   solution.bitmap->image_tile.get_tile_number(),
+                   solution.pixel,
                    bitmap.image_tile.get_tile_number(),
                    destination_pixel);
       bitmap.mark_seam_fix(destination_pixel);
