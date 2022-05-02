@@ -223,7 +223,7 @@ void USDLightWriter::do_write(HierarchyContext &context)
       }
 
 #if PXR_VERSION >= 2111
-      usd_light_api = distant_light.LightAPI();
+      usd_light_api = sun_light.LightAPI();
 #else
       usd_light_api = sun_light;
 #endif

@@ -33,6 +33,8 @@
 #include <pxr/pxr.h>
 #include <pxr/usd/usdGeom/scope.h>
 
+#include <pxr/usd/usdShade/connectableAPI.h>
+
 #include <cctype>
 #include <iostream>
 
@@ -1887,7 +1889,7 @@ static void link_cycles_nodes(pxr::UsdStageRefPtr a_stage,
     if (to_sock == nullptr)
       continue;
 
-    pxr::UsdShadeShader from_shader = pxr::UsdShadeShader::Define(
+    pxr::UsdShadeConnectableAPI from_shader = pxr::UsdShadeShader::Define(
         a_stage,
         shader_path.AppendChild(pxr::TfToken(pxr::TfMakeValidIdentifier(from_node->name))));
 
