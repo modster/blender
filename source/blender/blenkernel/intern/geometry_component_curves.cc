@@ -291,6 +291,15 @@ static void tag_component_topology_changed(GeometryComponent &component)
   }
 }
 
+static void tag_component_curve_types_changed(GeometryComponent &component)
+{
+  Curves *curves = get_curves_from_component_for_write(component);
+  if (curves) {
+    blender::bke::CurvesGeometry::wrap(curves->geometry).update_curve_types();
+    blender::bke::CurvesGeometry::wrap(curves->geometry).tag_topology_changed();
+  }
+}
+
 static void tag_component_positions_changed(GeometryComponent &component)
 {
   Curves *curves = get_curves_from_component_for_write(component);
@@ -462,14 +471,14 @@ static ComponentAttributeProviders create_attribute_providers_for_curve()
 
   static BuiltinCustomDataLayerProvider nurbs_order("nurbs_order",
                                                     ATTR_DOMAIN_CURVE,
-                                                    CD_PROP_INT32,
-                                                    CD_PROP_INT32,
+                                                    CD_PROP_INT8,
+                                                    CD_PROP_INT8,
                                                     BuiltinAttributeProvider::Creatable,
                                                     BuiltinAttributeProvider::Writable,
                                                     BuiltinAttributeProvider::Deletable,
                                                     curve_access,
-                                                    make_array_read_attribute<int>,
-                                                    make_array_write_attribute<int>,
+                                                    make_array_read_attribute<int8_t>,
+                                                    make_array_write_attribute<int8_t>,
                                                     tag_component_topology_changed);
 
   static BuiltinCustomDataLayerProvider normal_mode("normal_mode",
@@ -506,7 +515,7 @@ static ComponentAttributeProviders create_attribute_providers_for_curve()
                                                    curve_access,
                                                    make_array_read_attribute<int8_t>,
                                                    make_array_write_attribute<int8_t>,
-                                                   tag_component_topology_changed);
+                                                   tag_component_curve_types_changed);
 
   static BuiltinCustomDataLayerProvider resolution("resolution",
                                                    ATTR_DOMAIN_CURVE,
@@ -545,6 +554,7 @@ static ComponentAttributeProviders create_attribute_providers_for_curve()
                                       &handle_type_left,
                                       &normal_mode,
                                       &nurbs_order,
+                                      &nurbs_knots_mode,
                                       &nurbs_weight,
                                       &curve_type,
                                       &resolution,

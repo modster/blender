@@ -462,7 +462,6 @@ typedef enum eBrushCurvesSculptTool {
   CURVES_SCULPT_TOOL_SNAKE_HOOK = 2,
   CURVES_SCULPT_TOOL_ADD = 3,
   CURVES_SCULPT_TOOL_GROW_SHRINK = 4,
-  CURVES_SCULPT_TOOL_TEST1 = 5,
 } eBrushCurvesSculptTool;
 
 /** When #BRUSH_ACCUMULATE is used */
@@ -611,6 +610,8 @@ typedef enum eBrushFalloffShape {
 typedef enum eBrushCurvesSculptFlag {
   BRUSH_CURVES_SCULPT_FLAG_SCALE_UNIFORM = (1 << 0),
   BRUSH_CURVES_SCULPT_FLAG_GROW_SHRINK_INVERT = (1 << 1),
+  BRUSH_CURVES_SCULPT_FLAG_INTERPOLATE_LENGTH = (1 << 2),
+  BRUSH_CURVES_SCULPT_FLAG_INTERPOLATE_SHAPE = (1 << 3),
 } eBrushCurvesSculptFlag;
 
 #define MAX_BRUSH_PIXEL_RADIUS 500

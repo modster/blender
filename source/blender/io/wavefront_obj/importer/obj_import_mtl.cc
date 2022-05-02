@@ -13,12 +13,13 @@
 #include "DNA_material_types.h"
 #include "DNA_node_types.h"
 
+#include "IO_string_utils.hh"
+
 #include "NOD_shader.h"
 
 /* TODO: move eMTLSyntaxElement out of following file into a more neutral place */
 #include "obj_export_io.hh"
 #include "obj_import_mtl.hh"
-#include "parser_string_utils.hh"
 
 namespace blender::io::obj {
 
@@ -96,13 +97,16 @@ static bool load_texture_image(Main *bmain, const tex_map_XX &tex_map, bNode *r_
     return true;
   }
   /* Try removing quotes. */
-  std::string no_quote_path{replace_all_occurences(tex_path, "\"", "")};
+  std::string no_quote_path{tex_path};
+  auto end_pos = std::remove(no_quote_path.begin(), no_quote_path.end(), '"');
+  no_quote_path.erase(end_pos, no_quote_path.end());
   if (no_quote_path != tex_path &&
       load_texture_image_at_path(bmain, tex_map, r_node, no_quote_path)) {
     return true;
   }
   /* Try replacing underscores with spaces. */
-  std::string no_underscore_path{replace_all_occurences(no_quote_path, "_", " ")};
+  std::string no_underscore_path{no_quote_path};
+  std::replace(no_underscore_path.begin(), no_underscore_path.end(), '_', ' ');
   if (no_underscore_path != no_quote_path && no_underscore_path != tex_path &&
       load_texture_image_at_path(bmain, tex_map, r_node, no_underscore_path)) {
     return true;
@@ -118,7 +122,7 @@ ShaderNodetreeWrap::ShaderNodetreeWrap(Main *bmain, const MTLMaterial &mtl_mat, 
   bsdf_ = add_node_to_tree(SH_NODE_BSDF_PRINCIPLED);
   shader_output_ = add_node_to_tree(SH_NODE_OUTPUT_MATERIAL);
 
-  set_bsdf_socket_values();
+  set_bsdf_socket_values(mat);
   add_image_textures(bmain, mat);
   link_sockets(bsdf_, "BSDF", shader_output_, "Surface", 4);
 
@@ -184,7 +188,7 @@ void ShaderNodetreeWrap::link_sockets(bNode *from_node,
   nodeAddLink(nodetree_.get(), from_node, from_sock, to_node, to_sock);
 }
 
-void ShaderNodetreeWrap::set_bsdf_socket_values()
+void ShaderNodetreeWrap::set_bsdf_socket_values(Material *mat)
 {
   const int illum = mtl_mat_.illum;
   bool do_highlight = false;
@@ -305,6 +309,9 @@ void ShaderNodetreeWrap::set_bsdf_socket_values()
   set_property_of_socket(SOCK_FLOAT, "Metallic", {metallic}, bsdf_);
   set_property_of_socket(SOCK_FLOAT, "IOR", {ior}, bsdf_);
   set_property_of_socket(SOCK_FLOAT, "Alpha", {alpha}, bsdf_);
+  if (do_tranparency) {
+    mat->blend_method = MA_BM_BLEND;
+  }
 }
 
 void ShaderNodetreeWrap::add_image_textures(Main *bmain, Material *mat)

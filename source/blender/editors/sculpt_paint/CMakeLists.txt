@@ -48,7 +48,7 @@ set(SRC
   paint_ops.c
   paint_stroke.c
   paint_utils.c
-  paint_vertex.c
+  paint_vertex.cc
   paint_vertex_color_ops.c
   paint_vertex_color_utils.c
   paint_vertex_proj.c
@@ -72,6 +72,7 @@ set(SRC
   sculpt_multiplane_scrape.c
   sculpt_ops.c
   sculpt_paint_color.c
+  sculpt_paint_image.cc
   sculpt_pose.c
   sculpt_smooth.c
   sculpt_transform.c

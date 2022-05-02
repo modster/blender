@@ -183,6 +183,9 @@ struct uiBut {
 
   uchar col[4];
 
+  /** See \ref UI_but_func_identity_compare_set(). */
+  uiButIdentityCompareFunc identity_cmp_func;
+
   uiButHandleFunc func;
   void *func_arg1;
   void *func_arg2;
@@ -1028,7 +1031,7 @@ void ui_draw_but_CURVE(struct ARegion *region,
                        const struct uiWidgetColors *wcol,
                        const rcti *rect);
 /**
- *  Draws the curve profile widget. Somewhat similar to ui_draw_but_CURVE.
+ * Draws the curve profile widget. Somewhat similar to ui_draw_but_CURVE.
  */
 void ui_draw_but_CURVEPROFILE(struct ARegion *region,
                               uiBut *but,

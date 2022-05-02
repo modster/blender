@@ -539,10 +539,10 @@ ALEMBIC_FORCE_BUILD=false
 ALEMBIC_FORCE_REBUILD=false
 ALEMBIC_SKIP=false
 
-USD_VERSION="21.02"
-USD_VERSION_SHORT="21.02"
+USD_VERSION="22.03"
+USD_VERSION_SHORT="22.03"
 USD_VERSION_MIN="20.05"
-USD_VERSION_MEX="22.00"
+USD_VERSION_MEX="23.00"
 USD_FORCE_BUILD=false
 USD_FORCE_REBUILD=false
 USD_SKIP=false
@@ -4004,6 +4004,7 @@ install_DEB() {
   WEBP_DEV="libwebp-dev"
   check_package_DEB $WEBP_DEV
   if [ $? -eq 0 ]; then
+    install_packages_DEB $WEBP_DEV
     WEBP_USE=true
   fi
 
@@ -4435,9 +4436,6 @@ install_DEB() {
     if [ "$VPX_USE" = true ]; then
       _packages="$_packages $VPX_DEV"
     fi
-    if [ "$WEBP_USE" = true ]; then
-      _packages="$_packages $WEBP_DEV"
-    fi
     if [ "$OPUS_USE" = true ]; then
       _packages="$_packages $OPUS_DEV"
     fi
@@ -4722,6 +4720,7 @@ install_RPM() {
   WEBP_DEV="libwebp-devel"
   check_package_RPM $WEBP_DEV
   if [ $? -eq 0 ]; then
+    install_packages_RPM $WEBP_DEV
     WEBP_USE=true
   fi
 
@@ -5124,9 +5123,6 @@ install_RPM() {
     if [ "$VPX_USE" = true ]; then
       _packages="$_packages $VPX_DEV"
     fi
-    if [ "$WEBP_USE" = true ]; then
-      _packages="$_packages $WEBP_DEV"
-    fi
     if [ "$OPUS_USE" = true ]; then
       _packages="$_packages $OPUS_DEV"
     fi
@@ -5300,6 +5296,7 @@ install_ARCH() {
   WEBP_DEV="libwebp"
   check_package_ARCH $WEBP_DEV
   if [ $? -eq 0 ]; then
+    install_packages_ARCH $WEBP_DEV
     WEBP_USE=true
   fi
 
@@ -5704,16 +5701,12 @@ install_ARCH() {
     if [ "$VPX_USE" = true ]; then
       _packages="$_packages $VPX_DEV"
     fi
-    if [ "$WEBP_USE" = true ]; then
-      _packages="$_packages $WEBP_DEV"
-    fi
     if [ "$OPUS_USE" = true ]; then
       _packages="$_packages $OPUS_DEV"
     fi
     if [ "$MP3LAME_USE" = true ]; then
       _packages="$_packages $MP3LAME_DEV"
     fi
-    install_packages_ARCH $_packages
 
     compile_FFmpeg
   fi
@@ -5959,6 +5952,12 @@ print_info() {
       PRINT "  $_1"
       _buildargs="$_buildargs $_1"
     fi
+  fi
+
+  if [ "$WEBP_USE" = true ]; then
+    _1="-D WITH_IMAGE_WEBP=ON"
+    PRINT "  $_1"
+    _buildargs="$_buildargs $_1"
   fi
 
   if [ -d $INST/openexr ]; then
