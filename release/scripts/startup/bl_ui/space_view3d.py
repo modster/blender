@@ -3177,19 +3177,15 @@ class VIEW3D_MT_mask(Menu):
 
         props = layout.operator("sculpt.mask_filter", text='Smooth Mask')
         props.filter_type = 'SMOOTH'
-        props.auto_iteration_count = True
 
         props = layout.operator("sculpt.mask_filter", text='Sharpen Mask')
         props.filter_type = 'SHARPEN'
-        props.auto_iteration_count = True
 
         props = layout.operator("sculpt.mask_filter", text='Grow Mask')
         props.filter_type = 'GROW'
-        props.auto_iteration_count = True
 
         props = layout.operator("sculpt.mask_filter", text='Shrink Mask')
         props.filter_type = 'SHRINK'
-        props.auto_iteration_count = True
 
         props = layout.operator("sculpt.mask_filter", text='Increase Contrast')
         props.filter_type = 'CONTRAST_INCREASE'
@@ -5392,16 +5388,12 @@ class VIEW3D_MT_sculpt_mask_edit_pie(Menu):
         op.value = 0.0
         op = pie.operator("sculpt.mask_filter", text='Smooth Mask')
         op.filter_type = 'SMOOTH'
-        op.auto_iteration_count = True
         op = pie.operator("sculpt.mask_filter", text='Sharpen Mask')
         op.filter_type = 'SHARPEN'
-        op.auto_iteration_count = True
         op = pie.operator("sculpt.mask_filter", text='Grow Mask')
         op.filter_type = 'GROW'
-        op.auto_iteration_count = True
         op = pie.operator("sculpt.mask_filter", text='Shrink Mask')
         op.filter_type = 'SHRINK'
-        op.auto_iteration_count = True
         op = pie.operator("sculpt.mask_filter", text='Increase Contrast')
         op.filter_type = 'CONTRAST_INCREASE'
         op.auto_iteration_count = False
@@ -5692,12 +5684,13 @@ class VIEW3D_PT_object_type_visibility(Panel):
     bl_label = "View Object Types"
     bl_ui_units_x = 7
 
-    def draw(self, context):
+    # Allows derived classes to pass view data other than context.space_data. 
+    # This is used by the official VR add-on, which passes XrSessionSettings
+    # since VR has a 3D view that only exists for the duration of the VR session.
+    def draw_ex(self, context, view, show_select):
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
-
-        view = context.space_data
 
         layout.label(text="Object Types Visibility")
         layout.separator()
@@ -5736,19 +5729,25 @@ class VIEW3D_PT_object_type_visibility(Panel):
                 continue
 
             attr_v = "show_object_viewport_" + attr
-            attr_s = "show_object_select_" + attr
-
             icon_v = 'HIDE_OFF' if getattr(view, attr_v) else 'HIDE_ON'
-            icon_s = 'RESTRICT_SELECT_OFF' if getattr(view, attr_s) else 'RESTRICT_SELECT_ON'
 
             row = col.row(align=True)
             row.alignment = 'RIGHT'
 
             row.label(text=attr_name)
             row.prop(view, attr_v, text="", icon=icon_v, emboss=False)
-            rowsub = row.row(align=True)
-            rowsub.active = getattr(view, attr_v)
-            rowsub.prop(view, attr_s, text="", icon=icon_s, emboss=False)
+
+            if show_select:
+                attr_s = "show_object_select_" + attr
+                icon_s = 'RESTRICT_SELECT_OFF' if getattr(view, attr_s) else 'RESTRICT_SELECT_ON'
+
+                rowsub = row.row(align=True)
+                rowsub.active = getattr(view, attr_v)
+                rowsub.prop(view, attr_s, text="", icon=icon_s, emboss=False)
+
+    def draw(self, context):
+        view = context.space_data
+        self.draw_ex(context, view, True)
 
 
 class VIEW3D_PT_shading(Panel):

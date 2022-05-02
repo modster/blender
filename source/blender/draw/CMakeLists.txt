@@ -82,6 +82,7 @@ set(SRC
   intern/draw_cache_impl_volume.c
   intern/draw_color_management.cc
   intern/draw_common.c
+  intern/draw_curves.cc
   intern/draw_debug.c
   intern/draw_fluid.c
   intern/draw_hair.c
@@ -195,6 +196,7 @@ set(SRC
   intern/draw_color_management.h
   intern/draw_common.h
   intern/draw_common_shader_shared.h
+  intern/draw_curves_private.h
   intern/draw_debug.h
   intern/draw_hair_private.h
   intern/draw_instance_data.h
@@ -417,16 +419,16 @@ set(GLSL_SRC
   engines/gpencil/gpencil_defines.h
   engines/gpencil/gpencil_shader_shared.h
 
-  engines/select/shaders/selection_id_3D_vert.glsl
-  engines/select/shaders/selection_id_frag.glsl
+  engines/select/shaders/select_id_vert.glsl
+  engines/select/shaders/select_id_frag.glsl
 
   engines/basic/shaders/conservative_depth_geom.glsl
   engines/basic/shaders/depth_vert.glsl
+  engines/basic/shaders/depth_pointcloud_vert.glsl
   engines/basic/shaders/depth_frag.glsl
 
   engines/overlay/shaders/common_overlay_lib.glsl
   engines/overlay/shaders/antialiasing_frag.glsl
-  engines/overlay/shaders/antialiasing_vert.glsl
   engines/overlay/shaders/armature_dof_vert.glsl
   engines/overlay/shaders/armature_dof_solid_frag.glsl
   engines/overlay/shaders/armature_envelope_outline_vert.glsl
@@ -493,12 +495,16 @@ set(GLSL_SRC
   engines/overlay/shaders/grid_vert.glsl
   engines/overlay/shaders/image_vert.glsl
   engines/overlay/shaders/image_frag.glsl
+  engines/overlay/shaders/motion_path_line_frag.glsl
   engines/overlay/shaders/motion_path_line_geom.glsl
   engines/overlay/shaders/motion_path_line_vert.glsl
   engines/overlay/shaders/motion_path_point_vert.glsl
   engines/overlay/shaders/outline_detect_frag.glsl
   engines/overlay/shaders/outline_prepass_frag.glsl
+  engines/overlay/shaders/outline_prepass_gpencil_frag.glsl
   engines/overlay/shaders/outline_prepass_geom.glsl
+  engines/overlay/shaders/outline_prepass_gpencil_vert.glsl
+  engines/overlay/shaders/outline_prepass_pointcloud_vert.glsl
   engines/overlay/shaders/outline_prepass_vert.glsl
   engines/overlay/shaders/paint_face_vert.glsl
   engines/overlay/shaders/paint_point_vert.glsl
@@ -518,6 +524,8 @@ set(GLSL_SRC
   engines/overlay/shaders/wireframe_vert.glsl
   engines/overlay/shaders/wireframe_frag.glsl
   engines/overlay/shaders/xray_fade_frag.glsl
+
+  engines/overlay/overlay_shader_shared.h
 
   engines/image/shaders/image_engine_color_frag.glsl
   engines/image/shaders/image_engine_color_vert.glsl
