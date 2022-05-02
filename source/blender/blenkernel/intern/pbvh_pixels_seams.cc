@@ -46,10 +46,9 @@ bool share_uv(const MLoopUV *ldata_uv, EdgeLoop &edge1, EdgeLoop &edge2)
   const float2 &uv_1_b = ldata_uv[edge1.l[1]].uv;
   const float2 &uv_2_a = ldata_uv[edge2.l[0]].uv;
   const float2 &uv_2_b = ldata_uv[edge2.l[1]].uv;
-  const float limit = 0.0001f;
 
-  return (compare_v2v2(uv_1_a, uv_2_a, limit) && compare_v2v2(uv_1_b, uv_2_b, limit)) ||
-         (compare_v2v2(uv_1_a, uv_2_b, limit) && compare_v2v2(uv_1_b, uv_2_a, limit));
+  return (equals_v2v2(uv_1_a, uv_2_a) && equals_v2v2(uv_1_b, uv_2_b)) ||
+         (equals_v2v2(uv_1_a, uv_2_b) && equals_v2v2(uv_1_b, uv_2_a));
 }
 
 /** Make a list of connected and unconnected edgeloops that require UV Seam fixes. */
@@ -361,7 +360,8 @@ static void build_fixes(PBVH &pbvh,
        * difference.
        */
       float2 other_closest_point;
-      interp_v2_v2v2(other_closest_point, luv_b_1.uv, luv_b_2.uv, lambda);
+      // How should we handle the winding order...
+      interp_v2_v2v2(other_closest_point, luv_b_2.uv, luv_b_1.uv, lambda);
 
       /*
        * Find the bitmap containing the information of the tile containing the
