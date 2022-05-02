@@ -1889,7 +1889,7 @@ static void link_cycles_nodes(pxr::UsdStageRefPtr a_stage,
     if (to_sock == nullptr)
       continue;
 
-    pxr::UsdShadeConnectableAPI from_shader = pxr::UsdShadeShader::Define(
+    pxr::UsdShadeShader from_shader = pxr::UsdShadeShader::Define(
         a_stage,
         shader_path.AppendChild(pxr::TfToken(pxr::TfMakeValidIdentifier(from_node->name))));
 
@@ -1897,17 +1897,17 @@ static void link_cycles_nodes(pxr::UsdStageRefPtr a_stage,
       if (strncmp(to_sock->name, "Surface", 64) == 0) {
         if (strncmp(from_sock->name, "BSDF", 64) == 0)
           usd_material.CreateSurfaceOutput(cyclestokens::cycles)
-              .ConnectToSource(from_shader, cyclestokens::bsdf);
+              .ConnectToSource(from_shader.ConnectableAPI(), cyclestokens::bsdf);
         else
           usd_material.CreateSurfaceOutput(cyclestokens::cycles)
-              .ConnectToSource(from_shader, cyclestokens::closure);
+              .ConnectToSource(from_shader.ConnectableAPI(), cyclestokens::closure);
       }
       else if (strncmp(to_sock->name, "Volume", 64) == 0)
         usd_material.CreateVolumeOutput(cyclestokens::cycles)
-            .ConnectToSource(from_shader, cyclestokens::bsdf);
+            .ConnectToSource(from_shader.ConnectableAPI(), cyclestokens::bsdf);
       else if (strncmp(to_sock->name, "Displacement", 64) == 0)
         usd_material.CreateDisplacementOutput(cyclestokens::cycles)
-            .ConnectToSource(from_shader, cyclestokens::vector);
+            .ConnectToSource(from_shader.ConnectableAPI(), cyclestokens::vector);
       continue;
     }
 
@@ -1974,7 +1974,8 @@ static void link_cycles_nodes(pxr::UsdStageRefPtr a_stage,
     to_shader
         .CreateInput(pxr::TfToken(pxr::TfMakeValidIdentifier(toName)),
                      pxr::SdfValueTypeNames->Float)
-        .ConnectToSource(from_shader, pxr::TfToken(pxr::TfMakeValidIdentifier(fromName)));
+        .ConnectToSource(from_shader.ConnectableAPI(),
+                         pxr::TfToken(pxr::TfMakeValidIdentifier(fromName)));
   }
 }
 
