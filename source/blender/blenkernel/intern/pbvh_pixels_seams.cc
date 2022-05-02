@@ -18,9 +18,6 @@
 
 namespace blender::bke::pbvh::pixels {
 
-/* Distance between a pixel and its edge that will be fixed. Value is in pixels space. */
-constexpr float SEAMFIX_EDGE_DISTANCE = 3.5f;
-
 struct EdgeLoop {
   /** Loop indexes that form an edge. */
   int l[2];
@@ -377,7 +374,8 @@ static void build_fixes(PBVH &pbvh,
                         const MLoopUV &luv_a_2,
                         const MLoopUV &luv_b_1,
                         const MLoopUV &luv_b_2,
-                        const float scale_factor)
+                        const float scale_factor,
+                        const float seamfix_distance)
 {
   if (uvbounds.xmax < 0 || uvbounds.ymax < 0 || uvbounds.xmin > bitmap.resolution.x ||
       uvbounds.ymin > bitmap.resolution.y) {
@@ -412,7 +410,7 @@ static void build_fixes(PBVH &pbvh,
 
       /* Distance to the edge in pixel space. */
       float distance_to_edge = len_v2v2(closest_coord, uv_coord);
-      if (distance_to_edge > SEAMFIX_EDGE_DISTANCE) {
+      if (distance_to_edge > seamfix_distance) {
         continue;
       }
 
@@ -445,7 +443,8 @@ static void build_fixes(PBVH &pbvh,
 static void build_fixes(PBVH &pbvh,
                         const Vector<std::pair<EdgeLoop, EdgeLoop>> &connected,
                         Bitmaps &bitmaps,
-                        const MLoopUV *ldata_uv)
+                        const MLoopUV *ldata_uv,
+                        const float seamfix_distance)
 {
   for (const std::pair<EdgeLoop, EdgeLoop> &pair : connected) {
     // determine bounding rect in uv space + margin of 1;
@@ -477,8 +476,16 @@ static void build_fixes(PBVH &pbvh,
                             bitmap.resolution[1] +
                         MARGIN;
 
-      build_fixes(
-          pbvh, bitmaps, bitmap, uvbounds_i, luv_a_1, luv_a_2, luv_b_1, luv_b_2, scale_factor);
+      build_fixes(pbvh,
+                  bitmaps,
+                  bitmap,
+                  uvbounds_i,
+                  luv_a_1,
+                  luv_a_2,
+                  luv_b_1,
+                  luv_b_2,
+                  scale_factor,
+                  seamfix_distance);
     }
   }
 }
@@ -490,8 +497,12 @@ static void build_fixes(PBVH &pbvh,
 /** \name Build fixes for unconnected edges.
  * \{ */
 
-static void build_fixes(
-    PBVH &pbvh, Bitmap &bitmap, const rcti &uvbounds, const MLoopUV &luv_1, const MLoopUV &luv_2)
+static void build_fixes(PBVH &pbvh,
+                        Bitmap &bitmap,
+                        const rcti &uvbounds,
+                        const MLoopUV &luv_1,
+                        const MLoopUV &luv_2,
+                        const float seamfix_distance)
 {
   if (uvbounds.xmax < 0 || uvbounds.ymax < 0 || uvbounds.xmin > bitmap.resolution.x ||
       uvbounds.ymin > bitmap.resolution.y) {
@@ -523,7 +534,7 @@ static void build_fixes(
       float2 closest_coord(closest_point.x * bitmap.resolution.x,
                            closest_point.y * bitmap.resolution.y);
       float distance_to_edge = len_v2v2(uv_coord, closest_coord);
-      if (distance_to_edge > SEAMFIX_EDGE_DISTANCE) {
+      if (distance_to_edge > seamfix_distance) {
         continue;
       }
 
@@ -550,7 +561,8 @@ static void build_fixes(
 static void build_fixes(PBVH &pbvh,
                         const Vector<EdgeLoop> &unconnected,
                         Bitmaps &bitmaps,
-                        const MLoopUV *ldata_uv)
+                        const MLoopUV *ldata_uv,
+                        const float seamfix_distance)
 {
   for (const EdgeLoop &unconnected_loop : unconnected) {
     // determine bounding rect in uv space + margin of 1;
@@ -577,7 +589,7 @@ static void build_fixes(PBVH &pbvh,
                             bitmap.resolution[1] +
                         MARGIN;
 
-      build_fixes(pbvh, bitmap, uvbounds_i, luv_1, luv_2);
+      build_fixes(pbvh, bitmap, uvbounds_i, luv_1, luv_2, seamfix_distance);
     }
   }
 }
@@ -599,8 +611,8 @@ void BKE_pbvh_pixels_rebuild_seams(
 
   pbvh_pixels_clear_seams(pbvh);
   /* Fix connected edges before unconnected to improve quality. */
-  build_fixes(*pbvh, connected, bitmaps, ldata_uv);
-  build_fixes(*pbvh, unconnected, bitmaps, ldata_uv);
+  build_fixes(*pbvh, connected, bitmaps, ldata_uv, image->seamfix_distance);
+  build_fixes(*pbvh, unconnected, bitmaps, ldata_uv, image->seamfix_distance);
 }
 
 void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_user)

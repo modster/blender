@@ -2772,5 +2772,11 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+
+    if (!DNA_struct_elem_find(fd->filesdna, "Image", "float", "seamfix_distance")) {
+      LISTBASE_FOREACH (Image *, image, &bmain->images) {
+        image->seamfix_distance = 2.5f;
+      }
+    }
   }
 }

@@ -24,6 +24,7 @@
     .gpuframenr = INT_MAX, \
     .gpu_pass = SHRT_MAX, \
     .gpu_layer = SHRT_MAX, \
+    .seamfix_distance = 2.5f, \
   }
 
 /** \} */

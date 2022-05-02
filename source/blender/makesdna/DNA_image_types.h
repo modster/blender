@@ -170,7 +170,9 @@ typedef struct Image {
   short gpu_pass;
   short gpu_layer;
   short gpu_view;
-  char _pad2[4];
+
+  /* Thickness of the UV seam fix area in distance between pixels and edges in pixel space. */
+  float seamfix_distance;
 
   /** Deprecated. */
   struct PackedFile *packedfile DNA_DEPRECATED;
