@@ -281,7 +281,7 @@ USDPrimReader *USDStageReader::collect_readers(Main *bmain,
     }
   }
 
-  if (prim.IsPseudoRoot() || prim.IsMaster()) {
+  if (prim.IsPseudoRoot() || prim.IsPrototype()) {
     return nullptr;
   }
 
@@ -337,7 +337,7 @@ void USDStageReader::collect_readers(Main *bmain)
 
   if (params_.use_instancing) {
     // Collect the scenegraph instance prototypes.
-    std::vector<pxr::UsdPrim> protos = stage_->GetMasters();
+    std::vector<pxr::UsdPrim> protos = stage_->GetPrototypes();
 
     for (const pxr::UsdPrim &proto_prim : protos) {
       std::vector<USDPrimReader *> proto_readers;

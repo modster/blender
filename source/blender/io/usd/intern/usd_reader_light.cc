@@ -13,7 +13,6 @@
 #include <pxr/usd/usdGeom/metrics.h>
 #include <pxr/usd/usdLux/diskLight.h>
 #include <pxr/usd/usdLux/distantLight.h>
-#include <pxr/usd/usdLux/light.h>
 #include <pxr/usd/usdLux/rectLight.h>
 #include <pxr/usd/usdLux/shapingAPI.h>
 #include <pxr/usd/usdLux/sphereLight.h>
