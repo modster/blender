@@ -379,6 +379,11 @@ static void build_fixes(PBVH &pbvh,
                         const MLoopUV &luv_b_2,
                         const float scale_factor)
 {
+  if (uvbounds.xmax < 0 || uvbounds.ymax < 0 || uvbounds.xmin > bitmap.resolution.x ||
+      uvbounds.ymin > bitmap.resolution.y) {
+    return;
+  }
+
   for (int v = uvbounds.ymin; v <= uvbounds.ymax; v++) {
     for (int u = uvbounds.xmin; u <= uvbounds.xmax; u++) {
       if (u < 0 || u >= bitmap.resolution.x || v < 0 || v >= bitmap.resolution.y) {
@@ -488,6 +493,11 @@ static void build_fixes(PBVH &pbvh,
 static void build_fixes(
     PBVH &pbvh, Bitmap &bitmap, const rcti &uvbounds, const MLoopUV &luv_1, const MLoopUV &luv_2)
 {
+  if (uvbounds.xmax < 0 || uvbounds.ymax < 0 || uvbounds.xmin > bitmap.resolution.x ||
+      uvbounds.ymin > bitmap.resolution.y) {
+    return;
+  }
+
   for (int v = uvbounds.ymin; v <= uvbounds.ymax; v++) {
     for (int u = uvbounds.xmin; u <= uvbounds.xmax; u++) {
       if (u < 0 || u >= bitmap.resolution[0] || v < 0 || v >= bitmap.resolution[1]) {
