@@ -246,11 +246,11 @@ Vector<PixelInfo> create_tile_bitmap(const PBVH &pbvh,
 Bitmaps create_tile_bitmap(const PBVH &pbvh, Image &image, ImageUser &image_user)
 {
   Bitmaps result;
-  ImageUser watertight = image_user;
+  ImageUser image_tile_user = image_user;
   LISTBASE_FOREACH (ImageTile *, tile_data, &image.tiles) {
     image::ImageTileWrapper image_tile(tile_data);
-    watertight.tile = image_tile.get_tile_number();
-    ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &watertight, nullptr);
+    image_tile_user.tile = image_tile.get_tile_number();
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(&image, &image_tile_user, nullptr);
     if (image_buffer == nullptr) {
       continue;
     }
