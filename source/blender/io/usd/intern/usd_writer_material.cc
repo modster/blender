@@ -33,8 +33,6 @@
 #include <pxr/pxr.h>
 #include <pxr/usd/usdGeom/scope.h>
 
-#include <pxr/usd/usdShade/connectableAPI.h>
-
 #include <cctype>
 #include <iostream>
 
@@ -2057,7 +2055,7 @@ void create_mdl_material(const USDExporterContext &usd_export_context,
     return;
   }
 
-  material_surface_output.ConnectToSource(shader, usdtokens::out);
+  material_surface_output.ConnectToSource(shader.ConnectableAPI(), usdtokens::out);
 
   umm_export_material(usd_export_context, material, shader, "MDL");
 
