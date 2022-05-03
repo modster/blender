@@ -71,7 +71,7 @@ typedef struct GPData {
   int layers_size;
   int active_layer_index;
 
-  GPLayerGroup default_group;
+  GPLayerGroup *default_group;
 
   GPDataRuntimeHandle *runtime;
 } GPData;
