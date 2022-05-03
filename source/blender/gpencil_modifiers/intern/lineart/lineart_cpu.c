@@ -2006,6 +2006,38 @@ static void lineart_register_shadow_cuts(LineartRenderBuffer *rb,
   }
 }
 
+static void lineart_register_intersection_shadow_cuts(LineartRenderBuffer *rb,
+                                                      ListBase *shadow_elns)
+{
+  LineartElementLinkNode *eln_isect_shadow = NULL, *eln_isect_original = NULL;
+  if (!shadow_elns) {
+    return;
+  }
+  LISTBASE_FOREACH (LineartElementLinkNode *, eln, shadow_elns) {
+    if (eln->flags & LRT_ELEMENT_INTERSECTION_DATA) {
+      eln_isect_shadow = eln;
+      break;
+    }
+  }
+  LISTBASE_FOREACH (LineartElementLinkNode *, eln, &rb->line_buffer_pointers) {
+    if (eln->flags & LRT_ELEMENT_INTERSECTION_DATA) {
+      eln_isect_original = eln;
+      break;
+    }
+  }
+  if (!eln_isect_shadow || !eln_isect_original) {
+    return;
+  }
+  LineartEdge *e = (LineartEdge *)eln_isect_original->pointer;
+  for (int i = 0; i < eln_isect_original->element_count; i++) {
+    LineartEdge *shadow_e = lineart_find_matching_edge(eln_isect_shadow, (uint64_t)e->from_shadow);
+    if (shadow_e) {
+      lineart_register_shadow_cuts(rb, e, shadow_e);
+    }
+    e++;
+  }
+}
+
 static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
                                                   LineartRenderBuffer *re_buf,
                                                   ListBase *shadow_elns)
@@ -4444,6 +4476,7 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
   double ZMax = rb->far_clip;
   double ZMin = rb->near_clip;
 
+  int total_lines = 0;
   for (int i = 0; i < d->thread_count; i++) {
     LineartIsecThread *th = &d->threads[i];
     if (G.debug_value == 4000) {
@@ -4452,13 +4485,32 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
     if (!th->current) {
       continue;
     }
-    /* We don't care about removing duplicated vert in this method, chaning can handle that,
-     * and it saves us from using locks and look up tables. */
-    LineartVert *v = lineart_mem_acquire(&rb->render_data_pool,
-                                         sizeof(LineartVert) * th->current * 2);
-    LineartEdge *e = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdge) * th->current);
-    LineartEdgeSegment *es = lineart_mem_acquire(&rb->render_data_pool,
-                                                 sizeof(LineartEdgeSegment) * th->current);
+    total_lines += th->current;
+  }
+
+  if (!total_lines) {
+    return;
+  }
+
+  /* We don't care about removing duplicated vert in this method, chaning can handle that,
+   * and it saves us from using locks and look up tables. */
+  LineartVert *v = lineart_mem_acquire(rb->edge_data_pool, sizeof(LineartVert) * total_lines * 2);
+  LineartEdge *e = lineart_mem_acquire(rb->edge_data_pool, sizeof(LineartEdge) * total_lines);
+  LineartEdgeSegment *es = lineart_mem_acquire(rb->edge_data_pool,
+                                               sizeof(LineartEdgeSegment) * total_lines);
+
+  LineartElementLinkNode *eln = lineart_mem_acquire(rb->edge_data_pool,
+                                                    sizeof(LineartElementLinkNode));
+  eln->element_count = total_lines;
+  eln->pointer = e;
+  eln->flags |= LRT_ELEMENT_INTERSECTION_DATA;
+  BLI_addhead(&rb->line_buffer_pointers, eln);
+
+  for (int i = 0; i < d->thread_count; i++) {
+    LineartIsecThread *th = &d->threads[i];
+    if (!th->current) {
+      continue;
+    }
     for (int j = 0; j < th->current; j++) {
       LineartVert *v1 = v;
       LineartVert *v2 = v + 1;
@@ -5958,6 +6010,9 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
    * triangles and lines are all linked with acceleration structure, and the 2D occlusion stage
    * can do its job. */
   lineart_main_add_triangles(rb);
+
+  /* Add shadow cuts to intersection lines as well. */
+  lineart_register_intersection_shadow_cuts(rb, shadow_elns);
 
   /* Re-link bounding areas because they have been subdivided by worker threads and we need
    * andjacent info. */

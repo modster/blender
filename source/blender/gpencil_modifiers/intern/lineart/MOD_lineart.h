@@ -80,6 +80,7 @@ typedef enum eLineArtElementNodeFlag {
   LRT_ELEMENT_IS_ADDITIONAL = (1 << 0),
   LRT_ELEMENT_BORDER_ONLY = (1 << 1),
   LRT_ELEMENT_NO_INTERSECTION = (1 << 2),
+  LRT_ELEMENT_INTERSECTION_DATA = (1 << 3),
 } eLineArtElementNodeFlag;
 
 typedef struct LineartElementLinkNode {
