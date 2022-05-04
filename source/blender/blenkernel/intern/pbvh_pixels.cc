@@ -275,7 +275,19 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
         if (fixes.dst_tile_number != image_tile.get_tile_number()) {
           continue;
         }
-        for (SeamFix &fix : fixes.pixels) {
+        for (SeamFixCopy &fix : fixes.pixels_to_copy) {
+          int pixel_offset = fix.dst_pixel.y * image_buffer->x + fix.dst_pixel.x;
+          if (image_buffer->rect_float != nullptr) {
+            copy_v4_fl4(&image_buffer->rect_float[pixel_offset * 4], 1.0f, 0.0f, 0.0f, 1.0f);
+          }
+          else if (image_buffer->rect != nullptr) {
+            uint8_t *dest = static_cast<uint8_t *>(
+                static_cast<void *>(&image_buffer->rect[pixel_offset]));
+            static uint8_t seam_color[] = {255, 0, 0, 255};
+            copy_v4_v4_uchar(dest, seam_color);
+          }
+        }
+        for (SeamFixBlend &fix : fixes.pixels_to_blend) {
           int pixel_offset = fix.dst_pixel.y * image_buffer->x + fix.dst_pixel.x;
           if (image_buffer->rect_float != nullptr) {
             copy_v4_fl4(&image_buffer->rect_float[pixel_offset * 4], 1.0f, 0.0f, 0.0f, 1.0f);

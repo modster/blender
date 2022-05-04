@@ -183,6 +183,18 @@ struct Bitmap {
     return bitmap[offset];
   }
 
+  const PixelInfo &get_pixel_info_safe(int2 image_coordinate) const
+  {
+    static PixelInfo coordinate_out_of_bounds_result;
+    if (image_coordinate.x < 0 || image_coordinate.y < 0 || image_coordinate.x >= resolution.x ||
+        image_coordinate.y >= resolution.y) {
+      return coordinate_out_of_bounds_result;
+    }
+
+    int offset = image_coordinate.y * resolution.x + image_coordinate.x;
+    return bitmap[offset];
+  }
+
   bool contains(const float2 &uv) const
   {
     int2 tile_offset = image_tile.get_tile_offset();
@@ -311,7 +323,19 @@ static void add_seam_fix(PBVHNode &node,
 {
   NodeData &node_data = BKE_pbvh_pixels_node_data_get(node);
   UDIMSeamFixes &seam_fixes = node_data.ensure_seam_fixes(src_tile_number, dst_tile_number);
-  seam_fixes.pixels.append(SeamFix{src_pixel, dst_pixel});
+  seam_fixes.pixels_to_copy.append(SeamFixCopy{src_pixel, dst_pixel});
+}
+
+static void add_seam_fix(PBVHNode &node,
+                         uint16_t src_tile_number,
+                         float2 src_pixel,
+                         char src_bit_mask,
+                         uint16_t dst_tile_number,
+                         int2 dst_pixel)
+{
+  NodeData &node_data = BKE_pbvh_pixels_node_data_get(node);
+  UDIMSeamFixes &seam_fixes = node_data.ensure_seam_fixes(src_tile_number, dst_tile_number);
+  seam_fixes.pixels_to_blend.append(SeamFixBlend{src_pixel, dst_pixel, src_bit_mask});
 }
 
 /* -------------------------------------------------------------------- */
@@ -321,9 +345,10 @@ static void add_seam_fix(PBVHNode &node,
 
 struct Projection {
   const Bitmap *bitmap;
-  int2 pixel;
-  PixelInfo pixel_info;
-  bool is_valid;
+  int node_index;
+  float2 pixel;
+  char bit_mask;
+  float score;
 };
 
 /*
@@ -338,7 +363,9 @@ static void find_projection_source(const Bitmaps &bitmaps,
                                    const float scale_factor,
                                    Projection &r_projection)
 {
-  r_projection.is_valid = false;
+  r_projection.bit_mask = 0;
+  r_projection.score = 0;
+  r_projection.node_index = -1;
 
   float2 closest_point;
   interp_v2_v2v2(closest_point, uv1.uv, uv2.uv, lambda);
@@ -361,9 +388,49 @@ static void find_projection_source(const Bitmaps &bitmaps,
   float2 projected_coord = closest_point + perpedicular * distance_to_edge * scale_factor;
   projected_coord.x *= r_projection.bitmap->resolution.x;
   projected_coord.y *= r_projection.bitmap->resolution.y;
-  r_projection.pixel = find_source_pixel(*r_projection.bitmap, projected_coord);
-  r_projection.pixel_info = r_projection.bitmap->get_pixel_info(r_projection.pixel);
-  r_projection.is_valid = r_projection.pixel_info.is_extracted();
+  r_projection.pixel = projected_coord;
+
+  /* Check neighbouring pixels and extract mask. Pixels should be part of the same node. */
+  int2 pixel(std::floor(projected_coord.x), std::floor(projected_coord.y));
+  PixelInfo pixel_info = r_projection.bitmap->get_pixel_info_safe(pixel);
+  int node_index = pixel_info.get_node_index();
+  if (pixel_info.is_extracted() &&
+      (r_projection.node_index == -1 || r_projection.node_index == node_index)) {
+    r_projection.bit_mask |= 1;
+    r_projection.score += 1.0;
+    r_projection.node_index = node_index;
+  }
+
+  pixel.x += 1;
+  pixel_info = r_projection.bitmap->get_pixel_info_safe(pixel);
+  node_index = pixel_info.get_node_index();
+  if (pixel_info.is_extracted() &&
+      (r_projection.node_index == -1 || r_projection.node_index == node_index)) {
+    r_projection.bit_mask |= 2;
+    r_projection.score += 1.0;
+    r_projection.node_index = node_index;
+  }
+
+  pixel.x -= 1;
+  pixel.y += 1;
+  pixel_info = r_projection.bitmap->get_pixel_info_safe(pixel);
+  node_index = pixel_info.get_node_index();
+  if (pixel_info.is_extracted() &&
+      (r_projection.node_index == -1 || r_projection.node_index == node_index)) {
+    r_projection.bit_mask |= 4;
+    r_projection.score += 1.0;
+    r_projection.node_index = node_index;
+  }
+
+  pixel.x += 1;
+  pixel_info = r_projection.bitmap->get_pixel_info_safe(pixel);
+  node_index = pixel_info.get_node_index();
+  if (pixel_info.is_extracted() &&
+      (r_projection.node_index == -1 || r_projection.node_index == node_index)) {
+    r_projection.bit_mask |= 8;
+    r_projection.score += 1.0;
+    r_projection.node_index = node_index;
+  }
 }
 
 static void build_fixes(PBVH &pbvh,
@@ -414,25 +481,25 @@ static void build_fixes(PBVH &pbvh,
         continue;
       }
 
-      Projection solution;
+      Projection solution1;
+      Projection solution2;
       find_projection_source(
-          bitmaps, distance_to_edge, lambda, luv_b_1, luv_b_2, scale_factor, solution);
-      if (!solution.is_valid) {
-        find_projection_source(
-            bitmaps, distance_to_edge, 1.0f - lambda, luv_b_2, luv_b_1, scale_factor, solution);
-      }
-      if (!solution.is_valid) {
+          bitmaps, distance_to_edge, lambda, luv_b_1, luv_b_2, scale_factor, solution1);
+      find_projection_source(
+          bitmaps, distance_to_edge, 1.0f - lambda, luv_b_2, luv_b_1, scale_factor, solution2);
+      if (solution1.score == 0.0 && solution2.score == 0.0) {
         /* No solution found skip this pixel. */
         continue;
       }
+      Projection &best_solution = solution1.score > solution2.score ? solution1 : solution2;
 
       int2 destination_pixel(u, v);
-      int src_node = solution.pixel_info.get_node_index();
-
+      int src_node = best_solution.node_index;
       PBVHNode &node = pbvh.nodes[src_node];
       add_seam_fix(node,
-                   solution.bitmap->image_tile.get_tile_number(),
-                   solution.pixel,
+                   best_solution.bitmap->image_tile.get_tile_number(),
+                   best_solution.pixel,
+                   best_solution.bit_mask,
                    bitmap.image_tile.get_tile_number(),
                    destination_pixel);
       bitmap.mark_seam_fix(destination_pixel);
@@ -615,6 +682,45 @@ void BKE_pbvh_pixels_rebuild_seams(
   build_fixes(*pbvh, unconnected, bitmaps, ldata_uv, image->seamfix_distance);
 }
 
+static float4 blend_source(ImBuf *src_image_buffer, float2 src_coordinate, char src_bit_mask)
+{
+  int2 src_pixel(std::floor(src_coordinate.x), std::floor(src_coordinate.y));
+  int src_offset = src_pixel.y * src_image_buffer->x + src_pixel.x;
+  float2 frac(src_coordinate.x - src_pixel.x, src_coordinate.y - src_pixel.y);
+  float4 color(0.0f, 0.0f, 0.0f, 0.0f);
+  float sum_factor = 0.0f;
+  if (src_bit_mask & 1) {
+    float4 c1(src_image_buffer->rect_float[src_offset * 4]);
+    float f1 = std::sqrt(std::pow(1.0f - frac.x, 2)) + std::pow(1.0f - frac.y, 2);
+    color = color + c1 * f1;
+    sum_factor += f1;
+  }
+  if (src_bit_mask & 2) {
+    float4 c2(src_image_buffer->rect_float[(src_offset + 1) * 4]);
+    float f2 = std::sqrt(std::pow(frac.x, 2)) + std::pow(1.0f - frac.y, 2);
+    color = color + c2 * f2;
+    sum_factor += f2;
+  }
+  if (src_bit_mask & 4) {
+    float4 c3(src_image_buffer->rect_float[(src_offset + src_image_buffer->x) * 4]);
+    float f3 = std::sqrt(std::pow(1.0 - frac.x, 2)) + std::pow(frac.y, 2);
+    color = color + c3 * f3;
+    sum_factor += f3;
+  }
+  if (src_bit_mask & 8) {
+    float4 c4(src_image_buffer->rect_float[(src_offset + src_image_buffer->x + 1) * 4]);
+    float f4 = std::sqrt(std::pow(frac.x, 2)) + std::pow(frac.y, 2);
+    color = color + c4 * f4;
+    sum_factor += f4;
+  }
+  color.x /= sum_factor;
+  color.y /= sum_factor;
+  color.z /= sum_factor;
+  color.w = 1.0f;
+
+  return color;
+}
+
 void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_user)
 {
   NodeData &node_data = BKE_pbvh_pixels_node_data_get(*node);
@@ -638,7 +744,7 @@ void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_us
     BLI_rcti_init_minmax(&region_to_update);
 
     if (src_image_buffer->rect_float != nullptr && dst_image_buffer->rect_float != nullptr) {
-      for (SeamFix &fix : fixes.pixels) {
+      for (SeamFixCopy &fix : fixes.pixels_to_copy) {
         int src_offset = fix.src_pixel.y * src_image_buffer->x + fix.src_pixel.x;
         int dst_offset = fix.dst_pixel.y * dst_image_buffer->x + fix.dst_pixel.x;
 
@@ -650,9 +756,19 @@ void BKE_pbvh_pixels_fix_seams(PBVHNode *node, Image *image, ImageUser *image_us
         copy_v4_v4(&dst_image_buffer->rect_float[dst_offset * 4],
                    &src_image_buffer->rect_float[src_offset * 4]);
       }
+
+      for (SeamFixBlend &fix : fixes.pixels_to_blend) {
+        float4 color = blend_source(src_image_buffer, fix.src_pixel, fix.src_bit_mask);
+        int dst_offset = fix.dst_pixel.y * dst_image_buffer->x + fix.dst_pixel.x;
+        if (equals_v4v4(&dst_image_buffer->rect_float[dst_offset * 4], color)) {
+          continue;
+        }
+        BLI_rcti_do_minmax_v(&region_to_update, fix.dst_pixel);
+        copy_v4_v4(&dst_image_buffer->rect_float[dst_offset * 4], color);
+      }
     }
     else if (src_image_buffer->rect != nullptr && dst_image_buffer->rect != nullptr) {
-      for (SeamFix &fix : fixes.pixels) {
+      for (SeamFixCopy &fix : fixes.pixels_to_copy) {
         int src_offset = fix.src_pixel.y * src_image_buffer->x + fix.src_pixel.x;
         int dst_offset = fix.dst_pixel.y * dst_image_buffer->x + fix.dst_pixel.x;
         if (dst_image_buffer->rect[dst_offset] == src_image_buffer->rect[src_offset]) {

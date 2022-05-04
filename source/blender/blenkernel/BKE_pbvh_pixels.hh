@@ -132,15 +132,21 @@ struct UDIMTilePixels {
   }
 };
 
-struct SeamFix {
+struct SeamFixCopy {
   int2 src_pixel;
   int2 dst_pixel;
+};
+struct SeamFixBlend {
+  float2 src_pixel;
+  int2 dst_pixel;
+  char src_bit_mask;
 };
 
 struct UDIMSeamFixes {
   uint16_t src_tile_number;
   uint16_t dst_tile_number;
-  Vector<SeamFix> pixels;
+  Vector<SeamFixCopy> pixels_to_copy;
+  Vector<SeamFixBlend> pixels_to_blend;
 
   UDIMSeamFixes(uint16_t src_tile_number, uint16_t dst_tile_number)
       : src_tile_number(src_tile_number), dst_tile_number(dst_tile_number)
