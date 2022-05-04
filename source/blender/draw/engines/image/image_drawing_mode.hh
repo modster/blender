@@ -65,7 +65,7 @@ struct OneTextureMethod {
     rctf new_clipping_bounds;
     BLI_rctf_init(&new_clipping_bounds, min_uv[0], max_uv[0], min_uv[1], max_uv[1]);
 
-    if (!BLI_rctf_compare(&info.clipping_uv_bounds, &new_clipping_bounds, EPSILON_UV_BOUNDS)) {
+    if (memcmp(&info.clipping_uv_bounds, &new_clipping_bounds, sizeof(rctf)) != 0) {
       info.clipping_uv_bounds = new_clipping_bounds;
       info.dirty = true;
     }
@@ -177,6 +177,7 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
                        Image *image,
                        ImageUser *image_user) const
   {
+    printf("%s\n", __func__);
     PartialUpdateChecker<ImageTileData> checker(
         image, image_user, instance_data.partial_update.user);
     PartialUpdateChecker<ImageTileData>::CollectResult changes = checker.collect_changes();
@@ -281,9 +282,14 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
         const bool region_overlap = BLI_rctf_isect(&info.clipping_uv_bounds,
                                                    &changed_region_in_uv_space,
                                                    &changed_overlapping_region_in_uv_space);
+        print_rctf_id(&info.clipping_uv_bounds);
+        print_rctf_id(&changed_region_in_uv_space);
+        print_rctf_id(&changed_overlapping_region_in_uv_space);
+
         if (!region_overlap) {
           continue;
         }
+        printf(" *** START\n");
         /* Convert the overlapping region to texel space and to ss_pixel space...
          * TODO: first convert to ss_pixel space as integer based. and from there go back to texel
          * space. But perhaps this isn't needed and we could use an extraction offset somehow. */
@@ -298,7 +304,7 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
                  texture_height / BLI_rctf_size_y(&info.clipping_uv_bounds)),
             ceil((changed_overlapping_region_in_uv_space.ymax - info.clipping_uv_bounds.ymin) *
                  texture_height / BLI_rctf_size_y(&info.clipping_uv_bounds)));
-
+        print_rcti_id(&gpu_texture_region_to_update);
         rcti tile_region_to_extract;
         BLI_rcti_init(
             &tile_region_to_extract,
@@ -306,6 +312,7 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
             floor((changed_overlapping_region_in_uv_space.xmax - tile_offset_x) * tile_width),
             ceil((changed_overlapping_region_in_uv_space.ymin - tile_offset_y) * tile_height),
             ceil((changed_overlapping_region_in_uv_space.ymax - tile_offset_y) * tile_height));
+        print_rcti_id(&tile_region_to_extract);
 
         /* Create an image buffer with a size.
          * Extract and scale into an imbuf. */
@@ -332,6 +339,11 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
                                         &extracted_buffer.rect_float[offset * 4],
                                         u * tile_buffer->x,
                                         v * tile_buffer->y);
+#if 1
+            int off2 = (int)(u * tile_buffer->x) + tile_buffer->x * (int)(tile_buffer->y * v);
+            tile_buffer->rect_float[off2 * 4] = 1.0f;
+            extracted_buffer.rect_float[offset * 4 + 1] = 1.0f;
+#endif
             offset++;
           }
         }
@@ -345,7 +357,11 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
                                extracted_buffer.x,
                                extracted_buffer.y,
                                0);
+        IMB_saveiff(&extracted_buffer, "extracted.png", IB_rectfloat);
+        IMB_saveiff(tile_buffer, "tile_float.png", IB_rectfloat);
+        imb_freerectImBuf(tile_buffer);
         imb_freerectImbuf_all(&extracted_buffer);
+        printf(" *** END\n");
       }
     }
   }
