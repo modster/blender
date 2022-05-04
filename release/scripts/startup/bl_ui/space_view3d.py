@@ -109,8 +109,8 @@ class VIEW3D_HT_tool_header(Header):
             if is_valid_context:
                 brush = context.tool_settings.gpencil_sculpt_paint.brush
                 tool = brush.gpencil_sculpt_tool
-                if tool in {'SMOOTH', 'RANDOMIZE'}:
-                    layout.popover("VIEW3D_PT_tools_grease_pencil_sculpt_options")
+                if tool != 'CLONE':
+                    layout.popover("VIEW3D_PT_tools_grease_pencil_sculpt_brush_popover")
                 layout.popover("VIEW3D_PT_tools_grease_pencil_sculpt_appearance")
         elif tool_mode == 'WEIGHT_GPENCIL':
             if is_valid_context:
@@ -151,6 +151,11 @@ class VIEW3D_HT_tool_header(Header):
                 row.popover(panel="VIEW3D_PT_sculpt_symmetry_for_topbar", text="")
             elif mode_string == 'PAINT_VERTEX':
                 row.popover(panel="VIEW3D_PT_tools_vertexpaint_symmetry_for_topbar", text="")
+        elif mode_string == 'SCULPT_CURVES':
+            _row, sub = row_for_mirror()
+            sub.prop(context.object.data, "use_mirror_x", text="X", toggle=True)
+            sub.prop(context.object.data, "use_mirror_y", text="Y", toggle=True)
+            sub.prop(context.object.data, "use_mirror_z", text="Z", toggle=True)
 
         # Expand panels from the side-bar as popovers.
         popover_kw = {"space_type": 'VIEW_3D', "region_type": 'UI', "category": "Tool"}
@@ -5687,7 +5692,7 @@ class VIEW3D_PT_object_type_visibility(Panel):
     bl_label = "View Object Types"
     bl_ui_units_x = 7
 
-    # Allows derived classes to pass view data other than context.space_data. 
+    # Allows derived classes to pass view data other than context.space_data.
     # This is used by the official VR add-on, which passes XrSessionSettings
     # since VR has a 3D view that only exists for the duration of the VR session.
     def draw_ex(self, context, view, show_select):

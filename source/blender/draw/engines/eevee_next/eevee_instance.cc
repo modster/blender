@@ -21,9 +21,9 @@
 namespace blender::eevee {
 
 /* -------------------------------------------------------------------- */
-/** \name Init
+/** \name Initialization
  *
- * Init funcions need to be called once at the start of a frame.
+ * Initialization functions need to be called once at the start of a frame.
  * Active camera, render extent and enabled render passes are immutable until next init.
  * This takes care of resizing output buffers and view in case a parameter changed.
  * IMPORTANT: xxx.init() functions are NOT meant to acquire and allocate DRW resources.
@@ -41,6 +41,7 @@ void Instance::init(const int2 &output_res,
                     const View3D *v3d_,
                     const RegionView3D *rv3d_)
 {
+  UNUSED_VARS(light_probe_, camera_object_, output_rect);
   render = render_;
   depsgraph = depsgraph_;
   render_layer = render_layer_;
@@ -163,10 +164,12 @@ void Instance::render_sample(void)
 
 void Instance::render_frame(RenderLayer *render_layer, const char *view_name)
 {
+  UNUSED_VARS(render_layer, view_name);
 }
 
 void Instance::draw_viewport(DefaultFramebufferList *dfbl)
 {
+  UNUSED_VARS(dfbl);
   render_sample();
 }
 
