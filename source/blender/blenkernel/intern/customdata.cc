@@ -2883,24 +2883,6 @@ void CustomData_free_layers(CustomData *data, int type, int totelem)
   }
 }
 
-void CustomData_free_layers_anonymous(struct CustomData *data, int totelem)
-{
-  while (true) {
-    bool found_anonymous_layer = false;
-    for (int i = 0; i < data->totlayer; i++) {
-      const CustomDataLayer *layer = &data->layers[i];
-      if (layer->anonymous_id != nullptr) {
-        CustomData_free_layer(data, layer->type, totelem, i);
-        found_anonymous_layer = true;
-        break;
-      }
-    }
-    if (!found_anonymous_layer) {
-      break;
-    }
-  }
-}
-
 bool CustomData_has_layer(const CustomData *data, int type)
 {
   return (CustomData_get_layer_index(data, type) != -1);
@@ -5345,6 +5327,11 @@ void CustomData_blend_read(BlendDataReader *reader, CustomData *data, int count)
       i++;
     }
   }
+
+  /* Ensure allocated size is set to the size of the read array. While this should always be the
+   * case (see #CustomData_blend_write_prepare), there can be some corruption in rare cases (e.g.
+   * files saved between ff3d535bc2a63092 and 945f32e66d6ada2a). */
+  data->maxlayer = data->totlayer;
 
   CustomData_update_typemap(data);
 }
