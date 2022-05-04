@@ -14,18 +14,11 @@
 extern "C" {
 #endif
 
-/* Note: This should be in a file like BKE_gpencil.hh */
-namespace blender::bke::gpencil {
-class GPDataRuntime {
- public:
-  /* Runtime Data */
-  /* void *stroke_painting_buffer; */
-};
-}  // namespace blender::bke::gpencil
-
 #ifdef __cplusplus
+namespace blender::bke {
 class GPDataRuntime;
-using GPDataRuntimeHandle = blender::bke::gpencil::GPDataRuntime;
+}  // namespace blender::bke
+using GPDataRuntimeHandle = blender::bke::GPDataRuntime;
 #else
 typedef struct GPDataRuntimeHandle GPDataRuntimeHandle;
 #endif
@@ -62,12 +55,12 @@ typedef struct GPFrame {
 } GPFrame;
 
 typedef struct GPData {
-  GPFrame *frames;
+  GPFrame *frames_array;
   int frames_size;
   CustomData frame_data;
   int active_frame_index;
 
-  GPLayer *layers;
+  GPLayer *layers_array;
   int layers_size;
   int active_layer_index;
 
