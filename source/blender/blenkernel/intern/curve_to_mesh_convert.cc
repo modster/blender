@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BLI_array.hh"
+#include "BLI_devirtualize_parameters.hh"
 #include "BLI_set.hh"
 #include "BLI_task.hh"
 
@@ -667,12 +668,12 @@ Mesh *curve_to_mesh_sweep(const CurvesGeometry &main,
 
   Vector<std::byte> eval_buffer;
 
-  Curves main_id = {nullptr};
+  Curves main_id = {{nullptr}};
   main_id.geometry = reinterpret_cast<const ::CurvesGeometry &>(main);
   CurveComponent main_component;
   main_component.replace(&main_id, GeometryOwnershipType::Editable);
 
-  Curves profile_id = {nullptr};
+  Curves profile_id = {{nullptr}};
   profile_id.geometry = reinterpret_cast<const ::CurvesGeometry &>(profile);
   CurveComponent profile_component;
   profile_component.replace(&profile_id, GeometryOwnershipType::Editable);

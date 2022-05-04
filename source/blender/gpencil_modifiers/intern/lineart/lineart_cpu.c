@@ -2134,6 +2134,9 @@ static void lineart_geometry_object_load(LineartObjectInfo *ob_info, LineartRend
     TaskParallelSettings edge_loose_settings;
     BLI_parallel_range_settings_defaults(&edge_loose_settings);
     edge_loose_settings.min_iter_per_thread = 4000;
+    edge_loose_settings.func_reduce = loose_data_sum_reduce;
+    edge_loose_settings.userdata_chunk = &loose_data;
+    edge_loose_settings.userdata_chunk_size = sizeof(LooseEdgeData);
     loose_data.me = me;
     BLI_task_parallel_range(
         0, me->totedge, &loose_data, lineart_identify_loose_edges, &edge_loose_settings);

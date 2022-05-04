@@ -13,6 +13,7 @@ struct BMesh;
 struct GPUIndexBuf;
 struct GPUUniformBuf;
 struct GPUVertBuf;
+struct GPUVertFormat;
 struct Mesh;
 struct MeshBatchCache;
 struct MeshBufferCache;
@@ -206,7 +207,7 @@ void draw_subdiv_init_mesh_render_data(DRWSubdivCache *cache,
                                        const struct ToolSettings *toolsettings);
 
 void draw_subdiv_init_origindex_buffer(struct GPUVertBuf *buffer,
-                                       int *vert_origindex,
+                                       int32_t *vert_origindex,
                                        uint num_loops,
                                        uint loose_len);
 
@@ -283,6 +284,10 @@ void draw_subdiv_build_edituv_stretch_angle_buffer(const DRWSubdivCache *cache,
                                                    struct GPUVertBuf *uvs,
                                                    int uvs_offset,
                                                    struct GPUVertBuf *stretch_angles);
+
+/** Return the format used for the positions and normals VBO.
+ */
+struct GPUVertFormat *draw_subdiv_get_pos_nor_format(void);
 
 #ifdef __cplusplus
 }
