@@ -1503,40 +1503,12 @@ typedef struct EdgeFeatData {
   int freestyle_face_index;
   bool use_freestyle_edge;
   int freestyle_edge_index;
-  LineartEdgeNeighbor *en;
+  LineartEdgeNeighbor *edge_nabr;
 } EdgeFeatData;
 
 typedef struct EdgeFeatReduceData {
   int feat_edges;
 } EdgeFeatReduceData;
-
-typedef struct LooseEdgeData {
-  int loose_count;
-  int loose_max;
-  MEdge **loose_array;
-  SpinLock loose_lock;
-  Mesh *me;
-} LooseEdgeData;
-
-static void lineart_add_loose_edge(LooseEdgeData *loose_data, MEdge *e)
-{
-  BLI_spin_lock(&loose_data->loose_lock);
-  if (loose_data->loose_count >= loose_data->loose_max) {
-    if (!loose_data->loose_array) {
-      loose_data->loose_max = 100;
-    }
-    MEdge **new_arr = MEM_callocN(sizeof(MEdge *) * loose_data->loose_max * 2, "loose edge array");
-    if (loose_data->loose_array) {
-      memcpy(new_arr, loose_data->loose_array, sizeof(MEdge *) * loose_data->loose_max);
-      MEM_freeN(loose_data->loose_array);
-    }
-    loose_data->loose_array = new_arr;
-    loose_data->loose_max *= 2;
-  }
-  loose_data->loose_array[loose_data->loose_count] = e;
-  loose_data->loose_count++;
-  BLI_spin_unlock(&loose_data->loose_lock);
-}
 
 static void feat_data_sum_reduce(const void *__restrict UNUSED(userdata),
                                  void *__restrict chunk_join,
@@ -1554,39 +1526,42 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
   EdgeFeatData *e_feat_data = (EdgeFeatData *)userdata;
   EdgeFeatReduceData *reduce_data = (EdgeFeatReduceData *)tls->userdata_chunk;
   Mesh *me = e_feat_data->me;
-  LineartEdgeNeighbor *en = e_feat_data->en;
+  LineartEdgeNeighbor *edge_nabr = e_feat_data->edge_nabr;
   const MLoopTri *mlooptri = e_feat_data->mlooptri;
 
   uint16_t edge_flag_result = 0;
 
-  /* Only add one from two pairs of mlooptri edges. */
-  if (i < en[i].e) {
+  /* Because the Edge Neighbour array contains loop edge pairs, we only need to process the first
+   * edge in the pair. Otherwise we would add the same edge that the loops represent twice. */
+  if (i < edge_nabr[i].e) {
     return;
   }
 
-  FreestyleFace *fel, *fer;
   bool face_mark_filtered = false;
   bool enable_face_mark = (e_feat_data->use_freestyle_face && e_feat_data->rb->filter_face_mark);
   bool only_contour = false;
   if (enable_face_mark) {
+    FreestyleFace *ff1, *ff2;
     int index = e_feat_data->freestyle_face_index;
     if (index > -1) {
-      fel = &((FreestyleFace *)me->pdata.layers[index].data)[mlooptri[i / 3].poly];
+      ff1 = &((FreestyleFace *)me->pdata.layers[index].data)[mlooptri[i / 3].poly];
     }
-    if (en[i].e > -1) {
-      fer = &((FreestyleFace *)me->pdata.layers[index].data)[mlooptri[en[i].e / 3].poly];
+    if (edge_nabr[i].e > -1) {
+      ff2 = &((FreestyleFace *)me->pdata.layers[index].data)[mlooptri[edge_nabr[i].e / 3].poly];
     }
     else {
-      /* Handles mesh boundary case */
-      fer = fel;
+      /* Handle mesh boundary cases: We want mesh boundaries to respect
+       * `filter_face_mark_boundaries` option the same way as face mark boundaries, and the code
+       * path is simper when it's assuming both ff1 and ff2 not NULL.   */
+      ff2 = ff1;
     }
     if (e_feat_data->rb->filter_face_mark_boundaries ^ e_feat_data->rb->filter_face_mark_invert) {
-      if ((fel->flag & FREESTYLE_FACE_MARK) || (fer->flag & FREESTYLE_FACE_MARK)) {
+      if ((ff1->flag & FREESTYLE_FACE_MARK) || (ff2->flag & FREESTYLE_FACE_MARK)) {
         face_mark_filtered = true;
       }
     }
     else {
-      if ((fel->flag & FREESTYLE_FACE_MARK) && (fer->flag & FREESTYLE_FACE_MARK) && (fer != fel)) {
+      if ((ff1->flag & FREESTYLE_FACE_MARK) && (ff2->flag & FREESTYLE_FACE_MARK) && (ff2 != ff1)) {
         face_mark_filtered = true;
       }
     }
@@ -1594,7 +1569,7 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
       face_mark_filtered = !face_mark_filtered;
     }
     if (!face_mark_filtered) {
-      en[i].flags = LRT_EDGE_FLAG_INHIBIT;
+      edge_nabr[i].flags = LRT_EDGE_FLAG_INHIBIT;
       if (e_feat_data->rb->filter_face_mark_keep_contour) {
         only_contour = true;
       }
@@ -1604,124 +1579,166 @@ static void lineart_identify_mlooptri_feature_edges(void *__restrict userdata,
   if (enable_face_mark && !face_mark_filtered && !only_contour) {
     return;
   }
-  else {
 
-    /* Mesh boundary */
-    if (en[i].e == -1) {
-      en[i].flags = LRT_EDGE_FLAG_CONTOUR;
-      reduce_data->feat_edges += 1;
-      return;
+  /* Mesh boundary */
+  if (edge_nabr[i].e == -1) {
+    edge_nabr[i].flags = LRT_EDGE_FLAG_CONTOUR;
+    reduce_data->feat_edges += 1;
+    return;
+  }
+
+  LineartTriangle *tri1, *tri2;
+  LineartVert *vert;
+  LineartRenderBuffer *rb = e_feat_data->rb;
+
+  int f1 = i / 3, f2 = edge_nabr[i].e / 3;
+
+  /* The mesh should already be triangulated now, so we can assume each face is a triangle. */
+  tri1 = lineart_triangle_from_index(rb, e_feat_data->tri_array, f1);
+  tri2 = lineart_triangle_from_index(rb, e_feat_data->tri_array, f2);
+
+  vert = &e_feat_data->v_array[edge_nabr[i].v1];
+
+  double view_vector_persp[3];
+  double *view_vector = view_vector_persp;
+  double dot_1 = 0, dot_2 = 0;
+  double result;
+  bool material_back_face = ((tri1->flags | tri2->flags) & LRT_TRIANGLE_MAT_BACK_FACE_CULLING);
+
+  if (rb->use_contour || rb->use_back_face_culling || material_back_face) {
+    if (rb->cam_is_persp) {
+      sub_v3_v3v3_db(view_vector, rb->camera_pos, vert->gloc);
+    }
+    else {
+      view_vector = rb->view_vector;
     }
 
-    LineartTriangle *tri1, *tri2;
-    LineartVert *vert;
-    LineartRenderBuffer *rb = e_feat_data->rb;
+    dot_1 = dot_v3v3_db(view_vector, tri1->gn);
+    dot_2 = dot_v3v3_db(view_vector, tri2->gn);
 
-    int f1 = i / 3, f2 = en[i].e / 3;
-
-    /* The mesh should already be triangulated now, so we can assume each face is a triangle. */
-    tri1 = lineart_triangle_from_index(rb, e_feat_data->tri_array, f1);
-    tri2 = lineart_triangle_from_index(rb, e_feat_data->tri_array, f2);
-
-    vert = &e_feat_data->v_array[en[i].v1];
-
-    double vv[3];
-    double *view_vector = vv;
-    double dot_1 = 0, dot_2 = 0;
-    double result;
-    bool material_back_face = ((tri1->flags | tri2->flags) & LRT_TRIANGLE_MAT_BACK_FACE_CULLING);
-
-    if (rb->use_contour || rb->use_back_face_culling || material_back_face) {
-      if (rb->cam_is_persp) {
-        sub_v3_v3v3_db(view_vector, rb->camera_pos, vert->gloc);
-      }
-      else {
-        view_vector = rb->view_vector;
-      }
-
-      dot_1 = dot_v3v3_db(view_vector, tri1->gn);
-      dot_2 = dot_v3v3_db(view_vector, tri2->gn);
-
-      if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
-        edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
-      }
-
-      if (rb->use_back_face_culling) {
-        if (dot_1 < 0) {
-          tri1->flags |= LRT_CULL_DISCARD;
-        }
-        if (dot_2 < 0) {
-          tri2->flags |= LRT_CULL_DISCARD;
-        }
-      }
-      if (material_back_face) {
-        if (tri1->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_1 < 0) {
-          tri1->flags |= LRT_CULL_DISCARD;
-        }
-        if (tri2->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_2 < 0) {
-          tri2->flags |= LRT_CULL_DISCARD;
-        }
-      }
+    if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+      edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
     }
 
-    if (!only_contour) {
-
-      if (rb->use_crease) {
-        bool do_crease = true;
-        if (!rb->force_crease && !e_feat_data->use_auto_smooth &&
-            (me->mpoly[mlooptri[f1].poly].flag & ME_SMOOTH) &&
-            (me->mpoly[mlooptri[f2].poly].flag & ME_SMOOTH)) {
-          do_crease = false;
-        }
-        if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < e_feat_data->crease_threshold)) {
-          edge_flag_result |= LRT_EDGE_FLAG_CREASE;
-        }
+    if (rb->use_back_face_culling) {
+      if (dot_1 < 0) {
+        tri1->flags |= LRT_CULL_DISCARD;
       }
-
-      int mat1 = me->mpoly[mlooptri[f1].poly].mat_nr;
-      int mat2 = me->mpoly[mlooptri[f2].poly].mat_nr;
-
-      if (rb->use_material && mat1 != mat2) {
-        edge_flag_result |= LRT_EDGE_FLAG_MATERIAL;
+      if (dot_2 < 0) {
+        tri2->flags |= LRT_CULL_DISCARD;
       }
     }
-    else {                     /* only_contour */
-      if (!edge_flag_result) { /* Other edge types inhibited */
-        return;
+    if (material_back_face) {
+      if (tri1->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_1 < 0) {
+        tri1->flags |= LRT_CULL_DISCARD;
       }
-    }
-
-    int real_edges[3];
-    BKE_mesh_looptri_get_real_edges(me, &mlooptri[i / 3], real_edges);
-
-    if (real_edges[i % 3] >= 0) {
-      MEdge *medge = &me->medge[real_edges[i % 3]];
-
-      if (rb->use_crease && rb->sharp_as_crease && (medge->flag & ME_SHARP)) {
-        edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+      if (tri2->flags & LRT_TRIANGLE_MAT_BACK_FACE_CULLING && dot_2 < 0) {
+        tri2->flags |= LRT_CULL_DISCARD;
       }
-
-      if (rb->use_edge_marks && e_feat_data->use_freestyle_edge) {
-        FreestyleEdge *fe;
-        int index = e_feat_data->freestyle_edge_index;
-        fe = &((FreestyleEdge *)me->edata.layers[index].data)[real_edges[i % 3]];
-        if (fe->flag & FREESTYLE_EDGE_MARK) {
-          edge_flag_result |= LRT_EDGE_FLAG_EDGE_MARK;
-        }
-      }
-    }
-
-    en[i].flags = edge_flag_result;
-
-    if (edge_flag_result) {
-      /* Only allocate for feature edge (instead of all edges) to save memory.
-       * If allow duplicated edges, one edge gets added multiple times if it has multiple types.
-       */
-      reduce_data->feat_edges += e_feat_data->rb->allow_duplicated_types ?
-                                     lineart_edge_type_duplication_count(edge_flag_result) :
-                                     1;
     }
   }
+
+  if (!only_contour) {
+
+    if (rb->use_crease) {
+      bool do_crease = true;
+      if (!rb->force_crease && !e_feat_data->use_auto_smooth &&
+          (me->mpoly[mlooptri[f1].poly].flag & ME_SMOOTH) &&
+          (me->mpoly[mlooptri[f2].poly].flag & ME_SMOOTH)) {
+        do_crease = false;
+      }
+      if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < e_feat_data->crease_threshold)) {
+        edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+      }
+    }
+
+    int mat1 = me->mpoly[mlooptri[f1].poly].mat_nr;
+    int mat2 = me->mpoly[mlooptri[f2].poly].mat_nr;
+
+    if (rb->use_material && mat1 != mat2) {
+      edge_flag_result |= LRT_EDGE_FLAG_MATERIAL;
+    }
+  }
+  else {                     /* only_contour */
+    if (!edge_flag_result) { /* Other edge types inhibited */
+      return;
+    }
+  }
+
+  int real_edges[3];
+  BKE_mesh_looptri_get_real_edges(me, &mlooptri[i / 3], real_edges);
+
+  if (real_edges[i % 3] >= 0) {
+    MEdge *medge = &me->medge[real_edges[i % 3]];
+
+    if (rb->use_crease && rb->sharp_as_crease && (medge->flag & ME_SHARP)) {
+      edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+    }
+
+    if (rb->use_edge_marks && e_feat_data->use_freestyle_edge) {
+      FreestyleEdge *fe;
+      int index = e_feat_data->freestyle_edge_index;
+      fe = &((FreestyleEdge *)me->edata.layers[index].data)[real_edges[i % 3]];
+      if (fe->flag & FREESTYLE_EDGE_MARK) {
+        edge_flag_result |= LRT_EDGE_FLAG_EDGE_MARK;
+      }
+    }
+  }
+
+  edge_nabr[i].flags = edge_flag_result;
+
+  if (edge_flag_result) {
+    /* Only allocate for feature edge (instead of all edges) to save memory.
+     * If allow duplicated edges, one edge gets added multiple times if it has multiple types.
+     */
+    reduce_data->feat_edges += e_feat_data->rb->allow_duplicated_types ?
+                                   lineart_edge_type_duplication_count(edge_flag_result) :
+                                   1;
+  }
+}
+
+typedef struct LooseEdgeData {
+  int loose_count;
+  int loose_max;
+  MEdge **loose_array;
+  Mesh *me;
+} LooseEdgeData;
+
+static void lineart_loose_data_reallocate(LooseEdgeData *loose_data, int count)
+{
+  MEdge **new_arr = MEM_callocN(sizeof(MEdge *) * count, "loose edge array");
+  if (loose_data->loose_array) {
+    memcpy(new_arr, loose_data->loose_array, sizeof(MEdge *) * loose_data->loose_max);
+    MEM_freeN(loose_data->loose_array);
+  }
+  loose_data->loose_max = count;
+  loose_data->loose_array = new_arr;
+}
+
+static void lineart_join_loose_edge_arr(LooseEdgeData *loose_data, LooseEdgeData *to_be_joined)
+{
+  if (!to_be_joined->loose_array) {
+    return;
+  }
+  int new_count = loose_data->loose_count + to_be_joined->loose_count;
+  if (new_count >= loose_data->loose_max) {
+    lineart_loose_data_reallocate(loose_data, new_count);
+  }
+  memcpy(&loose_data->loose_array[loose_data->loose_count],
+         to_be_joined->loose_array,
+         sizeof(MEdge *) * to_be_joined->loose_count);
+  loose_data->loose_count += to_be_joined->loose_count;
+  MEM_freeN(to_be_joined->loose_array);
+}
+
+static void lineart_add_loose_edge(LooseEdgeData *loose_data, MEdge *e)
+{
+  if (loose_data->loose_count >= loose_data->loose_max) {
+    int min_amount = MAX2(100, loose_data->loose_count * 2);
+    lineart_loose_data_reallocate(loose_data, min_amount);
+  }
+  loose_data->loose_array[loose_data->loose_count] = e;
+  loose_data->loose_count++;
 }
 
 static void lineart_identify_loose_edges(void *__restrict userdata,
@@ -1734,6 +1751,15 @@ static void lineart_identify_loose_edges(void *__restrict userdata,
   if (me->medge[i].flag & ME_LOOSEEDGE) {
     lineart_add_loose_edge(loose_data, &me->medge[i]);
   }
+}
+
+static void loose_data_sum_reduce(const void *__restrict UNUSED(userdata),
+                                  void *__restrict chunk_join,
+                                  void *__restrict chunk)
+{
+  LooseEdgeData *final = (LooseEdgeData *)chunk_join;
+  LooseEdgeData *loose_chunk = (LooseEdgeData *)chunk;
+  lineart_join_loose_edge_arr(final, loose_chunk);
 }
 
 static void lineart_add_edge_to_list(LineartPendingEdges *pe, LineartEdge *e)
@@ -1863,47 +1889,74 @@ static void lineart_load_tri_task(void *__restrict userdata,
   /* Re-use this field to refer to adjacent info, will be cleared after culling stage. */
   tri->intersecting_verts = (void *)&tri_task_data->tri_adj[i];
 }
+typedef struct EdgeNeighborData {
+  LineartEdgeNeighbor *edge_nabr;
+  LineartAdjacentEdge *adj_e;
+  MLoopTri *mlooptri;
+  MLoop *mloop;
+} EdgeNeighborData;
+
+static void lineart_edge_neighbor_init_task(void *__restrict userdata,
+                                            const int i,
+                                            const TaskParallelTLS *__restrict UNUSED(tls))
+{
+  EdgeNeighborData *en_data = (EdgeNeighborData *)userdata;
+  LineartAdjacentEdge *adj_e = &en_data->adj_e[i];
+  MLoopTri *looptri = &en_data->mlooptri[i / 3];
+  LineartEdgeNeighbor *edge_nabr = &en_data->edge_nabr[i];
+  MLoop *mloop = en_data->mloop;
+
+  adj_e->e = i;
+  adj_e->v1 = mloop[looptri->tri[i % 3]].v;
+  adj_e->v2 = mloop[looptri->tri[(i + 1) % 3]].v;
+  if (adj_e->v1 > adj_e->v2) {
+    SWAP(unsigned int, adj_e->v1, adj_e->v2);
+  }
+  edge_nabr->e = -1;
+
+  edge_nabr->v1 = adj_e->v1;
+  edge_nabr->v2 = adj_e->v2;
+  edge_nabr->flags = 0;
+}
 
 static LineartEdgeNeighbor *lineart_build_edge_neighbor(Mesh *me, int total_edges)
 {
   /* Because the mesh is traingulated, so me->totedge should be reliable? */
-  LineartAdjacentItem *ai = MEM_mallocN(sizeof(LineartAdjacentItem) * total_edges,
-                                        "LineartAdjacentItem arr");
-  LineartEdgeNeighbor *en = MEM_mallocN(sizeof(LineartEdgeNeighbor) * total_edges,
-                                        "LineartEdgeNeighbor arr");
+  LineartAdjacentEdge *adj_e = MEM_mallocN(sizeof(LineartAdjacentEdge) * total_edges,
+                                           "LineartAdjacentEdge arr");
+  LineartEdgeNeighbor *edge_nabr = MEM_mallocN(sizeof(LineartEdgeNeighbor) * total_edges,
+                                               "LineartEdgeNeighbor arr");
 
-  MLoopTri *lt = me->runtime.looptris.array;
+  MLoopTri *mlooptri = me->runtime.looptris.array;
 
-  for (int i = 0; i < total_edges; i++) {
-    ai[i].e = i;
-    ai[i].v1 = me->mloop[lt[i / 3].tri[i % 3]].v;
-    ai[i].v2 = me->mloop[lt[i / 3].tri[(i + 1) % 3]].v;
-    if (ai[i].v1 > ai[i].v2) {
-      SWAP(unsigned int, ai[i].v1, ai[i].v2);
-    }
-    en[i].e = -1;
+  TaskParallelSettings en_settings;
+  BLI_parallel_range_settings_defaults(&en_settings);
+  /* Set the minimum amount of edges a thread has to process. */
+  en_settings.min_iter_per_thread = 50000;
 
-    en[i].v1 = ai[i].v1;
-    en[i].v2 = ai[i].v2;
-    en[i].flags = 0;
-  }
+  EdgeNeighborData en_data;
+  en_data.adj_e = adj_e;
+  en_data.edge_nabr = edge_nabr;
+  en_data.mlooptri = mlooptri;
+  en_data.mloop = me->mloop;
 
-  lineart_sort_adjacent_items(ai, total_edges);
+  BLI_task_parallel_range(0, total_edges, &en_data, lineart_edge_neighbor_init_task, &en_settings);
+
+  lineart_sort_adjacent_items(adj_e, total_edges);
 
   for (int i = 0; i < total_edges - 1; i++) {
-    if (ai[i].v1 == ai[i + 1].v1 && ai[i].v2 == ai[i + 1].v2) {
-      en[ai[i].e].e = ai[i + 1].e;
-      en[ai[i + 1].e].e = ai[i].e;
+    if (adj_e[i].v1 == adj_e[i + 1].v1 && adj_e[i].v2 == adj_e[i + 1].v2) {
+      edge_nabr[adj_e[i].e].e = adj_e[i + 1].e;
+      edge_nabr[adj_e[i + 1].e].e = adj_e[i].e;
     }
   }
 
-  MEM_freeN(ai);
+  MEM_freeN(adj_e);
 
-  return en;
+  return edge_nabr;
 }
 
-static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
-                                                  LineartRenderBuffer *re_buf)
+static void lineart_geometry_object_load(LineartObjectInfo *ob_info, LineartRenderBuffer *re_buf)
 {
   LineartElementLinkNode *elem_link_node;
   LineartVert *la_v_arr;
@@ -1956,16 +2009,16 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
   ob_info->eln = elem_link_node;
 
   bool use_auto_smooth = false;
-  float use_crease = 0;
+  float crease_angle = 0;
   if (orig_ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
-    use_crease = cosf(M_PI - orig_ob->lineart.crease_threshold);
+    crease_angle = cosf(M_PI - orig_ob->lineart.crease_threshold);
   }
   else if (ob_info->original_me->flag & ME_AUTOSMOOTH) {
-    use_crease = cosf(ob_info->original_me->smoothresh);
+    crease_angle = cosf(ob_info->original_me->smoothresh);
     use_auto_smooth = true;
   }
   else {
-    use_crease = re_buf->crease_threshold;
+    crease_angle = re_buf->crease_threshold;
   }
 
   /* FIXME(Yiming): Hack for getting clean 3D text, the seam that extruded text object creates
@@ -2052,10 +2105,10 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
   edge_feat_data.rb = re_buf;
   edge_feat_data.me = me;
   edge_feat_data.mlooptri = mlooptri;
-  edge_feat_data.en = lineart_build_edge_neighbor(me, total_edges);
+  edge_feat_data.edge_nabr = lineart_build_edge_neighbor(me, total_edges);
   edge_feat_data.tri_array = la_tri_arr;
   edge_feat_data.v_array = la_v_arr;
-  edge_feat_data.crease_threshold = use_crease;
+  edge_feat_data.crease_threshold = crease_angle;
   edge_feat_data.use_auto_smooth = use_auto_smooth;
   edge_feat_data.use_freestyle_face = can_find_freestyle_face;
   edge_feat_data.use_freestyle_edge = can_find_freestyle_edge;
@@ -2081,11 +2134,9 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
     TaskParallelSettings edge_loose_settings;
     BLI_parallel_range_settings_defaults(&edge_loose_settings);
     edge_loose_settings.min_iter_per_thread = 4000;
-    BLI_spin_init(&loose_data.loose_lock);
     loose_data.me = me;
     BLI_task_parallel_range(
         0, me->totedge, &loose_data, lineart_identify_loose_edges, &edge_loose_settings);
-    BLI_spin_end(&loose_data.loose_lock);
   }
 
   int allocate_la_e = edge_reduce.feat_edges + loose_data.loose_count;
@@ -2110,14 +2161,14 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
   la_seg = la_seg_arr;
 
   for (int i = 0; i < total_edges; i++) {
-    LineartEdgeNeighbor *en = &edge_feat_data.en[i];
+    LineartEdgeNeighbor *edge_nabr = &edge_feat_data.edge_nabr[i];
 
-    if (i < en->e) {
+    if (i < edge_nabr->e) {
       continue;
     }
 
     /* Not a feature line, so we skip. */
-    if (en->flags == 0) {
+    if (edge_nabr->flags == 0) {
       continue;
     }
 
@@ -2126,19 +2177,19 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
     /* See eLineartEdgeFlag for details. */
     for (int flag_bit = 0; flag_bit < LRT_EDGE_FLAG_TYPE_MAX_BITS; flag_bit++) {
       char use_type = 1 << flag_bit;
-      if (!(use_type & en->flags)) {
+      if (!(use_type & edge_nabr->flags)) {
         continue;
       }
 
-      la_edge->v1 = &la_v_arr[en->v1];
-      la_edge->v2 = &la_v_arr[en->v2];
+      la_edge->v1 = &la_v_arr[edge_nabr->v1];
+      la_edge->v2 = &la_v_arr[edge_nabr->v2];
       int findex = i / 3;
       la_edge->t1 = lineart_triangle_from_index(re_buf, la_tri_arr, findex);
       if (!edge_added) {
         lineart_triangle_adjacent_assign(la_edge->t1, &tri_adj[findex], la_edge);
       }
-      if (en->e != -1) {
-        findex = en->e / 3;
+      if (edge_nabr->e != -1) {
+        findex = edge_nabr->e / 3;
         la_edge->t2 = lineart_triangle_from_index(re_buf, la_tri_arr, findex);
         if (!edge_added) {
           lineart_triangle_adjacent_assign(la_edge->t2, &tri_adj[findex], la_edge);
@@ -2180,7 +2231,7 @@ static void lineart_geometry_object_load_no_bmesh(LineartObjectInfo *ob_info,
     MEM_freeN(loose_data.loose_array);
   }
 
-  MEM_freeN(edge_feat_data.en);
+  MEM_freeN(edge_feat_data.edge_nabr);
 
   if (ob_info->free_use_mesh) {
     BKE_id_free(NULL, me);
@@ -2196,7 +2247,7 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
   //- Assign the number of objects instead of number of threads
   printf("thread start: %d\n", olti->thread_id);
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
-    lineart_geometry_object_load_no_bmesh(obi, olti->rb);
+    lineart_geometry_object_load(obi, olti->rb);
     if (G.debug_value == 4000) {
       printf("thread id: %d processed: %d\n", olti->thread_id, obi->original_me->totpoly);
     }

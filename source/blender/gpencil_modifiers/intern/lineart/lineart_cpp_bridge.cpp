@@ -3,14 +3,17 @@
 #include "MOD_lineart.h"
 #include "lineart_intern.h"
 
-static bool cmp_adjacent_items(const LineartAdjacentItem &p1, const LineartAdjacentItem &p2)
+static bool cmp_adjacent_items(const LineartAdjacentEdge &p1, const LineartAdjacentEdge &p2)
 {
-  int a = (int)p1.v1 - (int)p2.v1;
-  int b = (int)p1.v2 - (int)p2.v2;
+  int a = p1.v1 - p2.v1;
+  int b = p1.v2 - p2.v2;
+  /* parallel_sort() requires cmp() to return true when the first element needs to appear before
+   * the second element in the sorted array, false otherwise (strict weak ordering), see
+   * https://en.cppreference.com/w/cpp/named_req/Compare. */
   return a < 0 ? true : (a == 0 ? b < 0 : false);
 }
 
-void lineart_sort_adjacent_items(LineartAdjacentItem *ai, int length)
+void lineart_sort_adjacent_items(LineartAdjacentEdge *ai, int length)
 {
   blender::parallel_sort(ai, ai + length - 1, cmp_adjacent_items);
 }

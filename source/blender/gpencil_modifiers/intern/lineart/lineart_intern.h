@@ -91,7 +91,7 @@ void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb
 extern "C" {
 #endif
 
-void lineart_sort_adjacent_items(LineartAdjacentItem *ai, int length);
+void lineart_sort_adjacent_items(LineartAdjacentEdge *ai, int length);
 
 #ifdef __cplusplus
 }

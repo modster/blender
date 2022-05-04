@@ -14,14 +14,6 @@
 
 #include <math.h>
 
-typedef struct EdgeFacePair {
-  int v1;
-  int v2;
-  int f1;
-  int f2;
-  uint16_t eflag;
-} EdgeFacePair;
-
 typedef struct LineartStaticMemPoolNode {
   Link item;
   size_t size;
@@ -177,7 +169,7 @@ typedef struct LineartEdgeChainItem {
   /** For restoring position to 3d space. */
   float gpos[3];
   float normal[3];
-  short line_type;
+  uint16_t line_type;
   char occlusion;
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
@@ -195,11 +187,11 @@ typedef struct LineartChainRegisterEntry {
   char is_left;
 } LineartChainRegisterEntry;
 
-typedef struct LineartAdjacentItem {
+typedef struct LineartAdjacentEdge {
   unsigned int v1;
   unsigned int v2;
   unsigned int e;
-} LineartAdjacentItem;
+} LineartAdjacentEdge;
 
 enum eLineArtTileRecursiveLimit {
   /* If tile gets this small, it's already much smaller than a pixel. No need to continue
