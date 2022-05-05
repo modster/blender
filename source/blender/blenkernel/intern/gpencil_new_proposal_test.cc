@@ -3,6 +3,9 @@
 /** \file
  * \ingroup bke
  */
+
+#include <algorithm>
+
 #include "BKE_curves.hh"
 #include "BLI_math_vec_types.hh"
 
@@ -67,7 +70,27 @@ class GPFrame : public ::GPFrame {
     this->start = this->end = -1;
   }
 
+  GPFrame(int layer_index, int start_frame)
+  {
+    this->layer_index = layer_index;
+    this->start = start_frame;
+    this->end = -1;
+  }
+
   ~GPFrame() = default;
+
+  bool operator<(const GPFrame &other) const
+  {
+    if (this->start == other.start) {
+      return this->layer_index < other.layer_index;
+    }
+    return this->start < other.start;
+  }
+
+  bool operator==(const GPFrame &other) const
+  {
+    return this->layer_index == other.layer_index && this->start == other.start;
+  }
 };
 
 class GPData : public ::GPData {
@@ -155,22 +178,57 @@ class GPData : public ::GPData {
     return true;
   }
 
-  const GPFrame &new_frame_on_layer(const int layer_index)
+  /**
+   * Find a GPFrame in the frame_array given by the layer index and the frame number in logarithmic
+   * time. If the frame is found, returns a pointer/iterator to it, otherwise nullptr.
+   *
+   * Note: This assumes that the array is sorted.
+   */
+  const GPFrame *frame_at(const int layer_idx, const int start_frame_number)
   {
-    BLI_assert(layer_index >= 0 && layer_index < this->layers_size);
-
-    GPFrame new_frame(layer_index);
-    ensure_frame_array_has_size_at_least(this->frames_size + 1);
-    this->frames_for_write().last() = new_frame;
-
-    return this->frames().last();
+    auto it = std::lower_bound(
+        this->frames().begin(), this->frames().end(), GPFrame(layer_idx, start_frame_number));
+    if (it == this->frames().end() || it->start != start_frame_number) {
+      return nullptr;
+    }
+    return it;
   }
 
-  const GPFrame &new_frame_on_layer(GPLayer &layer)
+  void create_new_frame_on_layer(const int layer_index, const int start_frame_number)
+  {
+    BLI_assert(layer_index >= 0 && layer_index < this->layers_size);
+    /* Allocate new space for the frame. */
+    ensure_frame_array_has_size_at_least(this->frames_size + 1);
+
+    /* Create a new frame and append it at the end. */
+    GPFrame new_frame(layer_index, start_frame_number);
+    this->frames_for_write().last() = new_frame;
+
+    /* Sort the frame array. */
+    update_frames_array();
+  }
+
+  void create_new_frame_on_layer(GPLayer &layer, const int start_frame_number)
   {
     int index = this->layers().first_index_try(layer);
     BLI_assert(index != -1);
-    return new_frame_on_layer(index);
+    create_new_frame_on_layer(index, start_frame_number);
+  }
+
+  const GPFrame &get_new_frame_on_layer(const int layer_index, const int start_frame_number)
+  {
+    create_new_frame_on_layer(layer_index, start_frame_number);
+    /* Find the frame in the array and return it. */
+    const GPFrame *gpf = this->frame_at(layer_index, start_frame_number);
+    BLI_assert(gpf != nullptr);
+    return *gpf;
+  }
+
+  const GPFrame &get_new_frame_on_layer(GPLayer &layer, const int start_frame_number)
+  {
+    int index = this->layers().first_index_try(layer);
+    BLI_assert(index != -1);
+    return get_new_frame_on_layer(index, start_frame_number);
   }
 
  private:
@@ -216,6 +274,12 @@ class GPData : public ::GPData {
     this->frames_array = new_array;
 
     return true;
+  }
+
+  void update_frames_array()
+  {
+    /* Make sure frames are ordered chronologically and by layer order. */
+    std::sort(this->frames_for_write().begin(), this->frames_for_write().end());
   }
 };
 
@@ -294,8 +358,51 @@ TEST(gpencil_proposal, AddFrameToLayer)
 
   my_data.add_layer(my_layer1);
   my_data.add_layer(my_layer2);
-  GPFrame my_frame = my_data.new_frame_on_layer(my_layer2);
+  GPFrame my_frame = my_data.get_new_frame_on_layer(my_layer2, 0);
   EXPECT_EQ(my_frame.layer_index, 1);
+}
+
+TEST(gpencil_proposal, CheckFramesSorted1)
+{
+  GPData my_data;
+  GPLayer my_layer1("TestLayer1");
+
+  const int frame_numbers1[5] = {10, 5, 6, 1, 3};
+  const int frame_numbers_sorted1[5] = {1, 3, 5, 6, 10};
+
+  my_data.add_layer(my_layer1);
+  for (int i : IndexRange(5)) {
+    GPFrame my_frame = my_data.get_new_frame_on_layer(my_layer1, frame_numbers1[i]);
+    int idx = my_data.frames().first_index(my_frame);
+    EXPECT_EQ(my_data.frames()[idx].start, frame_numbers1[i]);
+  }
+
+  for (const int i : my_data.frames().index_range()) {
+    EXPECT_EQ(my_data.frames()[i].start, frame_numbers_sorted1[i]);
+  }
+}
+
+TEST(gpencil_proposal, CheckFramesSorted2)
+{
+  GPData my_data;
+  GPLayer my_layer1("TestLayer1");
+  GPLayer my_layer2("TestLayer2");
+  const int frame_numbers_layer1[5] = {10, 5, 6, 1, 3};
+  const int frame_numbers_layer2[5] = {8, 5, 7, 1, 4};
+  const int frame_numbers_sorted2[10][2] = {
+      {0, 1}, {1, 1}, {0, 3}, {1, 4}, {0, 5}, {1, 5}, {0, 6}, {1, 7}, {1, 8}, {0, 10}};
+
+  my_data.add_layer(my_layer1);
+  my_data.add_layer(my_layer2);
+  for (int i : IndexRange(5)) {
+    my_data.create_new_frame_on_layer(my_layer1, frame_numbers_layer1[i]);
+    my_data.create_new_frame_on_layer(my_layer2, frame_numbers_layer2[i]);
+  }
+
+  for (const int i : my_data.frames().index_range()) {
+    EXPECT_EQ(my_data.frames()[i].layer_index, frame_numbers_sorted2[i][0]);
+    EXPECT_EQ(my_data.frames()[i].start, frame_numbers_sorted2[i][1]);
+  }
 }
 
 }  // namespace blender::bke::gpencil::tests
