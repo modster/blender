@@ -86,18 +86,28 @@ bool device_oneapi_init()
 
   // NOTE(sirgienko) we need to enable JIT cache from here and
   // right now this cache policy is controlled by env. variables
-  VLOG(1) << "Enable oneAPI persistent cache via environment variables";
+  // NOTE(hallade) we also enable immediate command lists + device scope events
+  // as they improve stability as of intel/llvm sycl-nighly/20220501.
+  // All these env variable can be set beforehand by end-users and
+  // will in that case -not- be overwritten.
 #  ifdef _WIN32
-  _putenv_s("SYCL_CACHE_PERSISTENT", "1");
-  _putenv_s("SYCL_CACHE_THRESHOLD", "0");
-  VLOG(1) << "Enabled oneAPI JIT caching on Windows platform";
+  if (getenv("SYCL_CACHE_PERSISTENT") == nullptr) {
+    _putenv_s("SYCL_CACHE_PERSISTENT", "1");
+  }
+  if (getenv("SYCL_CACHE_TRESHOLD") == nullptr) {
+    _putenv_s("SYCL_CACHE_THRESHOLD", "0");
+  }
+  if (getenv("SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS") == nullptr) {
+    _putenv_s("SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS", "0");
+  }
+  if (getenv("SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS") == nullptr) {
+    _putenv_s("SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS", "1");
+  }
 #  elif __linux__
-  setenv("SYCL_CACHE_PERSISTENT", "1", true);
-  setenv("SYCL_CACHE_THRESHOLD", "0", true);
-  VLOG(1) << "Enabled oneAPI JIT caching on Linux platform ";
-#  else
-  VLOG(1) << "Could not enable oneAPI JIT caching because the OS (Operating System) platform is "
-             "neither Linux nor Windows";
+  setenv("SYCL_CACHE_PERSISTENT", "1", false);
+  setenv("SYCL_CACHE_THRESHOLD", "0", false);
+  setenv("SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS", "0", false);
+  setenv("SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS", "1", false);
 #  endif
 
   return true;
