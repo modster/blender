@@ -18,6 +18,7 @@
 #include "BKE_layer.h"
 #include "BKE_material.h"
 #include "BKE_scene.h"
+#include "BKE_pbvh.h"
 
 #include "BLT_translation.h"
 
@@ -470,6 +471,10 @@ void DRW_shgroup_call_instances_with_attrs(DRWShadingGroup *shgroup,
 
 void DRW_shgroup_call_sculpt(DRWShadingGroup *sh, Object *ob, bool wire, bool mask);
 void DRW_shgroup_call_sculpt_with_materials(DRWShadingGroup **sh, int num_sh, Object *ob);
+void DRW_sculpt_debug_cb(void *user_data,
+                     const float bmin[3],
+                     const float bmax[3],
+                     PBVHNodeFlags flag);
 
 DRWCallBuffer *DRW_shgroup_call_buffer(DRWShadingGroup *shgroup,
                                        struct GPUVertFormat *format,
