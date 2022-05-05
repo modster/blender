@@ -59,6 +59,7 @@ typedef enum eGPUType {
   GPU_TEX2D = 1002,
   GPU_TEX2D_ARRAY = 1003,
   GPU_TEX3D = 1004,
+  GPU_IMAGE_2D = 1005,
 
   /* GLSL Struct types */
   GPU_CLOSURE = 1007,
@@ -121,6 +122,7 @@ typedef struct GPUCodegenOutput {
   char *surface;
   char *volume;
   char *thickness;
+  char *compute;
   char *material_functions;
 
   GPUShaderCreateInfo *create_info;
@@ -213,6 +215,7 @@ GPUMaterial *GPU_material_from_nodetree(struct Scene *scene,
                                         void *thunk);
 
 void GPU_material_compile(GPUMaterial *mat);
+void GPU_material_free_single(GPUMaterial *material);
 void GPU_material_free(struct ListBase *gpumaterial);
 
 void GPU_material_acquire(GPUMaterial *mat);
@@ -232,6 +235,9 @@ struct Material *GPU_material_get_material(GPUMaterial *material);
  */
 eGPUMaterialStatus GPU_material_status(GPUMaterial *mat);
 void GPU_material_status_set(GPUMaterial *mat, eGPUMaterialStatus status);
+
+bool GPU_material_is_compute(GPUMaterial *material);
+void GPU_material_is_compute_set(GPUMaterial *material, bool is_compute);
 
 struct GPUUniformBuf *GPU_material_uniform_buffer_get(GPUMaterial *material);
 /**
@@ -280,8 +286,16 @@ typedef struct GPUMaterialTexture {
   int sampler_state; /* eGPUSamplerState */
 } GPUMaterialTexture;
 
+/* A reference to a write only 2D image of a specific format. */
+typedef struct GPUMaterialImage {
+  struct GPUMaterialImage *next, *prev;
+  eGPUTextureFormat format;
+  char name_in_shader[32];
+} GPUMaterialImage;
+
 ListBase GPU_material_attributes(GPUMaterial *material);
 ListBase GPU_material_textures(GPUMaterial *material);
+ListBase GPU_material_images(GPUMaterial *material);
 
 typedef struct GPUUniformAttr {
   struct GPUUniformAttr *next, *prev;
@@ -307,6 +321,26 @@ GPUUniformAttrList *GPU_material_uniform_attributes(GPUMaterial *material);
 struct GHash *GPU_uniform_attr_list_hash_new(const char *info);
 void GPU_uniform_attr_list_copy(GPUUniformAttrList *dest, GPUUniformAttrList *src);
 void GPU_uniform_attr_list_free(GPUUniformAttrList *set);
+
+GPUMaterialTexture *GPU_material_add_texture(GPUMaterial *material,
+                                             eGPUSamplerState sampler_state);
+GPUMaterialImage *GPU_material_add_image_texture(GPUMaterial *material, eGPUTextureFormat format);
+
+GPUNodeLink *GPU_image_from_material_texture(GPUMaterialTexture *texture);
+GPUNodeLink *GPU_image_texture_from_material_image(GPUMaterialImage *image);
+
+typedef void (*GPUMaterialSetupFn)(void *thunk, GPUMaterial *material);
+typedef void (*GPUMaterialCompileFn)(void *thunk, GPUMaterial *material);
+
+/* Construct a GPU material from a set of callbacks. The setup callback should set the appropriate
+ * flags or members to the material. The compile callback should construct the material graph by
+ * adding and linking the necessary GPU material graph nodes. The generate function should
+ * construct the needed shader by initializing the passed shader create info structure. The given
+ * thunk will be passed as the first parameter of each callback. */
+GPUMaterial *GPU_material_from_callbacks(GPUMaterialSetupFn setup_function,
+                                         GPUMaterialCompileFn compile_function,
+                                         GPUCodegenCallbackFn generate_function,
+                                         void *thunk);
 
 #ifdef __cplusplus
 }

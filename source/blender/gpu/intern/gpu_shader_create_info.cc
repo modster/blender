@@ -145,7 +145,7 @@ std::string ShaderCreateInfo::check_error() const
   std::string error;
 
   /* At least a vertex shader and a fragment shader are required, or only a compute shader. */
-  if (this->compute_source_.is_empty()) {
+  if (this->compute_source_.is_empty() && this->compute_source_generated.empty()) {
     if (this->vertex_source_.is_empty()) {
       error += "Missing vertex shader in " + this->name_ + ".\n";
     }

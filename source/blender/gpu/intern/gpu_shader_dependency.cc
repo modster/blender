@@ -16,6 +16,7 @@
 #include "BLI_map.hh"
 #include "BLI_set.hh"
 #include "BLI_string_ref.hh"
+#include "BLI_vector_set.hh"
 
 #include "gpu_material_library.h"
 #include "gpu_shader_create_info.hh"
@@ -347,7 +348,7 @@ struct GPUSource {
 
     auto arg_parse = [&](const StringRef str,
                          int64_t &cursor,
-                         StringRef &out_qualifier,
+                         VectorSet<StringRef> &out_qualifiers,
                          StringRef &out_type,
                          StringRef &out_name) -> bool {
       int64_t arg_start = cursor + 1;
@@ -361,16 +362,19 @@ struct GPUSource {
       }
       const StringRef arg = str.substr(arg_start, cursor - arg_start);
 
+      /* Add all key words to the qualifiers vector set. Then pop the last element and store it in
+       * the name then pop the second to last element and store it in the type. The elements left
+       * are all the specified qualifiers. */
       int64_t keyword_cursor = 0;
-      out_qualifier = keyword_parse(arg, keyword_cursor);
-      out_type = keyword_parse(arg, keyword_cursor);
-      out_name = keyword_parse(arg, keyword_cursor);
-      if (out_name.is_empty()) {
-        /* No qualifier case. */
-        out_name = out_type;
-        out_type = out_qualifier;
-        out_qualifier = arg.substr(0, 0);
+      while (true) {
+        StringRef keyword = keyword_parse(arg, keyword_cursor);
+        if (keyword.is_empty()) {
+          break;
+        }
+        out_qualifiers.add(keyword);
       }
+      out_name = out_qualifiers.pop();
+      out_type = out_qualifiers.pop();
       return true;
     };
 
@@ -408,8 +412,9 @@ struct GPUSource {
 
       func->totparam = 0;
       int64_t args_cursor = -1;
-      StringRef arg_qualifier, arg_type, arg_name;
-      while (arg_parse(func_args, args_cursor, arg_qualifier, arg_type, arg_name)) {
+      StringRef arg_type, arg_name;
+      VectorSet<StringRef> arg_qualifiers;
+      while (arg_parse(func_args, args_cursor, arg_qualifiers, arg_type, arg_name)) {
 
         if (func->totparam >= ARRAY_SIZE(func->paramtype)) {
           print_error(input, source.find(func_name), "Too much parameter in function");
@@ -417,13 +422,25 @@ struct GPUSource {
         }
 
         auto parse_qualifier = [](StringRef qualifier) -> GPUFunctionQual {
+          if (qualifier == "in") {
+            return FUNCTION_QUAL_IN;
+          }
           if (qualifier == "out") {
             return FUNCTION_QUAL_OUT;
           }
           if (qualifier == "inout") {
             return FUNCTION_QUAL_INOUT;
           }
-          return FUNCTION_QUAL_IN;
+          if (qualifier == "const") {
+            return FUNCTION_QUAL_CONST;
+          }
+          if (qualifier == "restrict") {
+            return FUNCTION_QUAL_RESTRICT;
+          }
+          if (qualifier == "writeonly") {
+            return FUNCTION_QUAL_WRITEONLY;
+          }
+          return FUNCTION_QUAL_NONE;
         };
 
         auto parse_type = [](StringRef type) -> eGPUType {
@@ -460,10 +477,17 @@ struct GPUSource {
           if (type == "Closure") {
             return GPU_CLOSURE;
           }
+          if (type == "image2D") {
+            return GPU_IMAGE_2D;
+          }
           return GPU_NONE;
         };
 
-        func->paramqual[func->totparam] = parse_qualifier(arg_qualifier);
+        GPUFunctionQual qualifiers = FUNCTION_QUAL_NONE;
+        for (StringRef qualifier : arg_qualifiers) {
+          qualifiers = static_cast<GPUFunctionQual>(qualifiers | parse_qualifier(qualifier));
+        }
+        func->paramqual[func->totparam] = qualifiers;
         func->paramtype[func->totparam] = parse_type(arg_type);
 
         if (func->paramtype[func->totparam] == GPU_NONE) {
@@ -549,7 +573,10 @@ struct GPUSource {
 
   bool is_from_material_library() const
   {
-    return filename.startswith("gpu_shader_material_") && filename.endswith(".glsl");
+    return (filename.startswith("gpu_shader_material_") ||
+            filename.startswith("gpu_shader_common_") ||
+            filename.startswith("gpu_shader_compositor_")) &&
+           filename.endswith(".glsl");
   }
 };
 

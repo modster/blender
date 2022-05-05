@@ -8,6 +8,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "GPU_material.h"
+
+#include "VPC_gpu_material_node.hh"
+
 #include "node_composite_util.hh"
 
 /* ******************* channel Distance Matte ********************************* */
@@ -16,8 +20,12 @@ namespace blender::nodes::node_composite_distance_matte_cc {
 
 static void cmp_node_distance_matte_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
-  b.add_input<decl::Color>(N_("Key Color")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_input<decl::Color>(N_("Image"))
+      .default_value({1.0f, 1.0f, 1.0f, 1.0f})
+      .compositor_domain_priority(0);
+  b.add_input<decl::Color>(N_("Key Color"))
+      .default_value({1.0f, 1.0f, 1.0f, 1.0f})
+      .compositor_domain_priority(1);
   b.add_output<decl::Color>(N_("Image"));
   b.add_output<decl::Float>(N_("Matte"));
 }
@@ -48,6 +56,68 @@ static void node_composit_buts_distance_matte(uiLayout *layout,
   uiItemR(col, ptr, "falloff", UI_ITEM_R_SPLIT_EMPTY_NAME | UI_ITEM_R_SLIDER, nullptr, ICON_NONE);
 }
 
+using namespace blender::viewport_compositor;
+
+class DistanceMatteGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    const float tolerance = get_tolerance();
+    const float falloff = get_falloff();
+
+    if (get_color_space() == 1) {
+      GPU_stack_link(material,
+                     &bnode(),
+                     "node_composite_distance_matte_rgba",
+                     inputs,
+                     outputs,
+                     GPU_uniform(&tolerance),
+                     GPU_uniform(&falloff));
+      return;
+    }
+
+    GPU_stack_link(material,
+                   &bnode(),
+                   "node_composite_distance_matte_ycca",
+                   inputs,
+                   outputs,
+                   GPU_uniform(&tolerance),
+                   GPU_uniform(&falloff));
+  }
+
+  NodeChroma *get_node_chroma()
+  {
+    return static_cast<NodeChroma *>(bnode().storage);
+  }
+
+  /* 0 -> YCCA
+   * 1 -> RGBA */
+  int get_color_space()
+  {
+    return get_node_chroma()->channel;
+  }
+
+  float get_tolerance()
+  {
+    return get_node_chroma()->t1;
+  }
+
+  float get_falloff()
+  {
+    return get_node_chroma()->t2;
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new DistanceMatteGPUMaterialNode(node);
+}
+
 }  // namespace blender::nodes::node_composite_distance_matte_cc
 
 void register_node_type_cmp_distance_matte()
@@ -62,6 +132,7 @@ void register_node_type_cmp_distance_matte()
   ntype.flag |= NODE_PREVIEW;
   node_type_init(&ntype, file_ns::node_composit_init_distance_matte);
   node_type_storage(&ntype, "NodeChroma", node_free_standard_storage, node_copy_standard_storage);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

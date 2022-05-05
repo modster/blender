@@ -8,6 +8,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Z COMBINE ******************** */
@@ -33,6 +35,13 @@ static void node_composit_buts_zcombine(uiLayout *layout, bContext *UNUSED(C), P
   uiItemR(col, ptr, "use_antialias_z", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_zcombine_cc
 
 void register_node_type_cmp_zcombine()
@@ -44,6 +53,7 @@ void register_node_type_cmp_zcombine()
   cmp_node_type_base(&ntype, CMP_NODE_ZCOMBINE, "Z Combine", NODE_CLASS_OP_COLOR);
   ntype.declare = file_ns::cmp_node_zcombine_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_zcombine;
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

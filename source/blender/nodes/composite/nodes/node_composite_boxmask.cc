@@ -8,6 +8,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** SCALAR MATH ******************** */
@@ -48,6 +50,13 @@ static void node_composit_buts_boxmask(uiLayout *layout, bContext *UNUSED(C), Po
   uiItemR(layout, ptr, "mask_type", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_boxmask_cc
 
 void register_node_type_cmp_boxmask()
@@ -61,6 +70,7 @@ void register_node_type_cmp_boxmask()
   ntype.draw_buttons = file_ns::node_composit_buts_boxmask;
   node_type_init(&ntype, file_ns::node_composit_init_boxmask);
   node_type_storage(&ntype, "NodeBoxMask", node_free_standard_storage, node_copy_standard_storage);
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

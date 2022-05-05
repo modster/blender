@@ -5,14 +5,27 @@
  * \ingroup cmpnodes
  */
 
+#include "BKE_colortools.h"
+
+#include "GPU_material.h"
+
+#include "VPC_gpu_material_node.hh"
+
 #include "node_composite_util.hh"
 
 namespace blender::nodes::node_composite_huecorrect_cc {
 
 static void cmp_node_huecorrect_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Float>(N_("Fac")).default_value(1.0f).min(0.0f).max(1.0f).subtype(PROP_FACTOR);
-  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_input<decl::Float>(N_("Fac"))
+      .default_value(1.0f)
+      .min(0.0f)
+      .max(1.0f)
+      .subtype(PROP_FACTOR)
+      .compositor_domain_priority(1);
+  b.add_input<decl::Color>(N_("Image"))
+      .default_value({1.0f, 1.0f, 1.0f, 1.0f})
+      .compositor_domain_priority(0);
   b.add_output<decl::Color>(N_("Image"));
 }
 
@@ -33,6 +46,53 @@ static void node_composit_init_huecorrect(bNodeTree *UNUSED(ntree), bNode *node)
   cumapping->cur = 1;
 }
 
+using namespace blender::viewport_compositor;
+
+class HueCorrectGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    CurveMapping *curve_mapping = get_curve_mapping();
+
+    BKE_curvemapping_init(curve_mapping);
+    float *band_values;
+    int band_size;
+    BKE_curvemapping_table_RGBA(curve_mapping, &band_values, &band_size);
+    float band_layer;
+    GPUNodeLink *band_texture = GPU_color_band(material, band_size, band_values, &band_layer);
+
+    float range_minimums[CM_TOT];
+    BKE_curvemapping_get_range_minimums(curve_mapping, range_minimums);
+    float range_dividers[CM_TOT];
+    BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
+
+    GPU_stack_link(material,
+                   &bnode(),
+                   "node_composite_hue_correct",
+                   inputs,
+                   outputs,
+                   band_texture,
+                   GPU_constant(&band_layer),
+                   GPU_uniform(range_minimums),
+                   GPU_uniform(range_dividers));
+  }
+
+  CurveMapping *get_curve_mapping()
+  {
+    return static_cast<CurveMapping *>(bnode().storage);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new HueCorrectGPUMaterialNode(node);
+}
+
 }  // namespace blender::nodes::node_composite_huecorrect_cc
 
 void register_node_type_cmp_huecorrect()
@@ -46,6 +106,7 @@ void register_node_type_cmp_huecorrect()
   node_type_size(&ntype, 320, 140, 500);
   node_type_init(&ntype, file_ns::node_composit_init_huecorrect);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

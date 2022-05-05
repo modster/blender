@@ -395,6 +395,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
     ima->gpu_pass = requested_pass;
     ima->gpu_layer = requested_layer;
     ima->gpu_view = requested_view;
+    BKE_image_partial_update_mark_full_update(ima);
   }
 #undef GPU_FLAGS_TO_CHECK
 

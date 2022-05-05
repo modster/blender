@@ -1,3 +1,7 @@
+/* Limits. */
+
+#define FLT_EPSILON 1.192092896e-07F
+
 /* Float Math */
 
 float safe_divide(float a, float b)
@@ -29,6 +33,17 @@ float compatible_pow(float x, float y)
   }
   else if (x == 0.0) {
     return 0.0;
+  }
+
+  return pow(x, y);
+}
+
+/* A version of pow that returns a fallback value if the computation is undefined. From the spec:
+ * The result is undefined if x < 0 or if x = 0 and y is less than or equal 0. */
+float fallback_pow(float x, float y, float fallback)
+{
+  if (x < 0.0 || (x == 0.0 && y <= 0.0)) {
+    return fallback;
   }
 
   return pow(x, y);
@@ -109,12 +124,23 @@ void vector_normalize(vec3 normal, out vec3 outnormal)
   outnormal = normalize(normal);
 }
 
-void vector_copy(vec3 normal, out vec3 outnormal)
+vec3 fallback_pow(vec3 a, float b, vec3 fallback)
 {
-  outnormal = normal;
+  return vec3(fallback_pow(a.x, b, fallback.x),
+              fallback_pow(a.y, b, fallback.y),
+              fallback_pow(a.z, b, fallback.z));
 }
 
 /* Matirx Math */
+
+/* Return a 2D rotation matrix with the angle that the input 2D vector makes with the x axis. */
+mat2 vector_to_rotation_matrix(vec2 vector)
+{
+  vec2 normalized_vector = normalize(vector);
+  float cos_angle = normalized_vector.x;
+  float sin_angle = normalized_vector.y;
+  return mat2(cos_angle, sin_angle, -sin_angle, cos_angle);
+}
 
 mat3 euler_to_mat3(vec3 euler)
 {
@@ -138,76 +164,4 @@ mat3 euler_to_mat3(vec3 euler)
   mat[2][1] = sy * cx * sz - sx * cz;
   mat[2][2] = cy * cx;
   return mat;
-}
-
-void normal_transform_object_to_world(vec3 vin, out vec3 vout)
-{
-  vout = normal_object_to_world(vin);
-}
-
-void normal_transform_world_to_object(vec3 vin, out vec3 vout)
-{
-  vout = normal_world_to_object(vin);
-}
-
-void direction_transform_object_to_world(vec3 vin, out vec3 vout)
-{
-  vout = transform_direction(ModelMatrix, vin);
-}
-
-void direction_transform_object_to_view(vec3 vin, out vec3 vout)
-{
-  vout = transform_direction(ModelMatrix, vin);
-  vout = transform_direction(ViewMatrix, vout);
-}
-
-void direction_transform_view_to_world(vec3 vin, out vec3 vout)
-{
-  vout = transform_direction(ViewMatrixInverse, vin);
-}
-
-void direction_transform_view_to_object(vec3 vin, out vec3 vout)
-{
-  vout = transform_direction(ViewMatrixInverse, vin);
-  vout = transform_direction(ModelMatrixInverse, vout);
-}
-
-void direction_transform_world_to_view(vec3 vin, out vec3 vout)
-{
-  vout = transform_direction(ViewMatrix, vin);
-}
-
-void direction_transform_world_to_object(vec3 vin, out vec3 vout)
-{
-  vout = transform_direction(ModelMatrixInverse, vin);
-}
-
-void point_transform_object_to_world(vec3 vin, out vec3 vout)
-{
-  vout = point_object_to_world(vin);
-}
-
-void point_transform_object_to_view(vec3 vin, out vec3 vout)
-{
-  vout = point_object_to_view(vin);
-}
-
-void point_transform_view_to_world(vec3 vin, out vec3 vout)
-{
-  vout = point_view_to_world(vin);
-}
-
-void point_transform_view_to_object(vec3 vin, out vec3 vout)
-{
-  vout = point_view_to_object(vin);
-}
-
-void point_transform_world_to_view(vec3 vin, out vec3 vout)
-{
-  vout = point_world_to_view(vin);
-}
-
-void point_transform_world_to_object(vec3 vin, out vec3 vout)
-{
-  vout = point_world_to_object(vin);
 }

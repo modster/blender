@@ -5,57 +5,110 @@
  * \ingroup cmpnodes
  */
 
+#include "GPU_material.h"
+
+#include "VPC_gpu_material_node.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** SEPARATE RGBA ******************** */
-namespace blender::nodes::node_composite_sepcomb_rgba_cc {
+
+namespace blender::nodes::node_composite_separate_rgba_cc {
 
 static void cmp_node_seprgba_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_input<decl::Color>(N_("Image"))
+      .default_value({1.0f, 1.0f, 1.0f, 1.0f})
+      .compositor_domain_priority(0);
   b.add_output<decl::Float>(N_("R"));
   b.add_output<decl::Float>(N_("G"));
   b.add_output<decl::Float>(N_("B"));
   b.add_output<decl::Float>(N_("A"));
 }
 
-}  // namespace blender::nodes::node_composite_sepcomb_rgba_cc
+using namespace blender::viewport_compositor;
+
+class SeparateRGBAGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &bnode(), "node_composite_separate_rgba", inputs, outputs);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new SeparateRGBAGPUMaterialNode(node);
+}
+
+}  // namespace blender::nodes::node_composite_separate_rgba_cc
 
 void register_node_type_cmp_seprgba()
 {
-  namespace file_ns = blender::nodes::node_composite_sepcomb_rgba_cc;
+  namespace file_ns = blender::nodes::node_composite_separate_rgba_cc;
 
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPRGBA_LEGACY, "Separate RGBA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_seprgba_declare;
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }
 
 /* **************** COMBINE RGBA ******************** */
 
-namespace blender::nodes::node_composite_sepcomb_rgba_cc {
+namespace blender::nodes::node_composite_combine_rgba_cc {
 
 static void cmp_node_combrgba_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Float>(N_("R")).min(0.0f).max(1.0f);
-  b.add_input<decl::Float>(N_("G")).min(0.0f).max(1.0f);
-  b.add_input<decl::Float>(N_("B")).min(0.0f).max(1.0f);
-  b.add_input<decl::Float>(N_("A")).default_value(1.0f).min(0.0f).max(1.0f);
+  b.add_input<decl::Float>(N_("R")).min(0.0f).max(1.0f).compositor_domain_priority(0);
+  b.add_input<decl::Float>(N_("G")).min(0.0f).max(1.0f).compositor_domain_priority(1);
+  b.add_input<decl::Float>(N_("B")).min(0.0f).max(1.0f).compositor_domain_priority(2);
+  b.add_input<decl::Float>(N_("A"))
+      .default_value(1.0f)
+      .min(0.0f)
+      .max(1.0f)
+      .compositor_domain_priority(3);
   b.add_output<decl::Color>(N_("Image"));
 }
 
-}  // namespace blender::nodes::node_composite_sepcomb_rgba_cc
+using namespace blender::viewport_compositor;
+
+class CombineRGBAGPUMaterialNode : public GPUMaterialNode {
+ public:
+  using GPUMaterialNode::GPUMaterialNode;
+
+  void compile(GPUMaterial *material) override
+  {
+    GPUNodeStack *inputs = get_inputs_array();
+    GPUNodeStack *outputs = get_outputs_array();
+
+    GPU_stack_link(material, &bnode(), "node_composite_combine_rgba", inputs, outputs);
+  }
+};
+
+static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+{
+  return new CombineRGBAGPUMaterialNode(node);
+}
+
+}  // namespace blender::nodes::node_composite_combine_rgba_cc
 
 void register_node_type_cmp_combrgba()
 {
-  namespace file_ns = blender::nodes::node_composite_sepcomb_rgba_cc;
+  namespace file_ns = blender::nodes::node_composite_combine_rgba_cc;
 
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBRGBA_LEGACY, "Combine RGBA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_combrgba_declare;
+  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
 
   nodeRegisterType(&ntype);
 }

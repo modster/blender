@@ -11,6 +11,8 @@
 #include "BKE_context.h"
 #include "BKE_lib_id.h"
 
+#include "VPC_unsupported_node_operation.hh"
+
 #include "node_composite_util.hh"
 
 /* **************** Stabilize 2D ******************** */
@@ -58,6 +60,13 @@ static void node_composit_buts_stabilize2d(uiLayout *layout, bContext *C, Pointe
   uiItemR(layout, ptr, "invert", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
+using namespace blender::viewport_compositor;
+
+static NodeOperation *get_compositor_operation(Context &context, DNode node)
+{
+  return new UnsupportedNodeOperation(context, node);
+}
+
 }  // namespace blender::nodes::node_composite_stabilize2d_cc
 
 void register_node_type_cmp_stabilize2d()
@@ -70,6 +79,7 @@ void register_node_type_cmp_stabilize2d()
   ntype.declare = file_ns::cmp_node_stabilize2d_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_stabilize2d;
   ntype.initfunc_api = file_ns::init;
+  ntype.get_compositor_operation = file_ns::get_compositor_operation;
 
   nodeRegisterType(&ntype);
 }

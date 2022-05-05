@@ -34,6 +34,7 @@ typedef enum eGPUDataSource {
   GPU_SOURCE_STRUCT,
   GPU_SOURCE_TEX,
   GPU_SOURCE_TEX_TILED_MAPPING,
+  GPU_SOURCE_IMAGE,
   GPU_SOURCE_FUNCTION_CALL,
 } eGPUDataSource;
 
@@ -49,6 +50,7 @@ typedef enum {
   GPU_NODE_LINK_OUTPUT,
   GPU_NODE_LINK_UNIFORM,
   GPU_NODE_LINK_DIFFERENTIATE_FLOAT_FN,
+  GPU_NODE_LINK_IMAGE_TEXTURE,
 } GPUNodeLinkType;
 
 typedef enum {
@@ -96,6 +98,8 @@ struct GPUNodeLink {
     struct GPUMaterialTexture *texture;
     /* GPU_NODE_LINK_DIFFERENTIATE_FLOAT_FN */
     const char *function_name;
+    /* GPU_NODE_LINK_IMAGE_TEXTURE */
+    struct GPUMaterialImage *image;
   };
 };
 
@@ -130,6 +134,8 @@ typedef struct GPUInput {
     struct GPUUniformAttr *uniform_attr;
     /* GPU_SOURCE_FUNCTION_CALL */
     char function_call[64];
+    /* GPU_SOURCE_IMAGE */
+    struct GPUMaterialImage *image;
   };
 } GPUInput;
 
@@ -162,6 +168,7 @@ typedef struct GPUNodeGraph {
   /* Requested attributes and textures. */
   ListBase attributes;
   ListBase textures;
+  ListBase images;
 
   /* The list of uniform attributes. */
   GPUUniformAttrList uniform_attrs;

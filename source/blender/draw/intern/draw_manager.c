@@ -85,6 +85,7 @@
 #include "draw_cache_impl.h"
 
 #include "engines/basic/basic_engine.h"
+#include "engines/compositor/compositor_engine.h"
 #include "engines/eevee/eevee_engine.h"
 #include "engines/eevee_next/eevee_engine.h"
 #include "engines/external/external_engine.h"
@@ -1225,6 +1226,27 @@ static void drw_engines_enable_editors(void)
   }
 }
 
+static bool is_compositor_enabled()
+{
+  if (!(DST.draw_ctx.v3d->shading.flag & V3D_SHADING_COMPOSITOR)) {
+    return false;
+  }
+
+  if (!(DST.draw_ctx.v3d->shading.type > OB_MATERIAL)) {
+    return false;
+  }
+
+  if (!DST.draw_ctx.scene->use_nodes) {
+    return false;
+  }
+
+  if (!DST.draw_ctx.scene->nodetree) {
+    return false;
+  }
+
+  return true;
+}
+
 static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
                                RenderEngineType *engine_type,
                                bool gpencil_engine_needed)
@@ -1237,6 +1259,11 @@ static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
   if (gpencil_engine_needed && ((drawtype >= OB_SOLID) || !use_xray)) {
     use_drw_engine(&draw_engine_gpencil_type);
   }
+
+  if (is_compositor_enabled()) {
+    use_drw_engine(&draw_engine_compositor_type);
+  }
+
   drw_engines_enable_overlays();
 
 #ifdef WITH_DRAW_DEBUG
@@ -1608,7 +1635,6 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
                              GPUViewport *viewport,
                              const bContext *evil_C)
 {
-
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   ViewLayer *view_layer = DEG_get_evaluated_view_layer(depsgraph);
   RegionView3D *rv3d = region->regiondata;
@@ -2959,6 +2985,7 @@ void DRW_engines_register(void)
   DRW_engine_register(&draw_engine_overlay_type);
   DRW_engine_register(&draw_engine_select_type);
   DRW_engine_register(&draw_engine_basic_type);
+  DRW_engine_register(&draw_engine_compositor_type);
 #ifdef WITH_DRAW_DEBUG
   DRW_engine_register(&draw_engine_debug_select_type);
 #endif

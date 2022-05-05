@@ -60,6 +60,8 @@ struct GPUMaterial {
   eGPUMaterialStatus status;
   /** Some flags about the nodetree & the needed resources. */
   eGPUMaterialFlag flag;
+  /** If true, all material nodes will be serialized into a compute source. */
+  bool is_compute;
   /* Identify shader variations (shadow, probe, world background...).
    * Should be unique even across render engines. */
   uint64_t uuid;
@@ -144,7 +146,7 @@ static void gpu_material_ramp_texture_build(GPUMaterial *mat)
   mat->coba_builder = NULL;
 }
 
-static void gpu_material_free_single(GPUMaterial *material)
+void GPU_material_free_single(GPUMaterial *material)
 {
   bool do_free = atomic_sub_and_fetch_uint32(&material->refcount, 1) == 0;
   if (!do_free) {
@@ -168,15 +170,15 @@ static void gpu_material_free_single(GPUMaterial *material)
   if (material->sss_tex_profile != NULL) {
     GPU_texture_free(material->sss_tex_profile);
   }
+  MEM_freeN(material);
 }
 
 void GPU_material_free(ListBase *gpumaterial)
 {
   LISTBASE_FOREACH (LinkData *, link, gpumaterial) {
     GPUMaterial *material = link->data;
+    GPU_material_free_single(material);
     DRW_deferred_shader_remove(material);
-    gpu_material_free_single(material);
-    MEM_freeN(material);
   }
   BLI_freelistN(gpumaterial);
 }
@@ -224,6 +226,11 @@ ListBase GPU_material_attributes(GPUMaterial *material)
 ListBase GPU_material_textures(GPUMaterial *material)
 {
   return material->graph.textures;
+}
+
+ListBase GPU_material_images(GPUMaterial *material)
+{
+  return material->graph.images;
 }
 
 GPUUniformAttrList *GPU_material_uniform_attributes(GPUMaterial *material)
@@ -599,6 +606,16 @@ void GPU_material_status_set(GPUMaterial *mat, eGPUMaterialStatus status)
   mat->status = status;
 }
 
+bool GPU_material_is_compute(GPUMaterial *material)
+{
+  return material->is_compute;
+}
+
+void GPU_material_is_compute_set(GPUMaterial *material, bool is_compute)
+{
+  material->is_compute = is_compute;
+}
+
 /* Code generation */
 
 bool GPU_material_has_surface_output(GPUMaterial *mat)
@@ -724,7 +741,7 @@ void GPU_material_acquire(GPUMaterial *mat)
 
 void GPU_material_release(GPUMaterial *mat)
 {
-  gpu_material_free_single(mat);
+  GPU_material_free_single(mat);
 }
 
 void GPU_material_compile(GPUMaterial *mat)
@@ -771,4 +788,47 @@ void GPU_materials_free(Main *bmain)
 
   // BKE_world_defaults_free_gpu();
   BKE_material_defaults_free_gpu();
+}
+
+GPUMaterial *GPU_material_from_callbacks(GPUMaterialSetupFn setup_function,
+                                         GPUMaterialCompileFn compile_function,
+                                         GPUCodegenCallbackFn generate_function,
+                                         void *thunk)
+{
+  /* Allocate a new material and its material graph. */
+  GPUMaterial *material = MEM_callocN(sizeof(GPUMaterial), "GPUMaterial");
+  material->graph.used_libraries = BLI_gset_new(
+      BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "GPUNodeGraph.used_libraries");
+  material->refcount = 1;
+
+  /* Setup the newly allocated material. */
+  setup_function(thunk, material);
+
+  /* Compile the material. */
+  compile_function(thunk, material);
+
+  /* Create and initialize the texture storing color bands. */
+  gpu_material_ramp_texture_build(material);
+
+  /* Lookup an existing pass in the cache or generate a new one. */
+  material->pass = GPU_generate_pass(material, &material->graph, generate_function, thunk);
+
+  /* The pass already exists in the pass cache but its shader already failed to compile. */
+  if (material->pass == NULL) {
+    material->status = GPU_MAT_FAILED;
+    gpu_node_graph_free(&material->graph);
+    return material;
+  }
+
+  /* The pass already exists in the pass cache and its shader is already compiled. */
+  GPUShader *shader = GPU_pass_shader_get(material->pass);
+  if (shader != NULL) {
+    material->status = GPU_MAT_SUCCESS;
+    gpu_node_graph_free_nodes(&material->graph);
+    return material;
+  }
+
+  /* The material was created successfully but still needs to be compiled. */
+  material->status = GPU_MAT_CREATED;
+  return material;
 }

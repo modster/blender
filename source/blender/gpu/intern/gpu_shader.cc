@@ -370,8 +370,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     shader->geometry_shader_from_glsl(sources);
   }
 
-  if (!info.compute_source_.is_empty()) {
-    auto code = gpu_shader_dependency_get_resolved_source(info.compute_source_);
+  if (!info.compute_source_.is_empty() || !info.compute_source_generated.empty()) {
     std::string layout = shader->compute_layout_declare(info);
 
     Vector<const char *> sources;
@@ -381,7 +380,11 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     sources.extend(typedefs);
     sources.append(resources.c_str());
     sources.append(layout.c_str());
-    sources.extend(code);
+    if (!info.compute_source_.is_empty()) {
+      sources.extend(gpu_shader_dependency_get_resolved_source(info.compute_source_));
+    }
+    sources.extend(info.dependencies_generated);
+    sources.append(info.compute_source_generated.c_str());
 
     shader->compute_shader_from_glsl(sources);
   }
@@ -700,6 +703,18 @@ void GPU_shader_uniform_4fv(GPUShader *sh, const char *name, const float data[4]
 {
   const int loc = GPU_shader_get_uniform(sh, name);
   GPU_shader_uniform_vector(sh, loc, 4, 1, data);
+}
+
+void GPU_shader_uniform_2iv(GPUShader *sh, const char *name, const int data[2])
+{
+  const int loc = GPU_shader_get_uniform(sh, name);
+  GPU_shader_uniform_vector_int(sh, loc, 2, 1, data);
+}
+
+void GPU_shader_uniform_mat3(GPUShader *sh, const char *name, const float data[3][3])
+{
+  const int loc = GPU_shader_get_uniform(sh, name);
+  GPU_shader_uniform_vector(sh, loc, 9, 1, (const float *)data);
 }
 
 void GPU_shader_uniform_mat4(GPUShader *sh, const char *name, const float data[4][4])
