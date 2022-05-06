@@ -217,11 +217,11 @@ void ImageDepthOperation::update_memory_buffer_partial(MemoryBuffer *output,
 
 std::unique_ptr<MetaData> ImageOperation::get_meta_data()
 {
-  std::unique_ptr<MetaData> meta_data = std::unique_ptr<MetaData>();
+  MetaData meta_data;
   if (buffer_->metadata != nullptr) {
-    meta_data->add(buffer_->metadata);
+    meta_data.add(buffer_->metadata);
   }
-  return meta_data;
+  return std::make_unique<MetaData>(meta_data);
 }
 
 }  // namespace blender::compositor
