@@ -7,6 +7,8 @@
 #include <algorithm>
 
 #include "BKE_curves.hh"
+
+#include "BLI_index_mask_ops.hh"
 #include "BLI_math_vec_types.hh"
 
 #include "gpencil_new_proposal.hh"
@@ -154,6 +156,22 @@ class GPData : public ::GPData {
   MutableSpan<GPFrame> frames_for_write()
   {
     return {(GPFrame *)this->frames_array, this->frames_size};
+  }
+
+  IndexMask frames_on_layer(int layer_index) const
+  {
+    Vector<int64_t> indices;
+    return index_mask_ops::find_indices_based_on_predicate(
+        IndexMask(this->frames_size), 1024, indices, [&](const int index) {
+          return this->frames()[index].layer_index == layer_index;
+        });
+  }
+
+  IndexMask frames_on_layer(GPLayer &gpl) const
+  {
+    int layer_index = this->layers().first_index_try(gpl);
+    BLI_assert(layer_index != -1);
+    return frames_on_layer(layer_index);
   }
 
   Span<GPLayer> layers() const
@@ -402,6 +420,36 @@ TEST(gpencil_proposal, CheckFramesSorted2)
   for (const int i : my_data.frames().index_range()) {
     EXPECT_EQ(my_data.frames()[i].layer_index, frame_numbers_sorted2[i][0]);
     EXPECT_EQ(my_data.frames()[i].start, frame_numbers_sorted2[i][1]);
+  }
+}
+
+TEST(gpencil_proposal, IterateOverFramesOnLayer)
+{
+  GPData my_data;
+  GPLayer my_layer1("TestLayer1");
+  GPLayer my_layer2("TestLayer2");
+
+  const int frame_numbers_layer1[5] = {10, 5, 6, 1, 3};
+  const int frame_numbers_layer2[5] = {8, 5, 7, 1, 4};
+
+  const int frame_numbers_sorted1[5] = {1, 3, 5, 6, 10};
+  const int frame_numbers_sorted2[5] = {1, 4, 5, 7, 8};
+
+  my_data.add_layer(my_layer1);
+  my_data.add_layer(my_layer2);
+  for (int i : IndexRange(5)) {
+    my_data.create_new_frame_on_layer(my_layer1, frame_numbers_layer1[i]);
+    my_data.create_new_frame_on_layer(my_layer2, frame_numbers_layer2[i]);
+  }
+
+  IndexMask indices_frames_layer1 = my_data.frames_on_layer(my_layer1);
+  for (const int i : indices_frames_layer1.index_range()) {
+    EXPECT_EQ(my_data.frames()[indices_frames_layer1[i]].start, frame_numbers_sorted1[i]);
+  }
+
+  IndexMask indices_frames_layer2 = my_data.frames_on_layer(my_layer2);
+  for (const int i : indices_frames_layer2.index_range()) {
+    EXPECT_EQ(my_data.frames()[indices_frames_layer2[i]].start, frame_numbers_sorted2[i]);
   }
 }
 

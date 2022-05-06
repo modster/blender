@@ -87,7 +87,7 @@ typedef struct GPFrame {
 
 typedef struct GPData {
   /**
-   * The array of grease pencil frames. This is kept in cronological order (tiebreaks for two
+   * The array of grease pencil frames. This is kept in chronological order (tiebreaks for two
    * frames on different layers are resloved by the order of the layers).
    */
   GPFrame *frames_array;
