@@ -490,7 +490,7 @@ class ImageOperation : public NodeOperation {
   void allocate_invalid()
   {
     for (const OutputSocketRef *output : node()->outputs()) {
-      if (!is_output_needed(output->identifier())) {
+      if (!should_compute_output(output->identifier())) {
         continue;
       }
 
@@ -508,7 +508,7 @@ class ImageOperation : public NodeOperation {
 
   void compute_output(StringRef identifier)
   {
-    if (!is_output_needed(identifier)) {
+    if (!should_compute_output(identifier)) {
       return;
     }
 

@@ -14,11 +14,47 @@
 #include "VPC_input_descriptor.hh"
 #include "VPC_node_operation.hh"
 #include "VPC_result.hh"
+#include "VPC_scheduler.hh"
 #include "VPC_utilities.hh"
 
 namespace blender::viewport_compositor {
 
 using namespace nodes::derived_node_tree_types;
+
+CompileState::CompileState(const Schedule &schedule) : schedule_(schedule)
+{
+}
+
+const Schedule &CompileState::get_schedule()
+{
+  return schedule_;
+}
+
+void CompileState::map_node_to_node_operation(DNode node, NodeOperation *operations)
+{
+  return node_operations_.add_new(node, operations);
+}
+
+void CompileState::map_node_to_gpu_material_operation(DNode node, GPUMaterialOperation *operations)
+{
+  return gpu_material_operations_.add_new(node, operations);
+}
+
+Result &CompileState::get_result_from_output_socket(DOutputSocket output)
+{
+  /* The output belongs to a node that was compiled into a standard node operation, so return a
+   * reference to the result from that operation using the output identifier. */
+  if (node_operations_.contains(output.node())) {
+    NodeOperation *operation = node_operations_.lookup(output.node());
+    return operation->get_result(output->identifier());
+  }
+
+  /* Otherwise, the output belongs to a node that was compiled into a GPU material operation, so
+   * retrieve the internal identifier of that output and return a reference to the result from
+   * that operation using the retrieved identifier. */
+  GPUMaterialOperation *operation = gpu_material_operations_.lookup(output.node());
+  return operation->get_result(operation->get_output_identifier_from_output_socket(output));
+}
 
 void CompileState::add_node_to_gpu_material_compile_group(DNode node)
 {
@@ -67,32 +103,6 @@ bool CompileState::should_compile_gpu_material_compile_group(DNode node)
   /* Otherwise, the node is compatible and can be added to the compile group and it shouldn't be
    * compiled just yet. */
   return false;
-}
-
-void CompileState::map_node_to_node_operation(DNode node, NodeOperation *operations)
-{
-  return node_operations_.add_new(node, operations);
-}
-
-void CompileState::map_node_to_gpu_material_operation(DNode node, GPUMaterialOperation *operations)
-{
-  return gpu_material_operations_.add_new(node, operations);
-}
-
-Result &CompileState::get_result_from_output_socket(DOutputSocket output)
-{
-  /* The output belongs to a node that was compiled into a standard node operation, so return a
-   * reference to the result from that operation using the output identifier. */
-  if (node_operations_.contains(output.node())) {
-    NodeOperation *operation = node_operations_.lookup(output.node());
-    return operation->get_result(output->identifier());
-  }
-
-  /* Otherwise, the output belongs to a node that was compiled into a GPU material operation, so
-   * retrieve the internal identifier of that output and return a reference to the result from
-   * that operation using the retrieved identifier. */
-  GPUMaterialOperation *operation = gpu_material_operations_.lookup(output.node());
-  return operation->get_result(operation->get_output_identifier_from_output_socket(output));
 }
 
 Domain CompileState::compute_gpu_material_node_domain(DNode node)

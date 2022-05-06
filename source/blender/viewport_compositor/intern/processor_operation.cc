@@ -37,6 +37,8 @@ void ProcessorOperation::switch_result_mapped_to_input(Result *result)
 void ProcessorOperation::populate_result(Result result)
 {
   Operation::populate_result(output_identifier_, result);
+  /* The result of a processor operation is guaranteed to have a single user. */
+  get_result().set_initial_reference_count(1);
 }
 
 void ProcessorOperation::declare_input_descriptor(InputDescriptor descriptor)

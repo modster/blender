@@ -63,7 +63,7 @@ void Evaluator::compile_and_evaluate()
   const Schedule schedule = compute_schedule(*derived_node_tree_);
 
   /* Declare a compile state to use for tracking the state of the compilation. */
-  CompileState compile_state;
+  CompileState compile_state(schedule);
 
   /* Go over the nodes in the schedule, compiling them into either node operations or GPU material
    * operations. */
@@ -99,6 +99,9 @@ void Evaluator::compile_and_evaluate_node(DNode node, CompileState &compile_stat
   /* Add the operation to the operations stream. This has to be done after input mapping because
    * the method may add Input Single Value Operations to the operations stream. */
   operations_stream_.append(std::unique_ptr<Operation>(operation));
+
+  /* Compute the initial reference counts of the results of the operation. */
+  operation->compute_results_reference_counts(compile_state.get_schedule());
 
   /* Evaluate the operation. */
   operation->evaluate();
@@ -151,6 +154,9 @@ void Evaluator::compile_and_evaluate_gpu_material_compile_group(CompileState &co
 
   /* Add the operation to the operations stream. */
   operations_stream_.append(std::unique_ptr<Operation>(operation));
+
+  /* Compute the initial reference counts of the results of the operation. */
+  operation->compute_results_reference_counts(compile_state.get_schedule());
 
   /* Evaluate the operation. */
   operation->evaluate();

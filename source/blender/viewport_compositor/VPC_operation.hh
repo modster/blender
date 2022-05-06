@@ -45,9 +45,9 @@ using ProcessorsVector = Vector<std::unique_ptr<ProcessorOperation>>;
  * directly without having to add them again.
  *
  * The operation is evaluated by calling the evaluate method, which first adds the input processors
- * if they weren't added already and evaluate them, then it calls the execute method of the
- * operation, and finally it releases the results mapped to the inputs to declare that they are no
- * longer needed. */
+ * if they weren't added already and evaluates them, then it resets the results of the operation,
+ * then it calls the execute method of the operation, and finally it releases the results mapped to
+ * the inputs to declare that they are no longer needed. */
 class Operation {
  private:
   /* A reference to the compositor context. This member references the same object in all
@@ -86,16 +86,17 @@ class Operation {
 
   /* Evaluate the operation by:
    * 1. Evaluating the input processors.
-   * 2. Calling the execute method of the operation.
-   * 3. Releasing the results mapped to the inputs. */
+   * 2. Resetting the results of the operation.
+   * 3. Calling the execute method of the operation.
+   * 4. Releasing the results mapped to the inputs. */
   void evaluate();
 
   /* Get a reference to the output result identified by the given identifier. */
   Result &get_result(StringRef identifier);
 
-  /* Map the input identified by the given identifier to the result providing its data. This also
-   * increments the reference count of the result. See results_mapped_to_inputs_ for more details.
-   * This should be called by the evaluator to establish links between different operations. */
+  /* Map the input identified by the given identifier to the result providing its data. See
+   * results_mapped_to_inputs_ for more details. This should be called by the evaluator to
+   * establish links between different operations. */
   void map_input_to_result(StringRef identifier, Result *result);
 
  protected:
@@ -127,8 +128,7 @@ class Operation {
   Result &get_input(StringRef identifier) const;
 
   /* Switch the result mapped to the input identified by the given identifier with the given
-   * result. This will involve releasing the original result, but it is assumed that the result
-   * will be mapped to something else. */
+   * result. */
   void switch_result_mapped_to_input(StringRef identifier, Result *result);
 
   /* Add the given result to the results_ map identified by the given output identifier. This
@@ -157,6 +157,10 @@ class Operation {
   /* Evaluate the input processors. If the input processors were already added they will be
    * evaluated directly. Otherwise, the input processors will be added and evaluated. */
   void evaluate_input_processors();
+
+  /* Resets the results of the operation. See the reset method in the Result class for more
+   * information. */
+  void reset_results();
 
   /* Release the results that are mapped to the inputs of the operation. This is called after the
    * evaluation of the operation to declare that the results are no longer needed by this

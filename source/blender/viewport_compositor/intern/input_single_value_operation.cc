@@ -16,7 +16,11 @@ InputSingleValueOperation::InputSingleValueOperation(Context &context, DInputSoc
 {
   /* Populate the output result. */
   const ResultType result_type = get_node_socket_result_type(input_socket_.socket_ref());
-  const Result result = Result(result_type, texture_pool());
+  Result result = Result(result_type, texture_pool());
+
+  /* The result of an input single value operation is guaranteed to have a single user. */
+  result.set_initial_reference_count(1);
+
   populate_result(result);
 }
 

@@ -99,8 +99,15 @@ void Result::pass_through(Result &target)
 {
   /* Increment the reference count of the master by the original reference count of the target. */
   increment_reference_count(target.reference_count());
-  /* Copy the result to the target and set its master. */
+
+  /* Make the target an exact copy of this result, but keep the initial reference count as this is
+   * a property of the original result and is needed for correctly resetting the result before the
+   * next evaluation. */
+  const int initial_reference_count = target.initial_reference_count_;
   target = *this;
+  target.initial_reference_count_ = initial_reference_count;
+
+  /* Set the master of the target to be this result. */
   target.master_ = this;
 }
 
@@ -171,6 +178,17 @@ void Result::set_color_value(const float4 &value)
   GPU_texture_update(texture_, GPU_DATA_FLOAT, color_value_);
 }
 
+void Result::set_initial_reference_count(int count)
+{
+  initial_reference_count_ = count;
+}
+
+void Result::reset()
+{
+  master_ = nullptr;
+  reference_count_ = initial_reference_count_;
+}
+
 void Result::increment_reference_count(int count)
 {
   /* If there is a master result, increment its reference count instead. */
@@ -196,6 +214,11 @@ void Result::release()
   if (reference_count_ == 0) {
     texture_pool_->release(texture_);
   }
+}
+
+bool Result::should_compute()
+{
+  return initial_reference_count_ != 0;
 }
 
 ResultType Result::type() const

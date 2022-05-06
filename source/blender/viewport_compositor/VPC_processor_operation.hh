@@ -45,7 +45,8 @@ class ProcessorOperation : public Operation {
   void switch_result_mapped_to_input(Result *result);
 
   /* Populate the result of the processor, this essentially calls the super populate_result method
-   * with the output identifier of the processor. */
+   * with the output identifier of the processor and sets the initial reference count of the result
+   * to 1, since the result of a processor operation is guaranteed to have a single user. */
   void populate_result(Result result);
 
   /* Declare the descriptor of the input of the processor to be the given descriptor, this

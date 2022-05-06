@@ -108,7 +108,7 @@ class MovieClipOperation : public NodeOperation {
 
   void compute_image(GPUTexture *movie_clip_texture)
   {
-    if (!is_output_needed("Image")) {
+    if (!should_compute_output("Image")) {
       return;
     }
 
@@ -141,7 +141,7 @@ class MovieClipOperation : public NodeOperation {
 
   void compute_alpha(GPUTexture *movie_clip_texture)
   {
-    if (!is_output_needed("Alpha")) {
+    if (!should_compute_output("Alpha")) {
       return;
     }
 
@@ -177,22 +177,22 @@ class MovieClipOperation : public NodeOperation {
   {
     /* The movie clip texture is invalid or missing, set appropriate fallback values. */
     if (!movie_clip_texture) {
-      if (is_output_needed("Offset X")) {
+      if (should_compute_output("Offset X")) {
         Result &result = get_result("Offset X");
         result.allocate_single_value();
         result.set_float_value(0.0f);
       }
-      if (is_output_needed("Offset Y")) {
+      if (should_compute_output("Offset Y")) {
         Result &result = get_result("Offset Y");
         result.allocate_single_value();
         result.set_float_value(0.0f);
       }
-      if (is_output_needed("Scale")) {
+      if (should_compute_output("Scale")) {
         Result &result = get_result("Scale");
         result.allocate_single_value();
         result.set_float_value(1.0f);
       }
-      if (is_output_needed("Angle")) {
+      if (should_compute_output("Angle")) {
         Result &result = get_result("Angle");
         result.allocate_single_value();
         result.set_float_value(0.0f);
@@ -213,22 +213,22 @@ class MovieClipOperation : public NodeOperation {
     BKE_tracking_stabilization_data_get(
         movie_clip, frame_number, width, height, offset, &scale, &angle);
 
-    if (is_output_needed("Offset X")) {
+    if (should_compute_output("Offset X")) {
       Result &result = get_result("Offset X");
       result.allocate_single_value();
       result.set_float_value(offset.x);
     }
-    if (is_output_needed("Offset Y")) {
+    if (should_compute_output("Offset Y")) {
       Result &result = get_result("Offset Y");
       result.allocate_single_value();
       result.set_float_value(offset.y);
     }
-    if (is_output_needed("Scale")) {
+    if (should_compute_output("Scale")) {
       Result &result = get_result("Scale");
       result.allocate_single_value();
       result.set_float_value(scale);
     }
-    if (is_output_needed("Angle")) {
+    if (should_compute_output("Angle")) {
       Result &result = get_result("Angle");
       result.allocate_single_value();
       result.set_float_value(angle);

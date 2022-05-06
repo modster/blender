@@ -20,6 +20,7 @@
 #include "VPC_gpu_material_operation.hh"
 #include "VPC_operation.hh"
 #include "VPC_result.hh"
+#include "VPC_scheduler.hh"
 #include "VPC_utilities.hh"
 
 namespace blender::viewport_compositor {
@@ -72,6 +73,18 @@ StringRef GPUMaterialOperation::get_output_identifier_from_output_socket(DOutput
 InputsToLinkedOutputsMap &GPUMaterialOperation::get_inputs_to_linked_outputs_map()
 {
   return inputs_to_linked_outputs_map_;
+}
+
+void GPUMaterialOperation::compute_results_reference_counts(const Schedule &schedule)
+{
+  for (const OutputSocketsToOutputIdentifiersMap::Item &item :
+       output_sockets_to_output_identifiers_map_.items()) {
+
+    const int reference_count = number_of_inputs_linked_to_output_conditioned(
+        item.key, [&](DInputSocket input) { return schedule.contains(input.node()); });
+
+    get_result(item.value).set_initial_reference_count(reference_count);
+  }
 }
 
 void GPUMaterialOperation::bind_material_resources(GPUShader *shader)

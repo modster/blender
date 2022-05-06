@@ -77,6 +77,18 @@ bool is_output_linked_to_node_conditioned(DOutputSocket output, FunctionRef<bool
   return condition_satisfied;
 }
 
+int number_of_inputs_linked_to_output_conditioned(DOutputSocket output,
+                                                  FunctionRef<bool(DInputSocket)> condition)
+{
+  int count = 0;
+  output.foreach_target_socket([&](DInputSocket target, const TargetSocketPathInfo &path_info) {
+    if (condition(target)) {
+      count++;
+    }
+  });
+  return count;
+}
+
 bool is_gpu_material_node(DNode node)
 {
   return node->typeinfo()->get_compositor_gpu_material_node;

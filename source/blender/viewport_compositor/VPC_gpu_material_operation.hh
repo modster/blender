@@ -15,6 +15,7 @@
 
 #include "VPC_context.hh"
 #include "VPC_operation.hh"
+#include "VPC_scheduler.hh"
 
 namespace blender::viewport_compositor {
 
@@ -25,6 +26,9 @@ using SubSchedule = VectorSet<DNode>;
 /* A type representing a map that associates the identifier of each input of the operation with the
  * output socket it is linked to. */
 using InputsToLinkedOutputsMap = Map<StringRef, DOutputSocket>;
+/* A type representing a map that associates the output socket that provides the result of an
+ * output of the operation with the identifier of that output. */
+using OutputSocketsToOutputIdentifiersMap = Map<DOutputSocket, StringRef>;
 
 /* ------------------------------------------------------------------------------------------------
  * GPU Material Operation
@@ -102,7 +106,7 @@ class GPUMaterialOperation : public Operation {
   InputsToLinkedOutputsMap inputs_to_linked_outputs_map_;
   /* A map that associates the output socket that provides the result of an output of the operation
    * with the identifier of that output. See the above discussion for more information. */
-  Map<DOutputSocket, StringRef> output_sockets_to_output_identifiers_map_;
+  OutputSocketsToOutputIdentifiersMap output_sockets_to_output_identifiers_map_;
   /* A map that associates the output socket of a node that is not part of the GPU material to the
    * material texture that was created for it. This is used to share the same material texture with
    * all inputs that are linked to the same output socket. */
@@ -130,6 +134,12 @@ class GPUMaterialOperation : public Operation {
    * compiler to identify the output that each input of the operation is linked to for correct
    * input mapping. See inputs_to_linked_outputs_map_ for more information. */
   InputsToLinkedOutputsMap &get_inputs_to_linked_outputs_map();
+
+  /* Compute and set the initial reference counts of all the results of the operation. The
+   * reference counts of the results are the number of operations that use those results, which is
+   * computed as the number of inputs whose node is part of the schedule and is linked to the
+   * output corresponding to each result. The node execution schedule is given as an input. */
+  void compute_results_reference_counts(const Schedule &schedule);
 
  private:
   /* Bind the uniform buffer of the GPU material as well as any color band textures needed by the

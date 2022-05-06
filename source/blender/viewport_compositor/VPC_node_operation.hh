@@ -2,11 +2,7 @@
 
 #pragma once
 
-#include <memory>
-
-#include "BLI_map.hh"
 #include "BLI_string_ref.hh"
-#include "BLI_vector.hh"
 
 #include "DNA_node_types.h"
 
@@ -14,7 +10,7 @@
 
 #include "VPC_context.hh"
 #include "VPC_operation.hh"
-#include "VPC_result.hh"
+#include "VPC_scheduler.hh"
 
 namespace blender::viewport_compositor {
 
@@ -39,6 +35,12 @@ class NodeOperation : public Operation {
    * on the node inputs. */
   NodeOperation(Context &context, DNode node);
 
+  /* Compute and set the initial reference counts of all the results of the operation. The
+   * reference counts of the results are the number of operations that use those results, which is
+   * computed as the number of inputs whose node is part of the schedule and is linked to the
+   * output corresponding to each result. The node execution schedule is given as an input. */
+  void compute_results_reference_counts(const Schedule &schedule);
+
  protected:
   /* Returns a reference to the derived node that this operation represents. */
   const DNode &node() const;
@@ -48,7 +50,7 @@ class NodeOperation : public Operation {
 
   /* Returns true if the output identified by the given identifier is needed and should be
    * computed, otherwise returns false. */
-  bool is_output_needed(StringRef identifier) const;
+  bool should_compute_output(StringRef identifier);
 };
 
 }  // namespace blender::viewport_compositor

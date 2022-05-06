@@ -10,7 +10,7 @@ using namespace nodes::derived_node_tree_types;
 void UnsupportedNodeOperation::execute()
 {
   for (const OutputSocketRef *output : node()->outputs()) {
-    if (!is_output_needed(output->identifier())) {
+    if (!should_compute_output(output->identifier())) {
       continue;
     }
     Result &result = get_result(output->identifier());

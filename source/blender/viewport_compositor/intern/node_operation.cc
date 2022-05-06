@@ -16,6 +16,7 @@
 #include "VPC_node_operation.hh"
 #include "VPC_operation.hh"
 #include "VPC_result.hh"
+#include "VPC_scheduler.hh"
 #include "VPC_utilities.hh"
 
 namespace blender::viewport_compositor {
@@ -38,6 +39,18 @@ NodeOperation::NodeOperation(Context &context, DNode node) : Operation(context),
   }
 }
 
+void NodeOperation::compute_results_reference_counts(const Schedule &schedule)
+{
+  for (const OutputSocketRef *output_ref : node()->outputs()) {
+    const DOutputSocket output{node().context(), output_ref};
+
+    const int reference_count = number_of_inputs_linked_to_output_conditioned(
+        output, [&](DInputSocket input) { return schedule.contains(input.node()); });
+
+    get_result(output->identifier()).set_initial_reference_count(reference_count);
+  }
+}
+
 const DNode &NodeOperation::node() const
 {
   return node_;
@@ -48,13 +61,9 @@ const bNode &NodeOperation::bnode() const
   return *node_->bnode();
 }
 
-bool NodeOperation::is_output_needed(StringRef identifier) const
+bool NodeOperation::should_compute_output(StringRef identifier)
 {
-  DOutputSocket output = node_.output_by_identifier(identifier);
-  if (output->logically_linked_sockets().is_empty()) {
-    return false;
-  }
-  return true;
+  return get_result(identifier).should_compute();
 }
 
 }  // namespace blender::viewport_compositor

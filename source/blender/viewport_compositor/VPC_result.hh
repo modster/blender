@@ -24,12 +24,31 @@ enum class ResultType : uint8_t {
 /* ------------------------------------------------------------------------------------------------
  * Result
  *
- * A class that represents an output of an operation. A result reside in a certain domain defined
- * by its size and transformation, see the discussion in VPC_domain.hh for more information. A
- * result either stores a single value or a texture. An operation will output a single value result
- * if that value would have been constant over the whole texture. Single value results are stored
- * in 1x1 textures to make them easily accessible in shaders. But the same value is also stored in
- * the value member of the result for any host-side processing. */
+ * A class that represents an output of an operation, which either stores a single value or a
+ * texture. An operation will output a single value result if that value would have been constant
+ * over the whole texture. Single value results are stored in 1x1 textures to make them easily
+ * accessible in shaders. But the same value is also stored in the value union member of the result
+ * for any host-side processing. The texture of the result is allocated from the texture pool
+ * referenced by the result.
+ *
+ * Results are reference counted and their textures are released once their reference count reaches
+ * zero. After constructing a result, the set_initial_reference_count method is called to declare
+ * the number of operations that needs this result. Once each operation that needs the result no
+ * longer needs it, the release method is called and the reference count is decremented, until it
+ * reaches zero, where the result's texture is then released. Since results are eventually
+ * decremented to zero by the end of every evaluation, the reference count is restored before every
+ * evaluation to its initial reference count by calling the reset method, which is why a separate
+ * member initial_reference_count_ is stored to keep track of the initial value.
+ *
+ * A result reside in a certain domain defined by its texture size and transformation, see the
+ * discussion in VPC_domain.hh for more information.
+ *
+ * A result can be a proxy result that merely wraps another master result, in which case, the
+ * result's value is the value of its master and all reference counting is delegated to the master.
+ * However, a proxy result can have a different domain from its master, which is what transform
+ * operations do, they output a proxy result from their input and transform its domain in someway.
+ * Proxy results can be created by calling the pass_through method, see that method for more
+ * details. */
 class Result {
  private:
   /* The base type of the texture or the type of the single value. */
@@ -43,10 +62,19 @@ class Result {
   /* The texture pool used to allocate the texture of the result, this should be initialized during
    * construction. */
   TexturePool *texture_pool_ = nullptr;
-  /* The number of users currently referencing and using this result. If this result have a master
-   * result, then this reference count is irrelevant and shadowed by the reference count of the
-   * master result. */
-  int reference_count_ = 0;
+  /* The number of operations that currently needs this result. At the time when the result is
+   * computed, this member will have a value that matches initial_reference_count_. Once each
+   * operation that needs the result no longer needs it, the release method is called and the
+   * reference count is decremented, until it reaches zero, where the result's texture is then
+   * released. If this result have a master result, then this reference count is irrelevant and
+   * shadowed by the reference count of the master result. */
+  int reference_count_;
+  /* The number of operations that reference and use this result at the time when it was initially
+   * computed. Since reference_count_ is decremented and always becomes zero at the end of the
+   * evaluation, this member is used to reset the reference count of the results for later
+   * evaluations by calling the reset method. This member is also used to determine if this result
+   * should be computed by calling the should_compute method. */
+  int initial_reference_count_;
   /* If the result is a single value, this member stores the value of the result, the value of
    * which will be identical to that stored in the texture member. The active union member depends
    * on the type of the result. This member is uninitialized and should not be used if the result
@@ -102,13 +130,16 @@ class Result {
 
   /* Pass this result through to a target result. This method makes the target result a copy of
    * this result, essentially having identical values between the two and consequently sharing the
-   * underlying texture. Additionally, this result is set to be the master of the target result, by
-   * setting the master member of the target. Finally, the reference count of the result is
-   * incremented by the reference count of the target result. This is typically called in the
-   * allocate method of an operation whose input texture will not change and can be passed to the
-   * output directly. It should be noted that such operations can still adjust other properties of
-   * the result, like its domain. So for instance, the transform operation passes its input through
-   * to its output because it will not change it, however, it may adjusts its domain. */
+   * underlying texture. An exception is the initial reference count, whose value is retained and
+   * not copied, because it is a property of the original result and is needed for correctly
+   * resetting the result before the next evaluation. Additionally, this result is set to be the
+   * master of the target result, by setting the master member of the target. Finally, the
+   * reference count of the result is incremented by the reference count of the target result. This
+   * is typically called in the allocate method of an operation whose input texture will not change
+   * and can be passed to the output directly. It should be noted that such operations can still
+   * adjust other properties of the result, like its domain. So for instance, the transform
+   * operation passes its input through to its output because it will not change it, however, it
+   * may adjusts its domain. */
   void pass_through(Result &target);
 
   /* Transform the result by the given transformation. This effectively pre-multiply the given
@@ -152,16 +183,32 @@ class Result {
    * texture. Otherwise, an undefined behavior is invoked. */
   void set_color_value(const float4 &value);
 
-  /* Increment the reference count of the result by the given count. This should be called when a
-   * user gets a reference to the result to use. If this result have a master result, the reference
-   * count of the master result is incremented instead. */
+  /* Set the value of initial_reference_count_, see that member for more details. This should be
+   * called after constructing the result to declare the number of operations that needs it. */
+  void set_initial_reference_count(int count);
+
+  /* Reset the result to prepare it for a new evaluation. This should be called before evaluating
+   * the operation that computes this result. First, set the value of reference_count_ to the value
+   * of initial_reference_count_ since reference_count_ may have already been decremented to zero
+   * in a previous evaluation. Second, set master_ to nullptr because the result may have been
+   * turned into a proxy result in a previous evaluation. Other fields don't need to be reset
+   * because they are runtime and overwritten during evaluation. */
+  void reset();
+
+  /* Increment the reference count of the result by the given count. If this result have a master
+   * result, the reference count of the master result is incremented instead. */
   void increment_reference_count(int count = 1);
 
-  /* Decrement the reference count of the result and release the result texture back into the
-   * texture pool if the reference count reaches zero. This should be called when a user that
-   * previously referenced and incremented the reference count of the result no longer needs it. If
-   * this result have a master result, the master result is released instead. */
+  /* Decrement the reference count of the result and release the its texture back into the texture
+   * pool if the reference count reaches zero. This should be called when an operation that used
+   * this result no longer needs it. If this result have a master result, the master result is
+   * released instead. */
   void release();
+
+  /* Returns true if this result should be computed and false otherwise. The result should be
+   * computed if its reference count is not zero, that is, its result is used by at least one
+   * operation. */
+  bool should_compute();
 
   /* Returns the type of the result. */
   ResultType type() const;

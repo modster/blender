@@ -34,6 +34,10 @@ ResultType get_node_socket_result_type(const SocketRef *socket);
 bool is_output_linked_to_node_conditioned(DOutputSocket output,
                                           FunctionRef<bool(DNode)> condition);
 
+/* Returns the number of inputs linked to the given output that satisfy the given condition.  */
+int number_of_inputs_linked_to_output_conditioned(DOutputSocket output,
+                                                  FunctionRef<bool(DInputSocket)> condition);
+
 /* A node is a GPU material node if it defines a method to get a GPU material node operation. */
 bool is_gpu_material_node(DNode node);
 

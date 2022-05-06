@@ -31,6 +31,8 @@ void Operation::evaluate()
 {
   evaluate_input_processors();
 
+  reset_results();
+
   execute();
 
   release_inputs();
@@ -44,7 +46,6 @@ Result &Operation::get_result(StringRef identifier)
 void Operation::map_input_to_result(StringRef identifier, Result *result)
 {
   results_mapped_to_inputs_.add_new(identifier, result);
-  result->increment_reference_count();
 }
 
 Domain Operation::compute_domain()
@@ -135,7 +136,6 @@ Result &Operation::get_input(StringRef identifier) const
 
 void Operation::switch_result_mapped_to_input(StringRef identifier, Result *result)
 {
-  get_input(identifier).release();
   results_mapped_to_inputs_.lookup(identifier) = result;
 }
 
@@ -184,6 +184,13 @@ void Operation::evaluate_input_processors()
     for (const std::unique_ptr<ProcessorOperation> &processor : processors) {
       processor->evaluate();
     }
+  }
+}
+
+void Operation::reset_results()
+{
+  for (Result &result : results_.values()) {
+    result.reset();
   }
 }
 

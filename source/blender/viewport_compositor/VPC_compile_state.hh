@@ -9,6 +9,7 @@
 #include "VPC_domain.hh"
 #include "VPC_gpu_material_operation.hh"
 #include "VPC_node_operation.hh"
+#include "VPC_scheduler.hh"
 
 namespace blender::viewport_compositor {
 
@@ -96,19 +97,15 @@ using namespace nodes::derived_node_tree_types;
  * the domain of the compile group is assumed to be the domain of the first node whose computed
  * domain is not an identity domain. Identity domains corresponds to single value results, so those
  * are always compatible with any domain. The domain of the compile group is computed and set in
- * the add_node_to_gpu_material_compile_group method. WHen processing a node, the computed domain
+ * the add_node_to_gpu_material_compile_group method. When processing a node, the computed domain
  * of node is compared to compile group domain in the should_compile_gpu_material_compile_group
  * method, noting that identity domains are always compatible. Node domains are computed in the
  * compute_gpu_material_node_domain method, which is analogous to Operation::compute_domain for
  * nodes that are not yet compiled. */
 class CompileState {
  private:
-  /* A contiguous subset of the node execution schedule that contains the group of nodes that will
-   * be compiled together into a GPU Material Operation. See the discussion in VPC_evaluator.hh for
-   * more information. */
-  SubSchedule gpu_material_compile_group_;
-  /* The domain of the GPU material compile group. */
-  Domain gpu_material_compile_group_domain_ = Domain::identity();
+  /* A reference to the node execution schedule that is being compiled. */
+  const Schedule &schedule_;
   /* Those two maps associate each node with the operation it was compiled into. Each node is
    * either compiled into a node operation and added to node_operations, or compiled into a GPU
    * material operation and added to gpu_material_operations. Those maps are used to retrieve the
@@ -116,8 +113,32 @@ class CompileState {
    * method for more information. */
   Map<DNode, NodeOperation *> node_operations_;
   Map<DNode, GPUMaterialOperation *> gpu_material_operations_;
+  /* A contiguous subset of the node execution schedule that contains the group of nodes that will
+   * be compiled together into a GPU Material Operation. See the discussion in VPC_evaluator.hh for
+   * more information. */
+  SubSchedule gpu_material_compile_group_;
+  /* The domain of the GPU material compile group. */
+  Domain gpu_material_compile_group_domain_ = Domain::identity();
 
  public:
+  /* Construct a compile state from the node execution schedule being compiled. */
+  CompileState(const Schedule &schedule);
+
+  /* Get a reference to the node execution schedule being compiled. */
+  const Schedule &get_schedule();
+
+  /* Add an association between the given node and the give node operation that the node was
+   * compiled into in the node_operations_ map. */
+  void map_node_to_node_operation(DNode node, NodeOperation *operation);
+
+  /* Add an association between the given node and the give GPU material operation that the node
+   * was compiled into in the gpu_material_operations_ map. */
+  void map_node_to_gpu_material_operation(DNode node, GPUMaterialOperation *operation);
+
+  /* Returns a reference to the result of the operation corresponding to the given output that the
+   * given output's node was compiled to. */
+  Result &get_result_from_output_socket(DOutputSocket output);
+
   /* Add the given node to the GPU material compile group. And if the domain of the GPU material
    * compile group is not yet determined or was determined to be an identity domain, update it to
    * the computed domain for the give node. */
@@ -139,18 +160,6 @@ class CompileState {
    *   group, then it can't be added to the group and the group is considered complete and should
    *   be compiled. */
   bool should_compile_gpu_material_compile_group(DNode node);
-
-  /* Add an association between the given node and the give node operation that the node was
-   * compiled into in the node_operations_ map. */
-  void map_node_to_node_operation(DNode node, NodeOperation *operation);
-
-  /* Add an association between the given node and the give GPU material operation that the node
-   * was compiled into in the gpu_material_operations_ map. */
-  void map_node_to_gpu_material_operation(DNode node, GPUMaterialOperation *operation);
-
-  /* Returns a reference to the result of the operation corresponding to the given output that the
-   * given output's node was compiled to. */
-  Result &get_result_from_output_socket(DOutputSocket output);
 
  private:
   /* Compute the node domain of the given GPU material node. This is analogous to the
