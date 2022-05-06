@@ -1129,7 +1129,7 @@ void DRW_sculpt_debug_cb(void *user_data,
     DRW_debug_bbox(&bb, (float[4]){0.5f, 0.5f, 0.5f, 0.6f});
   }
 #else /* Color coded leaf bounds. */
-  if (flag & PBVH_Leaf) {
+  if (flag & (PBVH_Leaf | PBVH_TexLeaf)) {
     DRW_debug_bbox(&bb, SCULPT_DEBUG_COLOR((*debug_node_nr)++));
   }
 #endif

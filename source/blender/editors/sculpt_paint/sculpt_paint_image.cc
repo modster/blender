@@ -405,26 +405,31 @@ bool SCULPT_use_image_paint_brush(PaintModeSettings *settings, Object *ob)
   return BKE_paint_canvas_image_get(settings, ob, &image, &image_user);
 }
 
-void SCULPT_do_paint_brush_image(
-    PaintModeSettings *paint_mode_settings, Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
+void SCULPT_do_paint_brush_image(PaintModeSettings *paint_mode_settings,
+                                 Sculpt *sd,
+                                 Object *ob,
+                                 PBVHNode **nodes,
+                                 int totnode,
+                                 PBVHNode **texnodes,
+                                 int texnodes_num)
 {
   Brush *brush = BKE_paint_brush(&sd->paint);
 
   TexturePaintingUserData data = {nullptr};
   data.ob = ob;
   data.brush = brush;
-  data.nodes = nodes;
+  data.nodes = texnodes;
 
   if (!ImageData::init_active_image(ob, &data.image_data, paint_mode_settings)) {
     return;
   }
 
   TaskParallelSettings settings;
-  BKE_pbvh_parallel_range_settings(&settings, true, totnode);
-  BLI_task_parallel_range(0, totnode, &data, do_paint_pixels, &settings);
+  BKE_pbvh_parallel_range_settings(&settings, true, texnodes_num);
+  BLI_task_parallel_range(0, texnodes_num, &data, do_paint_pixels, &settings);
 
   TaskParallelSettings settings_flush;
-  BKE_pbvh_parallel_range_settings(&settings_flush, false, totnode);
-  BLI_task_parallel_range(0, totnode, &data, do_mark_dirty_regions, &settings_flush);
+  BKE_pbvh_parallel_range_settings(&settings_flush, false, texnodes_num);
+  BLI_task_parallel_range(0, texnodes_num, &data, do_mark_dirty_regions, &settings_flush);
 }
 }

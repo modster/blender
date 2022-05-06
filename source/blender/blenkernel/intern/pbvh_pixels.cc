@@ -14,6 +14,7 @@
 #include "BLI_math.h"
 #include "BLI_task.h"
 
+#include "BKE_global.h"
 #include "BKE_image_wrappers.hh"
 
 #include "bmesh.h"
@@ -21,12 +22,6 @@
 #include "pbvh_intern.h"
 
 namespace blender::bke::pbvh::pixels {
-
-/**
- * During debugging this check could be enabled.
- * It will write to each image pixel that is covered by the PBVH.
- */
-constexpr bool USE_WATERTIGHT_CHECK = false;
 
 /**
  * Calculate the delta of two neighbor UV coordinates in the given image buffer.
@@ -53,6 +48,192 @@ static float2 calc_barycentric_delta_x(const ImBuf *image_buffer,
   const float2 end_uv(float(x + 1) / image_buffer->x, float(y) / image_buffer->y);
   return calc_barycentric_delta(uvs, start_uv, end_uv);
 }
+
+int count_node_pixels(PBVHNode &node)
+{
+  if (!node.pixels.node_data) {
+    return 0;
+  }
+
+  NodeData &data = BKE_pbvh_pixels_node_data_get(node);
+
+  int totpixel = 0;
+
+  for (UDIMTilePixels &tile : data.tiles) {
+    for (PackedPixelRow &row : tile.pixel_rows) {
+      totpixel += row.num_pixels;
+    }
+  }
+
+  return totpixel;
+}
+
+ATTR_NO_OPT void split_pixel_node(
+    PBVH *pbvh, int node_i, Mesh *mesh, Image *image, ImageUser *image_user)
+{
+  BB cb;
+  PBVHNode *node = pbvh->nodes + node_i;
+
+  cb = node->vb;
+
+  /* Find widest axis and its midpoint */
+  const int axis = BB_widest_axis(&cb);
+  const float mid = (cb.bmax[axis] + cb.bmin[axis]) * 0.5f;
+
+  const int child1_i = pbvh->totnode;
+  const int child2_i = child1_i + 1;
+
+  node->flag = (PBVHNodeFlags)((int)node->flag & (int)~PBVH_TexLeaf);
+  pbvh_grow_nodes(pbvh, pbvh->totnode + 2);
+
+  node = pbvh->nodes + node_i;
+  PBVHNode *child1 = pbvh->nodes + child1_i;
+  PBVHNode *child2 = pbvh->nodes + child2_i;
+
+  node->children_offset = child1_i;
+
+  child1->flag = PBVH_TexLeaf;
+  child2->flag = PBVH_TexLeaf;
+
+  child1->vb = cb;
+  child1->vb.bmax[axis] = mid;
+
+  child2->vb = cb;
+  child2->vb.bmin[axis] = mid;
+
+  NodeData &data = BKE_pbvh_pixels_node_data_get(pbvh->nodes[node_i]);
+
+  NodeData *data1 = MEM_new<NodeData>(__func__);
+  NodeData *data2 = MEM_new<NodeData>(__func__);
+  child1->pixels.node_data = static_cast<void *>(data1);
+  child2->pixels.node_data = static_cast<void *>(data2);
+
+  data1->triangles = data.triangles;
+  data2->triangles = data.triangles;
+
+  data1->tiles.resize(data.tiles.size());
+  data2->tiles.resize(data.tiles.size());
+
+  for (int i : IndexRange(data.tiles.size())) {
+    UDIMTilePixels &tile = data.tiles[i];
+    UDIMTilePixels &tile1 = data1->tiles[i];
+    UDIMTilePixels &tile2 = data2->tiles[i];
+
+    tile1.tile_number = tile2.tile_number = tile.tile_number;
+    tile1.flags.dirty = tile2.flags.dirty = 0;
+  }
+
+  ImageUser image_user2 = *image_user;
+
+  for (int i : IndexRange(data.tiles.size())) {
+    const UDIMTilePixels &tile = data.tiles[i];
+
+    image_user2.tile = tile.tile_number;
+
+    ImBuf *image_buffer = BKE_image_acquire_ibuf(image, &image_user2, nullptr);
+    if (image_buffer == nullptr) {
+      continue;
+    }
+
+    for (const PackedPixelRow &row : tile.pixel_rows) {
+      UDIMTilePixels *tile1 = &data1->tiles[i];
+      UDIMTilePixels *tile2 = &data2->tiles[i];
+
+      TrianglePaintInput &tri = data.triangles.paint_input[row.triangle_index];
+
+      float verts[3][3];
+
+      copy_v3_v3(verts[0], mesh->mvert[tri.vert_indices[0]].co);
+      copy_v3_v3(verts[1], mesh->mvert[tri.vert_indices[1]].co);
+      copy_v3_v3(verts[2], mesh->mvert[tri.vert_indices[2]].co);
+
+      float2 delta = tri.delta_barycentric_coord_u;
+      float2 uv1 = row.start_barycentric_coord;
+      float2 uv2 = row.start_barycentric_coord + delta * (float)row.num_pixels;
+
+      float co1[3];
+      float co2[3];
+
+      interp_barycentric_tri_v3(verts, uv1[0], uv1[1], co1);
+      interp_barycentric_tri_v3(verts, uv2[0], uv2[1], co2);
+
+      /* Are we spanning the midpoint? */
+      if ((co1[axis] <= mid) != (co2[axis] <= mid)) {
+        PackedPixelRow row1 = row;
+        float t;
+
+        if (mid < co1[axis]) {
+          t = 1.0f - (mid - co2[axis]) / (co1[axis] - co2[axis]);
+        }
+        else {
+          t = (mid - co1[axis]) / (co2[axis] - co1[axis]);
+        }
+
+        int num_pixels = (int)floorf((float)row.num_pixels * t);
+
+        if (num_pixels) {
+          row1.num_pixels = num_pixels;
+          tile1->pixel_rows.append(row1);
+        }
+
+        if (num_pixels != row.num_pixels) {
+          PackedPixelRow row2 = row;
+
+          row2.num_pixels = row.num_pixels - num_pixels;
+
+          row2.start_barycentric_coord = row.start_barycentric_coord +
+                                         tri.delta_barycentric_coord_u * (float)num_pixels;
+          row2.start_image_coordinate = row.start_image_coordinate;
+          row2.start_image_coordinate[0] += num_pixels;
+
+          tile2->pixel_rows.append(row2);
+        }
+      }
+      else if (co1[axis] <= mid && co2[axis] <= mid) {
+        tile1->pixel_rows.append(row);
+      }
+      else {
+        tile2->pixel_rows.append(row);
+      }
+    }
+
+    BKE_image_release_ibuf(image, image_buffer, nullptr);
+  }
+
+  pbvh_pixels_free(node);
+}
+
+void split_pixel_nodes(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
+{
+  if (G.debug_value == 891) {
+    return;
+  }
+
+  if (!pbvh->depth_limit) {
+    pbvh->depth_limit = 25; /* TODO: move into a constant */
+  }
+
+  if (!pbvh->pixel_leaf_limit) {
+    pbvh->pixel_leaf_limit = 256 * 256; /* TODO: move into a constant */
+  }
+
+  for (int i = 0; i < pbvh->totnode; i++) {
+    PBVHNode &node = pbvh->nodes[i];
+
+    bool ok = node.flag & PBVH_TexLeaf;
+    ok = ok && (count_node_pixels(node) > pbvh->pixel_leaf_limit);
+
+    if (ok) {
+      split_pixel_node(pbvh, i, mesh, image, image_user);
+    }
+  }
+}
+
+/**
+ * During debugging this check could be enabled.
+ * It will write to each image pixel that is covered by the PBVH.
+ */
+constexpr bool USE_WATERTIGHT_CHECK = false;
 
 static void extract_barycentric_pixels(UDIMTilePixels &tile_data,
                                        const ImBuf *image_buffer,
@@ -172,6 +353,9 @@ static bool should_pixels_be_updated(PBVHNode *node)
   if ((node->flag & PBVH_Leaf) == 0) {
     return false;
   }
+  if (node->children_offset != 0) {
+    return false;
+  }
   if ((node->flag & PBVH_RebuildPixels) != 0) {
     return true;
   }
@@ -275,17 +459,17 @@ static void apply_watertight_check(PBVH *pbvh, Image *image, ImageUser *image_us
   BKE_image_partial_update_mark_full_update(image);
 }
 
-static void update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
+static bool update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
 {
   Vector<PBVHNode *> nodes_to_update;
 
   if (!find_nodes_to_update(pbvh, nodes_to_update)) {
-    return;
+    return false;
   }
 
   MLoopUV *ldata_uv = static_cast<MLoopUV *>(CustomData_get_layer(&mesh->ldata, CD_MLOOPUV));
   if (ldata_uv == nullptr) {
-    return;
+    return false;
   }
 
   for (PBVHNode *node : nodes_to_update) {
@@ -310,6 +494,15 @@ static void update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image
   /* Clear the UpdatePixels flag. */
   for (PBVHNode *node : nodes_to_update) {
     node->flag = static_cast<PBVHNodeFlags>(node->flag & ~PBVH_RebuildPixels);
+  }
+
+  /* Add PBVH_TexLeaf flag */
+  for (int i : IndexRange(pbvh->totnode)) {
+    PBVHNode &node = pbvh->nodes[i];
+
+    if (node.flag & PBVH_Leaf) {
+      node.flag = (PBVHNodeFlags)((int)node.flag | (int)PBVH_TexLeaf);
+    }
   }
 
 //#define DO_PRINT_STATISTICS
@@ -338,6 +531,8 @@ static void update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image
            float(compressed_data_len) / num_pixels);
   }
 #endif
+
+  return true;
 }
 
 NodeData &BKE_pbvh_pixels_node_data_get(PBVHNode &node)
@@ -367,7 +562,6 @@ void BKE_pbvh_pixels_mark_image_dirty(PBVHNode &node, Image &image, ImageUser &i
     node_data->flags.dirty = false;
   }
 }
-
 }  // namespace blender::bke::pbvh::pixels
 
 extern "C" {
@@ -375,7 +569,9 @@ using namespace blender::bke::pbvh::pixels;
 
 void BKE_pbvh_build_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
 {
-  update_pixels(pbvh, mesh, image, image_user);
+  if (update_pixels(pbvh, mesh, image, image_user)) {
+    split_pixel_nodes(pbvh, mesh, image, image_user);
+  }
 }
 
 void pbvh_pixels_free(PBVHNode *node)
