@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
+#include "BLI_float3x3.hh"
 #include "BLI_math_vec_types.hh"
-#include "BLI_transformation_2d.hh"
 
 #include "GPU_shader.h"
 #include "GPU_state.h"
@@ -111,7 +111,7 @@ void Result::pass_through(Result &target)
   target.master_ = this;
 }
 
-void Result::transform(const Transformation2D &transformation)
+void Result::transform(const float3x3 &transformation)
 {
   domain_.transform(transformation);
 }

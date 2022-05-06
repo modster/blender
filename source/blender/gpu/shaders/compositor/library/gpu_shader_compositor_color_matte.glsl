@@ -1,4 +1,4 @@
-#pragma BLENDER_REQUIRE(gpu_shader_common_color_utilities.glsl)
+#pragma BLENDER_REQUIRE(gpu_shader_common_color_utils.glsl)
 
 void node_composite_color_matte(vec4 color,
                                 vec4 key,

@@ -1,4 +1,4 @@
-#pragma BLENDER_REQUIRE(gpu_shader_common_color_utilities.glsl)
+#pragma BLENDER_REQUIRE(gpu_shader_common_color_utils.glsl)
 
 void separate_color_rgb(vec4 col, out float r, out float g, out float b)
 {

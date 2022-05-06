@@ -2,8 +2,8 @@
 
 #pragma once
 
+#include "BLI_float3x3.hh"
 #include "BLI_math_vec_types.hh"
-#include "BLI_transformation_2d.hh"
 
 #include "GPU_shader.h"
 #include "GPU_texture.h"
@@ -144,7 +144,7 @@ class Result {
 
   /* Transform the result by the given transformation. This effectively pre-multiply the given
    * transformation by the current transformation of the domain of the result. */
-  void transform(const Transformation2D &transformation);
+  void transform(const float3x3 &transformation);
 
   /* Get a reference to the realization options of this result. See the RealizationOptions class
    * for more information. */

@@ -1,4 +1,4 @@
-#pragma BLENDER_REQUIRE(gpu_shader_common_color_utilities.glsl)
+#pragma BLENDER_REQUIRE(gpu_shader_common_color_utils.glsl)
 
 void color_to_luminance(vec4 color, const vec3 luminance_coefficients, out float result)
 {

@@ -1,7 +1,3 @@
-/* Limits. */
-
-#define FLT_EPSILON 1.192092896e-07F
-
 /* Float Math */
 
 float safe_divide(float a, float b)
@@ -122,6 +118,11 @@ void invert_z(vec3 v, out vec3 outv)
 void vector_normalize(vec3 normal, out vec3 outnormal)
 {
   outnormal = normalize(normal);
+}
+
+void vector_copy(vec3 normal, out vec3 outnormal)
+{
+  outnormal = normal;
 }
 
 vec3 fallback_pow(vec3 a, float b, vec3 fallback)

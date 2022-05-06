@@ -4,8 +4,8 @@
 
 #include <cstdint>
 
+#include "BLI_float3x3.hh"
 #include "BLI_math_vec_types.hh"
-#include "BLI_transformation_2d.hh"
 
 namespace blender::viewport_compositor {
 
@@ -110,7 +110,7 @@ class Domain {
   int2 size;
   /* The 2D transformation of the domain defining its translation in pixels, rotation, and scale in
    * 2D space. */
-  Transformation2D transformation;
+  float3x3 transformation;
   /* The options that describe how this domain prefer to be realized on some other domain. See the
    * RealizationOptions class for more information. */
   RealizationOptions realization_options;
@@ -119,11 +119,11 @@ class Domain {
   /* A size only constructor that sets the transformation to identity. */
   Domain(int2 size);
 
-  Domain(int2 size, Transformation2D transformation);
+  Domain(int2 size, float3x3 transformation);
 
   /* Transform the domain by the given transformation. This effectively pre-multiply the given
    * transformation by the current transformation of the domain. */
-  void transform(const Transformation2D &transformation);
+  void transform(const float3x3 &transformation);
 
   /* Returns a domain of size 1x1 and an identity transformation. */
   static Domain identity();

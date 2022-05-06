@@ -6,8 +6,8 @@
  */
 
 #include "BLI_assert.h"
+#include "BLI_float3x3.hh"
 #include "BLI_math_vector.h"
-#include "BLI_transformation_2d.hh"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -71,7 +71,7 @@ class TransformOperation : public NodeOperation {
     const float rotation = get_input("Angle").get_float_value_default(0.0f);
     const float2 scale = float2(get_input("Scale").get_float_value_default(1.0f));
 
-    const Transformation2D transformation = Transformation2D::from_translation_rotation_scale(
+    const float3x3 transformation = float3x3::from_translation_rotation_scale(
         translation, rotation, scale);
 
     result.transform(transformation);

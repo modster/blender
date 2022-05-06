@@ -1,5 +1,5 @@
-#pragma BLENDER_REQUIRE(gpu_shader_common_math_utilities.glsl)
-#pragma BLENDER_REQUIRE(gpu_shader_common_color_utilities.glsl)
+#pragma BLENDER_REQUIRE(gpu_shader_common_math_utils.glsl)
+#pragma BLENDER_REQUIRE(gpu_shader_common_color_utils.glsl)
 
 void node_composite_color_correction(vec4 color,
                                      float mask,

@@ -1,29 +1,28 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
+#include "BLI_float3x3.hh"
 #include "BLI_math_vec_types.hh"
-#include "BLI_transformation_2d.hh"
 
 #include "VPC_domain.hh"
 
 namespace blender::viewport_compositor {
 
-Domain::Domain(int2 size) : size(size), transformation(Transformation2D::identity())
+Domain::Domain(int2 size) : size(size), transformation(float3x3::identity())
 {
 }
 
-Domain::Domain(int2 size, Transformation2D transformation)
-    : size(size), transformation(transformation)
+Domain::Domain(int2 size, float3x3 transformation) : size(size), transformation(transformation)
 {
 }
 
-void Domain::transform(const Transformation2D &input_transformation)
+void Domain::transform(const float3x3 &input_transformation)
 {
   transformation = input_transformation * transformation;
 }
 
 Domain Domain::identity()
 {
-  return Domain(int2(1), Transformation2D::identity());
+  return Domain(int2(1), float3x3::identity());
 }
 
 bool operator==(const Domain &a, const Domain &b)

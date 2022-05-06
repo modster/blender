@@ -5,8 +5,8 @@
  * \ingroup cmpnodes
  */
 
+#include "BLI_float3x3.hh"
 #include "BLI_math_vec_types.hh"
-#include "BLI_transformation_2d.hh"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -69,7 +69,7 @@ class TranslateOperation : public NodeOperation {
     }
 
     const float2 translation = float2(x, y);
-    const Transformation2D transformation = Transformation2D::from_translation(translation);
+    const float3x3 transformation = float3x3::from_translation(translation);
 
     result.transform(transformation);
     result.get_realization_options().repeat_x = get_repeat_x();

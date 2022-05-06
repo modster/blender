@@ -1,4 +1,4 @@
-#pragma BLENDER_REQUIRE(gpu_shader_common_color_utilities.glsl)
+#pragma BLENDER_REQUIRE(gpu_shader_common_color_utils.glsl)
 
 /* ** Combine/Separate XYZ ** */
 

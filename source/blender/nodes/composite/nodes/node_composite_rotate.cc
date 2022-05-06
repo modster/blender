@@ -6,7 +6,7 @@
  */
 
 #include "BLI_assert.h"
-#include "BLI_transformation_2d.hh"
+#include "BLI_float3x3.hh"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -57,7 +57,7 @@ class RotateOperation : public NodeOperation {
 
     const float rotation = get_input("Degr").get_float_value_default(0.0f);
 
-    const Transformation2D transformation = Transformation2D::from_rotation(rotation);
+    const float3x3 transformation = float3x3::from_rotation(rotation);
 
     result.transform(transformation);
     result.get_realization_options().interpolation = get_interpolation();

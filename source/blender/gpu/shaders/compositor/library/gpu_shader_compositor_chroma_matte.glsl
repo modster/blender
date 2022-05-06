@@ -1,4 +1,4 @@
-#pragma BLENDER_REQUIRE(gpu_shader_common_math_utilities.glsl)
+#pragma BLENDER_REQUIRE(gpu_shader_common_math_utils.glsl)
 
 /* Algorithm from the book Video Demystified. Chapter 7. Chroma Keying. */
 void node_composite_chroma_matte(vec4 color,

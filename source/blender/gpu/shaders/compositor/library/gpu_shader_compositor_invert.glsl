@@ -1,4 +1,4 @@
-#pragma BLENDER_REQUIRE(gpu_shader_common_color_utilities.glsl)
+#pragma BLENDER_REQUIRE(gpu_shader_common_color_utils.glsl)
 
 void node_composite_invert(float fac, vec4 color, float do_rgb, float do_alpha, out vec4 result)
 {

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
+#include "BLI_float3x3.hh"
 #include "BLI_math_vec_types.hh"
-#include "BLI_transformation_2d.hh"
 #include "BLI_utildefines.h"
 
 #include "GPU_shader.h"
@@ -38,19 +38,19 @@ void RealizeOnDomainProcessorOperation::execute()
   GPU_shader_bind(shader);
 
   /* Transform the input space into the domain space. */
-  const Transformation2D local_transformation = input.domain().transformation *
-                                                domain_.transformation.inverted();
+  const float3x3 local_transformation = input.domain().transformation *
+                                        domain_.transformation.inverted();
 
-  /* Set the pivot of the transformation to be the center of the domain.  */
-  const float2 pivot = float2(domain_.size) / 2.0f;
-  const Transformation2D pivoted_transformation = local_transformation.set_pivot(pivot);
+  /* Set the origin of the transformation to be the center of the domain.  */
+  const float3x3 transformation = float3x3::from_origin_transformation(
+      local_transformation, float2(domain_.size) / 2.0f);
 
   /* Invert the transformation because the shader transforms the domain coordinates instead of the
    * input image itself and thus expect the inverse. */
-  const Transformation2D inverse_transformation = pivoted_transformation.inverted();
+  const float3x3 inverse_transformation = transformation.inverted();
 
   /* Set the inverse of the transform to the shader. */
-  GPU_shader_uniform_mat3(shader, "inverse_transformation", inverse_transformation.matrix());
+  GPU_shader_uniform_mat3(shader, "inverse_transformation", inverse_transformation.ptr());
 
   /* The texture sampler should use bilinear interpolation for both the bilinear and bicubic
    * cases, as the logic used by the bicubic realization shader expects textures to use bilinear
