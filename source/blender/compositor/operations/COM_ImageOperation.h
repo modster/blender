@@ -78,6 +78,7 @@ class ImageOperation : public BaseImageOperation {
   void update_memory_buffer_partial(MemoryBuffer *output,
                                     const rcti &area,
                                     Span<MemoryBuffer *> inputs) override;
+  std::unique_ptr<MetaData> get_meta_data() override;
 };
 class ImageAlphaOperation : public BaseImageOperation {
  public:

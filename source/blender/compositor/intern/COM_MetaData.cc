@@ -3,6 +3,7 @@
 
 #include "COM_MetaData.h"
 
+#include "BKE_idprop.h"
 #include "BKE_image.h"
 
 #include "RE_pipeline.h"
@@ -12,6 +13,17 @@ namespace blender::compositor {
 void MetaData::add(const blender::StringRef key, const blender::StringRef value)
 {
   entries_.add(key, value);
+}
+
+static void add_property(IDProperty *id_prop, void *user_data)
+{
+  MetaData *meta_data = static_cast<MetaData *>(user_data);
+  meta_data->add(id_prop->name, IDP_String(id_prop));
+}
+
+void MetaData::add(IDProperty *id_prop)
+{
+  IDP_foreach_property(id_prop, IDP_TYPE_FILTER_STRING, add_property, this);
 }
 
 void MetaData::add_cryptomatte_entry(const blender::StringRef layer_name,
