@@ -3250,8 +3250,13 @@ static void lineart_destroy_isec_thread(LineartIsecData *d)
 static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
                                                         LineartTriangle *tri,
                                                         LineartBoundingArea *ba,
-                                                        LineartIsecThread *th)
+                                                        LineartIsecThread *th,
+                                                        int up_to)
 {
+  if (!th) {
+    return;
+  }
+
   /* Testing_triangle->testing[0] is used to store pairing triangle reference.
    * See definition of LineartTriangleThread for more info. */
   LineartTriangle *testing_triangle;
@@ -3259,18 +3264,12 @@ static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
 
   double *G0 = tri->v[0]->gloc, *G1 = tri->v[1]->gloc, *G2 = tri->v[2]->gloc;
 
-  /* If this is not the smallest subdiv bounding area. */
-  // if (ba->child[0]) {
-  //  lineart_triangle_intersect_in_bounding_area(rb, tri, ba->child[0], th);
-  //  lineart_triangle_intersect_in_bounding_area(rb, tri, ba->child[1], th);
-  //  lineart_triangle_intersect_in_bounding_area(rb, tri, ba->child[2], th);
-  //  lineart_triangle_intersect_in_bounding_area(rb, tri, ba->child[3], th);
-  //  return;
-  //}
-
   /* If this _is_ the smallest subdiv bounding area, then do the intersections there. */
-  for (int i = 0; i < ba->triangle_count; i++) {
-    testing_triangle = ba->linked_triangles[i];
+  for (int i = 0; i < up_to; i++) {
+    do {
+      testing_triangle = ba->linked_triangles[i];
+    } while (testing_triangle == NULL);
+
     tt = (LineartTriangleThread *)testing_triangle;
 
     if (testing_triangle == tri || tt->testing_e[th->thread_id] == (LineartEdge *)tri) {
@@ -4091,6 +4090,11 @@ __attribute__((optimize("O0"))) static void lineart_bounding_area_link_triangle_
       /* Successfully grabbed a viable index to insert the triangle into.
        * Insert into [old_tri_index] for correct array offset starting from [0]. */
       old_ba->linked_triangles[old_tri_index] = tri;
+
+      /* Do intersections in place. */
+      if (rb->use_intersections) {
+        lineart_triangle_intersect_in_bounding_area(rb, tri, old_ba, th, old_tri_index - 1);
+      }
       /* Not occupying tile for adding triangles, reduce user count. */
       // atomic_sub_and_fetch_uint32(&old_ba->user_count, 1);
       break;
@@ -4442,15 +4446,21 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
     }
     /* We don't care about removing duplicated vert in this method, chaning can handle that, and it
      * saves us from using locks and look up tables. */
-    LineartVert *v = lineart_mem_acquire(&rb->render_data_pool,
-                                         sizeof(LineartVert) * th->current * 2);
+    LineartVertIntersection *v = lineart_mem_acquire(
+        &rb->render_data_pool, sizeof(LineartVertIntersection) * th->current * 2);
     LineartEdge *e = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdge) * th->current);
     LineartEdgeSegment *es = lineart_mem_acquire(&rb->render_data_pool,
                                                  sizeof(LineartEdgeSegment) * th->current);
     for (int j = 0; j < th->current; j++) {
-      LineartVert *v1 = v;
-      LineartVert *v2 = v + 1;
+      LineartVertIntersection *v1i = v;
+      LineartVertIntersection *v2i = v + 1;
       LineartIsecSingle *is = &th->array[j];
+      v1i->intersecting_with = is->tri1;
+      v2i->intersecting_with = is->tri2;
+      LineartVert *v1 = (LineartVert *)v1i;
+      LineartVert *v2 = (LineartVert *)v2i;
+      v1->flag |= LRT_VERT_HAS_INTERSECTION_DATA;
+      v2->flag |= LRT_VERT_HAS_INTERSECTION_DATA;
       copy_v3db_v3fl(v1->gloc, is->v1);
       copy_v3db_v3fl(v2->gloc, is->v2);
       /* The intersection line has been generated only in geometry space, so we need to transform
