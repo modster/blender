@@ -239,6 +239,9 @@ typedef struct LineartRenderBuffer {
   ListBase line_buffer_pointers;
   ListBase triangle_buffer_pointers;
 
+  LineartElementLinkNode *isect_scheduled_up_to;
+  int isect_scheduled_up_to_index;
+
   /** This one's memory is not from main pool and is free()ed after culling stage. */
   ListBase triangle_adjacent_pointers;
 
