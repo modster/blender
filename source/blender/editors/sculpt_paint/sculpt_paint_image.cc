@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright 2022 Blender Foundation. All rights reserved. */
 
+/* Paint a color made from hash of node pointer. */
+//#define DEBUG_PIXEL_NODES
+
 #include "DNA_image_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
@@ -13,6 +16,9 @@
 #include "BLI_math.h"
 #include "BLI_math_color_blend.h"
 #include "BLI_task.h"
+#ifdef DEBUG_PIXEL_NODES
+#  include "BLI_rand.h"
+#endif
 
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
@@ -175,6 +181,15 @@ template<typename ImageBuffer> class PaintingKernel {
           ss, brush, pixel_pos, sqrtf(test.dist), normal, face_normal, mask, 0, thread_id);
       float4 paint_color = brush_color * falloff_strength * brush_strength;
       float4 buffer_color;
+
+#ifdef DEBUG_PIXEL_NODES
+      if ((pixel_row.start_image_coordinate.y >> 3) & 1) {
+        paint_color[0] *= 0.5f;
+        paint_color[1] *= 0.5f;
+        paint_color[2] *= 0.5f;
+      }
+#endif
+
       blend_color_mix_float(buffer_color, color, paint_color);
       buffer_color *= brush->alpha;
       IMB_blend_color_float(color, color, buffer_color, static_cast<IMB_BlendMode>(brush->blend));
@@ -187,20 +202,18 @@ template<typename ImageBuffer> class PaintingKernel {
     return pixels_painted;
   }
 
-  void init_brush_color(ImBuf *image_buffer)
+  void init_brush_color(ImBuf *image_buffer, float in_brush_color[3])
   {
     const char *to_colorspace = image_accessor.get_colorspace_name(image_buffer);
     if (last_used_color_space == to_colorspace) {
       return;
     }
-    copy_v3_v3(brush_color,
-               ss->cache->invert ? BKE_brush_secondary_color_get(ss->scene, brush) :
-                                   BKE_brush_color_get(ss->scene, brush));
+
     /* NOTE: Brush colors are stored in sRGB. We use math color to follow other areas that
      * use brush colors. From there on we use IMB_colormanagement to convert the brush color to the
      * colorspace of the texture. This isn't ideal, but would need more refactoring to make sure
      * that brush colors are stored in scene linear by default. */
-    srgb_to_linearrgb_v3_v3(brush_color, brush_color);
+    srgb_to_linearrgb_v3_v3(brush_color, in_brush_color);
     brush_color[3] = 1.0f;
 
     const char *from_colorspace = IMB_colormanagement_role_colorspace_name_get(
@@ -313,6 +326,22 @@ static void do_paint_pixels(void *__restrict userdata,
   PaintingKernel<ImageBufferFloat4> kernel_float4(ss, brush, thread_id, mvert);
   PaintingKernel<ImageBufferByte4> kernel_byte4(ss, brush, thread_id, mvert);
 
+  float brush_color[4];
+
+#ifdef DEBUG_PIXEL_NODES
+  RNG *rng = BLI_rng_new(POINTER_AS_UINT(node));
+
+  brush_color[0] = BLI_rng_get_float(rng);
+  brush_color[1] = BLI_rng_get_float(rng);
+  brush_color[2] = BLI_rng_get_float(rng);
+#else
+  copy_v3_v3(brush_color,
+             ss->cache->invert ? BKE_brush_secondary_color_get(ss->scene, brush) :
+                                 BKE_brush_color_get(ss->scene, brush));
+#endif
+
+  brush_color[3] = 1.0f;
+
   ImageUser image_user = *data->image_data.image_user;
   bool pixels_updated = false;
   for (UDIMTilePixels &tile_data : node_data.tiles) {
@@ -327,10 +356,10 @@ static void do_paint_pixels(void *__restrict userdata,
         }
 
         if (image_buffer->rect_float != nullptr) {
-          kernel_float4.init_brush_color(image_buffer);
+          kernel_float4.init_brush_color(image_buffer, brush_color);
         }
         else {
-          kernel_byte4.init_brush_color(image_buffer);
+          kernel_byte4.init_brush_color(image_buffer, brush_color);
         }
 
         for (const PackedPixelRow &pixel_row : tile_data.pixel_rows) {

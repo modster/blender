@@ -68,13 +68,17 @@ int count_node_pixels(PBVHNode &node)
   return totpixel;
 }
 
-ATTR_NO_OPT void split_pixel_node(
-    PBVH *pbvh, int node_i, Mesh *mesh, Image *image, ImageUser *image_user)
+ATTR_NO_OPT static void split_pixel_node(
+    PBVH *pbvh, int node_i, Mesh *mesh, Image *image, ImageUser *image_user, int depth)
 {
   BB cb;
   PBVHNode *node = pbvh->nodes + node_i;
 
   cb = node->vb;
+
+  if (depth >= pbvh->depth_limit || count_node_pixels(*node) <= pbvh->pixel_leaf_limit) {
+    return;
+  }
 
   /* Find widest axis and its midpoint */
   const int axis = BB_widest_axis(&cb);
@@ -164,6 +168,8 @@ ATTR_NO_OPT void split_pixel_node(
 
         if (mid < co1[axis]) {
           t = 1.0f - (mid - co2[axis]) / (co1[axis] - co2[axis]);
+
+          SWAP(UDIMTilePixels *, tile1, tile2);
         }
         else {
           t = (mid - co1[axis]) / (co2[axis] - co1[axis]);
@@ -201,30 +207,31 @@ ATTR_NO_OPT void split_pixel_node(
   }
 
   pbvh_pixels_free(node);
+
+  split_pixel_node(pbvh, child1_i, mesh, image, image_user, depth + 1);
+  split_pixel_node(pbvh, child2_i, mesh, image, image_user, depth + 1);
 }
 
-void split_pixel_nodes(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
+static void split_pixel_nodes(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
 {
   if (G.debug_value == 891) {
     return;
   }
 
   if (!pbvh->depth_limit) {
-    pbvh->depth_limit = 25; /* TODO: move into a constant */
+    pbvh->depth_limit = 40; /* TODO: move into a constant */
   }
 
   if (!pbvh->pixel_leaf_limit) {
     pbvh->pixel_leaf_limit = 256 * 256; /* TODO: move into a constant */
   }
 
-  for (int i = 0; i < pbvh->totnode; i++) {
+  int totnode = pbvh->totnode;
+  for (int i = 0; i < totnode; i++) {
     PBVHNode &node = pbvh->nodes[i];
 
-    bool ok = node.flag & PBVH_TexLeaf;
-    ok = ok && (count_node_pixels(node) > pbvh->pixel_leaf_limit);
-
-    if (ok) {
-      split_pixel_node(pbvh, i, mesh, image, image_user);
+    if (node.flag & PBVH_TexLeaf) {
+      split_pixel_node(pbvh, i, mesh, image, image_user, 0);
     }
   }
 }
