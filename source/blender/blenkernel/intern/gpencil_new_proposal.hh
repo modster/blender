@@ -64,7 +64,7 @@ typedef struct GPFrame {
    * The curves in this frame. Each individual curve is a single stroke. The CurvesGeometry
    * structure also stores attributes on the strokes and points.
    */
-  CurvesGeometry strokes;
+  CurvesGeometry *strokes;
 
   /**
    * The frame flag.

@@ -37,7 +37,135 @@ class GPLayerGroup : ::GPLayerGroup {
 
 class GPDataRuntime {
  public:
-  /* mutable void *sbuffer */;
+  /* mutable void *sbuffer */
+
+  /**
+   * Cache that maps the index of a layer to the index mask of the frames in that layer.
+   */
+  mutable Map<int, Vector<int64_t>> cached_frame_index_masks;
+
+  IndexMask get_cached_frame_index_mask(int layer_index)
+  {
+    return cached_frame_index_masks.lookup(layer_index).as_span();
+  }
+};
+
+class GPStroke {
+ public:
+  GPStroke(int num_points, int offset_index)
+      : num_points_(num_points), offset_index_(offset_index){};
+
+  ~GPStroke() = default;
+
+  int points_num() const
+  {
+    return num_points_;
+  }
+
+ private:
+  int num_points_;
+  int offset_index_;
+};
+
+class GPFrame : public ::GPFrame {
+ public:
+  GPFrame() : GPFrame(-1, -1)
+  {
+  }
+
+  GPFrame(int layer_index) : GPFrame(layer_index, -1)
+  {
+  }
+
+  GPFrame(int layer_index, int start_frame)
+  {
+    this->layer_index = layer_index;
+    this->start = start_frame;
+
+    /* Unused for now. */
+    this->end = -1;
+
+    this->strokes = MEM_new<CurvesGeometry>(__func__);
+  }
+
+  GPFrame(const GPFrame &other) : GPFrame(other.layer_index, other.start)
+  {
+    if (other.strokes != nullptr) {
+      this->strokes_as_curves() = CurvesGeometry::wrap(*other.strokes);
+    }
+  }
+
+  GPFrame &operator=(const GPFrame &other)
+  {
+    if (this != &other && other.strokes != nullptr) {
+      this->strokes_as_curves() = CurvesGeometry::wrap(*other.strokes);
+    }
+    this->layer_index = other.layer_index;
+    this->start = other.start;
+    return *this;
+  }
+
+  GPFrame(GPFrame &&other) : GPFrame(other.layer_index, other.start)
+  {
+    if (this != &other) {
+      std::swap(this->strokes, other.strokes);
+    }
+  }
+
+  GPFrame &operator=(GPFrame &&other)
+  {
+    if (this != &other) {
+      std::swap(this->strokes, other.strokes);
+    }
+    this->layer_index = other.layer_index;
+    this->start = other.start;
+    return *this;
+  }
+
+  ~GPFrame()
+  {
+    MEM_delete(reinterpret_cast<CurvesGeometry *>(this->strokes));
+    this->strokes = nullptr;
+  }
+
+  bool operator<(const GPFrame &other) const
+  {
+    if (this->start == other.start) {
+      return this->layer_index < other.layer_index;
+    }
+    return this->start < other.start;
+  }
+
+  /* Assumes that elem.first is the layer index and elem.second is the frame start. */
+  bool operator<(const std::pair<int, int> elem) const
+  {
+    if (this->start == elem.second) {
+      return this->layer_index < elem.first;
+    }
+    return this->start < elem.second;
+  }
+
+  bool operator==(const GPFrame &other) const
+  {
+    return this->layer_index == other.layer_index && this->start == other.start;
+  }
+
+  CurvesGeometry &strokes_as_curves()
+  {
+    return CurvesGeometry::wrap(*this->strokes);
+  }
+
+  int strokes_num() const
+  {
+    return this->strokes->curve_size;
+  }
+
+  GPStroke add_new_stroke(int num_points)
+  {
+    CurvesGeometry &strokes = this->strokes_as_curves();
+    strokes.resize(strokes.points_num() + num_points, strokes.curves_num() + 1);
+    return {num_points, strokes.offsets().last()};
+  }
 };
 
 class GPLayer : public ::GPLayer {
@@ -59,42 +187,6 @@ class GPLayer : public ::GPLayer {
   }
 };
 
-class GPFrame : public ::GPFrame {
- public:
-  GPFrame()
-  {
-    this->layer_index = this->start = this->end = -1;
-  }
-
-  GPFrame(int layer_index)
-  {
-    this->layer_index = layer_index;
-    this->start = this->end = -1;
-  }
-
-  GPFrame(int layer_index, int start_frame)
-  {
-    this->layer_index = layer_index;
-    this->start = start_frame;
-    this->end = -1;
-  }
-
-  ~GPFrame() = default;
-
-  bool operator<(const GPFrame &other) const
-  {
-    if (this->start == other.start) {
-      return this->layer_index < other.layer_index;
-    }
-    return this->start < other.start;
-  }
-
-  bool operator==(const GPFrame &other) const
-  {
-    return this->layer_index == other.layer_index && this->start == other.start;
-  }
-};
-
 class GPData : public ::GPData {
  public:
   GPData() : GPData(0, 0)
@@ -112,6 +204,7 @@ class GPData : public ::GPData {
     if (this->frames_size > 0) {
       this->frames_array = reinterpret_cast<::GPFrame *>(
           MEM_calloc_arrayN(this->frames_size, sizeof(::GPFrame), __func__));
+      default_construct_n(reinterpret_cast<GPFrame *>(this->frames_array), this->frames_size);
     }
     else {
       this->frames_array = nullptr;
@@ -136,10 +229,12 @@ class GPData : public ::GPData {
   ~GPData()
   {
     /* Free frames and frame custom data. */
+    destruct_n(reinterpret_cast<GPFrame *>(this->frames_array), this->frames_size);
     MEM_SAFE_FREE(this->frames_array);
     CustomData_free(&this->frame_data, this->frames_size);
 
     /* Free layer and layer groups. */
+    destruct_n(reinterpret_cast<GPLayer *>(this->layers_array), this->layers_size);
     MEM_SAFE_FREE(this->layers_array);
     MEM_delete(reinterpret_cast<GPLayerGroup *>(this->default_group));
     this->default_group = nullptr;
@@ -160,18 +255,29 @@ class GPData : public ::GPData {
 
   IndexMask frames_on_layer(int layer_index) const
   {
+    if (layer_index < 0 || layer_index > this->layers_size) {
+      return {};
+    }
+
+    /* If the indices are cached for this layer, use the cache. */
+    if (this->runtime->cached_frame_index_masks.contains(layer_index)) {
+      return this->runtime->get_cached_frame_index_mask(layer_index);
+    }
+
     Vector<int64_t> indices;
-    return index_mask_ops::find_indices_based_on_predicate(
+    const IndexMask mask = index_mask_ops::find_indices_based_on_predicate(
         IndexMask(this->frames_size), 1024, indices, [&](const int index) {
           return this->frames()[index].layer_index == layer_index;
         });
+
+    /* Cache the resulting index mask. */
+    this->runtime->cached_frame_index_masks.add(layer_index, std::move(indices));
+    return mask;
   }
 
-  IndexMask frames_on_layer(GPLayer &gpl) const
+  IndexMask frames_on_active_layer() const
   {
-    int layer_index = this->layers().first_index_try(gpl);
-    BLI_assert(layer_index != -1);
-    return frames_on_layer(layer_index);
+    return frames_on_layer(this->active_layer_index);
   }
 
   Span<GPLayer> layers() const
@@ -184,16 +290,27 @@ class GPData : public ::GPData {
     return {(GPLayer *)this->layers_array, this->layers_size};
   }
 
-  const bool add_layer(GPLayer &new_layer)
+  const int add_layer(GPLayer &new_layer)
   {
-    // Ensure that the layer array has enough space.
+    /* Ensure that the layer array has enough space. */
     if (!ensure_layer_array_has_size_at_least(this->layers_size + 1)) {
-      return false;
+      return -1;
     }
 
-    // Move new_layer to the end in the array.
+    /* Move new_layer to the end in the array. */
     this->layers_for_write().last() = new_layer;
-    return true;
+    return this->layers_size - 1;
+  }
+
+  int frame_index_at(const int layer_idx, const int start_frame_number)
+  {
+    auto it = std::lower_bound(this->frames().begin(),
+                               this->frames().end(),
+                               std::pair<int, int>(layer_idx, start_frame_number));
+    if (it == this->frames().end() || it->start != start_frame_number) {
+      return -1;
+    }
+    return it - this->frames().begin();
   }
 
   /**
@@ -204,33 +321,29 @@ class GPData : public ::GPData {
    */
   const GPFrame *frame_at(const int layer_idx, const int start_frame_number)
   {
-    auto it = std::lower_bound(
-        this->frames().begin(), this->frames().end(), GPFrame(layer_idx, start_frame_number));
-    if (it == this->frames().end() || it->start != start_frame_number) {
+    int index = frame_index_at(layer_idx, start_frame_number);
+    if (index == -1) {
       return nullptr;
     }
-    return it;
+    return &this->frames()[index];
   }
 
   void create_new_frame_on_layer(const int layer_index, const int start_frame_number)
   {
     BLI_assert(layer_index >= 0 && layer_index < this->layers_size);
     /* Allocate new space for the frame. */
-    ensure_frame_array_has_size_at_least(this->frames_size + 1);
+    if (!ensure_frame_array_has_size_at_least(this->frames_size + 1)) {
+      /* TODO: handle this properly. */
+      BLI_assert(false);
+      return;
+    }
 
     /* Create a new frame and append it at the end. */
-    GPFrame new_frame(layer_index, start_frame_number);
-    this->frames_for_write().last() = new_frame;
+    this->frames_for_write().last().layer_index = layer_index;
+    this->frames_for_write().last().start = start_frame_number;
 
     /* Sort the frame array. */
     update_frames_array();
-  }
-
-  void create_new_frame_on_layer(GPLayer &layer, const int start_frame_number)
-  {
-    int index = this->layers().first_index_try(layer);
-    BLI_assert(index != -1);
-    create_new_frame_on_layer(index, start_frame_number);
   }
 
   const GPFrame &get_new_frame_on_layer(const int layer_index, const int start_frame_number)
@@ -240,13 +353,6 @@ class GPData : public ::GPData {
     const GPFrame *gpf = this->frame_at(layer_index, start_frame_number);
     BLI_assert(gpf != nullptr);
     return *gpf;
-  }
-
-  const GPFrame &get_new_frame_on_layer(GPLayer &layer, const int start_frame_number)
-  {
-    int index = this->layers().first_index_try(layer);
-    BLI_assert(index != -1);
-    return get_new_frame_on_layer(index, start_frame_number);
   }
 
  private:
@@ -265,8 +371,10 @@ class GPData : public ::GPData {
       return false;
     }
 
-    memcpy(new_array, this->layers_array, old_size * sizeof(::GPLayer));
-    MEM_SAFE_FREE(this->layers_array);
+    if (this->layers_array != nullptr) {
+      memcpy(new_array, this->layers_array, old_size * sizeof(::GPLayer));
+      MEM_SAFE_FREE(this->layers_array);
+    }
     this->layers_array = new_array;
 
     return true;
@@ -287,10 +395,17 @@ class GPData : public ::GPData {
       return false;
     }
 
-    memcpy(new_array, this->frames_array, old_size * sizeof(::GPFrame));
-    MEM_SAFE_FREE(this->frames_array);
-    this->frames_array = new_array;
-
+    if (this->frames_array != nullptr) {
+      uninitialized_relocate_n(reinterpret_cast<GPFrame *>(this->frames_array),
+                               old_size,
+                               reinterpret_cast<GPFrame *>(new_array));
+      MEM_SAFE_FREE(this->frames_array);
+      this->frames_array = new_array;
+    }
+    else {
+      this->frames_array = new_array;
+      default_construct_n(reinterpret_cast<GPFrame *>(this->frames_array), this->frames_size);
+    }
     return true;
   }
 
@@ -298,6 +413,9 @@ class GPData : public ::GPData {
   {
     /* Make sure frames are ordered chronologically and by layer order. */
     std::sort(this->frames_for_write().begin(), this->frames_for_write().end());
+
+    /* Clear the cached indices since they are probably no longer valid. */
+    this->runtime->cached_frame_index_masks = {};
   }
 };
 
@@ -307,127 +425,128 @@ namespace blender::bke::gpencil::tests {
 
 TEST(gpencil_proposal, EmptyGPData)
 {
-  GPData my_data;
-  EXPECT_EQ(my_data.layers_size, 0);
-  EXPECT_EQ(my_data.frames_size, 0);
+  GPData data;
+  EXPECT_EQ(data.layers_size, 0);
+  EXPECT_EQ(data.frames_size, 0);
 }
 
 TEST(gpencil_proposal, OneLayer)
 {
-  GPData my_data(1, 0);
-  EXPECT_EQ(my_data.layers_size, 1);
-  EXPECT_EQ(my_data.frames_size, 0);
+  GPData data(1, 0);
+  EXPECT_EQ(data.layers_size, 1);
+  EXPECT_EQ(data.frames_size, 0);
 }
 
 TEST(gpencil_proposal, LayerName)
 {
-  GPLayer my_layer1;
-  EXPECT_STREQ(my_layer1.name, "GP_Layer");
+  GPLayer layer1;
+  EXPECT_STREQ(layer1.name, "GP_Layer");
 
-  GPLayer my_layer2("FooLayer");
-  EXPECT_STREQ(my_layer2.name, "FooLayer");
+  GPLayer layer2("FooLayer");
+  EXPECT_STREQ(layer2.name, "FooLayer");
 }
 
 TEST(gpencil_proposal, AddOneLayer)
 {
-  GPData my_data;
-  GPLayer my_layer("FooLayer");
+  GPData data;
+  GPLayer layer("FooLayer");
 
-  my_data.add_layer(my_layer);
-  EXPECT_EQ(my_data.layers_size, 1);
-  EXPECT_STREQ(my_data.layers().last().name, my_layer.name);
+  data.add_layer(layer);
+  EXPECT_EQ(data.layers_size, 1);
+  EXPECT_STREQ(data.layers().last().name, layer.name);
 }
 
 TEST(gpencil_proposal, AddLayers)
 {
-  GPData my_data;
+  GPData data;
   GPLayer layers[3] = {GPLayer("TestLayer1"), GPLayer("TestLayer2"), GPLayer("TestLayer3")};
 
   for (int i : IndexRange(3)) {
-    my_data.add_layer(layers[i]);
+    data.add_layer(layers[i]);
   }
-  EXPECT_EQ(my_data.layers_size, 3);
+  EXPECT_EQ(data.layers_size, 3);
 
   for (int i : IndexRange(3)) {
-    EXPECT_STREQ(my_data.layers()[i].name, layers[i].name);
+    EXPECT_STREQ(data.layers()[i].name, layers[i].name);
   }
 }
 
 TEST(gpencil_proposal, ChangeLayerName)
 {
-  GPData my_data;
-  GPLayer my_layer("FooLayer");
+  GPData data;
+  GPLayer layer("FooLayer");
 
-  my_data.add_layer(my_layer);
-  EXPECT_EQ(my_data.layers_size, 1);
-  EXPECT_STREQ(my_data.layers().last().name, my_layer.name);
+  data.add_layer(layer);
+  EXPECT_EQ(data.layers_size, 1);
+  EXPECT_STREQ(data.layers().last().name, layer.name);
 
-  strcpy(my_data.layers_for_write().last().name, "BarLayer");
+  strcpy(data.layers_for_write().last().name, "BarLayer");
 
-  EXPECT_EQ(my_data.layers_size, 1);
-  EXPECT_STREQ(my_data.layers().last().name, "BarLayer");
+  EXPECT_EQ(data.layers_size, 1);
+  EXPECT_STREQ(data.layers().last().name, "BarLayer");
 }
 
 TEST(gpencil_proposal, AddFrameToLayer)
 {
-  GPData my_data;
-  GPLayer my_layer1("TestLayer1");
-  GPLayer my_layer2("TestLayer2");
+  GPData data;
+  GPLayer layer1("TestLayer1");
+  GPLayer layer2("TestLayer2");
 
-  my_data.add_layer(my_layer1);
-  my_data.add_layer(my_layer2);
-  GPFrame my_frame = my_data.get_new_frame_on_layer(my_layer2, 0);
-  EXPECT_EQ(my_frame.layer_index, 1);
+  data.add_layer(layer1);
+  const int layer2_idx = data.add_layer(layer2);
+  data.create_new_frame_on_layer(layer2_idx, 0);
+  const GPFrame *frame = data.frame_at(layer2_idx, 0);
+  EXPECT_EQ(frame->layer_index, 1);
 }
 
 TEST(gpencil_proposal, CheckFramesSorted1)
 {
-  GPData my_data;
-  GPLayer my_layer1("TestLayer1");
+  GPData data;
+  GPLayer layer1("TestLayer1");
 
   const int frame_numbers1[5] = {10, 5, 6, 1, 3};
   const int frame_numbers_sorted1[5] = {1, 3, 5, 6, 10};
 
-  my_data.add_layer(my_layer1);
+  const int layer1_idx = data.add_layer(layer1);
   for (int i : IndexRange(5)) {
-    GPFrame my_frame = my_data.get_new_frame_on_layer(my_layer1, frame_numbers1[i]);
-    int idx = my_data.frames().first_index(my_frame);
-    EXPECT_EQ(my_data.frames()[idx].start, frame_numbers1[i]);
+    const GPFrame &frame = data.get_new_frame_on_layer(layer1_idx, frame_numbers1[i]);
+    int idx = data.frames().first_index(frame);
+    EXPECT_EQ(data.frames()[idx].start, frame_numbers1[i]);
   }
 
-  for (const int i : my_data.frames().index_range()) {
-    EXPECT_EQ(my_data.frames()[i].start, frame_numbers_sorted1[i]);
+  for (const int i : data.frames().index_range()) {
+    EXPECT_EQ(data.frames()[i].start, frame_numbers_sorted1[i]);
   }
 }
 
 TEST(gpencil_proposal, CheckFramesSorted2)
 {
-  GPData my_data;
-  GPLayer my_layer1("TestLayer1");
-  GPLayer my_layer2("TestLayer2");
+  GPData data;
+  GPLayer layer1("TestLayer1");
+  GPLayer layer2("TestLayer2");
   const int frame_numbers_layer1[5] = {10, 5, 6, 1, 3};
   const int frame_numbers_layer2[5] = {8, 5, 7, 1, 4};
   const int frame_numbers_sorted2[10][2] = {
       {0, 1}, {1, 1}, {0, 3}, {1, 4}, {0, 5}, {1, 5}, {0, 6}, {1, 7}, {1, 8}, {0, 10}};
 
-  my_data.add_layer(my_layer1);
-  my_data.add_layer(my_layer2);
+  const int layer1_idx = data.add_layer(layer1);
+  const int layer2_idx = data.add_layer(layer2);
   for (int i : IndexRange(5)) {
-    my_data.create_new_frame_on_layer(my_layer1, frame_numbers_layer1[i]);
-    my_data.create_new_frame_on_layer(my_layer2, frame_numbers_layer2[i]);
+    data.create_new_frame_on_layer(layer1_idx, frame_numbers_layer1[i]);
+    data.create_new_frame_on_layer(layer2_idx, frame_numbers_layer2[i]);
   }
 
-  for (const int i : my_data.frames().index_range()) {
-    EXPECT_EQ(my_data.frames()[i].layer_index, frame_numbers_sorted2[i][0]);
-    EXPECT_EQ(my_data.frames()[i].start, frame_numbers_sorted2[i][1]);
+  for (const int i : data.frames().index_range()) {
+    EXPECT_EQ(data.frames()[i].layer_index, frame_numbers_sorted2[i][0]);
+    EXPECT_EQ(data.frames()[i].start, frame_numbers_sorted2[i][1]);
   }
 }
 
 TEST(gpencil_proposal, IterateOverFramesOnLayer)
 {
-  GPData my_data;
-  GPLayer my_layer1("TestLayer1");
-  GPLayer my_layer2("TestLayer2");
+  GPData data;
+  GPLayer layer1("TestLayer1");
+  GPLayer layer2("TestLayer2");
 
   const int frame_numbers_layer1[5] = {10, 5, 6, 1, 3};
   const int frame_numbers_layer2[5] = {8, 5, 7, 1, 4};
@@ -435,22 +554,37 @@ TEST(gpencil_proposal, IterateOverFramesOnLayer)
   const int frame_numbers_sorted1[5] = {1, 3, 5, 6, 10};
   const int frame_numbers_sorted2[5] = {1, 4, 5, 7, 8};
 
-  my_data.add_layer(my_layer1);
-  my_data.add_layer(my_layer2);
+  const int layer1_idx = data.add_layer(layer1);
+  const int layer2_idx = data.add_layer(layer2);
   for (int i : IndexRange(5)) {
-    my_data.create_new_frame_on_layer(my_layer1, frame_numbers_layer1[i]);
-    my_data.create_new_frame_on_layer(my_layer2, frame_numbers_layer2[i]);
+    data.create_new_frame_on_layer(layer1_idx, frame_numbers_layer1[i]);
+    data.create_new_frame_on_layer(layer2_idx, frame_numbers_layer2[i]);
   }
 
-  IndexMask indices_frames_layer1 = my_data.frames_on_layer(my_layer1);
+  IndexMask indices_frames_layer1 = data.frames_on_layer(layer1_idx);
+  EXPECT_TRUE(data.runtime->cached_frame_index_masks.contains(0));
   for (const int i : indices_frames_layer1.index_range()) {
-    EXPECT_EQ(my_data.frames()[indices_frames_layer1[i]].start, frame_numbers_sorted1[i]);
+    EXPECT_EQ(data.frames()[indices_frames_layer1[i]].start, frame_numbers_sorted1[i]);
   }
 
-  IndexMask indices_frames_layer2 = my_data.frames_on_layer(my_layer2);
+  IndexMask indices_frames_layer2 = data.frames_on_layer(layer2_idx);
+  EXPECT_TRUE(data.runtime->cached_frame_index_masks.contains(1));
   for (const int i : indices_frames_layer2.index_range()) {
-    EXPECT_EQ(my_data.frames()[indices_frames_layer2[i]].start, frame_numbers_sorted2[i]);
+    EXPECT_EQ(data.frames()[indices_frames_layer2[i]].start, frame_numbers_sorted2[i]);
   }
+}
+
+TEST(gpencil_proposal, AddSingleStroke)
+{
+  GPData data;
+  GPLayer layer1("TestLayer1");
+
+  const int layer1_idx = data.add_layer(layer1);
+  GPFrame frame = data.get_new_frame_on_layer(layer1_idx, 0);
+  GPStroke stroke = frame.add_new_stroke(100);
+
+  EXPECT_EQ(frame.strokes_num(), 1);
+  EXPECT_EQ(stroke.points_num(), 100);
 }
 
 }  // namespace blender::bke::gpencil::tests
