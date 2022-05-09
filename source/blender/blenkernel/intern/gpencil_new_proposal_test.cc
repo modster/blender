@@ -306,6 +306,8 @@ class GPData : public ::GPData {
     return {(GPLayer *)this->layers_array, this->layers_size};
   }
 
+  /* TODO: Rework this API to take a string instead and create the layer in here. Similar to how we
+   * do it with frames. */
   int add_layer(GPLayer &new_layer)
   {
     /* Ensure that the layer array has enough space. */
@@ -328,7 +330,7 @@ class GPData : public ::GPData {
 
     GPFrame frame(frame_start);
     frame.layer_index = layer_index;
-    this->frames_for_write().last() = std::move(frame);/* TODO: Check for collisions. */
+    this->frames_for_write().last() = std::move(frame); /* TODO: Check for collisions. */
 
     /* Sort frame array. */
     update_frames_array();
