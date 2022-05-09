@@ -1741,11 +1741,11 @@ static void lineart_add_loose_edge(LooseEdgeData *loose_data, MEdge *e)
   loose_data->loose_count++;
 }
 
-static void lineart_identify_loose_edges(void *__restrict userdata,
+static void lineart_identify_loose_edges(void *__restrict UNUSED(userdata),
                                          const int i,
-                                         const TaskParallelTLS *__restrict UNUSED(tls))
+                                         const TaskParallelTLS *__restrict tls)
 {
-  LooseEdgeData *loose_data = (LooseEdgeData *)userdata;
+  LooseEdgeData *loose_data = (LooseEdgeData *)tls->userdata_chunk;
   Mesh *me = loose_data->me;
 
   if (me->medge[i].flag & ME_LOOSEEDGE) {
