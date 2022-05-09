@@ -444,8 +444,6 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
 
 static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRenderTaskInfo *rti)
 {
-  LineartEdge *data;
-  int i;
   int res = 0;
   int starting_index;
 
@@ -1463,8 +1461,6 @@ static void lineart_mvert_transform_task(void *__restrict userdata,
   mul_v4_m4v3_db(v->fbcoord, vert_task_data->model_view_proj, co);
   v->index = i;
 }
-
-#define LRT_EDGE_FLAG_TYPE_MAX_BITS 6
 
 static int lineart_edge_type_duplication_count(char eflag)
 {
@@ -3537,7 +3533,6 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
   int sp_h = LRT_BA_ROWS;
   int row, col;
   LineartBoundingArea *ba;
-  int lock_group_inc = sp_w * sp_h / rb->thread_count;
 
   /* Because NDC (Normalized Device Coordinates) range is (-1,1),
    * so the span for each initial tile is double of that in the (0,1) range. */
