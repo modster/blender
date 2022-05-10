@@ -43,11 +43,12 @@ class GPDataRuntime {
   /**
    * Cache that maps the index of a layer to the index mask of the frames in that layer.
    */
-  mutable Map<int, Vector<int64_t>> cached_frame_index_masks;
+  mutable Map<int, Vector<int64_t>> frame_index_masks_cache;
+  mutable std::mutex frame_index_masks_cache_mutex;
 
   IndexMask get_cached_frame_index_mask(int layer_index)
   {
-    return cached_frame_index_masks.lookup(layer_index).as_span();
+    return frame_index_masks_cache.lookup(layer_index).as_span();
   }
 };
 
@@ -276,7 +277,13 @@ class GPData : public ::GPData {
     }
 
     /* If the indices are cached for this layer, use the cache. */
-    if (this->runtime->cached_frame_index_masks.contains(layer_index)) {
+    if (this->runtime->frame_index_masks_cache.contains(layer_index)) {
+      return this->runtime->get_cached_frame_index_mask(layer_index);
+    }
+
+    /* A double checked lock. */
+    std::scoped_lock{this->runtime->frame_index_masks_cache_mutex};
+    if (this->runtime->frame_index_masks_cache.contains(layer_index)) {
       return this->runtime->get_cached_frame_index_mask(layer_index);
     }
 
@@ -287,7 +294,7 @@ class GPData : public ::GPData {
         });
 
     /* Cache the resulting index mask. */
-    this->runtime->cached_frame_index_masks.add(layer_index, std::move(indices));
+    this->runtime->frame_index_masks_cache.add(layer_index, std::move(indices));
     return mask;
   }
 
@@ -441,7 +448,7 @@ class GPData : public ::GPData {
     std::sort(this->frames_for_write().begin(), this->frames_for_write().end());
 
     /* Clear the cached indices since they are probably no longer valid. */
-    this->runtime->cached_frame_index_masks = {};
+    this->runtime->frame_index_masks_cache.clear();
   }
 };
 
@@ -593,13 +600,13 @@ TEST(gpencil_proposal, IterateOverFramesOnLayer)
   }
 
   IndexMask indices_frames_layer1 = data.frames_on_layer(layer1_idx);
-  EXPECT_TRUE(data.runtime->cached_frame_index_masks.contains(0));
+  EXPECT_TRUE(data.runtime->frame_index_masks_cache.contains(layer1_idx));
   for (const int i : indices_frames_layer1.index_range()) {
     EXPECT_EQ(data.frames()[indices_frames_layer1[i]].start, frame_numbers_sorted1[i]);
   }
 
   IndexMask indices_frames_layer2 = data.frames_on_layer(layer2_idx);
-  EXPECT_TRUE(data.runtime->cached_frame_index_masks.contains(1));
+  EXPECT_TRUE(data.runtime->frame_index_masks_cache.contains(layer2_idx));
   for (const int i : indices_frames_layer2.index_range()) {
     EXPECT_EQ(data.frames()[indices_frames_layer2[i]].start, frame_numbers_sorted2[i]);
   }
