@@ -51,6 +51,10 @@ class GPDataRuntime {
   }
 };
 
+/**
+ * A wrapper class around a single curve in GPFrame.strokes (CurvesGeometry). It holds the offset
+ * of where to find the stroke in the frame and it's size.
+ */
 class GPStroke {
  public:
   GPStroke(int num_points, int offset_index)
@@ -61,6 +65,11 @@ class GPStroke {
   int points_num() const
   {
     return num_points_;
+  }
+
+  int point_offset() const
+  {
+    return offset_index_;
   }
 
  private:
@@ -311,7 +320,7 @@ class GPData : public ::GPData {
   int add_layer(GPLayer &new_layer)
   {
     /* Ensure that the layer array has enough space. */
-    if (!ensure_layer_array_has_size_at_least(this->layers_size + 1)) {
+    if (!ensure_layers_array_has_size_at_least(this->layers_size + 1)) {
       return -1;
     }
 
@@ -324,7 +333,7 @@ class GPData : public ::GPData {
   {
     /* TODO: Check for collisions. */
 
-    if (!ensure_frame_array_has_size_at_least(this->frames_size + 1)) {
+    if (!ensure_frames_array_has_size_at_least(this->frames_size + 1)) {
       return nullptr;
     }
 
@@ -364,7 +373,7 @@ class GPData : public ::GPData {
   }
 
  private:
-  const bool ensure_layer_array_has_size_at_least(int64_t size)
+  const bool ensure_layers_array_has_size_at_least(int64_t size)
   {
     if (this->layers_size > size) {
       return true;
@@ -380,6 +389,7 @@ class GPData : public ::GPData {
     }
 
     if (this->layers_array != nullptr) {
+      /* Since the layers have default move constructors, we just use memcpy here. */
       memcpy(new_array, this->layers_array, old_size * sizeof(::GPLayer));
       MEM_SAFE_FREE(this->layers_array);
     }
@@ -388,7 +398,7 @@ class GPData : public ::GPData {
     return true;
   }
 
-  const bool ensure_frame_array_has_size_at_least(int64_t size)
+  const bool ensure_frames_array_has_size_at_least(int64_t size)
   {
     if (this->frames_size > size) {
       return true;
