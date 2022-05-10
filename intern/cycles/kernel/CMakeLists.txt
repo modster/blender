@@ -743,7 +743,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     list(APPEND sycl_compiler_flags
       -fsycl-targets=spir64,spir64_gen
       -Xsycl-target-backend=spir64 "${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}"
-      -Xsycl-target-backend=spir64_gen "-device ${CYCLES_ONEAPI_AOT_TARGETS} ${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}")
+      -Xsycl-target-backend=spir64_gen "-device ${CYCLES_ONEAPI_AOT_TARGETS} --format zebin ${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}")
   else()
     list(APPEND sycl_compiler_flags
       -fsycl-targets=spir64
