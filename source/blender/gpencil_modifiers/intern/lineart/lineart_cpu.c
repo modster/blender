@@ -3277,8 +3277,8 @@ static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
   /* If this _is_ the smallest subdiv bounding area, then do the intersections there. */
   for (int i = 0; i < up_to; i++) {
     do {
-      testing_triangle = ba->linked_triangles[i];
-    } while (testing_triangle == NULL);
+      testing_triangle = (LineartTriangle *)atomic_add_and_fetch_z(&ba->linked_triangles[i], 0);
+    } while (UNLIKELY(testing_triangle == NULL));
 
     tt = (LineartTriangleThread *)testing_triangle;
 
@@ -3863,7 +3863,7 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
 
   for (int i = 0; i < root->triangle_count; i++) {
     do {
-      tri = root->linked_triangles[i];
+      tri = (LineartTriangle *)atomic_add_and_fetch_z(&root->linked_triangles[i], 0);
       // tri = (LineartTriangle *)atomic_fetch_and_add_int64(&root->linked_triangles[i], 0);
       /* Need to wait for worker threads to fill in the last few triangles. */
     } while (UNLIKELY(tri == NULL));
@@ -4004,7 +4004,7 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
       lineart_bounding_area_split(rb, root_ba, recursive_level);
     }
     if (recursive && do_intersection && rb->use_intersections) {
-      lineart_triangle_intersect_in_bounding_area(rb, tri, root_ba, th);
+      lineart_triangle_intersect_in_bounding_area(rb, tri, root_ba, th, root_ba->triangle_count);
     }
     if (do_lock) {
       BLI_spin_unlock(&root_ba->lock);
@@ -4040,15 +4040,14 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
   }
 }
 
-__attribute__((optimize("O0"))) static void lineart_bounding_area_link_triangle_cas(
-    LineartRenderBuffer *rb,
-    LineartBoundingArea **root_ba,
-    LineartTriangle *tri,
-    double *LRUB,
-    int recursive,
-    int recursive_level,
-    bool do_intersection,
-    struct LineartIsecThread *th)
+static void lineart_bounding_area_link_triangle_cas(LineartRenderBuffer *rb,
+                                                    LineartBoundingArea **root_ba,
+                                                    LineartTriangle *tri,
+                                                    double *LRUB,
+                                                    int recursive,
+                                                    int recursive_level,
+                                                    bool do_intersection,
+                                                    struct LineartIsecThread *th)
 {
   if (!lineart_bounding_area_triangle_intersect(rb, tri, *root_ba)) {
     return;
@@ -4099,7 +4098,8 @@ __attribute__((optimize("O0"))) static void lineart_bounding_area_link_triangle_
       }
       /* Successfully grabbed a viable index to insert the triangle into.
        * Insert into [old_tri_index] for correct array offset starting from [0]. */
-      old_ba->linked_triangles[old_tri_index] = tri;
+      atomic_add_and_fetch_z(&old_ba->linked_triangles[old_tri_index], tri);
+      // old_ba->linked_triangles[old_tri_index] = tri;
 
       /* Do intersections in place. */
       if (rb->use_intersections) {
