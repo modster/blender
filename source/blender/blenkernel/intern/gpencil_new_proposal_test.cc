@@ -372,6 +372,14 @@ class GPData : public ::GPData {
     return count;
   }
 
+  void set_active_layer(int layer_index)
+  {
+    if (layer_index < 0 || layer_index >= this->layers_size) {
+      return;
+    }
+    this->active_layer_index = layer_index;
+  }
+
  private:
   const bool ensure_layers_array_has_size_at_least(int64_t size)
   {
