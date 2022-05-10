@@ -21,7 +21,16 @@ class GPLayerGroup : ::GPLayerGroup {
  public:
   GPLayerGroup()
   {
-    /* TODO */
+    this->children = nullptr;
+    this->children_size = 0;
+    this->layer_indices = nullptr;
+    this->layer_indices_size = 0;
+  }
+
+  GPLayerGroup(const StringRefNull name) : GPLayerGroup()
+  {
+    BLI_assert(name.size() < 128);
+    strcpy(this->name, name.c_str());
   }
 
   ~GPLayerGroup()
@@ -33,6 +42,11 @@ class GPLayerGroup : ::GPLayerGroup {
     /* Then free its data. */
     MEM_SAFE_FREE(this->children);
     MEM_SAFE_FREE(this->layer_indices);
+  }
+
+  IndexMask layers_index_mask()
+  {
+    return {reinterpret_cast<int64_t>(this->layer_indices), this->layer_indices_size};
   }
 };
 
