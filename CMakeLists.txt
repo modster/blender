@@ -486,7 +486,7 @@ if((UNIX AND NOT APPLE) OR (CMAKE_GENERATOR MATCHES "^Visual Studio.+"))
 endif()
 
 option(WITH_BOOST "Enable features depending on boost" ON)
-option(WITH_TBB   "Enable features depending on TBB (OpenVDB, OpenImageDenoise, sculpt multithreading)" ON)
+option(WITH_TBB   "Enable multithreading. TBB is also required for features such as Cycles, OpenVDB and USD" ON)
 
 # TBB malloc is only supported on for windows currently
 if(WIN32)
@@ -1539,7 +1539,6 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCC)
 
   ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ALL -Wall)
-  ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_CAST_ALIGN -Wcast-align)
   ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_IMPLICIT_FUNCTION_DECLARATION -Werror=implicit-function-declaration)
   ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_RETURN_TYPE  -Werror=return-type)
   ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_VLA -Werror=vla)
