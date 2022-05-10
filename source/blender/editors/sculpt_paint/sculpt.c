@@ -3329,6 +3329,7 @@ static void do_brush_action(Sculpt *sd,
 
   /* Only act if some verts are inside the brush area. */
   if (totnode == 0) {
+    MEM_SAFE_FREE(texnodes);
     return;
   }
   float location[3];
@@ -3512,6 +3513,7 @@ static void do_brush_action(Sculpt *sd,
   }
 
   MEM_SAFE_FREE(nodes);
+  MEM_SAFE_FREE(texnodes);
 
   /* Update average stroke position. */
   copy_v3_v3(location, ss->cache->true_location);

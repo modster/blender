@@ -13,6 +13,7 @@
 
 #include "BLI_math.h"
 #include "BLI_task.h"
+#include "PIL_time.h"
 
 #include "BKE_global.h"
 #include "BKE_image_wrappers.hh"
@@ -20,6 +21,8 @@
 #include "bmesh.h"
 
 #include "pbvh_intern.h"
+
+#include <atomic>
 
 namespace blender::bke::pbvh::pixels {
 
@@ -68,15 +71,49 @@ int count_node_pixels(PBVHNode &node)
   return totpixel;
 }
 
-ATTR_NO_OPT static void split_pixel_node(
-    PBVH *pbvh, int node_i, Mesh *mesh, Image *image, ImageUser *image_user, int depth)
+struct SplitThreadData {
+  ThreadQueue *queue;
+  ThreadQueue *new_nodes;
+  int thread_num, thread_nr;
+  std::atomic<bool> *working;
+
+  std::atomic<int> *nodes_num;
+
+  PBVH *pbvh;
+  Mesh *mesh;
+  Image *image;
+  ImageUser *image_user;
+};
+
+struct SplitNodePair {
+  SplitNodePair *parent;
+  PBVHNode node;
+  int children_offset = 0;
+  int depth = 0;
+  int source_index = -1;
+  bool is_old = false;
+
+  SplitNodePair(SplitNodePair *node_parent = nullptr) : parent(node_parent)
+  {
+    memset(static_cast<void *>(&node), 0, sizeof(PBVHNode));
+  }
+};
+
+static void split_pixel_node(PBVH *pbvh,
+                             SplitNodePair *split,
+                             Mesh *mesh,
+                             Image *image,
+                             ImageUser *image_user,
+                             SplitThreadData *tdata)
 {
   BB cb;
-  PBVHNode *node = pbvh->nodes + node_i;
+  PBVHNode *node = &split->node;
 
   cb = node->vb;
 
-  if (depth >= pbvh->depth_limit || count_node_pixels(*node) <= pbvh->pixel_leaf_limit) {
+  tdata->nodes_num->fetch_add(2);
+
+  if (count_node_pixels(*node) <= pbvh->pixel_leaf_limit || split->depth >= pbvh->depth_limit) {
     return;
   }
 
@@ -84,17 +121,16 @@ ATTR_NO_OPT static void split_pixel_node(
   const int axis = BB_widest_axis(&cb);
   const float mid = (cb.bmax[axis] + cb.bmin[axis]) * 0.5f;
 
-  const int child1_i = pbvh->totnode;
-  const int child2_i = child1_i + 1;
-
   node->flag = (PBVHNodeFlags)((int)node->flag & (int)~PBVH_TexLeaf);
-  pbvh_grow_nodes(pbvh, pbvh->totnode + 2);
 
-  node = pbvh->nodes + node_i;
-  PBVHNode *child1 = pbvh->nodes + child1_i;
-  PBVHNode *child2 = pbvh->nodes + child2_i;
+  SplitNodePair *split1 = MEM_new<SplitNodePair>("split_pixel_node split1", split);
+  SplitNodePair *split2 = MEM_new<SplitNodePair>("split_pixel_node split1", split);
 
-  node->children_offset = child1_i;
+  split1->depth = split->depth + 1;
+  split2->depth = split->depth + 1;
+
+  PBVHNode *child1 = &split1->node;
+  PBVHNode *child2 = &split2->node;
 
   child1->flag = PBVH_TexLeaf;
   child2->flag = PBVH_TexLeaf;
@@ -105,7 +141,7 @@ ATTR_NO_OPT static void split_pixel_node(
   child2->vb = cb;
   child2->vb.bmin[axis] = mid;
 
-  NodeData &data = BKE_pbvh_pixels_node_data_get(pbvh->nodes[node_i]);
+  NodeData &data = BKE_pbvh_pixels_node_data_get(split->node);
 
   NodeData *data1 = MEM_new<NodeData>(__func__);
   NodeData *data2 = MEM_new<NodeData>(__func__);
@@ -208,8 +244,84 @@ ATTR_NO_OPT static void split_pixel_node(
 
   pbvh_pixels_free(node);
 
-  split_pixel_node(pbvh, child1_i, mesh, image, image_user, depth + 1);
-  split_pixel_node(pbvh, child2_i, mesh, image, image_user, depth + 1);
+  BLI_thread_queue_push(tdata->new_nodes, static_cast<void *>(split1));
+  BLI_thread_queue_push(tdata->new_nodes, static_cast<void *>(split2));
+
+  BLI_thread_queue_push(tdata->queue, static_cast<void *>(split1));
+  BLI_thread_queue_push(tdata->queue, static_cast<void *>(split2));
+}
+
+static void split_flush_final_nodes(SplitThreadData *tdata)
+{
+  PBVH *pbvh = tdata->pbvh;
+  Vector<SplitNodePair *> splits;
+
+  while (!BLI_thread_queue_is_empty(tdata->new_nodes)) {
+    SplitNodePair *newsplit = static_cast<SplitNodePair *>(BLI_thread_queue_pop(tdata->new_nodes));
+
+    splits.append(newsplit);
+
+    if (newsplit->is_old) {
+      continue;
+    }
+
+    if (!newsplit->parent->children_offset) {
+      newsplit->parent->children_offset = pbvh->totnode;
+
+      pbvh_grow_nodes(pbvh, pbvh->totnode + 2);
+      newsplit->source_index = newsplit->parent->children_offset;
+    }
+    else {
+      newsplit->source_index = newsplit->parent->children_offset + 1;
+    }
+  }
+
+  for (SplitNodePair *split : splits) {
+    BLI_assert(split->source_index != -1);
+
+    split->node.children_offset = split->children_offset;
+    pbvh->nodes[split->source_index] = split->node;
+  }
+
+  for (SplitNodePair *split : splits) {
+    MEM_delete<SplitNodePair>(split);
+  }
+}
+
+extern "C" static void *split_thread_job(void *_tdata)
+{
+  SplitThreadData *tdata = static_cast<SplitThreadData *>(_tdata);
+  int thread_nr = tdata->thread_nr;
+
+  tdata->working[thread_nr].store(false);
+
+  while (1) {
+    void *work = BLI_thread_queue_pop_timeout(tdata->queue, 1);
+
+    if (work) {
+      SplitNodePair *split = static_cast<SplitNodePair *>(work);
+
+      tdata->working[thread_nr].store(true);
+      split_pixel_node(tdata->pbvh, split, tdata->mesh, tdata->image, tdata->image_user, tdata);
+      tdata->working[thread_nr].store(false);
+      continue;
+    }
+
+    bool ok = true;
+
+    for (int i : IndexRange(tdata->thread_num)) {
+      if (tdata->working[i].load()) {
+        ok = false;
+        break;
+      }
+    }
+
+    if (ok) {
+      break;
+    }
+  }
+
+  return nullptr;
 }
 
 static void split_pixel_nodes(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
@@ -226,14 +338,58 @@ static void split_pixel_nodes(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *i
     pbvh->pixel_leaf_limit = 256 * 256; /* TODO: move into a constant */
   }
 
-  int totnode = pbvh->totnode;
-  for (int i = 0; i < totnode; i++) {
-    PBVHNode &node = pbvh->nodes[i];
+  SplitThreadData tdata;
 
-    if (node.flag & PBVH_TexLeaf) {
-      split_pixel_node(pbvh, i, mesh, image, image_user, 0);
+  tdata.nodes_num = MEM_new<std::atomic<int>>("tdata.nodes_num");
+  tdata.nodes_num->store(pbvh->totnode);
+  tdata.pbvh = pbvh;
+  tdata.mesh = mesh;
+  tdata.image = image;
+  tdata.image_user = image_user;
+
+  tdata.queue = BLI_thread_queue_init();
+  tdata.new_nodes = BLI_thread_queue_init();
+
+  /* Set up initial jobs before initializing threads. */
+  for (int i : IndexRange(pbvh->totnode)) {
+    if (pbvh->nodes[i].flag & PBVH_TexLeaf) {
+      SplitNodePair *split = MEM_new<SplitNodePair>("split_pixel_nodes split");
+
+      split->source_index = i;
+      split->is_old = true;
+      split->node = pbvh->nodes[i];
+
+      BLI_thread_queue_push(tdata.queue, static_cast<void *>(split));
+      BLI_thread_queue_push(tdata.new_nodes, static_cast<void *>(split));
     }
   }
+
+  Vector<SplitThreadData> tdatas;
+  int thread_num = tdata.thread_num = G.debug_value != 892 ? BLI_system_thread_count() : 1;
+
+  tdata.working = new std::atomic<bool>[thread_num];
+
+  ListBase threads;
+  BLI_threadpool_init(&threads, split_thread_job, thread_num);
+
+  for (int i : IndexRange(thread_num)) {
+    tdata.thread_nr = i;
+    tdatas.append(tdata);
+  }
+
+  for (int i : IndexRange(thread_num)) {
+    BLI_threadpool_insert(&threads, &tdatas[i]);
+  }
+
+  BLI_threadpool_end(&threads);
+  split_flush_final_nodes(&tdata);
+
+  delete[] tdata.working;
+
+  BLI_thread_queue_free(tdata.queue);
+  BLI_thread_queue_free(tdata.new_nodes);
+
+  MEM_delete<std::atomic<int>>(tdata.nodes_num);
 }
 
 /**
@@ -577,7 +733,13 @@ using namespace blender::bke::pbvh::pixels;
 void BKE_pbvh_build_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
 {
   if (update_pixels(pbvh, mesh, image, image_user)) {
+    double time_ms = PIL_check_seconds_timer();
+
     split_pixel_nodes(pbvh, mesh, image, image_user);
+
+    time_ms = PIL_check_seconds_timer() - time_ms;
+
+    printf("Nodes split time: %.2fms\n", time_ms * 1000.0);
   }
 }
 
