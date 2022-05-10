@@ -766,10 +766,9 @@ static bool lineart_edge_match(LineartTriangle *tri, LineartEdge *e, int v1, int
 static void lineart_discard_duplicated_edges(LineartEdge *old_e, int v1id, int v2id)
 {
   LineartEdge *e = old_e;
-  e++;
-  while (e->v1 && e->v2 && e->v1->index == v1id && e->v2->index == v2id) {
-    e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
+  while (e->flags & LRT_EDGE_FLAG_NEXT_IS_DUPLICATION) {
     e++;
+    e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
   }
 }
 
@@ -2171,7 +2170,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *ob_info, LineartRend
       continue;
     }
 
-    bool edge_added = false;
+    LineartEdge *edge_added = NULL;
 
     /* See eLineartEdgeFlag for details. */
     for (int flag_bit = 0; flag_bit < LRT_EDGE_FLAG_TYPE_MAX_BITS; flag_bit++) {
@@ -2202,7 +2201,11 @@ static void lineart_geometry_object_load(LineartObjectInfo *ob_info, LineartRend
         lineart_add_edge_to_list_thread(ob_info, la_edge);
       }
 
-      edge_added = true;
+      if (edge_added) {
+        edge_added->flags |= LRT_EDGE_FLAG_NEXT_IS_DUPLICATION;
+      }
+
+      edge_added = la_edge;
 
       la_edge++;
       la_seg++;
@@ -2244,14 +2247,14 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
   //- Print size of pending objects.
   //- Try to feed this with an array instead of via the pool instead of a custom list
   //- Assign the number of objects instead of number of threads
-  printf("thread start: %d\n", olti->thread_id);
+  // printf("thread start: %d\n", olti->thread_id);
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
     lineart_geometry_object_load(obi, olti->rb);
     if (G.debug_value == 4000) {
-      printf("thread id: %d processed: %d\n", olti->thread_id, obi->original_me->totpoly);
+      // printf("thread id: %d processed: %d\n", olti->thread_id, obi->original_me->totpoly);
     }
   }
-  printf("thread end: %d\n", olti->thread_id);
+  // printf("thread end: %d\n", olti->thread_id);
 }
 
 static uchar lineart_intersection_mask_check(Collection *c, Object *ob)
