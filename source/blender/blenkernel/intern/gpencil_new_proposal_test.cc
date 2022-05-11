@@ -200,7 +200,7 @@ class GPFrame : public ::GPFrame {
     if (this->strokes == nullptr) {
       return 0;
     }
-    return this->strokes->curve_size;
+    return this->strokes->curve_num;
   }
 
   GPStroke add_new_stroke(int new_points_num)
