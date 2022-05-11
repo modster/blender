@@ -610,6 +610,25 @@ class NodeOperation {
    * The return parameter holds an instance or is an nullptr. */
   virtual std::unique_ptr<MetaData> get_meta_data()
   {
+    for (NodeOperationInput &input : inputs_) {
+      if (input.get_data_type() != DataType::Color) {
+        continue;
+      }
+      std::unique_ptr<MetaData> meta_data = input.get_reader()->get_meta_data();
+      if (meta_data.get()) {
+        return meta_data;
+      }
+    }
+    
+    for (NodeOperationInput &input : inputs_) {
+      if (input.get_data_type() == DataType::Color) {
+        continue;
+      }
+      std::unique_ptr<MetaData> meta_data = input.get_reader()->get_meta_data();
+      if (meta_data.get()) {
+        return meta_data;
+      }
+    }
     return std::unique_ptr<MetaData>();
   }
 

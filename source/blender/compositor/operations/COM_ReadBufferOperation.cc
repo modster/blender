@@ -122,4 +122,9 @@ void ReadBufferOperation::update_memory_buffer()
   buffer_ = this->get_memory_proxy()->get_buffer();
 }
 
+std::unique_ptr<MetaData> ReadBufferOperation::get_meta_data()
+{
+  return get_memory_proxy()->get_write_buffer_operation()->get_meta_data();
+}
+
 }  // namespace blender::compositor

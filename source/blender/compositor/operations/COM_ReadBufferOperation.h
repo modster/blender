@@ -57,6 +57,7 @@ class ReadBufferOperation : public NodeOperation {
   }
   void read_resolution_from_write_buffer();
   void update_memory_buffer();
+  std::unique_ptr<MetaData> get_meta_data() override;
 };
 
 }  // namespace blender::compositor
