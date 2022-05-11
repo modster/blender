@@ -138,7 +138,7 @@ struct NodeData {
   } flags;
 
   Vector<UDIMTilePixels> tiles;
-  Triangles triangles;
+  Triangles *triangles = nullptr;
 
   NodeData()
   {
@@ -168,7 +168,6 @@ struct NodeData {
   void clear_data()
   {
     tiles.clear();
-    triangles.clear();
   }
 
   static void free_func(void *instance)

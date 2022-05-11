@@ -321,7 +321,7 @@ static void do_paint_pixels(void *__restrict userdata,
   const int thread_id = BLI_task_parallel_thread_id(tls);
   MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
 
-  std::vector<bool> brush_test = init_triangle_brush_test(ss, node_data.triangles, mvert);
+  std::vector<bool> brush_test = init_triangle_brush_test(ss, *node_data.triangles, mvert);
 
   PaintingKernel<ImageBufferFloat4> kernel_float4(ss, brush, thread_id, mvert);
   PaintingKernel<ImageBufferByte4> kernel_byte4(ss, brush, thread_id, mvert);
@@ -368,10 +368,10 @@ static void do_paint_pixels(void *__restrict userdata,
           }
           bool pixels_painted = false;
           if (image_buffer->rect_float != nullptr) {
-            pixels_painted = kernel_float4.paint(node_data.triangles, pixel_row, image_buffer);
+            pixels_painted = kernel_float4.paint(*node_data.triangles, pixel_row, image_buffer);
           }
           else {
-            pixels_painted = kernel_byte4.paint(node_data.triangles, pixel_row, image_buffer);
+            pixels_painted = kernel_byte4.paint(*node_data.triangles, pixel_row, image_buffer);
           }
 
           if (pixels_painted) {

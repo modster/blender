@@ -179,7 +179,7 @@ static void split_pixel_node(PBVH *pbvh,
       UDIMTilePixels *tile1 = &data1->tiles[i];
       UDIMTilePixels *tile2 = &data2->tiles[i];
 
-      TrianglePaintInput &tri = data.triangles.paint_input[row.triangle_index];
+      TrianglePaintInput &tri = data.triangles->paint_input[row.triangle_index];
 
       float verts[3][3];
 
@@ -242,7 +242,12 @@ static void split_pixel_node(PBVH *pbvh,
     BKE_image_release_ibuf(image, image_buffer, nullptr);
   }
 
-  pbvh_pixels_free(node);
+  if (node->flag & PBVH_Leaf) {
+    data.clear_data();
+  }
+  else {
+    pbvh_pixels_free(node);
+  }
 
   BLI_thread_queue_push(tdata->new_nodes, static_cast<void *>(split1));
   BLI_thread_queue_push(tdata->new_nodes, static_cast<void *>(split2));
@@ -440,9 +445,15 @@ static void extract_barycentric_pixels(UDIMTilePixels &tile_data,
 
 static void init_triangles(PBVH *pbvh, PBVHNode *node, NodeData *node_data, const MLoop *mloop)
 {
+  if (node_data->triangles) {
+    MEM_delete<Triangles>(node_data->triangles);
+  }
+
+  node_data->triangles = MEM_new<Triangles>("triangles");
+
   for (int i = 0; i < node->totprim; i++) {
     const MLoopTri *lt = &pbvh->looptri[node->prim_indices[i]];
-    node_data->triangles.append(
+    node_data->triangles->append(
         int3(mloop[lt->tri[0]].v, mloop[lt->tri[1]].v, mloop[lt->tri[2]].v));
   }
 }
@@ -476,7 +487,7 @@ static void do_encode_pixels(void *__restrict userdata,
     float2 tile_offset = float2(image_tile.get_tile_offset());
     UDIMTilePixels tile_data;
 
-    Triangles &triangles = node_data->triangles;
+    Triangles &triangles = *node_data->triangles;
     for (int triangle_index = 0; triangle_index < triangles.size(); triangle_index++) {
       const MLoopTri *lt = &pbvh->looptri[node->prim_indices[triangle_index]];
       float2 uvs[3] = {
@@ -574,6 +585,11 @@ static bool find_nodes_to_update(PBVH *pbvh, Vector<PBVHNode *> &r_nodes_to_upda
     else {
       NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
       node_data->clear_data();
+
+      if (node_data->triangles && (node->flag & PBVH_Leaf)) {
+        MEM_delete<Triangles>(node_data->triangles);
+        node_data->triangles = nullptr;
+      }
     }
   }
 
@@ -746,6 +762,11 @@ void BKE_pbvh_build_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *imag
 void pbvh_pixels_free(PBVHNode *node)
 {
   NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
+
+  if (node->flag & PBVH_Leaf) {
+    MEM_delete<Triangles>(node_data->triangles);
+  }
+
   MEM_delete(node_data);
   node->pixels.node_data = nullptr;
 }

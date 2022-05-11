@@ -689,7 +689,7 @@ void BKE_pbvh_free(PBVH *pbvh)
       }
     }
 
-    if (node->flag & PBVH_TexLeaf) {
+    if (node->flag & (PBVH_Leaf | PBVH_TexLeaf)) {
       pbvh_pixels_free(node);
     }
   }
