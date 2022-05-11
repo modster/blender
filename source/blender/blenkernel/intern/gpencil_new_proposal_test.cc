@@ -69,27 +69,42 @@ class GPDataRuntime {
 /**
  * A wrapper class around a single curve in GPFrame.strokes (CurvesGeometry). It holds the offset
  * of where to find the stroke in the frame and it's size.
+ * This class is only meant to facilitate the handling of individual strokes.
  */
-class GPStroke {
+class GPStroke : NonCopyable, NonMovable {
  public:
-  GPStroke(int num_points, int offset_index)
-      : num_points_(num_points), offset_index_(offset_index){};
+  GPStroke(CurvesGeometry *geometry, int num_points, int offset)
+      : geometry_(geometry), points_num_(num_points), offset_(offset){};
 
   ~GPStroke() = default;
 
   int points_num() const
   {
-    return num_points_;
+    return points_num_;
   }
 
-  int point_offset() const
+  /**
+   * Start index of this stroke in the points array of geometry_.
+   */
+  int points_offset() const
   {
-    return offset_index_;
+    return offset_;
+  }
+
+  Span<float3> points_positions() const
+  {
+    return {geometry_->positions().begin() + offset_, points_num_};
+  }
+
+  MutableSpan<float3> points_positions_for_write() const
+  {
+    return {geometry_->positions_for_write().begin() + offset_, points_num_};
   }
 
  private:
-  int num_points_;
-  int offset_index_;
+  CurvesGeometry *geometry_ = nullptr;
+  int points_num_ = 0;
+  int offset_;
 };
 
 class GPFrame : public ::GPFrame {
@@ -188,14 +203,22 @@ class GPFrame : public ::GPFrame {
     return this->strokes->curve_size;
   }
 
-  GPStroke add_new_stroke(int num_points)
+  GPStroke add_new_stroke(int new_points_num)
   {
     if (this->strokes == nullptr) {
       this->strokes = MEM_new<CurvesGeometry>(__func__);
     }
     CurvesGeometry &strokes = this->strokes_as_curves();
-    strokes.resize(strokes.points_num() + num_points, strokes.curves_num() + 1);
-    return {num_points, strokes.offsets().last()};
+    int orig_last_offset = strokes.offsets().last();
+
+    strokes.resize(strokes.points_num() + new_points_num, strokes.curves_num() + 1);
+    strokes.offsets_for_write().last() = strokes.points_num();
+
+    /* Use ploy type by default. */
+    strokes.curve_types_for_write().last() = CURVE_TYPE_POLY;
+
+    strokes.tag_topology_changed();
+    return {reinterpret_cast<CurvesGeometry *>(this->strokes), new_points_num, orig_last_offset};
   }
 };
 
@@ -543,6 +566,7 @@ TEST(gpencil_proposal, AddFrameToLayer)
   data.add_layer(layer2);
 
   GPFrame *frame = data.add_frame_on_layer(layer2, 0);
+  EXPECT_NE(frame, nullptr);
 
   EXPECT_EQ(data.frames_size, 1);
   EXPECT_EQ(data.frames().last().layer_index, 1);
@@ -563,6 +587,7 @@ TEST(gpencil_proposal, CheckFramesSorted1)
   const int layer1_idx = data.add_layer(layer1);
   for (int i : IndexRange(5)) {
     GPFrame *frame = data.add_frame_on_layer(layer1_idx, frame_numbers1[i]);
+    EXPECT_NE(frame, nullptr);
     EXPECT_EQ(frame->start, frame_numbers1[i]);
   }
 
@@ -634,11 +659,38 @@ TEST(gpencil_proposal, AddSingleStroke)
   const int layer1_idx = data.add_layer(layer1);
 
   GPFrame *frame = data.add_frame_on_layer(layer1_idx, 0);
+  EXPECT_NE(frame, nullptr);
   GPStroke stroke = frame->add_new_stroke(100);
 
   EXPECT_EQ(data.strokes_num(), 1);
   EXPECT_EQ(frame->strokes_num(), 1);
   EXPECT_EQ(stroke.points_num(), 100);
+}
+
+TEST(gpencil_proposal, ChangeStrokePoints)
+{
+  GPData data;
+  GPLayer layer1("TestLayer1");
+
+  const int layer1_idx = data.add_layer(layer1);
+
+  static const Array<float3> test_positions{{
+      {1.0f, 2.0f, 3.0f},
+      {4.0f, 5.0f, 6.0f},
+      {7.0f, 8.0f, 9.0f},
+  }};
+
+  GPFrame *frame = data.add_frame_on_layer(layer1_idx, 0);
+  EXPECT_NE(frame, nullptr);
+  GPStroke stroke = frame->add_new_stroke(test_positions.size());
+
+  for (const int i : stroke.points_positions_for_write().index_range()) {
+    stroke.points_positions_for_write()[i] = test_positions[i];
+  }
+
+  for (const int i : stroke.points_positions().index_range()) {
+    EXPECT_V3_NEAR(stroke.points_positions()[i], test_positions[i], 1e-5f);
+  }
 }
 
 }  // namespace blender::bke::gpencil::tests
