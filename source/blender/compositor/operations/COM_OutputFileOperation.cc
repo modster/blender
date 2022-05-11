@@ -17,6 +17,7 @@
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
+#include "IMB_metadata.h"
 
 #include "RE_pipeline.h"
 
@@ -254,6 +255,12 @@ void OutputSingleLayerOperation::deinit_execution()
     ibuf->rect_float = output_buffer_;
     ibuf->mall |= IB_rectfloat;
     ibuf->dither = rd_->dither_intensity;
+
+    std::unique_ptr<MetaData> metadata = image_input_->get_meta_data();
+    if (metadata.get() != nullptr) {
+      IMB_metadata_ensure(&ibuf->metadata);
+      metadata->add_to_id_prop(ibuf->metadata);
+    }
 
     IMB_colormanagement_imbuf_for_write(ibuf, save_as_render_, false, &format_);
 

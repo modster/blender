@@ -201,11 +201,6 @@ void ViewerOperation::update_image(const rcti *rect)
                                     rect->xmax,
                                     rect->ymax);
 
-  std::unique_ptr<MetaData> metadata = image_input_->get_meta_data();
-  if (metadata.has_value()) {
-    // TODO:    metadata.add_to_id_prop.
-  }
-
   /* This could be improved to use partial updates. For now disabled as the full frame compositor
    * would not use partial frames anymore and the image engine requires more testing. */
   BKE_image_partial_update_mark_full_update(image_);

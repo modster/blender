@@ -6,6 +6,8 @@
 #include "BKE_idprop.h"
 #include "BKE_image.h"
 
+#include "IMB_metadata.h"
+
 #include "RE_pipeline.h"
 
 namespace blender::compositor {
@@ -59,6 +61,14 @@ void MetaData::add_to_render_result(RenderResult *render_result) const
 {
   for (Map<std::string, std::string>::Item entry : entries_.items()) {
     BKE_render_result_stamp_data(render_result, entry.key.c_str(), entry.value.c_str());
+  }
+}
+
+void MetaData::add_to_id_prop(IDProperty *id_properties) const
+{
+  BLI_assert(id_properties != nullptr);
+  for (Map<std::string, std::string>::Item entry : entries_.items()) {
+    IMB_metadata_set_field(id_properties, entry.key.c_str(), entry.value.c_str());
   }
 }
 

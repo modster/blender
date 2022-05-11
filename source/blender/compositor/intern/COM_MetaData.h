@@ -43,6 +43,7 @@ class MetaData {
    */
   void replace_hash_neutral_cryptomatte_keys(const blender::StringRef layer_name);
   void add_to_render_result(RenderResult *render_result) const;
+  void add_to_id_prop(IDProperty *properties) const;
   void add(IDProperty *properties);
 
 #ifdef WITH_CXX_GUARDEDALLOC
