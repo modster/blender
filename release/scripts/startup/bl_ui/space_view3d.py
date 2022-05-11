@@ -523,6 +523,7 @@ class _draw_tool_settings_context_mode:
             layout.prop(brush.curves_sculpt_settings, "curve_length")
             layout.prop(brush.curves_sculpt_settings, "interpolate_length")
             layout.prop(brush.curves_sculpt_settings, "interpolate_shape")
+            layout.prop(brush.curves_sculpt_settings, "interpolate_point_count")
 
         if brush.curves_sculpt_tool == 'GROW_SHRINK':
             layout.prop(brush, "direction", expand=True, text="")
@@ -1237,24 +1238,23 @@ class VIEW3D_MT_view_viewpoint(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        i18n_text_ctxt = bpy.app.translations.contexts_C_to_py['BLT_I18NCONTEXT_EDITOR_VIEW3D']
 
-        layout.operator("view3d.view_camera", text="Camera", text_ctxt=i18n_text_ctxt)
-
-        layout.separator()
-
-        layout.operator("view3d.view_axis", text="Top", text_ctxt=i18n_text_ctxt).type = 'TOP'
-        layout.operator("view3d.view_axis", text="Bottom", text_ctxt=i18n_text_ctxt).type = 'BOTTOM'
+        layout.operator("view3d.view_camera", text="Camera", text_ctxt=i18n_contexts.editor_view3d)
 
         layout.separator()
 
-        layout.operator("view3d.view_axis", text="Front", text_ctxt=i18n_text_ctxt).type = 'FRONT'
-        layout.operator("view3d.view_axis", text="Back", text_ctxt=i18n_text_ctxt).type = 'BACK'
+        layout.operator("view3d.view_axis", text="Top", text_ctxt=i18n_contexts.editor_view3d).type = 'TOP'
+        layout.operator("view3d.view_axis", text="Bottom", text_ctxt=i18n_contexts.editor_view3d).type = 'BOTTOM'
 
         layout.separator()
 
-        layout.operator("view3d.view_axis", text="Right", text_ctxt=i18n_text_ctxt).type = 'RIGHT'
-        layout.operator("view3d.view_axis", text="Left", text_ctxt=i18n_text_ctxt).type = 'LEFT'
+        layout.operator("view3d.view_axis", text="Front", text_ctxt=i18n_contexts.editor_view3d).type = 'FRONT'
+        layout.operator("view3d.view_axis", text="Back", text_ctxt=i18n_contexts.editor_view3d).type = 'BACK'
+
+        layout.separator()
+
+        layout.operator("view3d.view_axis", text="Right", text_ctxt=i18n_contexts.editor_view3d).type = 'RIGHT'
+        layout.operator("view3d.view_axis", text="Left", text_ctxt=i18n_contexts.editor_view3d).type = 'LEFT'
 
 
 class VIEW3D_MT_view_navigation(Menu):
@@ -1321,33 +1321,32 @@ class VIEW3D_MT_view_align_selected(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        i18n_text_ctxt = bpy.app.translations.contexts_C_to_py['BLT_I18NCONTEXT_EDITOR_VIEW3D']
 
-        props = layout.operator("view3d.view_axis", text="Top", text_ctxt=i18n_text_ctxt)
+        props = layout.operator("view3d.view_axis", text="Top", text_ctxt=i18n_contexts.editor_view3d)
         props.align_active = True
         props.type = 'TOP'
 
-        props = layout.operator("view3d.view_axis", text="Bottom", text_ctxt=i18n_text_ctxt)
+        props = layout.operator("view3d.view_axis", text="Bottom", text_ctxt=i18n_contexts.editor_view3d)
         props.align_active = True
         props.type = 'BOTTOM'
 
         layout.separator()
 
-        props = layout.operator("view3d.view_axis", text="Front", text_ctxt=i18n_text_ctxt)
+        props = layout.operator("view3d.view_axis", text="Front", text_ctxt=i18n_contexts.editor_view3d)
         props.align_active = True
         props.type = 'FRONT'
 
-        props = layout.operator("view3d.view_axis", text="Back", text_ctxt=i18n_text_ctxt)
+        props = layout.operator("view3d.view_axis", text="Back", text_ctxt=i18n_contexts.editor_view3d)
         props.align_active = True
         props.type = 'BACK'
 
         layout.separator()
 
-        props = layout.operator("view3d.view_axis", text="Right", text_ctxt=i18n_text_ctxt)
+        props = layout.operator("view3d.view_axis", text="Right", text_ctxt=i18n_contexts.editor_view3d)
         props.align_active = True
         props.type = 'RIGHT'
 
-        props = layout.operator("view3d.view_axis", text="Left", text_ctxt=i18n_text_ctxt)
+        props = layout.operator("view3d.view_axis", text="Left", text_ctxt=i18n_contexts.editor_view3d)
         props.align_active = True
         props.type = 'LEFT'
 
@@ -2347,6 +2346,7 @@ class VIEW3D_MT_object(Menu):
         layout.separator()
 
         layout.operator("object.shade_smooth")
+        layout.operator("object.shade_smooth", text="Shade Auto Smooth").use_auto_smooth = True
         layout.operator("object.shade_flat")
 
         layout.separator()
@@ -2589,7 +2589,8 @@ class VIEW3D_MT_object_context_menu(Menu):
         # Shared among some object types.
         if obj is not None:
             if obj.type in {'MESH', 'CURVE', 'SURFACE'}:
-                layout.operator("object.shade_smooth", text="Shade Smooth")
+                layout.operator("object.shade_smooth")
+                layout.operator("object.shade_smooth", text="Shade Auto Smooth").use_auto_smooth = True
                 layout.operator("object.shade_flat", text="Shade Flat")
 
                 layout.separator()
