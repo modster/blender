@@ -24,8 +24,7 @@
 static OneAPIErrorCallback s_error_cb = nullptr;
 static void *s_error_user_ptr = nullptr;
 
-static std::vector<sycl::device> oneapi_available_devices(
-    std::map<std::string, std::string> *proper_names_map = nullptr);
+static std::vector<sycl::device> oneapi_available_devices();
 
 void oneapi_set_error_cb(OneAPIErrorCallback cb, void *user_ptr)
 {
@@ -654,207 +653,134 @@ bool oneapi_enqueue_kernel(KernelContext *kernel_context,
   return success;
 }
 
-// TODO(sirgienko) Put proper linux driver version number here, when it will be known, which
-// exactly driver will have lowerest support
-static const int windows_lowest_supported_driver_build_version = 1011660;
-static const int linux_lowest_supported_driver_build_version = 20066;
+static const int lowest_supported_driver_version_win = 1011660;
+static const int lowest_supported_driver_version_neo = 20066;
 
-// Windows: os_type == 1
-// Linux: os_type == 2
-static int parse_driver_build_version(const sycl::device &device, int &os_type)
+static int parse_driver_build_version(const sycl::device &device)
 {
-  const std::string &device_name = device.get_info<sycl::info::device::name>();
   const std::string &driver_version = device.get_info<sycl::info::device::driver_version>();
+  int driver_build_version = 0;
 
-  // NOTE(sirgienko) Windows Intel GPUs driver version look like this:
-  //   xx.x.101.1340
-  // the 7 last digits are forming the version number.
-  // For more details, see
-  // https://www.intel.com/content/www/us/en/support/articles/000005654/graphics.html
-  if (std::count(driver_version.begin(), driver_version.end(), '.') == 3) {
-    os_type = 1;
-  }
-  // Linux versions examples: 22.01.022066, 22.01.018324
-  // Last number is used as driver version number.
-  else if (std::count(driver_version.begin(), driver_version.end(), '.') == 2) {
-    os_type = 2;
+  size_t second_dot_position = driver_version.find('.', driver_version.find('.') + 1);
+  if (second_dot_position == std::string::npos) {
+    std::cerr << "Unable to parse unknown Intel GPU driver version \"" << driver_version
+              << "\" does not match xx.xx.xxxxx (Linux), x.x.xxxx (L0),"
+              << " xx.xx.xxx.xxxx (Windows) for device \""
+              << device.get_info<sycl::info::device::name>() << "\"." << std::endl;
   }
   else {
-    std::cerr << "Unable to parse incorrect/unknown Intel GPU driver version \"" << driver_version
-              << "\" - device \"" << device_name << "\" will be skipped" << std::endl;
-    os_type = 0;
-    return 0;
-  }
-
-  size_t second_dot_position = driver_version.find('.', driver_version.find('.', 0) + 1);
-  // For easier parsing, let's consider third dot as an end string position for Linux version
-  // string
-  size_t third_dot_position = os_type == 1 ? driver_version.find('.', second_dot_position + 1) :
-                                             driver_version.length();
-
-  int driver_build_version = 0;
-  try {
-    const std::string &third_number_substr = driver_version.substr(
-        second_dot_position + 1, third_dot_position - second_dot_position - 1);
-    // Windows
-    if (os_type == 1) {
-      const std::string &forth_number_substr = driver_version.substr(
-          third_dot_position + 1, driver_version.length() - third_dot_position - 1);
-      if (third_number_substr.length() == 3 && forth_number_substr.length() == 4)
-        driver_build_version = std::stoi(third_number_substr) * 10000 +
-                               std::stoi(forth_number_substr);
-      else
-        std::cerr << "Unable to parse incorrect Intel GPU driver version \"" << driver_version
-                  << "\" - " << third_number_substr << "." << forth_number_substr
-                  << " does not match template xxx.xxxx, so device \"" << device_name
-                  << "\" be skipped" << std::endl;
-    }
-    // Linux
-    else if (os_type == 2) {
-      if (third_number_substr.length() == 5 || third_number_substr.length() == 6)
+    try {
+      size_t third_dot_position = driver_version.find('.', second_dot_position + 1);
+      if (third_dot_position != std::string::npos) {
+        const std::string &third_number_substr = driver_version.substr(
+            second_dot_position + 1, third_dot_position - second_dot_position - 1);
+        const std::string &forth_number_substr = driver_version.substr(third_dot_position + 1);
+        if (third_number_substr.length() == 3 && forth_number_substr.length() == 4)
+          driver_build_version = std::stoi(third_number_substr) * 10000 +
+                                 std::stoi(forth_number_substr);
+      }
+      else {
+        const std::string &third_number_substr = driver_version.substr(second_dot_position + 1);
         driver_build_version = std::stoi(third_number_substr);
-      else
-        std::cerr << "Unable to parse unknown Intel GPU driver version \"" << driver_version
-                  << "\" - the version does not match template xx.xx.xxxxx, so device \""
-                  << device_name << "\" will be skipped" << std::endl;
+      }
     }
-  }
-  catch (std::invalid_argument &e) {
-    std::cerr << "Unable to parse unknown Intel GPU driver version \"" << driver_version
-              << "\" - throws number parse exception \"" << e.what() << "\" so device \""
-              << device_name << "\" will be skipped" << std::endl;
+    catch (std::invalid_argument &e) {
+      std::cerr << "Unable to parse unknown Intel GPU driver version \"" << driver_version
+                << "\" does not match xx.xx.xxxxx (Linux), x.x.xxxx (L0),"
+                << " xx.xx.xxx.xxxx (Windows) for device \""
+                << device.get_info<sycl::info::device::name>() << "\"." << std::endl;
+    }
   }
 
   return driver_build_version;
 }
 
-static size_t make_device_uuid(const sycl::device &device)
+static std::string make_prettier_device_name(const std::string &orig_device_name)
 {
-  size_t max_compute_units = device.get_info<sycl::info::device::max_compute_units>();
-  size_t max_work_group_size = device.get_info<sycl::info::device::max_work_group_size>();
-  // Host device for some reason doesn't support this, so we set some default value
-  size_t max_clock_frequency = device.is_host() ?
-                                   0 :
-                                   device.get_info<sycl::info::device::max_clock_frequency>();
+  std::string new_device_name = orig_device_name;
 
-  return max_compute_units << 20 | max_work_group_size << 10 | max_clock_frequency;
+  size_t start_pos = new_device_name.find("(R)");
+  if (start_pos != std::string::npos) {
+    new_device_name.replace(start_pos, 3, "\xC2\xAE");
+  }
+
+  start_pos = new_device_name.find("(TM)");
+  if (start_pos != std::string::npos) {
+    new_device_name.replace(start_pos, 4, "\xE2\x84\xA2");
+  }
+
+  return new_device_name;
 }
 
-static std::vector<sycl::device> oneapi_available_devices(
-    std::map<std::string, std::string> *proper_names_map)
+static std::vector<sycl::device> oneapi_available_devices()
 {
   bool allow_all_devices = false;
   if (getenv("CYCLES_ONEAPI_ALL_DEVICES") != nullptr)
     allow_all_devices = true;
 
-  bool allow_host = false;
-  // Host device useful only for debugging so we hide this device with
-  // default build settings
+    // Host device is useful only for debugging at the moment
+    // so we hide this device with default build settings
 #  ifdef WITH_ONEAPI_SYCL_HOST_ENABLED
-  allow_host = true;
+  bool allow_host = true;
+#  else
+  bool allow_host = false;
 #  endif
 
-  // There are no benefits to support OpenCL backend, while we target L0 backend.
-  // Also, presenting two platforms in UI will give user an ability to choose one device for
-  // rendering twice: via OpenCL and via Level0, which doesn't make any sense (and will
-  // have obvious performance impact).
-  const static std::string level_zero_platform_name = "Intel(R) Level-Zero";
-  const static std::string opencl_platform_name = "Intel(R) OpenCL HD Graphics";
-  const static std::set<std::string> supported_platforms = {level_zero_platform_name};
-  const static bool is_level_zero_support_enabled = supported_platforms.find(
-                                                        level_zero_platform_name) !=
-                                                    supported_platforms.end();
   const std::vector<sycl::platform> &oneapi_platforms = sycl::platform::get_platforms();
-
-  // NOTE(sirgienko) Right now only OpenCL devices report GPU system driver version
-  // and proper device name. So we need to get driver info first by scanning for OpenCL platforms.
-  // And then filter-out devices by this information (and compute proper names in the same time)
-
-  // HW characteristics will be used to create an unique key - not best solution, but at least
-  // working for all different devices.
-  std::map<size_t, bool> device_filtering_list;
-  std::map<size_t, std::string> device_name_list;
-  for (const sycl::platform &platform : oneapi_platforms) {
-    const std::string &platform_name = platform.get_info<sycl::info::platform::name>();
-
-    if (platform_name == level_zero_platform_name)
-      continue;
-
-    bool is_enabled_host_device = allow_host && platform.is_host();
-    const std::vector<sycl::device> &oneapi_devices = platform.get_devices();
-    for (const sycl::device &device : oneapi_devices) {
-      size_t uuid = make_device_uuid(device);
-
-      if (device_filtering_list.find(uuid) == device_filtering_list.end())
-        device_filtering_list[uuid] = false;
-
-      if (allow_all_devices || is_enabled_host_device) {
-        device_filtering_list[uuid] = true;
-      }
-      else {
-        if (device.is_gpu() && platform_name == opencl_platform_name &&
-            is_level_zero_support_enabled) {
-          int os_type = 0;
-          int driver_build_version = parse_driver_build_version(device, os_type);
-
-          // Ignore GPUs with driver version older that first recommended
-          bool is_windows = os_type == 1;
-          if (is_windows && driver_build_version >= windows_lowest_supported_driver_build_version)
-            device_filtering_list[uuid] = true;
-
-          bool is_linux = os_type == 2;
-          if (is_linux && driver_build_version >= linux_lowest_supported_driver_build_version)
-            device_filtering_list[uuid] = true;
-        }
-        else {
-          device_filtering_list[uuid] = false;
-        }
-      }
-
-      device_name_list[uuid] = device.get_info<sycl::info::device::name>();
-    }
-  }
-
-  // Clean this map before putting any new values into it
-  if (proper_names_map)
-    proper_names_map->clear();
 
   std::vector<sycl::device> available_devices;
   for (const sycl::platform &platform : oneapi_platforms) {
     const std::string &platform_name = platform.get_info<sycl::info::platform::name>();
-
-    if (platform_name == opencl_platform_name)
+    // ignore OpenCL platforms to avoid using the same devices through both Level-Zero and OpenCL
+    if (platform_name.find("OpenCL") != std::string::npos)
       continue;
 
-    const std::vector<sycl::device> &oneapi_devices = platform.get_devices();
+    const std::vector<sycl::device> &oneapi_devices =
+        (allow_all_devices || allow_host) ? platform.get_devices(sycl::info::device_type::all) :
+                                            platform.get_devices(sycl::info::device_type::gpu);
+
     for (const sycl::device &device : oneapi_devices) {
-      size_t uuid = make_device_uuid(device);
-
-      bool is_filtered_out_additionaly = false;
-
-      // For GPU we will additionally filter-out devices by device id
-      if (device.is_gpu() && platform_name == level_zero_platform_name &&
-          is_level_zero_support_enabled) {
-        ze_device_handle_t ze_device = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(
-            device);
-        ze_device_properties_t prop;
-        zeDeviceGetProperties(ze_device, &prop);
-        is_filtered_out_additionaly = oneapi_allowed_gpu_devices.find(prop.deviceId) ==
-                                      oneapi_allowed_gpu_devices.end();
-      }
-
-      if (device_filtering_list[uuid] && !is_filtered_out_additionaly) {
+      if (allow_all_devices) {
         available_devices.push_back(device);
+      }
+      else {
+        bool filter_out = false;
 
-        if (proper_names_map) {
-          const std::string &device_name = device.get_info<sycl::info::device::name>();
-          if (device_name_list.find(uuid) != device_name_list.end()) {
-            (*proper_names_map)[device_name] = device_name_list[uuid];
+        // For now we support all Intel(R) Arc(TM) devices
+        // and any future GPU with more than 128 execution units
+        // official support can be broaden to older and smaller GPUs once ready
+        if (device.is_gpu()) {
+          ze_device_handle_t ze_device = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(
+              device);
+          ze_device_properties_t props = {ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES};
+          zeDeviceGetProperties(ze_device, &props);
+          bool is_dg2 = (intel_arc_alchemist_device_ids.find(props.deviceId) !=
+                         intel_arc_alchemist_device_ids.end());
+          int number_of_eus = props.numEUsPerSubslice * props.numSubslicesPerSlice *
+                              props.numSlices;
+          if (!is_dg2 || number_of_eus < 128)
+            filter_out = true;
+
+          // if not already filtered out, check driver version
+          if (!filter_out) {
+            int driver_build_version = parse_driver_build_version(device);
+            if ((driver_build_version > 100000 &&
+                 driver_build_version < lowest_supported_driver_version_win) ||
+                (driver_build_version > 0 &&
+                 driver_build_version < lowest_supported_driver_version_neo)) {
+              filter_out = true;
+            }
           }
-          else {
-            // If we don't have good name, then just use name, which reported by backend
-            (*proper_names_map)[device_name] = device_name;
-          }
+        }
+        else if (!allow_host && device.is_host()) {
+          filter_out = true;
+        }
+        else if (!allow_all_devices) {
+          filter_out = true;
+        }
+
+        if (!filter_out) {
+          available_devices.push_back(device);
         }
       }
     }
@@ -867,10 +793,10 @@ char *oneapi_device_capabilities()
 {
   std::stringstream capabilities;
 
-  std::map<std::string, std::string> proper_names;
-  const std::vector<sycl::device> &oneapi_devices = oneapi_available_devices(&proper_names);
+  const std::vector<sycl::device> &oneapi_devices = oneapi_available_devices();
   for (const sycl::device &device : oneapi_devices) {
-    const std::string &name = proper_names[device.get_info<sycl::info::device::name>()];
+    const std::string &name = make_prettier_device_name(
+        device.get_info<sycl::info::device::name>());
 
     capabilities << std::string("\t") << name << "\n";
 #  define WRITE_ATTR(attribute_name, attribute_variable) \
@@ -950,12 +876,11 @@ void oneapi_free(void *p)
 void oneapi_iterate_devices(OneAPIDeviceIteratorCallback cb, void *user_ptr)
 {
   int num = 0;
-  std::map<std::string, std::string> proper_names;
-  std::vector<sycl::device> devices = oneapi_available_devices(&proper_names);
+  std::vector<sycl::device> devices = oneapi_available_devices();
   for (sycl::device &device : devices) {
     const std::string &platform_name =
         device.get_platform().get_info<sycl::info::platform::name>();
-    std::string name = proper_names[device.get_info<sycl::info::device::name>()];
+    std::string name = make_prettier_device_name(device.get_info<sycl::info::device::name>());
     std::string id = "ONEAPI_" + platform_name + "_" + name;
     (cb)(id.c_str(), name.c_str(), num, user_ptr);
     num++;
