@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <optional>
+#include "testing/testing.h"
 
 #include "BKE_curves.hh"
 
@@ -13,7 +14,6 @@
 #include "BLI_math_vec_types.hh"
 
 #include "gpencil_new_proposal.hh"
-#include "testing/testing.h"
 
 namespace blender::bke {
 
