@@ -8,9 +8,8 @@
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
 
-#include "IO_string_utils.hh"
-
 #include "obj_import_file_reader.hh"
+#include "obj_import_string_utils.hh"
 
 namespace blender::io::obj {
 
@@ -128,6 +127,7 @@ static void geom_add_polygon(Geometry *geom,
   curr_face.start_index_ = orig_corners_size;
 
   bool face_valid = true;
+  line = drop_whitespace(line);
   while (!line.is_empty() && face_valid) {
     PolyCorner corner;
     bool got_uv = false, got_normal = false;
@@ -399,6 +399,7 @@ void OBJParser::parse(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
     StringRef buffer_str{buffer.data(), (int64_t)last_nl};
     while (!buffer_str.is_empty()) {
       StringRef line = read_next_line(buffer_str);
+      line = drop_whitespace(line);
       ++line_number;
       if (line.is_empty()) {
         continue;
@@ -483,9 +484,6 @@ void OBJParser::parse(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
       }
       else if (line.startswith("end")) {
         /* End of curve definition, nothing else to do. */
-      }
-      else if (line.front() <= ' ') {
-        /* Just whitespace, skip. */
       }
       else {
         std::cout << "OBJ element not recognized: '" << line << "'" << std::endl;

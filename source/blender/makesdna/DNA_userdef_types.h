@@ -57,7 +57,7 @@ typedef struct uiFontStyle {
   /** Saved in file, 0 is default. */
   short uifont_id;
   char _pad1[2];
-  /** Actual size depends on 'global' dpi. */
+  /** Actual size depends on 'global' DPI. */
   float points;
   /** Style hint. */
   short italic, bold;
@@ -652,7 +652,7 @@ typedef struct UserDef_Experimental {
   char use_override_templates;
   char enable_eevee_next;
   char use_sculpt_texture_paint;
-  char _pad0[1];
+  char use_draw_manager_acquire_lock;
   /** `makesdna` does not allow empty structs. */
 } UserDef_Experimental;
 

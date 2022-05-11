@@ -3292,7 +3292,7 @@ static struct IDFilterEnumPropertyItem rna_enum_space_file_id_filter_categories[
     {FILTER_ID_AR | FILTER_ID_CU_LEGACY | FILTER_ID_LT | FILTER_ID_MB | FILTER_ID_ME |
          FILTER_ID_CV | FILTER_ID_PT | FILTER_ID_VO,
      "category_geometry",
-     ICON_NODETREE,
+     ICON_GEOMETRY_NODES,
      "Geometry",
      "Show meshes, curves, lattice, armatures and metaballs data"},
     {FILTER_ID_LS | FILTER_ID_MA | FILTER_ID_NT | FILTER_ID_TE,
@@ -5406,6 +5406,17 @@ static void rna_def_space_image(BlenderRNA *brna)
   RNA_def_property_boolean_funcs(prop, "rna_SpaceImageEditor_show_maskedit_get", NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Show Mask Editor", "Show Mask editing related properties");
+
+  /* Gizmo Toggles. */
+  prop = RNA_def_property(srna, "show_gizmo", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SI_GIZMO_HIDE);
+  RNA_def_property_ui_text(prop, "Show Gizmo", "Show gizmos of all types");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
+
+  prop = RNA_def_property(srna, "show_gizmo_navigate", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SI_GIZMO_HIDE_NAVIGATE);
+  RNA_def_property_ui_text(prop, "Navigate Gizmo", "Viewport navigation gizmo");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
 
   /* Overlays */
   prop = RNA_def_property(srna, "overlay", PROP_POINTER, PROP_NONE);
