@@ -71,18 +71,18 @@ int count_node_pixels(PBVHNode &node)
   return totpixel;
 }
 
-struct SplitThreadData {
+struct SplitQueueData {
   ThreadQueue *queue;
   ThreadQueue *new_nodes;
-  int thread_num, thread_nr;
-  std::atomic<bool> *working;
-
-  std::atomic<int> *nodes_num;
+  int thread_num;
 
   PBVH *pbvh;
   Mesh *mesh;
   Image *image;
   ImageUser *image_user;
+
+  std::atomic<bool> *working;
+  std::atomic<int> *nodes_num;
 };
 
 struct SplitNodePair {
@@ -104,7 +104,7 @@ static void split_pixel_node(PBVH *pbvh,
                              Mesh *mesh,
                              Image *image,
                              ImageUser *image_user,
-                             SplitThreadData *tdata)
+                             SplitQueueData *tdata)
 {
   BB cb;
   PBVHNode *node = &split->node;
@@ -256,7 +256,7 @@ static void split_pixel_node(PBVH *pbvh,
   BLI_thread_queue_push(tdata->queue, static_cast<void *>(split2));
 }
 
-static void split_flush_final_nodes(SplitThreadData *tdata)
+static void split_flush_final_nodes(SplitQueueData *tdata)
 {
   PBVH *pbvh = tdata->pbvh;
   Vector<SplitNodePair *> splits;
@@ -293,10 +293,10 @@ static void split_flush_final_nodes(SplitThreadData *tdata)
   }
 }
 
-extern "C" static void *split_thread_job(void *_tdata)
+extern "C" static void split_thread_job(TaskPool *__restrict pool, void *taskdata)
 {
-  SplitThreadData *tdata = static_cast<SplitThreadData *>(_tdata);
-  int thread_nr = tdata->thread_nr;
+  SplitQueueData *tdata = static_cast<SplitQueueData *>(BLI_task_pool_user_data(pool));
+  int thread_nr = POINTER_AS_UINT(taskdata);
 
   tdata->working[thread_nr].store(false);
 
@@ -306,6 +306,8 @@ extern "C" static void *split_thread_job(void *_tdata)
     if (work) {
       SplitNodePair *split = static_cast<SplitNodePair *>(work);
 
+      /* Signal to other threads that we are working, needed to prevent
+         premature task exit when the queue is temporarily empty. */
       tdata->working[thread_nr].store(true);
       split_pixel_node(tdata->pbvh, split, tdata->mesh, tdata->image, tdata->image_user, tdata);
       tdata->working[thread_nr].store(false);
@@ -321,12 +323,11 @@ extern "C" static void *split_thread_job(void *_tdata)
       }
     }
 
+    /* No nodes left in queue? End task. */
     if (ok) {
       break;
     }
   }
-
-  return nullptr;
 }
 
 static void split_pixel_nodes(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image_user)
@@ -343,7 +344,7 @@ static void split_pixel_nodes(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *i
     pbvh->pixel_leaf_limit = 256 * 256; /* TODO: move into a constant */
   }
 
-  SplitThreadData tdata;
+  SplitQueueData tdata;
 
   tdata.nodes_num = MEM_new<std::atomic<int>>("tdata.nodes_num");
   tdata.nodes_num->store(pbvh->totnode);
@@ -369,24 +370,22 @@ static void split_pixel_nodes(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *i
     }
   }
 
-  Vector<SplitThreadData> tdatas;
   int thread_num = tdata.thread_num = G.debug_value != 892 ? BLI_system_thread_count() : 1;
-
   tdata.working = new std::atomic<bool>[thread_num];
 
-  ListBase threads;
-  BLI_threadpool_init(&threads, split_thread_job, thread_num);
+#if 0
+  TaskPool *pool = BLI_task_pool_create_no_threads(&tdata);
+#else
+  TaskPool *pool = BLI_task_pool_create_suspended(&tdata, TASK_PRIORITY_HIGH);
+#endif
 
   for (int i : IndexRange(thread_num)) {
-    tdata.thread_nr = i;
-    tdatas.append(tdata);
+    BLI_task_pool_push(pool, split_thread_job, POINTER_FROM_UINT(i), false, nullptr);
   }
 
-  for (int i : IndexRange(thread_num)) {
-    BLI_threadpool_insert(&threads, &tdatas[i]);
-  }
+  BLI_task_pool_work_and_wait(pool);
+  BLI_task_pool_free(pool);
 
-  BLI_threadpool_end(&threads);
   split_flush_final_nodes(&tdata);
 
   delete[] tdata.working;
@@ -763,7 +762,11 @@ void pbvh_pixels_free(PBVHNode *node)
 {
   NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
 
-  if (node->flag & PBVH_Leaf) {
+  if (!node_data) {
+    return;
+  }
+
+  if (node_data->triangles && (node->flag & PBVH_Leaf)) {
     MEM_delete<Triangles>(node_data->triangles);
   }
 
