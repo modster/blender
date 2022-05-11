@@ -302,9 +302,19 @@ class GPData : public ::GPData {
     return {(const GPFrame *)this->frames_array, this->frames_size};
   }
 
+  const GPFrame &frames(int index) const
+  {
+    return this->frames()[index];
+  }
+
   MutableSpan<GPFrame> frames_for_write()
   {
     return {(GPFrame *)this->frames_array, this->frames_size};
+  }
+
+  GPFrame &frames_for_write(int index)
+  {
+    return this->frames_for_write()[index];
   }
 
   IndexMask frames_on_layer(int layer_index) const
@@ -354,54 +364,63 @@ class GPData : public ::GPData {
     return {(const GPLayer *)this->layers_array, this->layers_size};
   }
 
+  const GPLayer &layers(int index) const
+  {
+    return layers()[index];
+  }
+
   MutableSpan<GPLayer> layers_for_write()
   {
     return {(GPLayer *)this->layers_array, this->layers_size};
   }
 
-  /* TODO: Rework this API to take a string instead and create the layer in here. Similar to how we
-   * do it with frames. */
-  int add_layer(GPLayer &new_layer)
+  GPLayer &layers_for_write(int index)
+  {
+    return layers_for_write()[index];
+  }
+
+  int add_layer(StringRefNull name)
   {
     /* Ensure that the layer array has enough space. */
     if (!ensure_layers_array_has_size_at_least(this->layers_size + 1)) {
       return -1;
     }
 
+    GPLayer new_layer(name);
     /* Move new_layer to the end in the array. */
     this->layers_for_write().last() = std::move(new_layer);
     return this->layers_size - 1;
   }
 
-  GPFrame *add_frame_on_layer(int layer_index, int frame_start)
+  int add_frame_on_layer(int layer_index, int frame_start)
   {
     /* TODO: Check for collisions. */
 
     if (!ensure_frames_array_has_size_at_least(this->frames_size + 1)) {
-      return nullptr;
+      return -1;
     }
 
-    GPFrame frame(frame_start);
-    frame.layer_index = layer_index;
-    this->frames_for_write().last() = std::move(frame); /* TODO: Check for collisions. */
+    GPFrame new_frame(frame_start);
+    new_frame.layer_index = layer_index;
+    this->frames_for_write().last() = std::move(new_frame);
 
     /* Sort frame array. */
     update_frames_array();
 
     auto it = std::lower_bound(this->frames().begin(),
                                this->frames().end(),
-                               std::pair<int, int>(layer_index, frame.start));
-    if (it == this->frames().end() || it->start != frame.start) {
-      return nullptr;
+                               std::pair<int, int>(layer_index, new_frame.start));
+    if (it == this->frames().end() || it->start != new_frame.start) {
+      return -1;
     }
-    return &this->frames_for_write()[std::distance(this->frames().begin(), it)];
+    return std::distance(this->frames().begin(), it);
   }
 
-  GPFrame *add_frame_on_layer(GPLayer &layer, int frame_start)
+  int add_frame_on_layer(GPLayer &layer, int frame_start)
   {
     int index = this->layers().first_index_try(layer);
     if (index == -1) {
-      return nullptr;
+      return -1;
     }
     return add_frame_on_layer(index, frame_start);
   }
@@ -519,111 +538,103 @@ TEST(gpencil_proposal, LayerName)
 TEST(gpencil_proposal, AddOneLayer)
 {
   GPData data;
-  GPLayer layer("FooLayer");
 
-  data.add_layer(layer);
+  const int layer_index = data.add_layer("FooLayer");
   EXPECT_EQ(data.layers_size, 1);
-  EXPECT_STREQ(data.layers().last().name, layer.name);
+  EXPECT_STREQ(data.layers(layer_index).name, "FooLayer");
 }
 
 TEST(gpencil_proposal, AddLayers)
 {
   GPData data;
-  GPLayer layers[3] = {GPLayer("TestLayer1"), GPLayer("TestLayer2"), GPLayer("TestLayer3")};
+  StringRefNull layer_names[3] = {"TestLayer1", "TestLayer2", "TestLayer3"};
 
   for (int i : IndexRange(3)) {
-    data.add_layer(layers[i]);
+    data.add_layer(layer_names[i]);
   }
   EXPECT_EQ(data.layers_size, 3);
 
   for (int i : IndexRange(3)) {
-    EXPECT_STREQ(data.layers()[i].name, layers[i].name);
+    EXPECT_STREQ(data.layers(i).name, layer_names[i].c_str());
   }
 }
 
 TEST(gpencil_proposal, ChangeLayerName)
 {
   GPData data;
-  GPLayer layer("FooLayer");
 
-  data.add_layer(layer);
+  const int layer_index = data.add_layer("FooLayer");
   EXPECT_EQ(data.layers_size, 1);
-  EXPECT_STREQ(data.layers().last().name, layer.name);
+  EXPECT_STREQ(data.layers(layer_index).name, "FooLayer");
 
-  strcpy(data.layers_for_write().last().name, "BarLayer");
+  strcpy(data.layers_for_write(layer_index).name, "BarLayer");
 
   EXPECT_EQ(data.layers_size, 1);
-  EXPECT_STREQ(data.layers().last().name, "BarLayer");
+  EXPECT_STREQ(data.layers(layer_index).name, "BarLayer");
 }
 
 TEST(gpencil_proposal, AddFrameToLayer)
 {
   GPData data;
-  GPLayer layer1("TestLayer1");
-  GPLayer layer2("TestLayer2");
 
-  data.add_layer(layer1);
-  data.add_layer(layer2);
+  data.add_layer("TestLayer1");
+  const int layer2_index = data.add_layer("TestLayer2");
 
-  GPFrame *frame = data.add_frame_on_layer(layer2, 0);
-  EXPECT_NE(frame, nullptr);
+  const int frame_index = data.add_frame_on_layer(layer2_index, 0);
+  EXPECT_NE(frame_index, -1);
 
   EXPECT_EQ(data.frames_size, 1);
   EXPECT_EQ(data.frames().last().layer_index, 1);
-  EXPECT_EQ(frame->layer_index, 1);
+  EXPECT_EQ(data.frames(frame_index).layer_index, 1);
 
-  frame->start = 20;
-  EXPECT_EQ(data.frames().last().start, 20);
+  data.frames_for_write(frame_index).start = 20;
+  EXPECT_EQ(data.frames(frame_index).start, 20);
 }
 
 TEST(gpencil_proposal, CheckFramesSorted1)
 {
   GPData data;
-  GPLayer layer1("TestLayer1");
 
   const int frame_numbers1[5] = {10, 5, 6, 1, 3};
   const int frame_numbers_sorted1[5] = {1, 3, 5, 6, 10};
 
-  const int layer1_idx = data.add_layer(layer1);
+  int layer1_index = data.add_layer("TestLayer1");
   for (int i : IndexRange(5)) {
-    GPFrame *frame = data.add_frame_on_layer(layer1_idx, frame_numbers1[i]);
-    EXPECT_NE(frame, nullptr);
-    EXPECT_EQ(frame->start, frame_numbers1[i]);
+    const int frame_index = data.add_frame_on_layer(layer1_index, frame_numbers1[i]);
+    EXPECT_NE(frame_index, -1);
+    EXPECT_EQ(data.frames(frame_index).start, frame_numbers1[i]);
   }
 
   for (const int i : data.frames().index_range()) {
-    EXPECT_EQ(data.frames()[i].start, frame_numbers_sorted1[i]);
+    EXPECT_EQ(data.frames(i).start, frame_numbers_sorted1[i]);
   }
 }
 
 TEST(gpencil_proposal, CheckFramesSorted2)
 {
   GPData data;
-  GPLayer layer1("TestLayer1");
-  GPLayer layer2("TestLayer2");
+
   const int frame_numbers_layer1[5] = {10, 5, 6, 1, 3};
   const int frame_numbers_layer2[5] = {8, 5, 7, 1, 4};
   const int frame_numbers_sorted2[10][2] = {
       {0, 1}, {1, 1}, {0, 3}, {1, 4}, {0, 5}, {1, 5}, {0, 6}, {1, 7}, {1, 8}, {0, 10}};
 
-  const int layer1_idx = data.add_layer(layer1);
-  const int layer2_idx = data.add_layer(layer2);
+  const int layer1_index = data.add_layer("TestLayer1");
+  const int layer2_index = data.add_layer("TestLayer2");
   for (int i : IndexRange(5)) {
-    data.add_frame_on_layer(layer1_idx, frame_numbers_layer1[i]);
-    data.add_frame_on_layer(layer2_idx, frame_numbers_layer2[i]);
+    data.add_frame_on_layer(layer1_index, frame_numbers_layer1[i]);
+    data.add_frame_on_layer(layer2_index, frame_numbers_layer2[i]);
   }
 
   for (const int i : data.frames().index_range()) {
-    EXPECT_EQ(data.frames()[i].layer_index, frame_numbers_sorted2[i][0]);
-    EXPECT_EQ(data.frames()[i].start, frame_numbers_sorted2[i][1]);
+    EXPECT_EQ(data.frames(i).layer_index, frame_numbers_sorted2[i][0]);
+    EXPECT_EQ(data.frames(i).start, frame_numbers_sorted2[i][1]);
   }
 }
 
 TEST(gpencil_proposal, IterateOverFramesOnLayer)
 {
   GPData data;
-  GPLayer layer1("TestLayer1");
-  GPLayer layer2("TestLayer2");
 
   const int frame_numbers_layer1[5] = {10, 5, 6, 1, 3};
   const int frame_numbers_layer2[5] = {8, 5, 7, 1, 4};
@@ -631,48 +642,44 @@ TEST(gpencil_proposal, IterateOverFramesOnLayer)
   const int frame_numbers_sorted1[5] = {1, 3, 5, 6, 10};
   const int frame_numbers_sorted2[5] = {1, 4, 5, 7, 8};
 
-  const int layer1_idx = data.add_layer(layer1);
-  const int layer2_idx = data.add_layer(layer2);
+  const int layer1_index = data.add_layer("TestLayer1");
+  const int layer2_index = data.add_layer("TestLayer2");
   for (int i : IndexRange(5)) {
-    data.add_frame_on_layer(layer1_idx, frame_numbers_layer1[i]);
-    data.add_frame_on_layer(layer2_idx, frame_numbers_layer2[i]);
+    data.add_frame_on_layer(layer1_index, frame_numbers_layer1[i]);
+    data.add_frame_on_layer(layer2_index, frame_numbers_layer2[i]);
   }
 
-  IndexMask indices_frames_layer1 = data.frames_on_layer(layer1_idx);
-  EXPECT_TRUE(data.runtime->frame_index_masks_cache.contains(layer1_idx));
+  IndexMask indices_frames_layer1 = data.frames_on_layer(layer1_index);
+  EXPECT_TRUE(data.runtime->frame_index_masks_cache.contains(layer1_index));
   for (const int i : indices_frames_layer1.index_range()) {
-    EXPECT_EQ(data.frames()[indices_frames_layer1[i]].start, frame_numbers_sorted1[i]);
+    EXPECT_EQ(data.frames(indices_frames_layer1[i]).start, frame_numbers_sorted1[i]);
   }
 
-  IndexMask indices_frames_layer2 = data.frames_on_layer(layer2_idx);
-  EXPECT_TRUE(data.runtime->frame_index_masks_cache.contains(layer2_idx));
+  IndexMask indices_frames_layer2 = data.frames_on_layer(layer2_index);
+  EXPECT_TRUE(data.runtime->frame_index_masks_cache.contains(layer2_index));
   for (const int i : indices_frames_layer2.index_range()) {
-    EXPECT_EQ(data.frames()[indices_frames_layer2[i]].start, frame_numbers_sorted2[i]);
+    EXPECT_EQ(data.frames(indices_frames_layer2[i]).start, frame_numbers_sorted2[i]);
   }
 }
 
 TEST(gpencil_proposal, AddSingleStroke)
 {
   GPData data;
-  GPLayer layer1("TestLayer1");
+  const int layer1_index = data.add_layer("TestLayer1");
 
-  const int layer1_idx = data.add_layer(layer1);
-
-  GPFrame *frame = data.add_frame_on_layer(layer1_idx, 0);
-  EXPECT_NE(frame, nullptr);
-  GPStroke stroke = frame->add_new_stroke(100);
+  const int frame_index = data.add_frame_on_layer(layer1_index, 0);
+  EXPECT_NE(frame_index, -1);
+  GPStroke stroke = data.frames_for_write(frame_index).add_new_stroke(100);
 
   EXPECT_EQ(data.strokes_num(), 1);
-  EXPECT_EQ(frame->strokes_num(), 1);
+  EXPECT_EQ(data.frames(frame_index).strokes_num(), 1);
   EXPECT_EQ(stroke.points_num(), 100);
 }
 
 TEST(gpencil_proposal, ChangeStrokePoints)
 {
   GPData data;
-  GPLayer layer1("TestLayer1");
-
-  const int layer1_idx = data.add_layer(layer1);
+  const int layer1_index = data.add_layer("TestLayer1");
 
   static const Array<float3> test_positions{{
       {1.0f, 2.0f, 3.0f},
@@ -680,9 +687,9 @@ TEST(gpencil_proposal, ChangeStrokePoints)
       {7.0f, 8.0f, 9.0f},
   }};
 
-  GPFrame *frame = data.add_frame_on_layer(layer1_idx, 0);
-  EXPECT_NE(frame, nullptr);
-  GPStroke stroke = frame->add_new_stroke(test_positions.size());
+  const int frame_index = data.add_frame_on_layer(layer1_index, 0);
+  EXPECT_NE(frame_index, -1);
+  GPStroke stroke = data.frames_for_write(frame_index).add_new_stroke(test_positions.size());
 
   for (const int i : stroke.points_positions_for_write().index_range()) {
     stroke.points_positions_for_write()[i] = test_positions[i];

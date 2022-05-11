@@ -77,10 +77,10 @@ typedef struct GPFrame {
   int layer_index;
 
   /**
-   * The start and end frame in the scene that the grease pencil frame is displayed.
+   * The start frame in the scene that the grease pencil frame is displayed.
    */
   int start;
-  int end;
+  int end; /* UNUSED for now. */
 
   /* ... */
 } GPFrame;
