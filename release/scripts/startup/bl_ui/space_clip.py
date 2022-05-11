@@ -247,11 +247,12 @@ class CLIP_HT_header(Header):
             if sc.view == 'CLIP':
                 r = active_object.reconstruction
                 if r.is_valid and sc.view == 'CLIP':
-                    layout.label(text="%s Solve error: %.2f px" %
-                                 (active_object.name, r.average_error))
+                    layout.label(text="Solve error: %.2f px" % (r.average_error))
+
+                object_icon = 'CAMERA_DATA' if active_object.is_camera else 'OBJECT_DATA'
 
                 row = layout.row()
-                row.popover(panel='CLIP_PT_objects')
+                row.popover(panel='CLIP_PT_objects', text=active_object.name, icon=object_icon)
                 row = layout.row(align=True)
                 icon = 'LOCKED' if sc.lock_selection else 'UNLOCKED'
                 row.operator("clip.lock_selection_toggle", icon=icon, text="", depress=sc.lock_selection)
