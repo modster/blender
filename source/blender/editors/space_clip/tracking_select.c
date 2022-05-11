@@ -558,17 +558,6 @@ static int box_select_exec(bContext *C, wmOperator *op)
   return OPERATOR_CANCELLED;
 }
 
-static int clip_box_select_invoke(bContext *C, wmOperator *op, const wmEvent *event)
-{
-  const bool tweak = RNA_boolean_get(op->ptr, "tweak");
-
-  if (tweak) {
-    return OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH;
-  }
-
-  return WM_gesture_box_invoke(C, op, event);
-}
-
 void CLIP_OT_select_box(wmOperatorType *ot)
 {
   /* identifiers */
