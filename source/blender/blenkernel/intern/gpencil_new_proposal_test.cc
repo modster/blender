@@ -6,7 +6,7 @@
 
 #include "testing/testing.h"
 #include <algorithm>
-#include <optional>
+
 
 #include "BKE_curves.hh"
 #include "BKE_gpencil.h"
