@@ -177,8 +177,8 @@ void GPU_material_free(ListBase *gpumaterial)
 {
   LISTBASE_FOREACH (LinkData *, link, gpumaterial) {
     GPUMaterial *material = link->data;
-    GPU_material_free_single(material);
     DRW_deferred_shader_remove(material);
+    GPU_material_free_single(material);
   }
   BLI_freelistN(gpumaterial);
 }

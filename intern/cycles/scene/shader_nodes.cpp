@@ -19,7 +19,6 @@
 #include "util/color.h"
 #include "util/foreach.h"
 #include "util/log.h"
-#include "util/string.h"
 #include "util/transform.h"
 
 #include "kernel/tables.h"
@@ -450,22 +449,19 @@ void ImageTextureNode::compile(OSLCompiler &compiler)
   const ustring known_colorspace = metadata.colorspace;
 
   if (handle.svm_slot() == -1) {
-    /* OIIO currently does not support <UVTILE> substitutions natively. Replace with a format they
-     * understand. */
-    std::string osl_filename = filename.string();
-    string_replace(osl_filename, "<UVTILE>", "<U>_<V>");
     compiler.parameter_texture(
-        "filename", ustring(osl_filename), compress_as_srgb ? u_colorspace_raw : known_colorspace);
+        "filename", filename, compress_as_srgb ? u_colorspace_raw : known_colorspace);
   }
   else {
-    compiler.parameter_texture("filename", handle.svm_slot());
+    compiler.parameter_texture("filename", handle);
   }
 
   const bool unassociate_alpha = !(ColorSpaceManager::colorspace_is_data(colorspace) ||
                                    alpha_type == IMAGE_ALPHA_CHANNEL_PACKED ||
                                    alpha_type == IMAGE_ALPHA_IGNORE);
   const bool is_tiled = (filename.find("<UDIM>") != string::npos ||
-                         filename.find("<UVTILE>") != string::npos);
+                         filename.find("<UVTILE>") != string::npos) ||
+                        handle.num_tiles() > 1;
 
   compiler.parameter(this, "projection");
   compiler.parameter(this, "projection_blend");
@@ -610,7 +606,7 @@ void EnvironmentTextureNode::compile(OSLCompiler &compiler)
         "filename", filename, compress_as_srgb ? u_colorspace_raw : known_colorspace);
   }
   else {
-    compiler.parameter_texture("filename", handle.svm_slot());
+    compiler.parameter_texture("filename", handle);
   }
 
   compiler.parameter(this, "projection");
@@ -965,7 +961,7 @@ void SkyTextureNode::compile(OSLCompiler &compiler)
   compiler.parameter_array("nishita_data", sunsky.nishita_data, 10);
   /* nishita texture */
   if (sky_type == NODE_SKY_NISHITA) {
-    compiler.parameter_texture("filename", handle.svm_slot());
+    compiler.parameter_texture("filename", handle);
   }
   compiler.add(this, "node_sky_texture");
 }
@@ -1860,7 +1856,7 @@ void PointDensityTextureNode::compile(OSLCompiler &compiler)
       handle = image_manager->add_image(filename.string(), image_params());
     }
 
-    compiler.parameter_texture("filename", handle.svm_slot());
+    compiler.parameter_texture("filename", handle);
     if (space == NODE_TEX_VOXEL_SPACE_WORLD) {
       compiler.parameter("mapping", tfm);
       compiler.parameter("use_mapping", 1);
