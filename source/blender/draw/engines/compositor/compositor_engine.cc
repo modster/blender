@@ -155,7 +155,9 @@ static void compositor_engine_draw(void *data)
 static void compositor_engine_update(void *data)
 {
   const CompositorData *compositor_data = static_cast<CompositorData *>(data);
-  compositor_data->instance_data->update(DRW_context_state_get()->depsgraph);
+  if (compositor_data->instance_data) {
+    compositor_data->instance_data->update(DRW_context_state_get()->depsgraph);
+  }
 }
 
 extern "C" {
