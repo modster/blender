@@ -16,6 +16,8 @@
 
 #include "testing/testing.h"
 
+#include "PIL_time_utildefines.h"
+
 namespace blender::bke {
 
 class GPLayerGroup : ::GPLayerGroup {
@@ -210,6 +212,14 @@ class GPFrame : public ::GPFrame {
       return 0;
     }
     return this->strokes->curve_num;
+  }
+
+  int points_num() const
+  {
+    if (this->strokes == nullptr) {
+      return 0;
+    }
+    return this->strokes->point_num;
   }
 
   GPStroke add_new_stroke(int new_points_num)
@@ -428,6 +438,13 @@ class GPData : public ::GPData {
     return this->layers_size - 1;
   }
 
+  void add_layers(Array<StringRefNull> names)
+  {
+    for (StringRefNull name : names) {
+      this->add_layer(name);
+    }
+  }
+
   int add_frame_on_layer(int layer_index, int frame_start)
   {
     /* TODO: Check for collisions. */
@@ -461,12 +478,29 @@ class GPData : public ::GPData {
     return add_frame_on_layer(index, frame_start);
   }
 
+  void add_frames_on_layer(int layer_index, Array<int> start_frames)
+  {
+    for (int start_frame : start_frames) {
+      add_frame_on_layer(layer_index, start_frame);
+    }
+  }
+
   int strokes_num() const
   {
     /* TODO: could be done with parallel_for */
     int count = 0;
     for (const GPFrame &gpf : this->frames()) {
       count += gpf.strokes_num();
+    }
+    return count;
+  }
+
+  int points_num() const
+  {
+    /* TODO: could be done with parallel_for */
+    int count = 0;
+    for (const GPFrame &gpf : this->frames()) {
+      count += gpf.points_num();
     }
     return count;
   }
@@ -599,6 +633,37 @@ class GPData : public ::GPData {
 }  // namespace blender::bke
 
 namespace blender::bke::gpencil::tests {
+
+static GPData build_gpencil_data(int num_layers,
+                                 int frames_per_layer,
+                                 int strokes_per_layer,
+                                 int points_per_stroke)
+{
+  GPData gpd;
+
+  Vector<StringRefNull> test_names;
+  for (const int i : IndexRange(num_layers)) {
+    test_names.append("GPLayer" + i);
+  }
+  gpd.add_layers(test_names.as_span());
+
+  Array<int> test_start_frames(IndexRange(frames_per_layer).as_span());
+  for (const int i : gpd.layers().index_range()) {
+    gpd.add_frames_on_layer(i, test_start_frames);
+  }
+
+  for (const int i : gpd.frames().index_range()) {
+    for (const int j : IndexRange(strokes_per_layer)) {
+      GPStroke stroke = gpd.frames_for_write(i).add_new_stroke(points_per_stroke);
+      for (const int k : stroke.points_positions_for_write().index_range()) {
+        stroke.points_positions_for_write()[k] = {
+            float(k), float((k * j) % stroke.points_num()), float(k + j)};
+      }
+    }
+  }
+
+  return gpd;
+}
 
 TEST(gpencil_proposal, EmptyGPData)
 {
@@ -788,11 +853,25 @@ TEST(gpencil_proposal, ChangeStrokePoints)
   }
 }
 
+TEST(gpencil_proposal, BigGPData)
+{
+  GPData data = build_gpencil_data(5, 500, 100, 100);
 
-/* 50 Layers. */
-/* 500 Frames. */
-/* 100 Strokes. */
-/* 100 Points. */
+  EXPECT_EQ(data.strokes_num(), 250e3);
+  EXPECT_EQ(data.points_num(), 25e6);
+}
 
+TEST(gpencil_proposal, BigGPDataCopy)
+{
+  GPData data = build_gpencil_data(5, 500, 100, 100);
+  GPData data_copy;
+
+  TIMEIT_START(BigGPDataCopy);
+  data_copy = data;
+  TIMEIT_END(BigGPDataCopy);
+
+  EXPECT_EQ(data_copy.strokes_num(), 250e3);
+  EXPECT_EQ(data_copy.points_num(), 25e6);
+}
 
 }  // namespace blender::bke::gpencil::tests
