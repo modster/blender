@@ -128,7 +128,11 @@ class GPFrame : public ::GPFrame {
   GPFrame(const GPFrame &other) : GPFrame(other.start_time, other.end_time)
   {
     if (other.strokes != nullptr) {
-      this->strokes_as_curves() = CurvesGeometry::wrap(*other.strokes);
+      /* Make sure old strokes are freed before copying. */
+      MEM_SAFE_FREE(this->strokes);
+      this->strokes = MEM_new<CurvesGeometry>(__func__);
+
+      *reinterpret_cast<CurvesGeometry *>(this->strokes) = CurvesGeometry::wrap(*other.strokes);
     }
     this->layer_index = other.layer_index;
   }
@@ -136,7 +140,11 @@ class GPFrame : public ::GPFrame {
   GPFrame &operator=(const GPFrame &other)
   {
     if (this != &other && other.strokes != nullptr) {
-      this->strokes_as_curves() = CurvesGeometry::wrap(*other.strokes);
+      /* Make sure old strokes are freed before copying. */
+      MEM_SAFE_FREE(this->strokes);
+      this->strokes = MEM_new<CurvesGeometry>(__func__);
+
+      *reinterpret_cast<CurvesGeometry *>(this->strokes) = CurvesGeometry::wrap(*other.strokes);
     }
     this->layer_index = other.layer_index;
     this->start_time = other.start_time;
@@ -279,6 +287,32 @@ class GPData : public ::GPData {
     this->default_group = MEM_new<::GPLayerGroup>(__func__);
 
     this->runtime = MEM_new<GPDataRuntime>(__func__);
+  }
+
+  GPData(const GPData &other) : GPData(other.layers_size, other.frames_size)
+  {
+    copy_gpdata(*this, other);
+  }
+
+  GPData &operator=(const GPData &other)
+  {
+    if (this != &other) {
+      copy_gpdata(*this, other);
+    }
+    return *this;
+  }
+
+  GPData(GPData &&other) : GPData(other.layers_size, other.frames_size)
+  {
+    move_gpdata(*this, other);
+  }
+
+  GPData &operator=(GPData &&other)
+  {
+    if (this != &other) {
+      move_gpdata(*this, other);
+    }
+    return *this;
   }
 
   ~GPData()
@@ -446,6 +480,58 @@ class GPData : public ::GPData {
   }
 
  private:
+  const void copy_gpdata(GPData &dst, const GPData &src)
+  {
+    /* Make sure previous frame data is freed. */
+    MEM_SAFE_FREE(dst.frames_array);
+    CustomData_free(&dst.frame_data, dst.frames_size);
+
+    /* Copy frame data. */
+    dst.frames_size = src.frames_size;
+    dst.frames_array = reinterpret_cast<::GPFrame *>(
+        MEM_calloc_arrayN(dst.frames_size, sizeof(::GPFrame), __func__));
+    uninitialized_copy_n(reinterpret_cast<GPFrame *>(src.frames_array),
+                         src.frames_size,
+                         reinterpret_cast<GPFrame *>(dst.frames_array));
+    CustomData_copy(&src.frame_data, &dst.frame_data, CD_MASK_ALL, CD_DUPLICATE, dst.frames_size);
+
+    /* Make sure layer data is freed then copy it over. */
+    MEM_SAFE_FREE(dst.layers_array);
+    dst.layers_size = src.layers_size;
+    dst.layers_array = reinterpret_cast<::GPLayer *>(
+        MEM_calloc_arrayN(dst.layers_size, sizeof(::GPLayer), __func__));
+    uninitialized_copy_n(reinterpret_cast<GPLayer *>(src.layers_array),
+                         src.layers_size,
+                         reinterpret_cast<GPLayer *>(dst.layers_array));
+    dst.active_layer_index = src.active_layer_index;
+
+    /* Copy layer groups. */
+    *dst.default_group = *src.default_group;
+  }
+
+  const void move_gpdata(GPData &dst, GPData &src)
+  {
+    /* Move frame data. */
+    dst.frames_size = src.frames_size;
+    std::swap(dst.frames_array, src.frames_array);
+    std::swap(dst.frame_data, src.frame_data);
+    MEM_SAFE_FREE(src.frames_array);
+    CustomData_free(&src.frame_data, src.frames_size);
+    src.frames_size = 0;
+
+    /* Move layer data. */
+    dst.layers_size = src.layers_size;
+    std::swap(dst.layers_array, src.layers_array);
+    dst.active_layer_index = src.active_layer_index;
+    MEM_SAFE_FREE(src.layers_array);
+    src.layers_size = 0;
+    src.active_layer_index = -1;
+
+    /* Move layer group and runtime pointers. */
+    std::swap(dst.default_group, src.default_group);
+    std::swap(dst.runtime, src.runtime);
+  }
+
   const bool ensure_layers_array_has_size_at_least(int64_t size)
   {
     if (this->layers_size > size) {
