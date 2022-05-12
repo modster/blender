@@ -6450,7 +6450,6 @@ def km_generic_tool_mask_add_vertex(params):
     )
 
 
-
 def km_generic_tool_mask_add_feather_vertex(params):
     return (
         "Mask Editing: Add Feather Vertex and Slide",
@@ -6462,6 +6461,7 @@ def km_generic_tool_mask_add_feather_vertex(params):
             ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ]},
     )
+
 
 def km_image_editor_tool_generic_sample(params):
     return (
