@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <optional>
-#include "testing/testing.h"
 
 #include "BKE_curves.hh"
 
@@ -14,6 +13,8 @@
 #include "BLI_math_vec_types.hh"
 
 #include "gpencil_new_proposal.hh"
+
+#include "testing/testing.h"
 
 namespace blender::bke {
 
@@ -119,12 +120,12 @@ class GPFrame : public ::GPFrame {
 
   GPFrame(int start_frame, int end_frame)
   {
-    this->start = start_frame;
-    this->end = end_frame;
+    this->start_time = start_frame;
+    this->end_time = end_frame;
     this->strokes = nullptr;
   }
 
-  GPFrame(const GPFrame &other) : GPFrame(other.start, other.end)
+  GPFrame(const GPFrame &other) : GPFrame(other.start_time, other.end_time)
   {
     if (other.strokes != nullptr) {
       this->strokes_as_curves() = CurvesGeometry::wrap(*other.strokes);
@@ -138,12 +139,12 @@ class GPFrame : public ::GPFrame {
       this->strokes_as_curves() = CurvesGeometry::wrap(*other.strokes);
     }
     this->layer_index = other.layer_index;
-    this->start = other.start;
-    this->end = other.end;
+    this->start_time = other.start_time;
+    this->end_time = other.end_time;
     return *this;
   }
 
-  GPFrame(GPFrame &&other) : GPFrame(other.start, other.end)
+  GPFrame(GPFrame &&other) : GPFrame(other.start_time, other.end_time)
   {
     if (this != &other) {
       std::swap(this->strokes, other.strokes);
@@ -157,8 +158,8 @@ class GPFrame : public ::GPFrame {
       std::swap(this->strokes, other.strokes);
     }
     this->layer_index = other.layer_index;
-    this->start = other.start;
-    this->end = other.end;
+    this->start_time = other.start_time;
+    this->end_time = other.end_time;
     return *this;
   }
 
@@ -170,24 +171,24 @@ class GPFrame : public ::GPFrame {
 
   bool operator<(const GPFrame &other) const
   {
-    if (this->start == other.start) {
+    if (this->start_time == other.start_time) {
       return this->layer_index < other.layer_index;
     }
-    return this->start < other.start;
+    return this->start_time < other.start_time;
   }
 
-  /* Assumes that elem.first is the layer index and elem.second is the frame start. */
+  /* Assumes that elem.first is the layer index and elem.second is the start time. */
   bool operator<(const std::pair<int, int> elem) const
   {
-    if (this->start == elem.second) {
+    if (this->start_time == elem.second) {
       return this->layer_index < elem.first;
     }
-    return this->start < elem.second;
+    return this->start_time < elem.second;
   }
 
   bool operator==(const GPFrame &other) const
   {
-    return this->layer_index == other.layer_index && this->start == other.start;
+    return this->layer_index == other.layer_index && this->start_time == other.start_time;
   }
 
   CurvesGeometry &strokes_as_curves()
@@ -410,8 +411,8 @@ class GPData : public ::GPData {
 
     auto it = std::lower_bound(this->frames().begin(),
                                this->frames().end(),
-                               std::pair<int, int>(layer_index, new_frame.start));
-    if (it == this->frames().end() || it->start != new_frame.start) {
+                               std::pair<int, int>(layer_index, new_frame.start_time));
+    if (it == this->frames().end() || it->start_time != new_frame.start_time) {
       return -1;
     }
     return std::distance(this->frames().begin(), it);
@@ -588,8 +589,8 @@ TEST(gpencil_proposal, AddFrameToLayer)
   EXPECT_EQ(data.frames().last().layer_index, 1);
   EXPECT_EQ(data.frames(frame_index).layer_index, 1);
 
-  data.frames_for_write(frame_index).start = 20;
-  EXPECT_EQ(data.frames(frame_index).start, 20);
+  data.frames_for_write(frame_index).start_time = 20;
+  EXPECT_EQ(data.frames(frame_index).start_time, 20);
 }
 
 TEST(gpencil_proposal, CheckFramesSorted1)
@@ -603,11 +604,11 @@ TEST(gpencil_proposal, CheckFramesSorted1)
   for (int i : IndexRange(5)) {
     const int frame_index = data.add_frame_on_layer(layer1_index, frame_numbers1[i]);
     EXPECT_NE(frame_index, -1);
-    EXPECT_EQ(data.frames(frame_index).start, frame_numbers1[i]);
+    EXPECT_EQ(data.frames(frame_index).start_time, frame_numbers1[i]);
   }
 
   for (const int i : data.frames().index_range()) {
-    EXPECT_EQ(data.frames(i).start, frame_numbers_sorted1[i]);
+    EXPECT_EQ(data.frames(i).start_time, frame_numbers_sorted1[i]);
   }
 }
 
@@ -629,7 +630,7 @@ TEST(gpencil_proposal, CheckFramesSorted2)
 
   for (const int i : data.frames().index_range()) {
     EXPECT_EQ(data.frames(i).layer_index, frame_numbers_sorted2[i][0]);
-    EXPECT_EQ(data.frames(i).start, frame_numbers_sorted2[i][1]);
+    EXPECT_EQ(data.frames(i).start_time, frame_numbers_sorted2[i][1]);
   }
 }
 
@@ -653,13 +654,13 @@ TEST(gpencil_proposal, IterateOverFramesOnLayer)
   IndexMask indices_frames_layer1 = data.frames_on_layer(layer1_index);
   EXPECT_TRUE(data.runtime->frame_index_masks_cache.contains(layer1_index));
   for (const int i : indices_frames_layer1.index_range()) {
-    EXPECT_EQ(data.frames(indices_frames_layer1[i]).start, frame_numbers_sorted1[i]);
+    EXPECT_EQ(data.frames(indices_frames_layer1[i]).start_time, frame_numbers_sorted1[i]);
   }
 
   IndexMask indices_frames_layer2 = data.frames_on_layer(layer2_index);
   EXPECT_TRUE(data.runtime->frame_index_masks_cache.contains(layer2_index));
   for (const int i : indices_frames_layer2.index_range()) {
-    EXPECT_EQ(data.frames(indices_frames_layer2[i]).start, frame_numbers_sorted2[i]);
+    EXPECT_EQ(data.frames(indices_frames_layer2[i]).start_time, frame_numbers_sorted2[i]);
   }
 }
 
@@ -700,5 +701,12 @@ TEST(gpencil_proposal, ChangeStrokePoints)
     EXPECT_V3_NEAR(stroke.points_positions()[i], test_positions[i], 1e-5f);
   }
 }
+
+
+/* 50 Layers. */
+/* 500 Frames. */
+/* 100 Strokes. */
+/* 100 Points. */
+
 
 }  // namespace blender::bke::gpencil::tests

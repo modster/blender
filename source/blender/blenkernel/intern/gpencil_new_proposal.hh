@@ -79,8 +79,8 @@ typedef struct GPFrame {
   /**
    * The start frame in the scene that the grease pencil frame is displayed.
    */
-  int start;
-  int end; /* UNUSED for now. */
+  int start_time;
+  int end_time; /* UNUSED for now. */
 
   /* ... */
 } GPFrame;
