@@ -4,6 +4,7 @@
  * \ingroup bke
  */
 
+#include "testing/testing.h"
 #include <algorithm>
 #include <optional>
 
@@ -16,8 +17,6 @@
 #include "DNA_gpencil_types.h"
 
 #include "gpencil_new_proposal.hh"
-
-#include "testing/testing.h"
 
 #include "PIL_time_utildefines.h"
 
