@@ -199,6 +199,9 @@ static void blo_update_defaults_screen(bScreen *screen,
               sl->spacetype == SPACE_SEQ) {
             region->flag |= RGN_FLAG_HIDDEN;
           }
+          else if ((sl->spacetype == SPACE_CLIP) && ((SpaceClip *)sl)->view != SC_VIEW_CLIP) {
+            region->flag |= RGN_FLAG_HIDDEN;
+          }
           else {
             region->flag &= ~(RGN_FLAG_HIDDEN | RGN_FLAG_HIDDEN_BY_USER);
           }
