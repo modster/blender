@@ -8,9 +8,12 @@
 #include <optional>
 
 #include "BKE_curves.hh"
+#include "BKE_gpencil.h"
 
 #include "BLI_index_mask_ops.hh"
 #include "BLI_math_vec_types.hh"
+
+#include "DNA_gpencil_types.h"
 
 #include "gpencil_new_proposal.hh"
 
@@ -665,6 +668,60 @@ static GPData build_gpencil_data(int num_layers,
   return gpd;
 }
 
+static bGPdata *build_old_gpencil_data(int num_layers,
+                                       int frames_per_layer,
+                                       int strokes_per_layer,
+                                       int points_per_stroke)
+{
+  bGPdata *gpd = reinterpret_cast<bGPdata *>(MEM_callocN(sizeof(bGPdata), __func__));
+  for (int i = 0; i < num_layers; i++) {
+    bGPDlayer *gpl = reinterpret_cast<bGPDlayer *>(MEM_callocN(sizeof(bGPDlayer), __func__));
+    sprintf(gpl->info, "%s%d", "GPLayer", i);
+
+    for (int j = 0; j < frames_per_layer; j++) {
+      bGPDframe *gpf = reinterpret_cast<bGPDframe *>(MEM_callocN(sizeof(bGPDframe), __func__));
+      gpf->framenum = j;
+
+      for (int k = 0; k < strokes_per_layer; k++) {
+        bGPDstroke *gps = reinterpret_cast<bGPDstroke *>(
+            MEM_callocN(sizeof(bGPDstroke), __func__));
+        gps->points = reinterpret_cast<bGPDspoint *>(
+            MEM_calloc_arrayN(points_per_stroke, sizeof(bGPDspoint), __func__));
+
+        for (int l = 0; l < points_per_stroke; l++) {
+          float pos[3] = {(float)l, (float)((l * k) % points_per_stroke), (float)(l + k)};
+          bGPDspoint *pt = &gps->points[l];
+          copy_v3_v3(&pt->x, pos);
+        }
+
+        BLI_addtail(&gpf->strokes, gps);
+      }
+      BLI_addtail(&gpl->frames, gpf);
+    }
+    BLI_addtail(&gpd->layers, gpl);
+  }
+
+  return gpd;
+}
+
+static bGPdata *copy_old_gpencil_data(bGPdata *gpd_src)
+{
+  bGPdata *gpd_dst = reinterpret_cast<bGPdata *>(MEM_callocN(sizeof(bGPdata), __func__));
+  BLI_listbase_clear(&gpd_dst->layers);
+  LISTBASE_FOREACH (bGPDlayer *, gpl_src, &gpd_src->layers) {
+    bGPDlayer *gpl_dst = BKE_gpencil_layer_duplicate(gpl_src, true, true);
+    BLI_addtail(&gpd_dst->layers, gpl_dst);
+  }
+
+  return gpd_dst;
+}
+
+static void free_old_gpencil_data(bGPdata *gpd)
+{
+  BKE_gpencil_free_layers(&gpd->layers);
+  MEM_SAFE_FREE(gpd);
+}
+
 TEST(gpencil_proposal, EmptyGPData)
 {
   GPData data;
@@ -863,15 +920,26 @@ TEST(gpencil_proposal, BigGPData)
 
 TEST(gpencil_proposal, BigGPDataCopy)
 {
-  GPData data = build_gpencil_data(5, 500, 100, 100);
+  int layers_num = 10, frames_num = 500, strokes_num = 100, points_num = 100;
+  GPData data = build_gpencil_data(layers_num, frames_num, strokes_num, points_num);
   GPData data_copy;
 
   TIMEIT_START(BigGPDataCopy);
   data_copy = data;
   TIMEIT_END(BigGPDataCopy);
 
-  EXPECT_EQ(data_copy.strokes_num(), 250e3);
-  EXPECT_EQ(data_copy.points_num(), 25e6);
+  EXPECT_EQ(data_copy.strokes_num(), layers_num * frames_num * strokes_num);
+  EXPECT_EQ(data_copy.points_num(), layers_num * frames_num * strokes_num * points_num);
+
+  bGPdata *old_data = build_old_gpencil_data(layers_num, frames_num, strokes_num, points_num);
+  bGPdata *old_data_copy;
+
+  TIMEIT_START(BigGPDataCopyOld);
+  old_data_copy = copy_old_gpencil_data(old_data);
+  TIMEIT_END(BigGPDataCopyOld);
+
+  free_old_gpencil_data(old_data);
+  free_old_gpencil_data(old_data_copy);
 }
 
 }  // namespace blender::bke::gpencil::tests
