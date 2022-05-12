@@ -214,7 +214,7 @@ class GPFrame : public ::GPFrame {
     strokes.resize(strokes.points_num() + new_points_num, strokes.curves_num() + 1);
     strokes.offsets_for_write().last() = strokes.points_num();
 
-    /* Use ploy type by default. */
+    /* Use poly type by default. */
     strokes.curve_types_for_write().last() = CURVE_TYPE_POLY;
 
     strokes.tag_topology_changed();
@@ -293,6 +293,7 @@ class GPData : public ::GPData {
     MEM_delete(reinterpret_cast<GPLayerGroup *>(this->default_group));
     this->default_group = nullptr;
 
+    /* Free the runtime structure. */
     MEM_delete(this->runtime);
     this->runtime = nullptr;
   }
