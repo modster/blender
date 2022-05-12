@@ -230,6 +230,13 @@ static SpaceLink *clip_create(const ScrArea *area, const Scene *scene)
 
   sc = DNA_struct_default_alloc(SpaceClip);
 
+  /* header */
+  region = MEM_callocN(sizeof(ARegion), "header for clip");
+
+  BLI_addtail(&sc->regionbase, region);
+  region->regiontype = RGN_TYPE_HEADER;
+  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+
   /* tool header */
   region = MEM_callocN(sizeof(ARegion), "tool header for clip");
 
@@ -237,13 +244,6 @@ static SpaceLink *clip_create(const ScrArea *area, const Scene *scene)
   region->regiontype = RGN_TYPE_TOOL_HEADER;
   region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
   region->flag = RGN_FLAG_HIDDEN | RGN_FLAG_HIDDEN_BY_USER;
-
-  /* header */
-  region = MEM_callocN(sizeof(ARegion), "header for clip");
-
-  BLI_addtail(&sc->regionbase, region);
-  region->regiontype = RGN_TYPE_HEADER;
-  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
 
   /* tools view */
   region = MEM_callocN(sizeof(ARegion), "tools for clip");
