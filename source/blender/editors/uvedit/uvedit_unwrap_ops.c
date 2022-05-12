@@ -332,6 +332,36 @@ static void construct_param_handle_face_add(ParamHandle *handle,
   GEO_uv_parametrizer_face_add(handle, key, i, vkeys, co, uv, pin, select);
 }
 
+static bool is_face_affected(const Scene *scene,
+                             BMFace *efa,
+                             const UnwrapOptions *options,
+                             const int cd_loop_uv_offset)
+{
+  if (BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
+    return false; /* Face is hidden. */
+  }
+
+  if (options->only_selected_faces) {
+    if (!BM_elem_flag_test(efa, BM_ELEM_SELECT)) {
+      return false; /* Face is not selected. */
+    }
+  }
+
+  if (options->topology_from_uvs) {
+    BLI_assert(options->only_selected_uvs);
+    BMLoop *l;
+    BMIter liter;
+    BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
+      if (uvedit_uv_select_test(scene, l, cd_loop_uv_offset)) {
+        return true; /* At least one uv is selected. */
+      }
+    }
+    return false; /* No uvs are selected. */
+  }
+
+  return true; /* Default is to assume affected. */
+}
+
 /* See: construct_param_handle_multi to handle multiple objects at once. */
 static ParamHandle *construct_param_handle(const Scene *scene,
                                            Object *ob,
@@ -341,9 +371,8 @@ static ParamHandle *construct_param_handle(const Scene *scene,
 {
   ParamHandle *handle;
   BMFace *efa;
-  BMLoop *l;
   BMEdge *eed;
-  BMIter iter, liter;
+  BMIter iter;
   int i;
 
   const int cd_loop_uv_offset = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
@@ -364,29 +393,9 @@ static ParamHandle *construct_param_handle(const Scene *scene,
   BM_mesh_elem_index_ensure(bm, BM_VERT);
 
   BM_ITER_MESH_INDEX (efa, &iter, bm, BM_FACES_OF_MESH, i) {
-
-    if (BM_elem_flag_test(efa, BM_ELEM_HIDDEN) ||
-        (options->only_selected_faces && BM_elem_flag_test(efa, BM_ELEM_SELECT) == 0)) {
-      continue;
+    if (is_face_affected(scene, efa, options, cd_loop_uv_offset)) {
+      construct_param_handle_face_add(handle, scene, efa, i, cd_loop_uv_offset);
     }
-
-    if (options->topology_from_uvs) {
-      bool is_loopsel = false;
-
-      BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
-        if (options->only_selected_uvs &&
-            (uvedit_uv_select_test(scene, l, cd_loop_uv_offset) == false)) {
-          continue;
-        }
-        is_loopsel = true;
-        break;
-      }
-      if (is_loopsel == false) {
-        continue;
-      }
-    }
-
-    construct_param_handle_face_add(handle, scene, efa, i, cd_loop_uv_offset);
   }
 
   if (!options->topology_from_uvs || options->topology_from_uvs_use_seams) {
@@ -419,9 +428,8 @@ static ParamHandle *construct_param_handle_multi(const Scene *scene,
 {
   ParamHandle *handle;
   BMFace *efa;
-  BMLoop *l;
   BMEdge *eed;
-  BMIter iter, liter;
+  BMIter iter;
   int i;
 
   handle = GEO_uv_parametrizer_construct_begin();
@@ -453,29 +461,9 @@ static ParamHandle *construct_param_handle_multi(const Scene *scene,
     }
 
     BM_ITER_MESH_INDEX (efa, &iter, bm, BM_FACES_OF_MESH, i) {
-
-      if (BM_elem_flag_test(efa, BM_ELEM_HIDDEN) ||
-          (options->only_selected_faces && BM_elem_flag_test(efa, BM_ELEM_SELECT) == 0)) {
-        continue;
+      if (is_face_affected(scene, efa, options, cd_loop_uv_offset)) {
+        construct_param_handle_face_add(handle, scene, efa, i + offset, cd_loop_uv_offset);
       }
-
-      if (options->topology_from_uvs) {
-        bool is_loopsel = false;
-
-        BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
-          if (options->only_selected_uvs &&
-              (uvedit_uv_select_test(scene, l, cd_loop_uv_offset) == false)) {
-            continue;
-          }
-          is_loopsel = true;
-          break;
-        }
-        if (is_loopsel == false) {
-          continue;
-        }
-      }
-
-      construct_param_handle_face_add(handle, scene, efa, i + offset, cd_loop_uv_offset);
     }
 
     if (!options->topology_from_uvs || options->topology_from_uvs_use_seams) {
