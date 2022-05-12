@@ -788,9 +788,9 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
 	      -L "${WINDOWS_KITS_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/ucrt/x64")
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
-	      COMMAND ${CMAKE_COMMAND} -E env
-	              "LIB=${sycl_compiler_root}/../lib;${LIB}"
-		            "PATH=${sycl_compiler_root}/../lib/ocloc;${sycl_compiler_root};${PATH}"
+        COMMAND ${CMAKE_COMMAND} -E env
+                "LIB=${sycl_compiler_root}/../lib"
+                "PATH=${sycl_compiler_root}/../lib/ocloc;${sycl_compiler_root};$ENV{PATH}"
                 ${SYCL_COMPILER} ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
@@ -807,7 +807,9 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       # Set the variables manually.
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
-        COMMAND ${CMAKE_COMMAND} -E env LD_LIBRARY_DIR="${sycl_compiler_root}/lib:${LD_LIBRARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E env
+                "LD_LIBRARY_PATH=${sycl_compiler_root}/../lib:${sycl_compiler_root}/../lib/ocloc/lib64:${sycl_compiler_root}/../lib/ocloc/lib64/intel-opencl:${sycl_compiler_root}/../lib/igc/lib64:$ENV{LD_LIBRARY_PATH}"
+                "PATH=${sycl_compiler_root}/../lib/ocloc/bin:${sycl_compiler_root}:$ENV{PATH}"
                 ${SYCL_COMPILER} ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
