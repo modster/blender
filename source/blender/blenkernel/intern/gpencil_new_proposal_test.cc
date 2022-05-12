@@ -160,6 +160,7 @@ class GPFrame : public ::GPFrame {
   {
     if (this != &other) {
       std::swap(this->strokes, other.strokes);
+      other.strokes = nullptr;
     }
     this->layer_index = other.layer_index;
   }
@@ -168,6 +169,7 @@ class GPFrame : public ::GPFrame {
   {
     if (this != &other) {
       std::swap(this->strokes, other.strokes);
+      other.strokes = nullptr;
     }
     this->layer_index = other.layer_index;
     this->start_time = other.start_time;
