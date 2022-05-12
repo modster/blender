@@ -675,10 +675,12 @@ static void clip_refresh(const bContext *C, ScrArea *area)
   SpaceClip *sc = (SpaceClip *)area->spacedata.first;
   ARegion *region_main = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
   ARegion *region_tools = BKE_area_find_region_type(area, RGN_TYPE_TOOLS);
+  ARegion *region_tool_header = BKE_area_find_region_type(area, RGN_TYPE_TOOL_HEADER);
   ARegion *region_preview = ED_clip_has_preview_region(C, area);
   ARegion *region_properties = ED_clip_has_properties_region(area);
   ARegion *region_channels = ED_clip_has_channels_region(area);
-  bool main_visible = false, preview_visible = false, tools_visible = false;
+  bool main_visible = false, preview_visible = false, tools_visible = false,
+       tool_header_visible = false;
   bool properties_visible = false, channels_visible = false;
   bool view_changed = false;
 
@@ -687,6 +689,7 @@ static void clip_refresh(const bContext *C, ScrArea *area)
       main_visible = true;
       preview_visible = false;
       tools_visible = true;
+      tool_header_visible = true;
       properties_visible = true;
       channels_visible = false;
       break;
@@ -694,6 +697,7 @@ static void clip_refresh(const bContext *C, ScrArea *area)
       main_visible = false;
       preview_visible = true;
       tools_visible = false;
+      tool_header_visible = false;
       properties_visible = false;
       channels_visible = false;
 
@@ -703,6 +707,7 @@ static void clip_refresh(const bContext *C, ScrArea *area)
       main_visible = false;
       preview_visible = true;
       tools_visible = false;
+      tool_header_visible = false;
       properties_visible = false;
       channels_visible = true;
 
@@ -710,10 +715,18 @@ static void clip_refresh(const bContext *C, ScrArea *area)
       break;
   }
 
+  /* TODO(sergey): Look into preserving the alignment of the regions when hiding, so that we do
+   * not need to have all the logic about alignment here. */
   view_changed |= clip_set_region_visible(C, region_main, main_visible, RGN_ALIGN_NONE, false);
   view_changed |= clip_set_region_visible(
       C, region_properties, properties_visible, RGN_ALIGN_RIGHT, false);
   view_changed |= clip_set_region_visible(C, region_tools, tools_visible, RGN_ALIGN_LEFT, false);
+  view_changed |= clip_set_region_visible(C,
+                                          region_tool_header,
+                                          tool_header_visible,
+                                          (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM :
+                                                                            RGN_ALIGN_TOP,
+                                          false);
   view_changed |= clip_set_region_visible(
       C, region_preview, preview_visible, RGN_ALIGN_NONE, true);
   view_changed |= clip_set_region_visible(

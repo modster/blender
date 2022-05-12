@@ -2569,24 +2569,6 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
       }
     }
-
-    {
-      for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
-        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-          LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-            ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase :
-                                                                   &sl->regionbase;
-            if ((sl->spacetype == SPACE_CLIP) &&
-                (do_versions_find_region_or_null(regionbase, RGN_TYPE_TOOL_HEADER) == NULL)) {
-              ARegion *region = do_versions_add_region_if_not_found(
-                  regionbase, RGN_TYPE_TOOL_HEADER, "tool header", RGN_TYPE_HEADER);
-              region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM :
-                                                                    RGN_ALIGN_TOP;
-            }
-          }
-        }
-      }
-    }
   }
 
   if (!MAIN_VERSION_ATLEAST(bmain, 302, 9)) {
@@ -3060,6 +3042,29 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         LISTBASE_FOREACH_INDEX (ImagePackedFile *, imapf, &ima->packedfiles, view) {
           imapf->view = view;
           imapf->tile_number = 1001;
+        }
+      }
+    }
+
+    {
+      for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+            ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase :
+                                                                   &sl->regionbase;
+            if ((sl->spacetype == SPACE_CLIP) &&
+                (do_versions_find_region_or_null(regionbase, RGN_TYPE_TOOL_HEADER) == NULL)) {
+              SpaceClip *space_clip = (SpaceClip *)sl;
+              ARegion *region = do_versions_add_region_if_not_found(
+                  regionbase, RGN_TYPE_TOOL_HEADER, "tool header", RGN_TYPE_HEADER);
+              region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM :
+                                                                    RGN_ALIGN_TOP;
+
+              if (space_clip->view != SC_VIEW_CLIP) {
+                region->flag |= RGN_FLAG_HIDDEN;
+              }
+            }
+          }
         }
       }
     }

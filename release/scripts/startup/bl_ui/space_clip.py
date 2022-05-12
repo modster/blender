@@ -137,9 +137,6 @@ class CLIP_HT_tool_header(Header):
 
             self.draw_mode_settings(context)
 
-        else:
-            sc.show_region_tool_header = False
-
     def draw_tool_settings(self, context):
         layout = self.layout
         # Active Tool
