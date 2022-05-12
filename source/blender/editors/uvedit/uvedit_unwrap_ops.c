@@ -359,6 +359,17 @@ static bool is_face_affected(const Scene *scene,
     return false; /* No uvs are selected. */
   }
 
+  if (options->only_selected_uvs) {
+    BMLoop *l;
+    BMIter liter;
+    BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
+      if (!uvedit_uv_select_test(scene, l, cd_loop_uv_offset)) {
+        return false; /* At least one uv is deselected. */
+      }
+    }
+    return true; /* All uvs are selected. */
+  }
+
   return true; /* Default is to assume affected. */
 }
 
