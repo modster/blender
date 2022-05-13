@@ -6620,10 +6620,15 @@ def km_clip_editor_tool_select(params):
         "Clip Editor: Tweak",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
         {"items": [
+            ("clip.change_frame", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
+             {"properties": [
+                 ("extend", False),
+                 ("deselect_all", True),
+                 ("activate_selected", params.select_mouse == 'LEFTMOUSE')]}
+             ),
             ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
             ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
-             {"properties": [("extend", False), ("deselect_all", not params.legacy)]}),
         ]},
     )
 
