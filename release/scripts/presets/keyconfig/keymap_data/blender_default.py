@@ -6637,6 +6637,7 @@ def km_clip_editor_tool_select_box(params):
         )},
     )
 
+
 def km_clip_editor_tool_select_lasso(params):
     return (
         "Clip Editor: Select Lasso",
@@ -6645,6 +6646,7 @@ def km_clip_editor_tool_select_lasso(params):
             "clip.select_lasso", type=params.tool_mouse, value='PRESS',
         )},
     )
+
 
 def km_clip_editor_tool_select_circle(params):
     return (
@@ -6655,6 +6657,7 @@ def km_clip_editor_tool_select_circle(params):
             properties=[("wait_for_input", False)],
         )},
     )
+
 
 def km_clip_editor_tool_add_marker_tweak(params):
     return (
