@@ -759,6 +759,16 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
   get_filename_component(sycl_compiler_root ${SYCL_COMPILER} DIRECTORY)
   get_filename_component(sycl_compiler_compiler_name ${SYCL_COMPILER} NAME_WE)
 
+  if(UNIX AND NOT APPLE)
+    if(NOT WITH_CXX11_ABI)
+      check_library_exists(sycl
+        _ZN2cl4sycl7handler22verifyUsedKernelBundleERKSs ${sycl_compiler_root}/../lib SYCL_NO_CXX11_ABI)
+      if(SYCL_NO_CXX11_ABI)
+        list(APPEND sycl_compiler_flags -D_GLIBCXX_USE_CXX11_ABI=0)
+      endif()
+    endif()
+  endif()
+
   if(WIN32)
     list(APPEND sycl_compiler_flags
     -fms-extensions
