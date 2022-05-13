@@ -6615,21 +6615,43 @@ def km_image_editor_tool_uv_scale(params):
 # ------------------------------------------------------------------------------
 # Tool System (Clip Editor)
 
+def _template_items_clip_tool_tweak_selection(params):
+    items = [
+        ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
+            {"properties": [
+                ("extend", False),
+                ("deselect_all", True),
+                ("activate_selected", params.select_mouse == 'LEFTMOUSE')]}
+         ),
+    ]
+
+    if params.select_mouse == 'RIGHTMOUSE':
+        items.append(
+            ("clip.select", {"type": 'LEFTMOUSE', "value": 'PRESS'},
+                {"properties": [
+                    ("extend", False),
+                    ("deselect_all", True),
+                    ("activate_selected", True)]}
+             ),
+        )
+
+    return items
+
+
+def _template_items_clip_tool_tweak(params):
+    return [
+        ("clip.change_frame", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        *_template_items_clip_tool_tweak_selection(params),
+        ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+    ]
+
+
 def km_clip_editor_tool_select(params):
     return (
         "Clip Editor: Tweak",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("clip.change_frame", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
-             {"properties": [
-                 ("extend", False),
-                 ("deselect_all", True),
-                 ("activate_selected", params.select_mouse == 'LEFTMOUSE')]}
-             ),
-            ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-        ]},
+        {"items": _template_items_clip_tool_tweak(params)},
     )
 
 
@@ -6669,15 +6691,7 @@ def km_clip_editor_tool_add_marker_tweak(params):
         "Clip Editor: Add Marker and Tweak",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("clip.change_frame", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
-             {"properties": [
-                 ("extend", False),
-                 ("deselect_all", True),
-                 ("activate_selected", params.select_mouse == 'LEFTMOUSE')]}
-             ),
-            ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            *_template_items_clip_tool_tweak(params),
             ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ]},
     )
