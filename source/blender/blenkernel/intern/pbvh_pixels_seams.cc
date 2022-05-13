@@ -272,9 +272,11 @@ Bitmaps create_tile_bitmap(const PBVH &pbvh, Image &image, ImageUser &image_user
   return result;
 }
 
-int2 find_source_pixel(const Bitmap &bitmap, float2 near_image_coord)
+int2 find_source_pixel(const Bitmap &bitmap,
+                       float2 near_image_coord,
+                       const float seam_fix_distance)
 {
-  const int SEARCH_RADIUS = 2;
+  const int SEARCH_RADIUS = std::ceil(seam_fix_distance);
   float min_distance = FLT_MAX;
   int2 result(0, 0);
   int2 image_coord(int(near_image_coord.x), int(near_image_coord.y));
@@ -290,8 +292,9 @@ int2 find_source_pixel(const Bitmap &bitmap, float2 near_image_coord)
       if (!pixel_info.is_extracted()) {
         continue;
       }
+      float2 center_pixel_uv(u + 0.5f, v + 0.5f);
 
-      float distance = len_v2v2_int(uv, image_coord);
+      float distance = len_v2v2(center_pixel_uv, near_image_coord);
       if (distance < min_distance) {
         result = uv;
         min_distance = distance;
@@ -344,11 +347,11 @@ static void add_seam_fix(PBVHNode &node,
  * \{ */
 
 struct Projection {
-  const Bitmap *bitmap;
-  int node_index;
-  float2 pixel;
-  char bit_mask;
-  float score;
+  const Bitmap *bitmap = nullptr;
+  int node_index = -1;
+  float2 pixel = float2(0.0f, 0.0f);
+  char bit_mask = 0;
+  float score = 0.0f;
 };
 
 /*
@@ -455,6 +458,9 @@ static void build_fixes(PBVH &pbvh,
         /** Pixel not part of this tile. */
         continue;
       }
+      if (u == 18 && v == 530) {
+        printf("error");
+      }
 
       int pixel_offset = v * bitmap.resolution.x + u;
       PixelInfo &pixel_info = bitmap.bitmap[pixel_offset];
@@ -466,27 +472,38 @@ static void build_fixes(PBVH &pbvh,
       float2 dst_uv_offset(bitmap.image_tile.get_tile_x_offset(),
                            bitmap.image_tile.get_tile_y_offset());
       float2 uv_coord(u, v);
-      float2 uv(uv_coord.x / bitmap.resolution.x, uv_coord.y / bitmap.resolution.y);
+      float2 center_uv_coord(u + 0.5f, v + 0.5f);
+      float2 center_uv(center_uv_coord.x / bitmap.resolution.x,
+                       center_uv_coord.y / bitmap.resolution.y);
       float2 closest_point;
       const float lambda = closest_to_line_v2(closest_point,
-                                              uv,
+                                              center_uv,
                                               float2(luv_a_1.uv) - dst_uv_offset,
                                               float2(luv_a_2.uv) - dst_uv_offset);
       float2 closest_coord(closest_point.x * bitmap.resolution.x,
                            closest_point.y * bitmap.resolution.y);
 
       /* Distance to the edge in pixel space. */
-      float distance_to_edge = len_v2v2(closest_coord, uv_coord);
+      float distance_to_edge = len_v2v2(closest_coord, center_uv_coord);
       if (distance_to_edge > seamfix_distance) {
         continue;
       }
 
       Projection solution1;
       Projection solution2;
-      find_projection_source(
-          bitmaps, distance_to_edge, lambda, luv_b_1, luv_b_2, scale_factor, solution1);
-      find_projection_source(
-          bitmaps, distance_to_edge, 1.0f - lambda, luv_b_2, luv_b_1, scale_factor, solution2);
+      /* When distance to edge is small, it could happen that the solution is pointing to a pixel
+       * that also needs to be fixed. In this case we increase the distance until we find a
+       * solution or skip this pixel after some iterations. */
+      while (solution1.score == 0.0f && solution2.score == 0.0f) {
+        find_projection_source(
+            bitmaps, distance_to_edge, lambda, luv_b_1, luv_b_2, scale_factor, solution1);
+        find_projection_source(
+            bitmaps, distance_to_edge, 1.0f - lambda, luv_b_2, luv_b_1, scale_factor, solution2);
+        if (distance_to_edge > 1.4f) {
+          break;
+        }
+        distance_to_edge += 0.25f;
+      }
       if (solution1.score == 0.0 && solution2.score == 0.0) {
         /* No solution found skip this pixel. */
         continue;
@@ -513,6 +530,7 @@ static void build_fixes(PBVH &pbvh,
                         const MLoopUV *ldata_uv,
                         const float seamfix_distance)
 {
+  const int margin = std::ceil(seamfix_distance);
   for (const std::pair<EdgeLoop, EdgeLoop> &pair : connected) {
     // determine bounding rect in uv space + margin of 1;
     rctf uvbounds;
@@ -529,19 +547,19 @@ static void build_fixes(PBVH &pbvh,
 
     for (Bitmap &bitmap : bitmaps.bitmaps) {
       rcti uvbounds_i;
-      const int MARGIN = 2;
       uvbounds_i.xmin = (uvbounds.xmin - bitmap.image_tile.get_tile_x_offset()) *
-                            bitmap.resolution[0] -
-                        MARGIN;
+                        bitmap.resolution[0];
       uvbounds_i.ymin = (uvbounds.ymin - bitmap.image_tile.get_tile_y_offset()) *
-                            bitmap.resolution[1] -
-                        MARGIN;
+                        bitmap.resolution[1];
       uvbounds_i.xmax = (uvbounds.xmax - bitmap.image_tile.get_tile_x_offset()) *
-                            bitmap.resolution[0] +
-                        MARGIN;
+                        bitmap.resolution[0];
       uvbounds_i.ymax = (uvbounds.ymax - bitmap.image_tile.get_tile_y_offset()) *
-                            bitmap.resolution[1] +
-                        MARGIN;
+                        bitmap.resolution[1];
+
+      uvbounds_i.xmin -= margin;
+      uvbounds_i.xmax += margin;
+      uvbounds_i.ymin -= margin;
+      uvbounds_i.ymax += margin;
 
       build_fixes(pbvh,
                   bitmaps,
@@ -605,7 +623,7 @@ static void build_fixes(PBVH &pbvh,
         continue;
       }
 
-      int2 source_pixel = find_source_pixel(bitmap, closest_coord);
+      int2 source_pixel = find_source_pixel(bitmap, closest_coord, seamfix_distance);
       int2 destination_pixel(u, v);
 
       PixelInfo src_pixel_info = bitmap.get_pixel_info(source_pixel);
