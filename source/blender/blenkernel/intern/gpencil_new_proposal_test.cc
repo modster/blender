@@ -647,9 +647,9 @@ static GPData build_gpencil_data(int num_layers,
 {
   GPData gpd;
 
-  Vector<StringRefNull> test_names;
+  Vector<std::string> test_names;
   for (const int i : IndexRange(num_layers)) {
-    test_names.append("GPLayer" + i);
+    test_names.append(std::string("GPLayer") + std::to_string(i));
   }
   gpd.add_layers(test_names.as_span());
 
