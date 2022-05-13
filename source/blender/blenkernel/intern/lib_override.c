@@ -249,7 +249,7 @@ static ID *lib_override_library_create_from(Main *bmain,
 
 /* TODO: This could be simplified by storing a flag in #IDOverrideLibrary
  * during the diffing process? */
-bool BKE_lib_override_library_is_user_edited(struct ID *id)
+bool BKE_lib_override_library_is_user_edited(const ID *id)
 {
 
   if (!ID_IS_OVERRIDE_LIBRARY(id)) {
@@ -263,8 +263,8 @@ bool BKE_lib_override_library_is_user_edited(struct ID *id)
     return false;
   }
 
-  LISTBASE_FOREACH (IDOverrideLibraryProperty *, op, &id->override_library->properties) {
-    LISTBASE_FOREACH (IDOverrideLibraryPropertyOperation *, opop, &op->operations) {
+  LISTBASE_FOREACH (const IDOverrideLibraryProperty *, op, &id->override_library->properties) {
+    LISTBASE_FOREACH (const IDOverrideLibraryPropertyOperation *, opop, &op->operations) {
       if ((opop->flag & IDOVERRIDE_LIBRARY_FLAG_IDPOINTER_MATCH_REFERENCE) != 0) {
         continue;
       }
@@ -279,12 +279,13 @@ bool BKE_lib_override_library_is_user_edited(struct ID *id)
   return false;
 }
 
-bool BKE_lib_override_library_is_system_defined(Main *bmain, ID *id)
+bool BKE_lib_override_library_is_system_defined(const Main *bmain, const ID *id)
 {
 
   if (ID_IS_OVERRIDE_LIBRARY(id)) {
     ID *override_owner_id;
-    lib_override_get(bmain, id, &override_owner_id);
+    /* Cast away const, since the data is not changed. */
+    lib_override_get((Main *)bmain, (ID *)id, &override_owner_id);
     return (override_owner_id->override_library->flag & IDOVERRIDE_LIBRARY_FLAG_SYSTEM_DEFINED) !=
            0;
   }
@@ -305,7 +306,7 @@ static int foreachid_is_hierarchy_leaf_fn(LibraryIDLinkCallbackData *cb_data)
   return IDWALK_RET_NOP;
 }
 
-bool BKE_lib_override_library_is_hierarchy_leaf(Main *bmain, ID *id)
+bool BKE_lib_override_library_is_hierarchy_leaf(const Main *bmain, const ID *id)
 {
   if (ID_IS_OVERRIDE_LIBRARY_REAL(id)) {
     bool is_leaf = true;
