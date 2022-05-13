@@ -37,6 +37,8 @@
 #include "ED_screen.h"
 #include "ED_view3d.h"
 
+#include "WM_api.h"
+
 /**
  * The code below uses a prefix naming convention to indicate the coordinate space:
  * cu: Local space of the curves object that is being edited.
@@ -252,6 +254,7 @@ struct AddOperationExecutor {
     curves_->update_curve_types();
 
     DEG_id_tag_update(&curves_id_->id, ID_RECALC_GEOMETRY);
+    WM_main_add_notifier(NC_GEOM | ND_DATA, &curves_id_->id);
     ED_region_tag_redraw(region_);
   }
 
@@ -608,9 +611,14 @@ struct AddOperationExecutor {
     attribute_math::DefaultMixer<int> mixer{new_offsets};
     threading::parallel_for(neighbors_per_curve.index_range(), 1024, [&](IndexRange curves_range) {
       for (const int i : curves_range) {
-        for (const NeighborInfo &neighbor : neighbors_per_curve[i]) {
-          const int neighbor_points_num = curves_->points_for_curve(neighbor.index).size();
-          mixer.mix_in(i, neighbor_points_num, neighbor.weight);
+        if (neighbors_per_curve[i].is_empty()) {
+          mixer.mix_in(i, constant_points_per_curve_, 1.0f);
+        }
+        else {
+          for (const NeighborInfo &neighbor : neighbors_per_curve[i]) {
+            const int neighbor_points_num = curves_->points_for_curve(neighbor.index).size();
+            mixer.mix_in(i, neighbor_points_num, neighbor.weight);
+          }
         }
       }
     });

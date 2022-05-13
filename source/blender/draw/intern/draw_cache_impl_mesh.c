@@ -531,7 +531,7 @@ static uint mesh_cd_calc_gpu_layers_vcol_used(const Mesh *me_query,
                     layer_i;
     }
 
-    /* Note: this is not the same as the layer_i below. */
+    /* NOTE: this is not the same as the layer_i below. */
     if (layer_i != -1) {
       layer = (domain == ATTR_DOMAIN_POINT ? cd_vdata : cd_ldata)->layers + layer_i;
     }
@@ -544,7 +544,7 @@ static uint mesh_cd_calc_gpu_layers_vcol_used(const Mesh *me_query,
     return -1;
   }
 
-  /* Note: this is the logical index into the color attribute list,
+  /* NOTE: this is the logical index into the color attribute list,
    * not the customdata index. */
   int vcol_i = BKE_id_attribute_to_index(
       (ID *)me_query, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
@@ -701,19 +701,25 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
             break;
           }
 
-          /* Note: attr->type will always be CD_PROP_COLOR even for
+          /* NOTE: attr->type will always be CD_PROP_COLOR even for
            * CD_PROP_BYTE_COLOR layers, see node_shader_gpu_vertex_color in
            * node_shader_vertex_color.cc.
            */
           case CD_MCOL:
           case CD_PROP_BYTE_COLOR:
           case CD_PROP_COLOR: {
+            /* First check Color attributes, when not found check mesh attributes. Geometry nodes
+             * can generate those layers. */
             int vcol_bit = mesh_cd_calc_gpu_layers_vcol_used(&me_query, cd_vdata, cd_ldata, name);
 
             if (vcol_bit != -1) {
               cd_used.vcol |= 1UL << (uint)vcol_bit;
+              break;
             }
 
+            if (layer != -1 && domain != ATTR_DOMAIN_NUM) {
+              drw_mesh_attributes_add_request(attributes, type, layer, domain);
+            }
             break;
           }
           case CD_PROP_FLOAT3:
@@ -1231,11 +1237,11 @@ static void sculpt_request_active_vcol(MeshBatchCache *cache, Object *object, Me
       &me_query.id, render, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
 
   if (active_i >= 0) {
-    cache->cd_used.vcol |= 1UL << (uint)active_i;
+    cache->cd_needed.vcol |= 1UL << (uint)active_i;
   }
 
   if (render_i >= 0) {
-    cache->cd_used.vcol |= 1UL << (uint)render_i;
+    cache->cd_needed.vcol |= 1UL << (uint)render_i;
   }
 }
 
