@@ -280,7 +280,7 @@ class GPData : public ::GPData {
 
     if (this->frames_size > 0) {
       this->frames_array = reinterpret_cast<::GPFrame *>(
-          MEM_calloc_arrayN(this->frames_size, sizeof(::GPFrame), __func__));
+          MEM_malloc_arrayN(this->frames_size, sizeof(::GPFrame), __func__));
       default_construct_n(reinterpret_cast<GPFrame *>(this->frames_array), this->frames_size);
     }
     else {
@@ -290,7 +290,7 @@ class GPData : public ::GPData {
 
     if (this->layers_size > 0) {
       this->layers_array = reinterpret_cast<::GPLayer *>(
-          MEM_calloc_arrayN(this->layers_size, sizeof(::GPLayer), __func__));
+          MEM_malloc_arrayN(this->layers_size, sizeof(::GPLayer), __func__));
       this->active_layer_index = 0;
     }
     else {
@@ -527,7 +527,7 @@ class GPData : public ::GPData {
     /* Copy frame data. */
     dst.frames_size = src.frames_size;
     dst.frames_array = reinterpret_cast<::GPFrame *>(
-        MEM_calloc_arrayN(dst.frames_size, sizeof(::GPFrame), __func__));
+        MEM_malloc_arrayN(dst.frames_size, sizeof(::GPFrame), __func__));
     uninitialized_copy_n(reinterpret_cast<GPFrame *>(src.frames_array),
                          src.frames_size,
                          reinterpret_cast<GPFrame *>(dst.frames_array));
@@ -537,7 +537,7 @@ class GPData : public ::GPData {
     MEM_SAFE_FREE(dst.layers_array);
     dst.layers_size = src.layers_size;
     dst.layers_array = reinterpret_cast<::GPLayer *>(
-        MEM_calloc_arrayN(dst.layers_size, sizeof(::GPLayer), __func__));
+        MEM_malloc_arrayN(dst.layers_size, sizeof(::GPLayer), __func__));
     uninitialized_copy_n(reinterpret_cast<GPLayer *>(src.layers_array),
                          src.layers_size,
                          reinterpret_cast<GPLayer *>(dst.layers_array));
@@ -605,7 +605,7 @@ class GPData : public ::GPData {
     this->frames_size = size;
 
     ::GPFrame *new_array = reinterpret_cast<::GPFrame *>(
-        MEM_calloc_arrayN(this->frames_size, sizeof(::GPFrame), __func__));
+        MEM_malloc_arrayN(this->frames_size, sizeof(::GPFrame), __func__));
     if (new_array == nullptr) {
       return false;
     }
@@ -614,6 +614,8 @@ class GPData : public ::GPData {
       uninitialized_relocate_n(reinterpret_cast<GPFrame *>(this->frames_array),
                                old_size,
                                reinterpret_cast<GPFrame *>(new_array));
+      default_construct_n(reinterpret_cast<GPFrame *>(new_array + old_size),
+                          this->frames_size - old_size);
       MEM_SAFE_FREE(this->frames_array);
       this->frames_array = new_array;
     }
@@ -674,20 +676,28 @@ static bGPdata *build_old_gpencil_data(int num_layers,
                                        int strokes_per_layer,
                                        int points_per_stroke)
 {
-  bGPdata *gpd = reinterpret_cast<bGPdata *>(MEM_callocN(sizeof(bGPdata), __func__));
+  bGPdata *gpd = reinterpret_cast<bGPdata *>(MEM_mallocN(sizeof(bGPdata), __func__));
+  BLI_listbase_clear(&gpd->layers);
   for (int i = 0; i < num_layers; i++) {
-    bGPDlayer *gpl = reinterpret_cast<bGPDlayer *>(MEM_callocN(sizeof(bGPDlayer), __func__));
+    bGPDlayer *gpl = reinterpret_cast<bGPDlayer *>(MEM_mallocN(sizeof(bGPDlayer), __func__));
     sprintf(gpl->info, "%s%d", "GPLayer", i);
 
+    BLI_listbase_clear(&gpl->mask_layers);
+    BLI_listbase_clear(&gpl->frames);
     for (int j = 0; j < frames_per_layer; j++) {
-      bGPDframe *gpf = reinterpret_cast<bGPDframe *>(MEM_callocN(sizeof(bGPDframe), __func__));
+      bGPDframe *gpf = reinterpret_cast<bGPDframe *>(MEM_mallocN(sizeof(bGPDframe), __func__));
       gpf->framenum = j;
 
+      BLI_listbase_clear(&gpf->strokes);
       for (int k = 0; k < strokes_per_layer; k++) {
         bGPDstroke *gps = reinterpret_cast<bGPDstroke *>(
-            MEM_callocN(sizeof(bGPDstroke), __func__));
+            MEM_mallocN(sizeof(bGPDstroke), __func__));
+        gps->totpoints = points_per_stroke;
         gps->points = reinterpret_cast<bGPDspoint *>(
             MEM_calloc_arrayN(points_per_stroke, sizeof(bGPDspoint), __func__));
+        gps->triangles = nullptr;
+        gps->editcurve = nullptr;
+        gps->dvert = nullptr;
 
         for (int l = 0; l < points_per_stroke; l++) {
           float pos[3] = {(float)l, (float)((l * k) % points_per_stroke), (float)(l + k)};
@@ -707,7 +717,7 @@ static bGPdata *build_old_gpencil_data(int num_layers,
 
 static bGPdata *copy_old_gpencil_data(bGPdata *gpd_src)
 {
-  bGPdata *gpd_dst = reinterpret_cast<bGPdata *>(MEM_callocN(sizeof(bGPdata), __func__));
+  bGPdata *gpd_dst = reinterpret_cast<bGPdata *>(MEM_mallocN(sizeof(bGPdata), __func__));
   BLI_listbase_clear(&gpd_dst->layers);
   LISTBASE_FOREACH (bGPDlayer *, gpl_src, &gpd_src->layers) {
     bGPDlayer *gpl_dst = BKE_gpencil_layer_duplicate(gpl_src, true, true);
