@@ -21,7 +21,7 @@
 
 namespace blender::bke {
 
-class GPLayerGroup : ::GPLayerGroup {
+class GPLayerGroup : ::GPLayerGroup { /* Unused for now. Placeholder class. */
  public:
   GPLayerGroup()
   {
@@ -64,7 +64,7 @@ class GPDataRuntime {
   mutable Map<int, Vector<int64_t>> frame_index_masks_cache;
   mutable std::mutex frame_index_masks_cache_mutex;
 
-  IndexMask get_cached_frame_index_mask(int layer_index)
+  IndexMask frame_index_masks_cache_for_layer(int layer_index)
   {
     return frame_index_masks_cache.lookup(layer_index).as_span();
   }
@@ -290,6 +290,7 @@ class GPData : public ::GPData {
     if (this->layers_size > 0) {
       this->layers_array = reinterpret_cast<::GPLayer *>(
           MEM_malloc_arrayN(this->layers_size, sizeof(::GPLayer), __func__));
+      default_construct_n(reinterpret_cast<GPLayer *>(this->layers_array), this->layers_size);
       this->active_layer_index = 0;
     }
     else {
@@ -348,7 +349,7 @@ class GPData : public ::GPData {
 
   Span<GPFrame> frames() const
   {
-    return {(const GPFrame *)this->frames_array, this->frames_size};
+    return {reinterpret_cast<const GPFrame *>(this->frames_array), this->frames_size};
   }
 
   const GPFrame &frames(int index) const
@@ -358,7 +359,7 @@ class GPData : public ::GPData {
 
   MutableSpan<GPFrame> frames_for_write()
   {
-    return {(GPFrame *)this->frames_array, this->frames_size};
+    return {reinterpret_cast<GPFrame *>(this->frames_array), this->frames_size};
   }
 
   GPFrame &frames_for_write(int index)
@@ -374,13 +375,13 @@ class GPData : public ::GPData {
 
     /* If the indices are cached for this layer, use the cache. */
     if (this->runtime->frame_index_masks_cache.contains(layer_index)) {
-      return this->runtime->get_cached_frame_index_mask(layer_index);
+      return this->runtime->frame_index_masks_cache_for_layer(layer_index);
     }
 
     /* A double checked lock. */
     std::scoped_lock{this->runtime->frame_index_masks_cache_mutex};
     if (this->runtime->frame_index_masks_cache.contains(layer_index)) {
-      return this->runtime->get_cached_frame_index_mask(layer_index);
+      return this->runtime->frame_index_masks_cache_for_layer(layer_index);
     }
 
     Vector<int64_t> indices;
@@ -410,7 +411,7 @@ class GPData : public ::GPData {
 
   Span<GPLayer> layers() const
   {
-    return {(const GPLayer *)this->layers_array, this->layers_size};
+    return {reinterpret_cast<const GPLayer *>(this->layers_array), this->layers_size};
   }
 
   const GPLayer &layers(int index) const
@@ -420,7 +421,7 @@ class GPData : public ::GPData {
 
   MutableSpan<GPLayer> layers_for_write()
   {
-    return {(GPLayer *)this->layers_array, this->layers_size};
+    return {reinterpret_cast<GPLayer *>(this->layers_array), this->layers_size};
   }
 
   GPLayer &layers_for_write(int index)
@@ -463,6 +464,7 @@ class GPData : public ::GPData {
     /* Sort frame array. */
     update_frames_array();
 
+    /* Find the frame again and return its index (now from the sorted array). */
     auto it = std::lower_bound(this->frames().begin(),
                                this->frames().end(),
                                std::pair<int, int>(layer_index, new_frame.start_time));
@@ -542,7 +544,7 @@ class GPData : public ::GPData {
                          reinterpret_cast<GPLayer *>(dst.layers_array));
     dst.active_layer_index = src.active_layer_index;
 
-    /* Copy layer groups. */
+    /* Copy layer default group. */
     *dst.default_group = *src.default_group;
   }
 
@@ -630,7 +632,7 @@ class GPData : public ::GPData {
     /* Make sure frames are ordered chronologically and by layer order. */
     std::sort(this->frames_for_write().begin(), this->frames_for_write().end());
 
-    /* Clear the cached indices since they are probably no longer valid. */
+    /* Clear the cached indices since they are (probably) no longer valid. */
     this->runtime->frame_index_masks_cache.clear();
   }
 };

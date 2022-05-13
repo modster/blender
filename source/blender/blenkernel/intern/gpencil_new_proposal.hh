@@ -120,13 +120,17 @@ typedef struct GPData {
   GPDataRuntimeHandle *runtime;
 } GPData;
 
-/* This is the ID_GP structure that holds all the information at the object data level. */
+/**
+ * This would be the new Grease Pencil ID structure. This is where the animation data, materials, etc. are stored.
+ * Layers, Frames, Groups and RuntimeData would be stored in GPData.
+ */
 typedef struct GreasePencil {
   ID id;
   /* Animation data (must be immediately after id). */
   struct AnimData *adt;
 
-  /* Pointer to the actual data-block containing the frames, layers and layer groups. */
+  /* Pointer to the actual data-block containing the frames, layers and layer groups. Note: This is
+   * stored as a pointer to easily wrap it in a class. */
   GPData *grease_pencil_data;
 
   /* GreasePencil flag. */
