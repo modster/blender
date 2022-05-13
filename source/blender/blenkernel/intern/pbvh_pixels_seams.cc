@@ -458,9 +458,6 @@ static void build_fixes(PBVH &pbvh,
         /** Pixel not part of this tile. */
         continue;
       }
-      if (u == 18 && v == 530) {
-        printf("error");
-      }
 
       int pixel_offset = v * bitmap.resolution.x + u;
       PixelInfo &pixel_info = bitmap.bitmap[pixel_offset];
