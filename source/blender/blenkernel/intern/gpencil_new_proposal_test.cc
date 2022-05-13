@@ -7,7 +7,6 @@
 #include "testing/testing.h"
 #include <algorithm>
 
-
 #include "BKE_curves.hh"
 #include "BKE_gpencil.h"
 
@@ -929,18 +928,16 @@ TEST(gpencil_proposal, BigGPData)
   EXPECT_EQ(data.points_num(), 25e6);
 }
 
-TEST(gpencil_proposal, BigGPDataCopy)
+TEST(gpencil_proposal, TimeBigGPDataCopy)
 {
   int layers_num = 10, frames_num = 500, strokes_num = 100, points_num = 100;
+
   GPData data = build_gpencil_data(layers_num, frames_num, strokes_num, points_num);
   GPData data_copy;
 
   TIMEIT_START(BigGPDataCopy);
   data_copy = data;
   TIMEIT_END(BigGPDataCopy);
-
-  EXPECT_EQ(data_copy.strokes_num(), layers_num * frames_num * strokes_num);
-  EXPECT_EQ(data_copy.points_num(), layers_num * frames_num * strokes_num * points_num);
 
   bGPdata *old_data = build_old_gpencil_data(layers_num, frames_num, strokes_num, points_num);
   bGPdata *old_data_copy;
