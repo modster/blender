@@ -185,6 +185,7 @@ ccl_always_inline float3 make_float3(float x)
 #define fmaxf(x, y) sycl::fmax((x), (y))
 #define fminf(x, y) sycl::fmin((x), (y))
 #define fmodf(x, y) sycl::fmod((x), (y))
+#define lgammaf(x) sycl::lgamma((x))
 
 #define __forceinline inline
 
