@@ -31,6 +31,7 @@
 #include "DNA_listBase.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
@@ -2764,6 +2765,26 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
       if (settings->curve_length == 0.0f) {
         settings->curve_length = 0.3f;
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 303, 1)) {
+    /* Move mesh bevel weights from structs to dedicated custom data layers, like edit mode. */
+    LISTBASE_FOREACH (Mesh *, mesh, &bmain->meshes) {
+      if (mesh->cd_flag & ME_CDFLAG_EDGE_BWEIGHT) {
+        float *weights = (float *)CustomData_add_layer(
+            &mesh->edata, CD_BWEIGHT, CD_DEFAULT, NULL, mesh->totedge);
+        for (int i = 0; i < mesh->totedge; i++) {
+          weights[i] = mesh->medge[i].bweight / 255.0f;
+        }
+      }
+      if (mesh->cd_flag & ME_CDFLAG_VERT_BWEIGHT) {
+        float *weights = (float *)CustomData_add_layer(
+            &mesh->vdata, CD_BWEIGHT, CD_DEFAULT, NULL, mesh->totvert);
+        for (int i = 0; i < mesh->totvert; i++) {
+          weights[i] = mesh->mvert[i].bweight / 255.0f;
+        }
       }
     }
   }

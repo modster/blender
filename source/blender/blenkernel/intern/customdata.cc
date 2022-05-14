@@ -1813,7 +1813,7 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
     /* 28: CD_SHAPEKEY */
     {sizeof(float[3]), "", 0, N_("ShapeKey"), nullptr, nullptr, layerInterp_shapekey},
     /* 29: CD_BWEIGHT */
-    {sizeof(float), "", 0, N_("BevelWeight"), nullptr, nullptr, layerInterp_bweight},
+    {sizeof(MFloatProperty), "MFloatProperty", 1, nullptr, nullptr, nullptr, layerInterp_bweight},
     /* 30: CD_CREASE */
     /* NOTE: we do not interpolate crease data as it should be either inherited for subdivided
      * edges, or for vertex creases, only present on the original vertex. */
@@ -2063,8 +2063,8 @@ const CustomData_MeshMasks CD_MASK_BAREMESH_ORIGINDEX = {
 };
 const CustomData_MeshMasks CD_MASK_MESH = {
     /* vmask */ (CD_MASK_MVERT | CD_MASK_MDEFORMVERT | CD_MASK_MVERT_SKIN | CD_MASK_PAINT_MASK |
-                 CD_MASK_PROP_ALL | CD_MASK_CREASE),
-    /* emask */ (CD_MASK_MEDGE | CD_MASK_FREESTYLE_EDGE | CD_MASK_PROP_ALL),
+                 CD_MASK_PROP_ALL | CD_MASK_CREASE | CD_MASK_BWEIGHT),
+    /* emask */ (CD_MASK_MEDGE | CD_MASK_FREESTYLE_EDGE | CD_MASK_PROP_ALL | CD_MASK_BWEIGHT),
     /* fmask */ 0,
     /* pmask */
     (CD_MASK_MPOLY | CD_MASK_FACEMAP | CD_MASK_FREESTYLE_FACE | CD_MASK_PROP_ALL |
@@ -5089,7 +5089,7 @@ void CustomData_data_transfer(const MeshPairRemap *me_remap,
   else {
     const LayerTypeInfo *type_info = layerType_getInfo(data_type);
 
-    /* NOTE: we can use 'fake' CDLayers, like e.g. for crease, bweight, etc. :/. */
+    /* NOTE: we can use 'fake' CDLayers, like e.g. for crease :/. */
     data_size = (size_t)type_info->size;
     data_step = laymap->elem_size ? laymap->elem_size : data_size;
     data_offset = laymap->data_offset;

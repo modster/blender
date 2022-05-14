@@ -1592,7 +1592,9 @@ void createTransEditVerts(TransInfo *t)
     int cd_vert_bweight_offset = -1;
     int cd_vert_crease_offset = -1;
     if (t->mode == TFM_BWEIGHT) {
-      BM_mesh_cd_flag_ensure(bm, BKE_mesh_from_object(tc->obedit), ME_CDFLAG_VERT_BWEIGHT);
+      if (!CustomData_has_layer(&bm->vdata, CD_BWEIGHT)) {
+        BM_data_layer_add(bm, &bm->vdata, CD_BWEIGHT);
+      }
       cd_vert_bweight_offset = CustomData_get_offset(&bm->vdata, CD_BWEIGHT);
     }
     else if (t->mode == TFM_VERT_CREASE) {

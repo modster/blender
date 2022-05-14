@@ -738,7 +738,6 @@ static void subdiv_copy_edge_data(SubdivMeshContext *ctx,
   const int subdiv_edge_index = subdiv_edge - ctx->subdiv_mesh->medge;
   if (coarse_edge == NULL) {
     subdiv_edge->crease = 0;
-    subdiv_edge->bweight = 0;
     subdiv_edge->flag = 0;
     if (!ctx->settings->use_optimal_display) {
       subdiv_edge->flag |= ME_EDGERENDER;
@@ -1074,9 +1073,6 @@ static void subdiv_mesh_vertex_of_loose_edge(const struct SubdivForeachContext *
       coarse_mesh, coarse_edge, is_simple, u, subdiv_vertex->co);
   /* Reset flags and such. */
   subdiv_vertex->flag = 0;
-  /* TODO(sergey): This matches old behavior, but we can as well interpolate
-   * it. Maybe even using vertex varying attributes. */
-  subdiv_vertex->bweight = 0.0f;
 }
 
 /** \} */

@@ -25,7 +25,8 @@ extern "C" {
  */
 typedef struct MVert {
   float co[3];
-  char flag, bweight;
+  char flag;
+  char bweight DNA_DEPRECATED;
   char _pad[2];
 } MVert;
 
@@ -43,7 +44,8 @@ enum {
 typedef struct MEdge {
   /** Un-ordered vertex indices (cannot match). */
   unsigned int v1, v2;
-  char crease, bweight;
+  char crease;
+  char bweight DNA_DEPRECATED;
   short flag;
 } MEdge;
 
