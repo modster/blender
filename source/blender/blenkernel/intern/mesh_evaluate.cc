@@ -1012,8 +1012,13 @@ void BKE_mesh_flush_hidden_from_verts(Mesh *me)
   MeshComponent component;
   component.replace(me, GeometryOwnershipType::Editable);
 
-  VArray<bool> vert_hide = component.attribute_get_for_read<bool>(
+  const VArray<bool> vert_hide = component.attribute_get_for_read<bool>(
       ".vert_hide", ATTR_DOMAIN_POINT, false);
+  if (vert_hide.is_single() && !vert_hide.get_internal_single()) {
+    component.attribute_try_delete(".edge_hide");
+    component.attribute_try_delete(".face_hide");
+    return;
+  }
 
   OutputAttribute_Typed<bool> edge_hide = component.attribute_try_get_for_output_only<bool>(
       ".edge_hide", ATTR_DOMAIN_EDGE);
@@ -1033,8 +1038,13 @@ void BKE_mesh_flush_hidden_from_polys(Mesh *me)
   MeshComponent component;
   component.replace(me, GeometryOwnershipType::Editable);
 
-  VArray<bool> face_hide = component.attribute_get_for_read<bool>(
+  const VArray<bool> face_hide = component.attribute_get_for_read<bool>(
       ".face_hide", ATTR_DOMAIN_FACE, false);
+  if (face_hide.is_single() && face_hide.get_internal_single()) {
+    component.attribute_try_delete(".vert_hide");
+    component.attribute_try_delete(".edge_hide");
+    return;
+  }
 
   OutputAttribute_Typed<bool> edge_hide = component.attribute_try_get_for_output_only<bool>(
       ".edge_hide", ATTR_DOMAIN_EDGE);

@@ -9,6 +9,8 @@
 #include "BLI_bitmap.h"
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_span.hh"
+#include "BLI_virtual_array.hh"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -19,6 +21,7 @@
 
 #include "BKE_context.h"
 #include "BKE_customdata.h"
+#include "BKE_geometry_set.hh"
 #include "BKE_global.h"
 #include "BKE_mesh.h"
 #include "BKE_object.h"
@@ -33,6 +36,10 @@
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
+
+using blender::MutableSpan;
+using blender::VArray;
+using blender::bke::OutputAttribute_Typed;
 
 /* own include */
 
@@ -49,7 +56,7 @@ void paintface_flush_flags(bContext *C, Object *ob, short flag, const bool flush
     return;
   }
 
-  /* NOTE: call #BKE_mesh_flush_hidden_from_verts first when changing hidden flags. */
+  /* NOTE: call #BKE_mesh_flush_hidden_from_verts_ex first when changing hidden flags. */
 
   /* we could call this directly in all areas that change selection,
    * since this could become slow for realtime updates (circle-select for eg) */
@@ -120,20 +127,27 @@ void paintface_hide(bContext *C, Object *ob, const bool unselected)
     return;
   }
 
-  bool *face_hide = (bool *)CustomData_get_layer_named(&me->pdata, CD_PROP_BOOL, ".face_hide");
+  MeshComponent component;
+  component.replace(me, GeometryOwnershipType::Editable);
+
+  OutputAttribute_Typed<bool> face_hide_attribute =
+      component.attribute_try_get_for_output_only<bool>(".face_hide", ATTR_DOMAIN_FACE);
+  MutableSpan<bool> face_hide = face_hide_attribute.as_span();
 
   for (int i = 0; i < me->totpoly; i++) {
     MPoly *mpoly = &me->mpoly[i];
-    if (!(face_hide && face_hide[i])) {
+    if (!face_hide[i]) {
       if (((mpoly->flag & ME_FACE_SEL) == 0) == unselected) {
         face_hide[i] = true;
       }
     }
 
-    if (face_hide && face_hide[i]) {
+    if (face_hide[i]) {
       mpoly->flag &= ~ME_FACE_SEL;
     }
   }
+
+  face_hide_attribute.save();
 
   BKE_mesh_flush_hidden_from_polys(me);
 
@@ -147,15 +161,21 @@ void paintface_reveal(bContext *C, Object *ob, const bool select)
     return;
   }
 
-  bool *face_hide = (bool *)CustomData_get_layer_named(&me->pdata, CD_PROP_BOOL, ".face_hide");
+  MeshComponent component;
+  component.replace(me, GeometryOwnershipType::Editable);
 
-  for (int i = 0; i < me->totpoly; i++) {
-    MPoly *mpoly = &me->mpoly[i];
-    if (face_hide && face_hide[i]) {
-      SET_FLAG_FROM_TEST(mpoly->flag, select, ME_FACE_SEL);
-      face_hide[i] = false;
+  if (select) {
+    const VArray<bool> face_hide = component.attribute_get_for_read<bool>(
+        ".face_hide", ATTR_DOMAIN_FACE, false);
+    for (int i = 0; i < me->totpoly; i++) {
+      MPoly *mpoly = &me->mpoly[i];
+      if (face_hide[i]) {
+        mpoly->flag |= ME_FACE_SEL;
+      }
     }
   }
+
+  component.attribute_try_delete(".face_hide");
 
   BKE_mesh_flush_hidden_from_polys(me);
 
@@ -172,8 +192,11 @@ static void select_linked_tfaces_with_seams(Mesh *me, const uint index, const bo
   BLI_bitmap *edge_tag = BLI_BITMAP_NEW(me->totedge, __func__);
   BLI_bitmap *poly_tag = BLI_BITMAP_NEW(me->totpoly, __func__);
 
-  const bool *face_hide = (const bool *)CustomData_get_layer_named(
-      &me->pdata, CD_PROP_BOOL, ".face_hide");
+  MeshComponent component;
+  component.replace(me, GeometryOwnershipType::Editable);
+
+  const VArray<bool> face_hide = component.attribute_get_for_read<bool>(
+      ".face_hide", ATTR_DOMAIN_FACE, false);
 
   if (index != (uint)-1) {
     /* only put face under cursor in array */
@@ -185,7 +208,7 @@ static void select_linked_tfaces_with_seams(Mesh *me, const uint index, const bo
     /* fill array by selection */
     for (int i = 0; i < me->totpoly; i++) {
       MPoly *mp = &me->mpoly[i];
-      if (face_hide && face_hide[i]) {
+      if (face_hide[i]) {
         /* pass */
       }
       else if (mp->flag & ME_FACE_SEL) {
@@ -201,7 +224,7 @@ static void select_linked_tfaces_with_seams(Mesh *me, const uint index, const bo
     /* expand selection */
     for (int i = 0; i < me->totpoly; i++) {
       MPoly *mp = &me->mpoly[i];
-      if (face_hide && face_hide[i]) {
+      if (face_hide[i]) {
         continue;
       }
 
@@ -266,15 +289,18 @@ bool paintface_deselect_all_visible(bContext *C, Object *ob, int action, bool fl
     return false;
   }
 
-  const bool *face_hide = (const bool *)CustomData_get_layer_named(
-      &me->pdata, CD_PROP_BOOL, ".face_hide");
+  MeshComponent component;
+  component.replace(me, GeometryOwnershipType::Editable);
+
+  const VArray<bool> face_hide = component.attribute_get_for_read<bool>(
+      ".face_hide", ATTR_DOMAIN_FACE, false);
 
   if (action == SEL_TOGGLE) {
     action = SEL_SELECT;
 
     for (int i = 0; i < me->totpoly; i++) {
       MPoly *mpoly = &me->mpoly[i];
-      if (!(face_hide && face_hide[i]) && mpoly->flag & ME_FACE_SEL) {
+      if (!face_hide[i] && mpoly->flag & ME_FACE_SEL) {
         action = SEL_DESELECT;
         break;
       }
@@ -285,7 +311,7 @@ bool paintface_deselect_all_visible(bContext *C, Object *ob, int action, bool fl
 
   for (int i = 0; i < me->totpoly; i++) {
     MPoly *mpoly = &me->mpoly[i];
-    if (!(face_hide && face_hide[i])) {
+    if (!face_hide[i]) {
       switch (action) {
         case SEL_SELECT:
           if ((mpoly->flag & ME_FACE_SEL) == 0) {
@@ -328,12 +354,15 @@ bool paintface_minmax(Object *ob, float r_min[3], float r_max[3])
 
   copy_m3_m4(bmat, ob->obmat);
 
-  const bool *face_hide = (const bool *)CustomData_get_layer_named(
-      &me->pdata, CD_PROP_BOOL, ".face_hide");
+  MeshComponent component;
+  component.replace(const_cast<Mesh *>(me), GeometryOwnershipType::ReadOnly);
+
+  const VArray<bool> face_hide = component.attribute_get_for_read<bool>(
+      ".face_hide", ATTR_DOMAIN_FACE, false);
 
   for (int i = 0; i < me->totpoly; i++) {
     MPoly *mp = &me->mpoly[i];
-    if ((face_hide && face_hide[i]) || !(mp->flag & ME_FACE_SEL)) {
+    if (face_hide[i] || !(mp->flag & ME_FACE_SEL)) {
       continue;
     }
 
@@ -363,13 +392,16 @@ bool paintface_mouse_select(bContext *C,
   /* Get the face under the cursor */
   Mesh *me = BKE_mesh_from_object(ob);
 
-  const bool *face_hide = (const bool *)CustomData_get_layer_named(
-      &me->pdata, CD_PROP_BOOL, ".face_hide");
+  MeshComponent component;
+  component.replace(const_cast<Mesh *>(me), GeometryOwnershipType::ReadOnly);
+
+  const VArray<bool> face_hide = component.attribute_get_for_read<bool>(
+      ".face_hide", ATTR_DOMAIN_FACE, false);
 
   if (ED_mesh_pick_face(C, ob, mval, ED_MESH_PICK_DEFAULT_FACE_DIST, &index)) {
     if (index < me->totpoly) {
       mpoly_sel = me->mpoly + index;
-      if (!(face_hide && face_hide[index])) {
+      if (!face_hide[index]) {
         found = true;
       }
     }
@@ -484,15 +516,18 @@ bool paintvert_deselect_all_visible(Object *ob, int action, bool flush_flags)
     return false;
   }
 
-  const bool *vert_hide = (const bool *)CustomData_get_layer_named(
-      &me->vdata, CD_PROP_BOOL, ".vert_hide");
+  MeshComponent component;
+  component.replace(const_cast<Mesh *>(me), GeometryOwnershipType::ReadOnly);
+
+  const VArray<bool> vert_hide = component.attribute_get_for_read<bool>(
+      "vert_hide", ATTR_DOMAIN_POINT, false);
 
   if (action == SEL_TOGGLE) {
     action = SEL_SELECT;
 
     for (int i = 0; i < me->totvert; i++) {
       MVert *mvert = &me->mvert[i];
-      if (!(vert_hide && vert_hide[i]) && mvert->flag & SELECT) {
+      if (!vert_hide[i] && mvert->flag & SELECT) {
         action = SEL_DESELECT;
         break;
       }
@@ -502,7 +537,7 @@ bool paintvert_deselect_all_visible(Object *ob, int action, bool flush_flags)
   bool changed = false;
   for (int i = 0; i < me->totvert; i++) {
     MVert *mvert = &me->mvert[i];
-    if (!(vert_hide && vert_hide[i])) {
+    if (!vert_hide[i]) {
       switch (action) {
         case SEL_SELECT:
           if ((mvert->flag & SELECT) == 0) {
@@ -555,13 +590,16 @@ void paintvert_select_ungrouped(Object *ob, bool extend, bool flush_flags)
     paintvert_deselect_all_visible(ob, SEL_DESELECT, false);
   }
 
-  const bool *vert_hide = (const bool *)CustomData_get_layer_named(
-      &me->vdata, CD_PROP_BOOL, ".vert_hide");
+  MeshComponent component;
+  component.replace(const_cast<Mesh *>(me), GeometryOwnershipType::ReadOnly);
+
+  const VArray<bool> vert_hide = component.attribute_get_for_read<bool>(
+      "vert_hide", ATTR_DOMAIN_POINT, false);
 
   for (int i = 0; i < me->totvert; i++) {
     MVert *mv = &me->mvert[i];
     MDeformVert *dv = &me->dvert[i];
-    if (!(vert_hide && vert_hide[i])) {
+    if (!vert_hide[i]) {
       if (dv->dw == nullptr) {
         /* if null weight then not grouped */
         mv->flag |= SELECT;
