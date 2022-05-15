@@ -20,6 +20,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_bvhutils.h"
+#include "BKE_customdata.h"
 #include "BKE_editmesh.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_runtime.h"
@@ -1205,6 +1206,7 @@ static BLI_bitmap *loose_edges_map_get(const MEdge *medge,
 }
 
 static BLI_bitmap *looptri_no_hidden_map_get(const MPoly *mpoly,
+                                             const bool *face_hide,
                                              const int looptri_len,
                                              int *r_looptri_active_len)
 {
@@ -1212,10 +1214,10 @@ static BLI_bitmap *looptri_no_hidden_map_get(const MPoly *mpoly,
 
   int looptri_no_hidden_len = 0;
   int looptri_iter = 0;
-  const MPoly *mp = mpoly;
+  int poly_index = 0;
   while (looptri_iter != looptri_len) {
-    int mp_totlooptri = mp->totloop - 2;
-    if (mp->flag & ME_HIDE) {
+    int mp_totlooptri = mpoly[poly_index].totloop - 2;
+    if (face_hide && face_hide[poly_index]) {
       looptri_iter += mp_totlooptri;
     }
     else {
@@ -1225,7 +1227,7 @@ static BLI_bitmap *looptri_no_hidden_map_get(const MPoly *mpoly,
         looptri_no_hidden_len++;
       }
     }
-    mp++;
+    poly_index++;
   }
 
   *r_looptri_active_len = looptri_no_hidden_len;
@@ -1300,7 +1302,11 @@ BVHTree *BKE_bvhtree_from_mesh_get(struct BVHTreeFromMesh *data,
       break;
 
     case BVHTREE_FROM_LOOPTRI_NO_HIDDEN:
-      mask = looptri_no_hidden_map_get(mesh->mpoly, looptri_len, &mask_bits_act_len);
+      mask = looptri_no_hidden_map_get(
+          mesh->mpoly,
+          (const bool *)CustomData_get_layer_named(&mesh->pdata, CD_PROP_BOOL, ".face_hide"),
+          looptri_len,
+          &mask_bits_act_len);
       ATTR_FALLTHROUGH;
     case BVHTREE_FROM_LOOPTRI:
       data->tree = bvhtree_from_mesh_looptri_create_tree(0.0f,

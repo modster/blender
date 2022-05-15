@@ -1232,11 +1232,13 @@ void BKE_paint_blend_read_lib(BlendLibReader *reader, Scene *sce, Paint *p)
   }
 }
 
-bool paint_is_face_hidden(const MLoopTri *lt, const MVert *mvert, const MLoop *mloop)
+bool paint_is_face_hidden(const MLoopTri *lt, const bool *vert_hide, const MLoop *mloop)
 {
-  return ((mvert[mloop[lt->tri[0]].v].flag & ME_HIDE) ||
-          (mvert[mloop[lt->tri[1]].v].flag & ME_HIDE) ||
-          (mvert[mloop[lt->tri[2]].v].flag & ME_HIDE));
+  if (!vert_hide) {
+    return false;
+  }
+  return ((vert_hide[mloop[lt->tri[0]].v]) || (vert_hide[mloop[lt->tri[1]].v]) ||
+          (vert_hide[mloop[lt->tri[2]].v]));
 }
 
 bool paint_is_grid_face_hidden(const uint *grid_hidden, int gridsize, int x, int y)
@@ -1661,6 +1663,7 @@ static void sculpt_update_object(Depsgraph *depsgraph,
     ss->totpoly = me->totpoly;
     ss->totfaces = me->totpoly;
     ss->mvert = me->mvert;
+    // ss->vert_hidden = CustomData_get_layer_named(&me->vdata, CD_PROP_BOOL, ".vert_hide");
     ss->mpoly = me->mpoly;
     ss->mloop = me->mloop;
     ss->multires.active = false;
@@ -2029,9 +2032,11 @@ void BKE_sculpt_face_sets_ensure_from_base_mesh_visibility(Mesh *mesh)
   }
 
   int *face_sets = CustomData_get_layer(&mesh->pdata, CD_SCULPT_FACE_SETS);
+  const bool *face_hide = (const bool *)CustomData_get_layer_named(
+      &mesh->pdata, CD_PROP_BOOL, ".face_hide");
 
   for (int i = 0; i < mesh->totpoly; i++) {
-    if (!(mesh->mpoly[i].flag & ME_HIDE)) {
+    if (!(face_hide && face_hide[i])) {
       continue;
     }
 
@@ -2056,9 +2061,13 @@ void BKE_sculpt_sync_face_sets_visibility_to_base_mesh(Mesh *mesh)
     return;
   }
 
+  bool *face_hide = (bool *)CustomData_get_layer_named(&mesh->pdata, CD_PROP_BOOL, ".face_hide");
+  if (!face_hide) {
+    return;
+  }
+
   for (int i = 0; i < mesh->totpoly; i++) {
-    const bool is_face_set_visible = face_sets[i] >= 0;
-    SET_FLAG_FROM_TEST(mesh->mpoly[i].flag, !is_face_set_visible, ME_HIDE);
+    face_hide[i] = face_sets[i] < 0;
   }
 
   BKE_mesh_flush_hidden_from_polys(mesh);

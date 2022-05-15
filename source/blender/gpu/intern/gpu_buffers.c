@@ -21,6 +21,7 @@
 #include "BLI_math_color_blend.h"
 #include "BLI_utildefines.h"
 
+#include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_userdef_types.h"
 
@@ -186,17 +187,18 @@ static void gpu_pbvh_batch_init(GPU_PBVH_Buffers *buffers, GPUPrimType prim)
  * \{ */
 
 static bool gpu_pbvh_is_looptri_visible(const MLoopTri *lt,
-                                        const MVert *mvert,
+                                        const bool *vert_hide,
                                         const MLoop *mloop,
                                         const int *sculpt_face_sets)
 {
-  return (!paint_is_face_hidden(lt, mvert, mloop) && sculpt_face_sets &&
+  return (!paint_is_face_hidden(lt, vert_hide, mloop) && sculpt_face_sets &&
           sculpt_face_sets[lt->poly] > SCULPT_FACE_SET_NONE);
 }
 
 void GPU_pbvh_mesh_buffers_update(GPU_PBVH_Buffers *buffers,
                                   const MVert *mvert,
                                   const float (*vert_normals)[3],
+                                  const bool *vert_hide,
                                   const float *vmask,
                                   const void *vcol_data,
                                   int vcol_type,
@@ -251,7 +253,7 @@ void GPU_pbvh_mesh_buffers_update(GPU_PBVH_Buffers *buffers,
             buffers->mloop[lt->tri[2]].v,
         };
 
-        if (!gpu_pbvh_is_looptri_visible(lt, mvert, buffers->mloop, sculpt_face_sets)) {
+        if (!gpu_pbvh_is_looptri_visible(lt, vert_hide, buffers->mloop, sculpt_face_sets)) {
           continue;
         }
 
@@ -361,7 +363,7 @@ void GPU_pbvh_mesh_buffers_update(GPU_PBVH_Buffers *buffers,
 GPU_PBVH_Buffers *GPU_pbvh_mesh_buffers_build(const MPoly *mpoly,
                                               const MLoop *mloop,
                                               const MLoopTri *looptri,
-                                              const MVert *mvert,
+                                              const bool *vert_hide,
                                               const int *face_indices,
                                               const int *sculpt_face_sets,
                                               const int face_indices_len,
@@ -381,7 +383,7 @@ GPU_PBVH_Buffers *GPU_pbvh_mesh_buffers_build(const MPoly *mpoly,
   /* Count the number of visible triangles */
   for (i = 0, tottri = 0; i < face_indices_len; i++) {
     const MLoopTri *lt = &looptri[face_indices[i]];
-    if (gpu_pbvh_is_looptri_visible(lt, mvert, mloop, sculpt_face_sets)) {
+    if (gpu_pbvh_is_looptri_visible(lt, vert_hide, mloop, sculpt_face_sets)) {
       int r_edges[3];
       BKE_mesh_looptri_get_real_edges(mesh, lt, r_edges);
       for (int j = 0; j < 3; j++) {
@@ -414,7 +416,7 @@ GPU_PBVH_Buffers *GPU_pbvh_mesh_buffers_build(const MPoly *mpoly,
     const MLoopTri *lt = &looptri[face_indices[i]];
 
     /* Skip hidden faces */
-    if (!gpu_pbvh_is_looptri_visible(lt, mvert, mloop, sculpt_face_sets)) {
+    if (!gpu_pbvh_is_looptri_visible(lt, vert_hide, mloop, sculpt_face_sets)) {
       continue;
     }
 

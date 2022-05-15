@@ -43,10 +43,10 @@ BLI_INLINE void vert_set_mesh(GPUIndexBufBuilder *elb,
                               const int v_index,
                               const int l_index)
 {
-  const MVert *mv = &mr->mvert[v_index];
-  if (!((mr->use_hide && (mv->flag & ME_HIDE)) ||
-        ((mr->extract_type == MR_EXTRACT_MAPPED) && (mr->v_origindex) &&
-         (mr->v_origindex[v_index] == ORIGINDEX_NONE)))) {
+  const bool hidden = mr->use_hide && mr->vert_hide && mr->vert_hide[v_index];
+
+  if (!(hidden || ((mr->extract_type == MR_EXTRACT_MAPPED) && (mr->v_origindex) &&
+                   (mr->v_origindex[v_index] == ORIGINDEX_NONE)))) {
     GPU_indexbuf_set_point_vert(elb, v_index, l_index);
   }
   else {

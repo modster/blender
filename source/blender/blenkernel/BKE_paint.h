@@ -206,7 +206,7 @@ bool BKE_paint_select_elem_test(struct Object *ob);
  * Returns non-zero if any of the face's vertices are hidden, zero otherwise.
  */
 bool paint_is_face_hidden(const struct MLoopTri *lt,
-                          const struct MVert *mvert,
+                          const bool *vert_hide,
                           const struct MLoop *mloop);
 /**
  * Returns non-zero if any of the corners of the grid

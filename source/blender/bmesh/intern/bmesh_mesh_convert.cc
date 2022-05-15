@@ -103,6 +103,7 @@ static CLG_LogRef LOG = {"bmesh.mesh.convert"};
 
 using blender::Array;
 using blender::IndexRange;
+using blender::MutableSpan;
 using blender::Span;
 
 void BM_mesh_cd_flag_ensure(BMesh *bm, Mesh *mesh, const char cd_flag)
@@ -355,6 +356,13 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
                                            CustomData_get_offset(&bm->vdata, CD_SHAPE_KEYINDEX) :
                                            -1;
 
+  const bool *vert_hide = (const bool *)CustomData_get_layer_named(
+      &me->vdata, CD_PROP_BOOL, ".vert_hide");
+  const bool *edge_hide = (const bool *)CustomData_get_layer_named(
+      &me->edata, CD_PROP_BOOL, ".edge_hide");
+  const bool *face_hide = (const bool *)CustomData_get_layer_named(
+      &me->pdata, CD_PROP_BOOL, ".face_hide");
+
   Span<MVert> mvert{me->mvert, me->totvert};
   Array<BMVert *> vtable(me->totvert);
   for (const int i : mvert.index_range()) {
@@ -364,6 +372,9 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
 
     /* Transfer flag. */
     v->head.hflag = BM_vert_flag_from_mflag(mvert[i].flag & ~SELECT);
+    if (vert_hide && vert_hide[i]) {
+      BM_elem_flag_enable(v, BM_ELEM_HIDDEN);
+    }
 
     /* This is necessary for selection counts to work properly. */
     if (mvert[i].flag & SELECT) {
@@ -407,6 +418,9 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
 
     /* Transfer flags. */
     e->head.hflag = BM_edge_flag_from_mflag(medge[i].flag & ~SELECT);
+    if (edge_hide && edge_hide[i]) {
+      BM_elem_flag_enable(e, BM_ELEM_HIDDEN);
+    }
 
     /* This is necessary for selection counts to work properly. */
     if (medge[i].flag & SELECT) {
@@ -460,6 +474,9 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
 
     /* Transfer flag. */
     f->head.hflag = BM_face_flag_from_mflag(mpoly[i].flag & ~ME_FACE_SEL);
+    if (face_hide && face_hide[i]) {
+      BM_elem_flag_enable(f, BM_ELEM_HIDDEN);
+    }
 
     /* This is necessary for selection counts to work properly. */
     if (mpoly[i].flag & ME_FACE_SEL) {
@@ -905,6 +922,17 @@ BLI_INLINE void bmesh_quick_edgedraw_flag(MEdge *med, BMEdge *e)
   }
 }
 
+static void ensure_bool_layer(MutableSpan<bool> &values,
+                              CustomData &data,
+                              const char *name,
+                              const int num)
+{
+  if (values.is_empty()) {
+    values = {(bool *)CustomData_add_layer_named(&data, CD_PROP_BOOL, CD_CALLOC, NULL, num, name),
+              num};
+  }
+}
+
 void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMeshParams *params)
 {
   MEdge *med;
@@ -939,6 +967,8 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   me->act_face = -1;
 
   {
+    /* TODO: Somehow deal with BMesh storage of hide layers (currently it's still stored as a
+     * generic attribute there too). */
     CustomData_MeshMasks mask = CD_MASK_MESH;
     CustomData_MeshMasks_update(&mask, &params->cd_mask_extra);
     CustomData_copy(&bm->vdata, &me->vdata, mask.vmask, CD_CALLOC, me->totvert);
@@ -961,6 +991,10 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, mloop, me->totloop);
   CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, mpoly, me->totpoly);
 
+  MutableSpan<bool> vert_hide;
+  MutableSpan<bool> edge_hide;
+  MutableSpan<bool> face_hide;
+
   /* Clear normals on the mesh completely, since the original vertex and polygon count might be
    * different than the BMesh's. */
   BKE_mesh_clear_derived_normals(me);
@@ -975,6 +1009,10 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
     copy_v3_v3(mvert->co, v->co);
 
     mvert->flag = BM_vert_flag_to_mflag(v);
+    if (BM_elem_flag_test(v, BM_ELEM_HIDDEN)) {
+      ensure_bool_layer(vert_hide, me->vdata, ".vert_hide", me->totvert);
+      vert_hide[i] = true;
+    }
 
     BM_elem_index_set(v, i); /* set_inline */
 
@@ -999,6 +1037,10 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
     med->v2 = BM_elem_index_get(e->v2);
 
     med->flag = BM_edge_flag_to_mflag(e);
+    if (BM_elem_flag_test(e, BM_ELEM_HIDDEN)) {
+      ensure_bool_layer(edge_hide, me->edata, ".edge_hide", me->totedge);
+      edge_hide[i] = true;
+    }
 
     BM_elem_index_set(e, i); /* set_inline */
 
@@ -1028,7 +1070,10 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
     mpoly->totloop = f->len;
     mpoly->mat_nr = f->mat_nr;
     mpoly->flag = BM_face_flag_to_mflag(f);
-
+    if (BM_elem_flag_test(f, BM_ELEM_HIDDEN)) {
+      ensure_bool_layer(face_hide, me->pdata, ".face_hide", me->totpoly);
+      face_hide[i] = true;
+    }
     l_iter = l_first = BM_FACE_FIRST_LOOP(f);
     do {
       mloop->e = BM_elem_index_get(l_iter->e);
@@ -1213,6 +1258,10 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
   const int cd_edge_bweight_offset = CustomData_get_offset(&bm->edata, CD_BWEIGHT);
   const int cd_edge_crease_offset = CustomData_get_offset(&bm->edata, CD_CREASE);
 
+  MutableSpan<bool> vert_hide;
+  MutableSpan<bool> edge_hide;
+  MutableSpan<bool> face_hide;
+
   /* Clear normals on the mesh completely, since the original vertex and polygon count might be
    * different than the BMesh's. */
   BKE_mesh_clear_derived_normals(me);
@@ -1227,6 +1276,14 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
     BM_elem_index_set(eve, i); /* set_inline */
 
     mv->flag = BM_vert_flag_to_mflag(eve);
+    if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN)) {
+      ensure_bool_layer(vert_hide, me->vdata, ".vert_hide", me->totvert);
+      vert_hide[i] = true;
+    }
+
+    if (cd_vert_bweight_offset != -1) {
+      mv->bweight = BM_ELEM_CD_GET_FLOAT_AS_UCHAR(eve, cd_vert_bweight_offset);
+    }
 
     if (cd_vert_bweight_offset != -1) {
       mv->bweight = BM_ELEM_CD_GET_FLOAT_AS_UCHAR(eve, cd_vert_bweight_offset);
@@ -1245,6 +1302,10 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
     med->v2 = BM_elem_index_get(eed->v2);
 
     med->flag = BM_edge_flag_to_mflag(eed);
+    if (BM_elem_flag_test(eed, BM_ELEM_HIDDEN)) {
+      ensure_bool_layer(edge_hide, me->edata, ".edge_hide", me->totedge);
+      edge_hide[i] = true;
+    }
 
     /* Handle this differently to editmode switching,
      * only enable draw for single user edges rather than calculating angle. */
@@ -1275,6 +1336,11 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
 
     mp->totloop = efa->len;
     mp->flag = BM_face_flag_to_mflag(efa);
+    if (BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
+      ensure_bool_layer(face_hide, me->pdata, ".face_hide", me->totpoly);
+      face_hide[i] = true;
+    }
+
     mp->loopstart = j;
     mp->mat_nr = efa->mat_nr;
 

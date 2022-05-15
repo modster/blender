@@ -287,7 +287,7 @@ static void build_mesh_leaf_node(PBVH *pbvh, PBVHNode *node)
     }
 
     if (has_visible == false) {
-      if (!paint_is_face_hidden(lt, pbvh->verts, pbvh->mloop)) {
+      if (!paint_is_face_hidden(lt, pbvh->vert_hide, pbvh->mloop)) {
         has_visible = true;
       }
     }
@@ -562,6 +562,9 @@ void BKE_pbvh_build_mesh(PBVH *pbvh,
   pbvh->verts = verts;
   BKE_mesh_vertex_normals_ensure(mesh);
   pbvh->vert_normals = BKE_mesh_vertex_normals_for_write(mesh);
+
+  pbvh->vert_hide = (bool *)CustomData_get_layer_named(&mesh->vdata, CD_PROP_BOOL, ".vert_hide");
+
   pbvh->vert_bitmap = BLI_BITMAP_NEW(totvert, "bvh->vert_bitmap");
   pbvh->totvert = totvert;
   pbvh->leaf_limit = LEAF_LIMIT;
@@ -1309,7 +1312,7 @@ static void pbvh_update_draw_buffer_cb(void *__restrict userdata,
             pbvh->mpoly,
             pbvh->mloop,
             pbvh->looptri,
-            pbvh->verts,
+            pbvh->vert_hide,
             node->prim_indices,
             CustomData_get_layer(pbvh->pdata, CD_SCULPT_FACE_SETS),
             node->totprim,
@@ -1347,6 +1350,7 @@ static void pbvh_update_draw_buffer_cb(void *__restrict userdata,
         GPU_pbvh_mesh_buffers_update(node->draw_buffers,
                                      pbvh->verts,
                                      pbvh->vert_normals,
+                                     pbvh->vert_hide,
                                      CustomData_get_layer(pbvh->vdata, CD_PAINT_MASK),
                                      layer ? layer->data : NULL,
                                      layer ? layer->type : -1,
@@ -1514,9 +1518,12 @@ static void pbvh_faces_node_visibility_update(PBVH *pbvh, PBVHNode *node)
   BKE_pbvh_node_num_verts(pbvh, node, NULL, &totvert);
   BKE_pbvh_node_get_verts(pbvh, node, &vert_indices, &mvert);
 
+  if (pbvh->vert_hide == NULL) {
+    BKE_pbvh_node_fully_hidden_set(node, false);
+    return;
+  }
   for (i = 0; i < totvert; i++) {
-    MVert *v = &mvert[vert_indices[i]];
-    if (!(v->flag & ME_HIDE)) {
+    if (!(pbvh->vert_hide[vert_indices[i]])) {
       BKE_pbvh_node_fully_hidden_set(node, false);
       return;
     }
@@ -2226,7 +2233,7 @@ static bool pbvh_faces_node_raycast(PBVH *pbvh,
     const MLoopTri *lt = &pbvh->looptri[faces[i]];
     const int *face_verts = node->face_vert_indices[i];
 
-    if (pbvh->respect_hide && paint_is_face_hidden(lt, vert, mloop)) {
+    if (pbvh->respect_hide && paint_is_face_hidden(lt, pbvh->vert_hide, mloop)) {
       continue;
     }
 
@@ -2535,7 +2542,7 @@ static bool pbvh_faces_node_nearest_to_ray(PBVH *pbvh,
     const MLoopTri *lt = &pbvh->looptri[faces[i]];
     const int *face_verts = node->face_vert_indices[i];
 
-    if (pbvh->respect_hide && paint_is_face_hidden(lt, vert, mloop)) {
+    if (pbvh->respect_hide && paint_is_face_hidden(lt, pbvh->vert_hide, mloop)) {
       continue;
     }
 
@@ -3058,6 +3065,7 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
   vi->mask = NULL;
   if (pbvh->type == PBVH_FACES) {
     vi->vert_normals = pbvh->vert_normals;
+    vi->vert_hide = pbvh->vert_hide;
 
     vi->vmask = CustomData_get_layer(pbvh->vdata, CD_PAINT_MASK);
   }
@@ -3135,6 +3143,23 @@ const float (*BKE_pbvh_get_vert_normals(const PBVH *pbvh))[3]
 {
   BLI_assert(pbvh->type == PBVH_FACES);
   return pbvh->vert_normals;
+}
+
+const bool *BKE_pbvh_get_vert_hide(const PBVH *pbvh)
+{
+  BLI_assert(pbvh->type == PBVH_FACES);
+  return pbvh->vert_hide;
+}
+
+bool *BKE_pbvh_get_vert_hide_for_write(PBVH *pbvh)
+{
+  BLI_assert(pbvh->type == PBVH_FACES);
+  if (pbvh->vert_hide) {
+    return pbvh->vert_hide;
+  }
+  pbvh->vert_hide = (bool *)CustomData_add_layer_named(
+      &pbvh->mesh->vdata, CD_PROP_BOOL, CD_CALLOC, NULL, pbvh->mesh->totvert, ".vert_hide");
+  return pbvh->vert_hide;
 }
 
 void BKE_pbvh_subdiv_cgg_set(PBVH *pbvh, SubdivCCG *subdiv_ccg)

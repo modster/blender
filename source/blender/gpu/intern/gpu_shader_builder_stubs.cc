@@ -104,7 +104,7 @@ void UI_GetThemeColorShadeAlpha4ubv(int UNUSED(colorid),
 /** \name Stubs of BKE_paint.h
  * \{ */
 bool paint_is_face_hidden(const struct MLoopTri *UNUSED(lt),
-                          const struct MVert *UNUSED(mvert),
+                          const bool *UNUSED(vert_hide),
                           const struct MLoop *UNUSED(mloop))
 {
   BLI_assert_unreachable();

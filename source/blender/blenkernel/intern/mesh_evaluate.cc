@@ -18,14 +18,22 @@
 #include "BLI_alloca.h"
 #include "BLI_bitmap.h"
 #include "BLI_edgehash.h"
-
+#include "BLI_index_range.hh"
 #include "BLI_math.h"
+#include "BLI_span.hh"
 #include "BLI_utildefines.h"
 
 #include "BKE_customdata.h"
 
+#include "BKE_geometry_set.hh"
 #include "BKE_mesh.h"
 #include "BKE_multires.h"
+
+using blender::IndexRange;
+using blender::MutableSpan;
+using blender::Span;
+using blender::VArray;
+using blender::bke::OutputAttribute_Typed;
 
 /* -------------------------------------------------------------------- */
 /** \name Polygon Calculations
@@ -999,75 +1007,46 @@ void BKE_mesh_polygons_flip(MPoly *mpoly, MLoop *mloop, CustomData *ldata, int t
 /** \name Mesh Flag Flushing
  * \{ */
 
-void BKE_mesh_flush_hidden_from_verts_ex(const MVert *mvert,
-                                         const MLoop *mloop,
-                                         MEdge *medge,
-                                         const int totedge,
-                                         MPoly *mpoly,
-                                         const int totpoly)
-{
-  int i, j;
-
-  for (i = 0; i < totedge; i++) {
-    MEdge *e = &medge[i];
-    if (mvert[e->v1].flag & ME_HIDE || mvert[e->v2].flag & ME_HIDE) {
-      e->flag |= ME_HIDE;
-    }
-    else {
-      e->flag &= ~ME_HIDE;
-    }
-  }
-  for (i = 0; i < totpoly; i++) {
-    MPoly *p = &mpoly[i];
-    p->flag &= (char)~ME_HIDE;
-    for (j = 0; j < p->totloop; j++) {
-      if (mvert[mloop[p->loopstart + j].v].flag & ME_HIDE) {
-        p->flag |= ME_HIDE;
-      }
-    }
-  }
-}
 void BKE_mesh_flush_hidden_from_verts(Mesh *me)
 {
-  BKE_mesh_flush_hidden_from_verts_ex(
-      me->mvert, me->mloop, me->medge, me->totedge, me->mpoly, me->totpoly);
+  MeshComponent component;
+  component.replace(me, GeometryOwnershipType::Editable);
+
+  VArray<bool> vert_hide = component.attribute_get_for_read<bool>(
+      ".vert_hide", ATTR_DOMAIN_POINT, false);
+
+  OutputAttribute_Typed<bool> edge_hide = component.attribute_try_get_for_output_only<bool>(
+      ".edge_hide", ATTR_DOMAIN_EDGE);
+  component.attribute_try_adapt_domain(vert_hide, ATTR_DOMAIN_POINT, ATTR_DOMAIN_EDGE)
+      .materialize(edge_hide.as_span());
+  edge_hide.save();
+
+  OutputAttribute_Typed<bool> face_hide = component.attribute_try_get_for_output_only<bool>(
+      ".face_hide", ATTR_DOMAIN_FACE);
+  component.attribute_try_adapt_domain(vert_hide, ATTR_DOMAIN_POINT, ATTR_DOMAIN_FACE)
+      .materialize(face_hide.as_span());
+  face_hide.save();
 }
 
-void BKE_mesh_flush_hidden_from_polys_ex(MVert *mvert,
-                                         const MLoop *mloop,
-                                         MEdge *medge,
-                                         const int UNUSED(totedge),
-                                         const MPoly *mpoly,
-                                         const int totpoly)
-{
-  int i = totpoly;
-  for (const MPoly *mp = mpoly; i--; mp++) {
-    if (mp->flag & ME_HIDE) {
-      const MLoop *ml;
-      int j = mp->totloop;
-      for (ml = &mloop[mp->loopstart]; j--; ml++) {
-        mvert[ml->v].flag |= ME_HIDE;
-        medge[ml->e].flag |= ME_HIDE;
-      }
-    }
-  }
-
-  i = totpoly;
-  for (const MPoly *mp = mpoly; i--; mp++) {
-    if ((mp->flag & ME_HIDE) == 0) {
-      const MLoop *ml;
-      int j = mp->totloop;
-      for (ml = &mloop[mp->loopstart]; j--; ml++) {
-        mvert[ml->v].flag &= (char)~ME_HIDE;
-        medge[ml->e].flag &= (short)~ME_HIDE;
-      }
-    }
-  }
-}
 void BKE_mesh_flush_hidden_from_polys(Mesh *me)
 {
-  BKE_mesh_flush_hidden_from_polys_ex(
-      me->mvert, me->mloop, me->medge, me->totedge, me->mpoly, me->totpoly);
+  MeshComponent component;
+  component.replace(me, GeometryOwnershipType::Editable);
+
+  VArray<bool> face_hide = component.attribute_get_for_read<bool>(
+      ".face_hide", ATTR_DOMAIN_FACE, false);
+
+  OutputAttribute_Typed<bool> edge_hide = component.attribute_try_get_for_output_only<bool>(
+      ".edge_hide", ATTR_DOMAIN_EDGE);
+  component.attribute_try_adapt_domain(face_hide, ATTR_DOMAIN_FACE, ATTR_DOMAIN_EDGE)
+      .materialize(edge_hide.as_span());
+  edge_hide.save();
+
+  OutputAttribute_Typed<bool> vert_hide = component.attribute_try_get_for_output_only<bool>(
+      ".vert_hide", ATTR_DOMAIN_POINT);
+  component.attribute_try_adapt_domain(face_hide, ATTR_DOMAIN_FACE, ATTR_DOMAIN_POINT)
+      .materialize(vert_hide.as_span());
+  vert_hide.save();
 }
 
 void BKE_mesh_flush_select_from_polys_ex(MVert *mvert,
@@ -1113,58 +1092,57 @@ void BKE_mesh_flush_select_from_polys(Mesh *me)
       me->mvert, me->totvert, me->mloop, me->medge, me->totedge, me->mpoly, me->totpoly);
 }
 
-void BKE_mesh_flush_select_from_verts_ex(const MVert *mvert,
-                                         const int UNUSED(totvert),
-                                         const MLoop *mloop,
-                                         MEdge *medge,
-                                         const int totedge,
-                                         MPoly *mpoly,
-                                         const int totpoly)
+static void mesh_flush_select_from_verts(const Span<MVert> verts,
+                                         const Span<MLoop> loops,
+                                         const VArray<bool> &edge_hide,
+                                         const VArray<bool> &poly_hide,
+                                         MutableSpan<MEdge> edges,
+                                         MutableSpan<MPoly> polys)
 {
-  MEdge *med;
-  MPoly *mp;
-
-  /* edges */
-  int i = totedge;
-  for (med = medge; i--; med++) {
-    if ((med->flag & ME_HIDE) == 0) {
-      if ((mvert[med->v1].flag & SELECT) && (mvert[med->v2].flag & SELECT)) {
-        med->flag |= SELECT;
+  for (const int i : edges.index_range()) {
+    if (!edge_hide[i]) {
+      MEdge &edge = edges[i];
+      if ((verts[edge.v1].flag & SELECT) && (verts[edge.v2].flag & SELECT)) {
+        edge.flag |= SELECT;
       }
       else {
-        med->flag &= ~SELECT;
+        edge.flag &= ~SELECT;
       }
     }
   }
 
-  /* polys */
-  i = totpoly;
-  for (mp = mpoly; i--; mp++) {
-    if ((mp->flag & ME_HIDE) == 0) {
-      bool ok = true;
-      const MLoop *ml;
-      int j;
-      j = mp->totloop;
-      for (ml = &mloop[mp->loopstart]; j--; ml++) {
-        if ((mvert[ml->v].flag & SELECT) == 0) {
-          ok = false;
-          break;
-        }
+  for (const int i : polys.index_range()) {
+    if (poly_hide[i]) {
+      continue;
+    }
+    MPoly &poly = polys[i];
+    bool all_verts_selected = true;
+    for (const MLoop &loop : loops.slice(poly.loopstart, poly.totloop)) {
+      if (!(verts[loop.v].flag & SELECT)) {
+        all_verts_selected = false;
       }
-
-      if (ok) {
-        mp->flag |= ME_FACE_SEL;
-      }
-      else {
-        mp->flag &= (char)~ME_FACE_SEL;
-      }
+    }
+    if (all_verts_selected) {
+      poly.flag |= ME_FACE_SEL;
+    }
+    else {
+      poly.flag &= (char)~ME_FACE_SEL;
     }
   }
 }
+
 void BKE_mesh_flush_select_from_verts(Mesh *me)
 {
-  BKE_mesh_flush_select_from_verts_ex(
-      me->mvert, me->totvert, me->mloop, me->medge, me->totedge, me->mpoly, me->totpoly);
+  MeshComponent component;
+  component.replace(me, GeometryOwnershipType::Editable);
+
+  mesh_flush_select_from_verts(
+      {me->mvert, me->totvert},
+      {me->mloop, me->totloop},
+      component.attribute_get_for_read<bool>(".edge_hide", ATTR_DOMAIN_EDGE, false),
+      component.attribute_get_for_read<bool>(".face_hide", ATTR_DOMAIN_FACE, false),
+      {me->medge, me->totedge},
+      {me->mpoly, me->totpoly});
 }
 
 /** \} */

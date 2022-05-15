@@ -87,6 +87,9 @@ typedef struct MeshRenderData {
   MLoopTri *mlooptri;
   const float (*vert_normals)[3];
   const float (*poly_normals)[3];
+  const bool *vert_hide;
+  const bool *edge_hide;
+  const bool *face_hide;
   float (*loop_normals)[3];
   int *lverts, *ledges;
 

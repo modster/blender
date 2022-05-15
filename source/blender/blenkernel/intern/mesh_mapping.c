@@ -29,6 +29,7 @@
 
 /* ngon version wip, based on BM_uv_vert_map_create */
 UvVertMap *BKE_mesh_uv_vert_map_create(const MPoly *mpoly,
+                                       const bool *face_hide,
                                        const MLoop *mloop,
                                        const MLoopUV *mloopuv,
                                        uint totpoly,
@@ -51,7 +52,7 @@ UvVertMap *BKE_mesh_uv_vert_map_create(const MPoly *mpoly,
   /* generate UvMapVert array */
   mp = mpoly;
   for (a = 0; a < totpoly; a++, mp++) {
-    if (!selected || (!(mp->flag & ME_HIDE) && (mp->flag & ME_FACE_SEL))) {
+    if (!selected || (!(face_hide && face_hide[a]) && (mp->flag & ME_FACE_SEL))) {
       totuv += mp->totloop;
     }
   }
@@ -74,7 +75,7 @@ UvVertMap *BKE_mesh_uv_vert_map_create(const MPoly *mpoly,
 
   mp = mpoly;
   for (a = 0; a < totpoly; a++, mp++) {
-    if (!selected || (!(mp->flag & ME_HIDE) && (mp->flag & ME_FACE_SEL))) {
+    if (!selected || (!(face_hide && face_hide[a]) && (mp->flag & ME_FACE_SEL))) {
       float(*tf_uv)[2] = NULL;
 
       if (use_winding) {

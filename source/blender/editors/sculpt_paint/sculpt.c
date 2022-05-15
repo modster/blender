@@ -342,7 +342,8 @@ void SCULPT_vertex_visible_set(SculptSession *ss, int index, bool visible)
 {
   switch (BKE_pbvh_type(ss->pbvh)) {
     case PBVH_FACES:
-      SET_FLAG_FROM_TEST(ss->mvert[index].flag, !visible, ME_HIDE);
+      bool *vert_hide = BKE_pbvh_get_vert_hide_for_write(ss->pbvh);
+      vert_hide[index] = visible;
       BKE_pbvh_vert_mark_update(ss->pbvh, index);
       break;
     case PBVH_BMESH:
@@ -357,7 +358,8 @@ bool SCULPT_vertex_visible_get(SculptSession *ss, int index)
 {
   switch (BKE_pbvh_type(ss->pbvh)) {
     case PBVH_FACES:
-      return !(ss->mvert[index].flag & ME_HIDE);
+      const bool *vert_hide = BKE_pbvh_get_vert_hide(ss->pbvh);
+      return !vert_hide[index];
     case PBVH_BMESH:
       return !BM_elem_flag_test(BM_vert_at_index(ss->bm, index), BM_ELEM_HIDDEN);
     case PBVH_GRIDS: {
