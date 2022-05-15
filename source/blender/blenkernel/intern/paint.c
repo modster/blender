@@ -1663,7 +1663,6 @@ static void sculpt_update_object(Depsgraph *depsgraph,
     ss->totpoly = me->totpoly;
     ss->totfaces = me->totpoly;
     ss->mvert = me->mvert;
-    // ss->vert_hidden = CustomData_get_layer_named(&me->vdata, CD_PROP_BOOL, ".vert_hide");
     ss->mpoly = me->mpoly;
     ss->mloop = me->mloop;
     ss->multires.active = false;
