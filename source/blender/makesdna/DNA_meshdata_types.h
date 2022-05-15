@@ -31,12 +31,12 @@ typedef struct MVert {
 
 /** #MVert.flag */
 
-enum {
-/*  SELECT = (1 << 0), */
 #ifdef DNA_DEPRECATED_ALLOW
+enum {
+  /*  SELECT = (1 << 0), */
   ME_HIDE = (1 << 4),
-#endif
 };
+#endif
 
 /**
  * Mesh Edges.
