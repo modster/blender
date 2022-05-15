@@ -133,8 +133,6 @@ void paintface_hide(bContext *C, Object *ob, const bool unselected)
     if (face_hide && face_hide[i]) {
       mpoly->flag &= ~ME_FACE_SEL;
     }
-
-    mpoly++;
   }
 
   BKE_mesh_flush_hidden_from_polys(me);
@@ -157,7 +155,6 @@ void paintface_reveal(bContext *C, Object *ob, const bool select)
       SET_FLAG_FROM_TEST(mpoly->flag, select, ME_FACE_SEL);
       face_hide[i] = false;
     }
-    mpoly++;
   }
 
   BKE_mesh_flush_hidden_from_polys(me);
@@ -169,7 +166,6 @@ void paintface_reveal(bContext *C, Object *ob, const bool select)
 
 static void select_linked_tfaces_with_seams(Mesh *me, const uint index, const bool select)
 {
-  int b;
   bool do_it = true;
   bool mark = false;
 
@@ -213,7 +209,7 @@ static void select_linked_tfaces_with_seams(Mesh *me, const uint index, const bo
         mark = false;
 
         MLoop *ml = me->mloop + mp->loopstart;
-        for (b = 0; b < mp->totloop; b++, ml++) {
+        for (int b = 0; b < mp->totloop; b++, ml++) {
           if ((me->medge[ml->e].flag & ME_SEAM) == 0) {
             if (BLI_BITMAP_TEST(edge_tag, ml->e)) {
               mark = true;
@@ -245,10 +241,9 @@ static void select_linked_tfaces_with_seams(Mesh *me, const uint index, const bo
 
 void paintface_select_linked(bContext *C, Object *ob, const int mval[2], const bool select)
 {
-  Mesh *me;
   uint index = (uint)-1;
 
-  me = BKE_mesh_from_object(ob);
+  Mesh *me = BKE_mesh_from_object(ob);
   if (me == NULL || me->totpoly == 0) {
     return;
   }
@@ -322,33 +317,28 @@ bool paintface_deselect_all_visible(bContext *C, Object *ob, int action, bool fl
 
 bool paintface_minmax(Object *ob, float r_min[3], float r_max[3])
 {
-  const Mesh *me;
-  const MPoly *mp;
-  const MLoop *ml;
-  const MVert *mvert;
-  int a, b;
   bool ok = false;
   float vec[3], bmat[3][3];
 
-  me = BKE_mesh_from_object(ob);
+  const Mesh *me = BKE_mesh_from_object(ob);
   if (!me || !me->mloopuv) {
     return ok;
   }
+  const MVert *mvert = me->mvert;
 
   copy_m3_m4(bmat, ob->obmat);
 
   const bool *face_hide = (const bool *)CustomData_get_layer_named(
       &me->pdata, CD_PROP_BOOL, ".face_hide");
 
-  mvert = me->mvert;
-  mp = me->mpoly;
-  for (a = me->totpoly; a > 0; a--, mp++) {
-    if ((face_hide && face_hide[a]) || !(mp->flag & ME_FACE_SEL)) {
+  for (int i = 0; i < me->totpoly; i++) {
+    MPoly *mp = &me->mpoly[i];
+    if ((face_hide && face_hide[i]) || !(mp->flag & ME_FACE_SEL)) {
       continue;
     }
 
-    ml = me->mloop + mp->loopstart;
-    for (b = 0; b < mp->totloop; b++, ml++) {
+    const MLoop *ml = me->mloop + mp->loopstart;
+    for (int b = 0; b < mp->totloop; b++, ml++) {
       mul_v3_m3v3(vec, bmat, mvert[ml->v].co);
       add_v3_v3v3(vec, vec, ob->obmat[3]);
       minmax_v3v3_v3(r_min, r_max, vec);
@@ -365,14 +355,13 @@ bool paintface_mouse_select(struct bContext *C,
                             const struct SelectPick_Params *params,
                             Object *ob)
 {
-  Mesh *me;
   MPoly *mpoly_sel = NULL;
   uint index;
   bool changed = false;
   bool found = false;
 
   /* Get the face under the cursor */
-  me = BKE_mesh_from_object(ob);
+  Mesh *me = BKE_mesh_from_object(ob);
 
   const bool *face_hide = (const bool *)CustomData_get_layer_named(
       &me->pdata, CD_PROP_BOOL, ".face_hide");
@@ -557,9 +546,6 @@ bool paintvert_deselect_all_visible(Object *ob, int action, bool flush_flags)
 void paintvert_select_ungrouped(Object *ob, bool extend, bool flush_flags)
 {
   Mesh *me = BKE_mesh_from_object(ob);
-  MVert *mv;
-  MDeformVert *dv;
-  int a, tot;
 
   if (me == NULL || me->dvert == NULL) {
     return;
@@ -569,14 +555,13 @@ void paintvert_select_ungrouped(Object *ob, bool extend, bool flush_flags)
     paintvert_deselect_all_visible(ob, SEL_DESELECT, false);
   }
 
-  dv = me->dvert;
-  tot = me->totvert;
-
   const bool *vert_hide = (const bool *)CustomData_get_layer_named(
       &me->vdata, CD_PROP_BOOL, ".vert_hide");
 
-  for (a = 0, mv = me->mvert; a < tot; a++, mv++, dv++) {
-    if (!(vert_hide && vert_hide[a])) {
+  for (int i = 0; i < me->totvert; i++) {
+    MVert *mv = &me->mvert[i];
+    MDeformVert *dv = &me->dvert[i];
+    if (!(vert_hide && vert_hide[i])) {
       if (dv->dw == NULL) {
         /* if null weight then not grouped */
         mv->flag |= SELECT;

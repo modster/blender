@@ -1217,10 +1217,10 @@ static BLI_bitmap *looptri_no_hidden_map_get(const MPoly *mpoly,
 
   int looptri_no_hidden_len = 0;
   int looptri_iter = 0;
-  int poly_index = 0;
+  int i_poly = 0;
   while (looptri_iter != looptri_len) {
-    int mp_totlooptri = mpoly[poly_index].totloop - 2;
-    if (face_hide[poly_index]) {
+    int mp_totlooptri = mpoly[i_poly].totloop - 2;
+    if (face_hide[i_poly]) {
       looptri_iter += mp_totlooptri;
     }
     else {
@@ -1230,7 +1230,7 @@ static BLI_bitmap *looptri_no_hidden_map_get(const MPoly *mpoly,
         looptri_no_hidden_len++;
       }
     }
-    poly_index++;
+    i_poly++;
   }
 
   *r_looptri_active_len = looptri_no_hidden_len;
