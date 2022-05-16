@@ -4,6 +4,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_string_ref.hh"
+#include "BLI_utildefines.h"
 
 #include "GPU_material.h"
 #include "GPU_shader.h"
@@ -122,7 +123,7 @@ void GPUMaterialOperation::bind_outputs(GPUShader *shader)
   }
 }
 
-void GPUMaterialOperation::setup_material(void *thunk, GPUMaterial *material)
+void GPUMaterialOperation::setup_material(void *UNUSED(thunk), GPUMaterial *material)
 {
   GPU_material_is_compute_set(material, true);
 }
@@ -319,8 +320,8 @@ void GPUMaterialOperation::populate_material_result(DOutputSocket output, GPUMat
   GPU_link(material, store_function_name, output_image_link, output_link);
 }
 
-void GPUMaterialOperation::generate_material(void *thunk,
-                                             GPUMaterial *material,
+void GPUMaterialOperation::generate_material(void *UNUSED(thunk),
+                                             GPUMaterial *UNUSED(material),
                                              GPUCodegenOutput *code_generator_output)
 {
   gpu::shader::ShaderCreateInfo &info = *reinterpret_cast<gpu::shader::ShaderCreateInfo *>(

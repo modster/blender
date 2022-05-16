@@ -3,6 +3,7 @@
 #include "BLI_listbase.h"
 #include "BLI_math_vec_types.hh"
 #include "BLI_string_ref.hh"
+#include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
 
@@ -51,7 +52,7 @@ class DRWContext : public Context {
     return DRW_viewport_texture_list_get()->color;
   }
 
-  GPUTexture *get_pass_texture(int view_layer, eScenePassType pass_type) override
+  GPUTexture *get_pass_texture(int UNUSED(view_layer), eScenePassType UNUSED(pass_type)) override
   {
     return get_viewport_texture();
   }

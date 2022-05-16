@@ -31,6 +31,8 @@ class TexturePoolKey {
   uint64_t hash() const;
 };
 
+bool operator==(const TexturePoolKey &a, const TexturePoolKey &b);
+
 /* ------------------------------------------------------------------------------------------------
  * Texture Pool
  *

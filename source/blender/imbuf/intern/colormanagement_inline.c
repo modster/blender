@@ -29,7 +29,7 @@ unsigned char IMB_colormanagement_get_luminance_byte(const unsigned char rgb[3])
 
 void IMB_colormanagement_get_luminance_coefficients(float rgb[3])
 {
-  return copy_v3_v3(rgb, imbuf_luma_coefficients);
+  copy_v3_v3(rgb, imbuf_luma_coefficients);
 }
 
 void IMB_colormanagement_xyz_to_rgb(float rgb[3], const float xyz[3])

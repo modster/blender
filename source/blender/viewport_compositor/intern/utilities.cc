@@ -3,6 +3,7 @@
 #include "BLI_assert.h"
 #include "BLI_function_ref.hh"
 #include "BLI_math_vec_types.hh"
+#include "BLI_utildefines.h"
 
 #include "DNA_node_types.h"
 
@@ -68,12 +69,13 @@ ResultType get_node_socket_result_type(const SocketRef *socket)
 bool is_output_linked_to_node_conditioned(DOutputSocket output, FunctionRef<bool(DNode)> condition)
 {
   bool condition_satisfied = false;
-  output.foreach_target_socket([&](DInputSocket target, const TargetSocketPathInfo &path_info) {
-    if (condition(target.node())) {
-      condition_satisfied = true;
-      return;
-    }
-  });
+  output.foreach_target_socket(
+      [&](DInputSocket target, const TargetSocketPathInfo &UNUSED(path_info)) {
+        if (condition(target.node())) {
+          condition_satisfied = true;
+          return;
+        }
+      });
   return condition_satisfied;
 }
 
@@ -81,11 +83,12 @@ int number_of_inputs_linked_to_output_conditioned(DOutputSocket output,
                                                   FunctionRef<bool(DInputSocket)> condition)
 {
   int count = 0;
-  output.foreach_target_socket([&](DInputSocket target, const TargetSocketPathInfo &path_info) {
-    if (condition(target)) {
-      count++;
-    }
-  });
+  output.foreach_target_socket(
+      [&](DInputSocket target, const TargetSocketPathInfo &UNUSED(path_info)) {
+        if (condition(target)) {
+          count++;
+        }
+      });
   return count;
 }
 

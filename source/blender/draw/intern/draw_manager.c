@@ -1226,7 +1226,7 @@ static void drw_engines_enable_editors(void)
   }
 }
 
-static bool is_compositor_enabled()
+static bool is_compositor_enabled(void)
 {
   if (!(DST.draw_ctx.v3d->shading.flag & V3D_SHADING_COMPOSITOR)) {
     return false;
