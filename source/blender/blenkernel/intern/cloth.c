@@ -632,7 +632,7 @@ static void cloth_apply_vgroup(ClothModifierData *clmd, Mesh *mesh)
       verts->flags &= ~(CLOTH_VERT_FLAG_PINNED | CLOTH_VERT_FLAG_NOSELFCOLL |
                         CLOTH_VERT_FLAG_NOOBJCOLL);
 
-      MDeformVert *dvert = CustomData_get(&mesh->vdata, i, CD_MDEFORMVERT);
+      const MDeformVert *dvert = CustomData_get(&mesh->vdata, i, CD_MDEFORMVERT);
       if (dvert) {
         for (int j = 0; j < dvert->totweight; j++) {
           if (dvert->dw[j].def_nr == (clmd->sim_parms->vgroup_mass - 1)) {
@@ -715,7 +715,7 @@ static bool cloth_from_object(
   int i = 0;
   MVert *mvert = NULL;
   ClothVertex *verts = NULL;
-  float(*shapekey_rest)[3] = NULL;
+  const float(*shapekey_rest)[3] = NULL;
   const float tnull[3] = {0, 0, 0};
 
   /* If we have a clothObject, free it. */
