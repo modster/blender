@@ -17,8 +17,6 @@
 
 #include "gpencil_new_proposal.hh"
 
-#include "PIL_time_utildefines.h"
-
 namespace blender::bke {
 
 class GPLayerGroup : ::GPLayerGroup { /* Unused for now. Placeholder class. */
@@ -459,10 +457,19 @@ class GPData : public ::GPData {
     }
   }
 
+  int find_layer_by_name(StringRefNull name)
+  {
+    for (const int i : this->layers().index_range()) {
+      if (STREQ(this->layers(i).name, name.c_str())) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
   int add_frame_on_layer(int layer_index, int frame_start)
   {
-    /* TODO: Check for collisions. */
-
+    /* TODO: Check for collisions before resizing the array. */
     if (!ensure_frames_array_has_size_at_least(this->frames_size + 1)) {
       return -1;
     }
@@ -989,16 +996,18 @@ TEST(gpencil_proposal, TimeBigGPDataCopy)
   GPData data = build_gpencil_data(layers_num, frames_num, strokes_num, points_num);
   GPData data_copy;
 
-  TIMEIT_START(BigGPDataCopy);
-  data_copy = data;
-  TIMEIT_END(BigGPDataCopy);
+  {
+    SCOPED_TIMER("BigGPDataCopy");
+    data_copy = data;
+  }
 
   bGPdata *old_data = build_old_gpencil_data(layers_num, frames_num, strokes_num, points_num);
   bGPdata *old_data_copy;
 
-  TIMEIT_START(BigGPDataCopyOld);
-  old_data_copy = copy_old_gpencil_data(old_data);
-  TIMEIT_END(BigGPDataCopyOld);
+  {
+    SCOPED_TIMER("BigGPDataCopyOld");
+    old_data_copy = copy_old_gpencil_data(old_data);
+  }
 
   free_old_gpencil_data(old_data);
   free_old_gpencil_data(old_data_copy);
@@ -1010,9 +1019,10 @@ TEST(gpencil_proposal, TimeBigGPDataInsertFrame)
   GPData data = build_gpencil_data(layers_num, frames_num, strokes_num, points_num);
   data.set_active_layer(7);
 
-  TIMEIT_START(TimeBigGPDataInsertFrame);
-  data.add_frame_on_active_layer(347);
-  TIMEIT_END(TimeBigGPDataInsertFrame);
+  {
+    SCOPED_TIMER("TimeBigGPDataInsertFrame");
+    data.add_frame_on_active_layer(347);
+  }
 
   EXPECT_EQ(data.frames_on_active_layer().size(), 1001);
 
@@ -1034,9 +1044,10 @@ TEST(gpencil_proposal, TimeBigGPDataInsertFrame)
     }
   }
 
-  TIMEIT_START(TimeBigGPDataOldInsertFrame);
-  insert_new_frame_old_gpencil_data(old_data, 347);
-  TIMEIT_END(TimeBigGPDataOldInsertFrame);
+  {
+    SCOPED_TIMER("TimeBigGPDataOldInsertFrame");
+    insert_new_frame_old_gpencil_data(old_data, 347);
+  }
 
   EXPECT_EQ(BLI_listbase_count(&gpl_active->frames), 1000);
 
