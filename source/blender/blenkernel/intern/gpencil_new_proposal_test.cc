@@ -429,6 +429,16 @@ class GPData : public ::GPData {
     return layers_for_write()[index];
   }
 
+  const GPLayer &active_layer()
+  {
+    return this->layers()[this->active_layer_index];
+  }
+
+  GPLayer &active_layer_for_write()
+  {
+    return this->layers_for_write()[this->active_layer_index];
+  }
+
   int add_layer(StringRefNull name)
   {
     /* Ensure that the layer array has enough space. */
@@ -457,21 +467,7 @@ class GPData : public ::GPData {
       return -1;
     }
 
-    GPFrame new_frame(frame_start);
-    new_frame.layer_index = layer_index;
-    this->frames_for_write().last() = std::move(new_frame);
-
-    /* Sort frame array. */
-    update_frames_array();
-
-    /* Find the frame again and return its index (now from the sorted array). */
-    auto it = std::lower_bound(this->frames().begin(),
-                               this->frames().end(),
-                               std::pair<int, int>(layer_index, new_frame.start_time));
-    if (it == this->frames().end() || it->start_time != new_frame.start_time) {
-      return -1;
-    }
-    return std::distance(this->frames().begin(), it);
+    return add_frame_on_layer_initialized(layer_index, frame_start, 1);
   }
 
   int add_frame_on_layer(GPLayer &layer, int frame_start)
@@ -483,10 +479,23 @@ class GPData : public ::GPData {
     return add_frame_on_layer(index, frame_start);
   }
 
+  int add_frame_on_active_layer(int frame_start)
+  {
+    return add_frame_on_layer(active_layer_index, frame_start);
+  }
+
   void add_frames_on_layer(int layer_index, Array<int> start_frames)
   {
+    int new_frames_size = start_frames.size();
+    /* TODO: Check for collisions before resizing the array. */
+    if (!ensure_frames_array_has_size_at_least(this->frames_size + new_frames_size)) {
+      return;
+    }
+
+    int reserved = new_frames_size;
     for (int start_frame : start_frames) {
-      add_frame_on_layer(layer_index, start_frame);
+      add_frame_on_layer_initialized(layer_index, start_frame, reserved);
+      reserved--;
     }
   }
 
@@ -627,6 +636,42 @@ class GPData : public ::GPData {
     return true;
   }
 
+  /**
+   * Creates a new frame and inserts it into the  \a frames_array so that the ordering is kept.
+   * Assumes that \a frames_array is sorted and that the array has been reallocated + expaned by \a
+   * reserved.
+   */
+  int add_frame_on_layer_initialized(int layer_index, int frame_start, int reserved)
+  {
+    /* Create the new frame. */
+    GPFrame new_frame(frame_start);
+    new_frame.layer_index = layer_index;
+
+    int last_index = this->frames_size - reserved - 1;
+
+    /* Check if the frame can be appended at the end. */
+    if (this->frames_size == 0 || this->frames_size == reserved ||
+        this->frames(last_index) < std::pair<int, int>(layer_index, frame_start)) {
+      this->frames_for_write(last_index + 1) = std::move(new_frame);
+      return last_index + 1;
+    }
+
+    /* Look for the first frame that is equal or greater than the new frame. */
+    auto it = std::lower_bound(this->frames().begin(),
+                               this->frames().drop_back(reserved).end(),
+                               std::pair<int, int>(layer_index, frame_start));
+    /* Get the index of the frame. */
+    int index = std::distance(this->frames().begin(), it);
+    /* Move all the frames and make space at index. */
+    initialized_reversed_move_n(reinterpret_cast<GPFrame *>(this->frames_array + index),
+                                this->frames_size - index - 1,
+                                reinterpret_cast<GPFrame *>(this->frames_array + index + 1));
+    /* Move the new frame into the space at index. */
+    this->frames_for_write(index) = std::move(new_frame);
+
+    return index;
+  }
+
   void update_frames_array()
   {
     /* Make sure frames are ordered chronologically and by layer order. */
@@ -643,7 +688,7 @@ namespace blender::bke::gpencil::tests {
 
 static GPData build_gpencil_data(int num_layers,
                                  int frames_per_layer,
-                                 int strokes_per_layer,
+                                 int strokes_per_frame,
                                  int points_per_stroke)
 {
   GPData gpd;
@@ -660,7 +705,7 @@ static GPData build_gpencil_data(int num_layers,
   }
 
   for (const int i : gpd.frames().index_range()) {
-    for (const int j : IndexRange(strokes_per_layer)) {
+    for (const int j : IndexRange(strokes_per_frame)) {
       GPStroke stroke = gpd.frames_for_write(i).add_new_stroke(points_per_stroke);
       for (const int k : stroke.points_positions_for_write().index_range()) {
         stroke.points_positions_for_write()[k] = {
@@ -674,7 +719,7 @@ static GPData build_gpencil_data(int num_layers,
 
 static bGPdata *build_old_gpencil_data(int num_layers,
                                        int frames_per_layer,
-                                       int strokes_per_layer,
+                                       int strokes_per_frame,
                                        int points_per_stroke)
 {
   bGPdata *gpd = reinterpret_cast<bGPdata *>(MEM_mallocN(sizeof(bGPdata), __func__));
@@ -682,6 +727,7 @@ static bGPdata *build_old_gpencil_data(int num_layers,
   for (int i = 0; i < num_layers; i++) {
     bGPDlayer *gpl = reinterpret_cast<bGPDlayer *>(MEM_mallocN(sizeof(bGPDlayer), __func__));
     sprintf(gpl->info, "%s%d", "GPLayer", i);
+    gpl->flag = 0;
 
     BLI_listbase_clear(&gpl->mask_layers);
     BLI_listbase_clear(&gpl->frames);
@@ -690,7 +736,7 @@ static bGPdata *build_old_gpencil_data(int num_layers,
       gpf->framenum = j;
 
       BLI_listbase_clear(&gpf->strokes);
-      for (int k = 0; k < strokes_per_layer; k++) {
+      for (int k = 0; k < strokes_per_frame; k++) {
         bGPDstroke *gps = reinterpret_cast<bGPDstroke *>(
             MEM_mallocN(sizeof(bGPDstroke), __func__));
         gps->totpoints = points_per_stroke;
@@ -726,6 +772,12 @@ static bGPdata *copy_old_gpencil_data(bGPdata *gpd_src)
   }
 
   return gpd_dst;
+}
+
+static void insert_new_frame_old_gpencil_data(bGPdata *gpd, int frame_num)
+{
+  bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(gpd);
+  BKE_gpencil_frame_addnew(gpl_active, frame_num);
 }
 
 static void free_old_gpencil_data(bGPdata *gpd)
@@ -950,6 +1002,45 @@ TEST(gpencil_proposal, TimeBigGPDataCopy)
 
   free_old_gpencil_data(old_data);
   free_old_gpencil_data(old_data_copy);
+}
+
+TEST(gpencil_proposal, TimeBigGPDataInsertFrame)
+{
+  int layers_num = 100, frames_num = 1000, strokes_num = 10, points_num = 10;
+  GPData data = build_gpencil_data(layers_num, frames_num, strokes_num, points_num);
+  data.set_active_layer(7);
+
+  TIMEIT_START(TimeBigGPDataInsertFrame);
+  data.add_frame_on_active_layer(347);
+  TIMEIT_END(TimeBigGPDataInsertFrame);
+
+  EXPECT_EQ(data.frames_on_active_layer().size(), 1001);
+
+  bGPdata *old_data = build_old_gpencil_data(layers_num, frames_num, strokes_num, points_num);
+  int i = 0;
+  bGPDlayer *gpl_active = NULL;
+  LISTBASE_FOREACH_INDEX (bGPDlayer *, gpl, &old_data->layers, i) {
+    if (i == 7) {
+      BKE_gpencil_layer_active_set(old_data, gpl);
+      gpl_active = gpl;
+      break;
+    }
+  }
+  /* Remove the frame so we can insert it again. */
+  LISTBASE_FOREACH (bGPDframe *, gpf, &gpl_active->frames) {
+    if (gpf->framenum == 347) {
+      BKE_gpencil_layer_frame_delete(gpl_active, gpf);
+      break;
+    }
+  }
+
+  TIMEIT_START(TimeBigGPDataOldInsertFrame);
+  insert_new_frame_old_gpencil_data(old_data, 347);
+  TIMEIT_END(TimeBigGPDataOldInsertFrame);
+
+  EXPECT_EQ(BLI_listbase_count(&gpl_active->frames), 1000);
+
+  free_old_gpencil_data(old_data);
 }
 
 }  // namespace blender::bke::gpencil::tests
