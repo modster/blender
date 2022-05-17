@@ -3188,10 +3188,6 @@ def km_clip_editor(params):
         ("clip.frame_jump", {"type": 'RIGHT_ARROW', "value": 'PRESS', "shift": True, "alt": True, "repeat": True},
          {"properties": [("position", 'PATHSTART')]}),
         ("clip.change_frame", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-        ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
-         {"properties": [("deselect_all", not params.legacy)]}),
-        ("clip.select", {"type": params.select_mouse, "value": 'PRESS', "shift": True},
-         {"properties": [("extend", True)]}),
         *_template_items_select_actions(params, "clip.select_all"),
         ("clip.select_box", {"type": 'B', "value": 'PRESS'}, None),
         ("clip.select_circle", {"type": 'C', "value": 'PRESS'}, None),
@@ -6615,14 +6611,22 @@ def km_image_editor_tool_uv_scale(params):
 # ------------------------------------------------------------------------------
 # Tool System (Clip Editor)
 
-def _template_items_clip_tool_tweak_selection(params):
-    items = [
-        ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
+def _template_items_clip_tool_mouse_selection(params, use_release = False):
+    return (
+        ("clip.select", {"type": params.select_mouse, "value": 'RELEASE' if use_release else 'PRESS'},
             {"properties": [
                 ("extend", False),
                 ("deselect_all", True),
                 ("activate_selected", params.select_mouse == 'LEFTMOUSE')]}
          ),
+        ("clip.select", {"type": params.select_mouse, "value": 'PRESS', "shift": True},
+            {"properties": [("extend", True)]}),
+    )
+
+
+def _template_items_clip_tool_tweak_selection(params):
+    items = [
+        *_template_items_clip_tool_mouse_selection(params),
     ]
 
     if params.select_mouse == 'RIGHTMOUSE':
@@ -6659,9 +6663,12 @@ def km_clip_editor_tool_select_box(params):
     return (
         "Clip Editor: Select Box",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select_actions_simple(
-            "clip.select_box", type=params.tool_mouse, value='CLICK_DRAG',
-        )},
+        {"items": (
+            *_template_items_clip_tool_mouse_selection(params, params.select_mouse == 'LEFTMOUSE'),
+            *_template_items_tool_select_actions_simple(
+                "clip.select_box", type=params.tool_mouse, value='CLICK_DRAG'),
+        )
+        },
     )
 
 
@@ -6669,9 +6676,12 @@ def km_clip_editor_tool_select_lasso(params):
     return (
         "Clip Editor: Select Lasso",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select_actions_simple(
-            "clip.select_lasso", type=params.tool_mouse, value='PRESS',
-        )},
+        {"items": (
+            *_template_items_clip_tool_mouse_selection(params, params.select_mouse == 'LEFTMOUSE'),
+            *_template_items_tool_select_actions_simple(
+                "clip.select_lasso", type=params.tool_mouse, value='PRESS'),
+        )
+        },
     )
 
 
@@ -6679,9 +6689,12 @@ def km_clip_editor_tool_select_circle(params):
     return (
         "Clip Editor: Select Circle",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select_actions_simple(
-            "clip.select_circle", type=params.tool_mouse, value='PRESS',
-            properties=[("wait_for_input", False)],
+        {"items": (
+            *_template_items_clip_tool_mouse_selection(params, params.select_mouse == 'LEFTMOUSE'),
+            *_template_items_tool_select_actions_simple(
+                "clip.select_circle", type=params.tool_mouse, value='PRESS',
+                properties=[("wait_for_input", False)],
+            )
         )},
     )
 
@@ -6690,10 +6703,10 @@ def km_clip_editor_tool_add_marker_tweak(params):
     return (
         "Clip Editor: Add Marker and Tweak",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
+        {"items": (
             *_template_items_clip_tool_tweak(params),
             ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-        ]},
+        )},
     )
 
 
