@@ -734,6 +734,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       ${ONEAPI_DPCPP_FLAGS}
       )
 
+
   if (WITH_CYCLES_ONEAPI_SYCL_HOST_ENABLED)
     list(APPEND sycl_compiler_flags -DWITH_ONEAPI_SYCL_HOST_ENABLED)
   endif()
@@ -754,6 +755,10 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     list(APPEND sycl_compiler_flags
       -DWITH_NANOVDB
       -I"${NANOVDB_INCLUDE_DIR}")
+  endif()
+
+  if(WITH_CYCLES_DEBUG)
+    list(APPEND sycl_compiler_flags -DWITH_CYCLES_DEBUG)
   endif()
 
   get_filename_component(sycl_compiler_root ${SYCL_COMPILER} DIRECTORY)
@@ -786,7 +791,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
         COMMAND "${sycl_compiler_root}/../../env/vars.bat"
-        COMMAND ${SYCL_COMPILER} ${sycl_compiler_flags}
+        COMMAND ${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     else()
       # The open source SYCL compiler just goes by clang++ and does not have such a script.
@@ -801,7 +806,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
         COMMAND ${CMAKE_COMMAND} -E env
                 "LIB=${sycl_compiler_root}/../lib"
                 "PATH=${sycl_compiler_root}/../lib/ocloc;${sycl_compiler_root};$ENV{PATH}"
-                ${SYCL_COMPILER} ${sycl_compiler_flags}
+                ${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
   else()
@@ -810,7 +815,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     if(sycl_compiler_compiler_name MATCHES "dpcpp")
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
-        COMMAND bash -c \"source ${sycl_compiler_root}/../../env/vars.sh&&${SYCL_COMPILER} ${sycl_compiler_flags}\"
+        COMMAND bash -c \"source ${sycl_compiler_root}/../../env/vars.sh&&${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}\"
         DEPENDS ${cycles_oneapi_kernel_sources})
     else()
       # The open source SYCL compiler just goes by clang++ and does not have such a script.
@@ -820,7 +825,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
         COMMAND ${CMAKE_COMMAND} -E env
                 "LD_LIBRARY_PATH=${sycl_compiler_root}/../lib:${sycl_compiler_root}/../lib/ocloc/lib64:${sycl_compiler_root}/../lib/ocloc/lib64/intel-opencl:${sycl_compiler_root}/../lib/igc/lib64:$ENV{LD_LIBRARY_PATH}"
                 "PATH=${sycl_compiler_root}/../lib/ocloc/bin:${sycl_compiler_root}:$ENV{PATH}"
-                ${SYCL_COMPILER} ${sycl_compiler_flags}
+                ${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
   endif()
