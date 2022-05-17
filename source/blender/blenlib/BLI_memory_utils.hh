@@ -180,6 +180,27 @@ template<typename T> void initialized_move_n(T *src, int64_t n, T *dst)
 }
 
 /**
+ * Move n values from src to dst starting with the last value.
+ *
+ * Exception Safety: Basic.
+ *
+ * Before:
+ *  src: initialized
+ *  dst: initialized
+ * After:
+ *  src: initialized, moved-from
+ *  dst: initialized
+ */
+template<typename T> void initialized_reversed_move_n(T *src, int64_t n, T *dst)
+{
+  BLI_assert(n >= 0);
+
+  for (int64_t i = n - 1; i >= 0; i--) {
+    dst[i] = std::move(src[i]);
+  }
+}
+
+/**
  * Move n values from src to dst.
  *
  * Exception Safety: Basic.
