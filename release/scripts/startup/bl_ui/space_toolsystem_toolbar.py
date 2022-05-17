@@ -2414,7 +2414,7 @@ class _defs_clip_select:
             from gpu_extras.presets import draw_circle_2d
             props = tool.operator_properties("clip.select_circle")
             radius = props.radius
-            draw_circle_2d(xy, (1.0,) * 4, radius, 32)
+            draw_circle_2d(xy, (1.0,) * 4, radius, segments=32)
 
         return dict(
             idname="builtin.select_circle",
@@ -2425,6 +2425,7 @@ class _defs_clip_select:
             draw_settings=draw_settings,
             draw_cursor=draw_cursor,
         )
+
 
 class _defs_clip_tracking_tools:
 
@@ -2523,7 +2524,7 @@ class _defs_mask_select:
             from gpu_extras.presets import draw_circle_2d
             props = tool.operator_properties("mask.select_circle")
             radius = props.radius
-            draw_circle_2d(xy, (1.0,) * 4, radius, 32)
+            draw_circle_2d(xy, (1.0,) * 4, radius, segments=32)
 
         return dict(
             idname="builtin.select_circle",
@@ -2554,6 +2555,7 @@ class _defs_mask_tools:
             draw_settings=draw_settings,
             keymap="Mask Editing: Add Vertex and Slide"
         )
+
     @ToolDef.from_fn
     def add_feather_vertex_slide():
         def draw_settings(_context, layout, tool):
