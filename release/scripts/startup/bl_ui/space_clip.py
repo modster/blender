@@ -1439,11 +1439,6 @@ class CLIP_MT_clip(Menu):
             layout.operator("clip.reload")
             layout.menu("CLIP_MT_proxy")
 
-            layout.separator()
-
-            layout.operator("clip.set_viewport_background")
-            layout.operator("clip.setup_tracking_scene")
-
 
 class CLIP_MT_proxy(Menu):
     bl_label = "Proxy"
@@ -1562,9 +1557,6 @@ class CLIP_MT_track(Menu):
     def draw(self, context):
         layout = self.layout
 
-        clip = context.space_data.clip
-        tracking_object = clip.tracking.objects.active
-
         layout.menu("CLIP_MT_track_transform")
         layout.menu("CLIP_MT_track_motion")
         layout.menu("CLIP_MT_track_clear")
@@ -1574,17 +1566,9 @@ class CLIP_MT_track(Menu):
 
         layout.operator("clip.add_marker_move", text="Add Marker")
         layout.operator("clip.detect_features")
-        layout.operator("clip.create_plane_track")
 
         layout.separator()
 
-        layout.operator(
-            "clip.solve_camera",
-            text=(
-                "Solve Camera Motion" if tracking_object.is_camera else
-                "Solve Object Motion"
-            ),
-        )
 
         layout.separator()
 
@@ -1619,8 +1603,10 @@ class CLIP_MT_track(Menu):
 class CLIP_MT_reconstruction(Menu):
     bl_label = "Reconstruction"
 
-    def draw(self, _context):
+    def draw(self, context):
         layout = self.layout
+        clip = context.space_data.clip
+        tracking_object = clip.tracking.objects.active
 
         layout.operator("clip.set_origin")
         layout.operator("clip.set_plane", text="Set Floor").plane = 'FLOOR'
@@ -1628,6 +1614,24 @@ class CLIP_MT_reconstruction(Menu):
 
         layout.operator("clip.set_axis", text="Set X Axis").axis = 'X'
         layout.operator("clip.set_axis", text="Set Y Axis").axis = 'Y'
+
+        layout.separator()
+
+        layout.operator(
+            "clip.solve_camera",
+            text=(
+                "Solve Camera Motion" if tracking_object.is_camera else
+                "Solve Object Motion"
+            ),
+        )
+        layout.operator("clip.create_plane_track")
+
+        layout.separator()
+
+        layout.operator("clip.set_viewport_background")
+        layout.operator("clip.setup_tracking_scene")
+
+        layout.separator()
 
         layout.operator("clip.set_scale")
         layout.operator("clip.apply_solution_scale")
@@ -1689,10 +1693,6 @@ class CLIP_MT_tracking_context_menu(Menu):
 
             layout.separator()
 
-            layout.operator("clip.track_copy_color")
-
-            layout.separator()
-
             layout.operator("clip.copy_tracks", icon='COPYDOWN')
             layout.operator("clip.paste_tracks", icon='PASTEDOWN')
 
@@ -1726,6 +1726,14 @@ class CLIP_MT_tracking_context_menu(Menu):
             layout.separator()
 
             layout.operator("clip.delete_track")
+
+            layout.separator()
+
+            layout.operator("clip.track_copy_color")
+
+            layout.separator()
+
+            layout.operator("clip.create_plane_track")
 
         elif mode == 'MASK':
             from .properties_mask_common import draw_mask_context_menu
