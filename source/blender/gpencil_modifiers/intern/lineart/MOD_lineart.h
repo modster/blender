@@ -254,18 +254,7 @@ typedef struct LineartRenderBuffer {
 
   int triangle_size;
 
-  /* Although using ListBase here, LineartEdge is single linked list.
-   * list.last is used to store worker progress along the list.
-   * See lineart_main_occlusion_begin() for more info. */
-  ListBase contour;
-  ListBase intersection;
-  ListBase crease;
-  ListBase material;
-  ListBase edge_mark;
-  ListBase floating;
-  ListBase light_contour;
-
-  /* Note: Data here are allocated with MEM_xxx call instead of in pool. */
+  /* Note: Data inside #pending_edges are allocated with MEM_xxx call instead of in pool. */
   struct LineartPendingEdges pending_edges;
   int scheduled_count;
 
@@ -377,18 +366,8 @@ typedef struct LineartRenderTaskInfo {
 
   int thread_id;
 
-  /* These lists only denote the part of the main edge list that the thread should iterate over.
-   * Be careful to not iterate outside of these bounds as it is not thread safe to do so. */
-  ListBase contour;
-  ListBase intersection;
-  ListBase crease;
-  ListBase material;
-  ListBase edge_mark;
-  ListBase floating;
-  ListBase light_contour;
-
-  /* Here it doesn't really hold memory, it just stores a refernce to a portion in
-   * rb->pending_edges. */
+  /* #pending_edges here only stores a refernce to a portion in LineartRenderbuffer::pending_edges,
+   * assigned by the occlusion scheduler. */
   struct LineartPendingEdges pending_edges;
 
 } LineartRenderTaskInfo;
@@ -407,17 +386,7 @@ typedef struct LineartObjectInfo {
 
   bool free_use_mesh;
 
-  /* Threads will add lines inside here, when all threads are done, we combine those into the
-   * ones in LineartRenderBuffer. */
-  ListBase contour;
-  ListBase intersection;
-  ListBase crease;
-  ListBase material;
-  ListBase edge_mark;
-  ListBase floating;
-  ListBase light_contour;
-
-  /* Note: Data here are allocated with MEM_xxx call instead of in pool. */
+  /* Note: Data inside #pending_edges are allocated with MEM_xxx call instead of in pool. */
   struct LineartPendingEdges pending_edges;
 
 } LineartObjectInfo;

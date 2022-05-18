@@ -798,8 +798,9 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
 
     float new_len = rb->use_geometry_space_chain ? len_v3v3(cre->eci->gpos, eci->gpos) :
                                                    len_v2v2(cre->eci->pos, eci->pos);
-    /* If the vertex is not from the same contour loop, then we tighten up the range, this way we
-     * could chain small loops better and later smooth out. */
+    /* Even if the vertex is not from the same contour loop, we try to chain it still if the
+     * distance is small enough. This way we can better chain smaller loops and smooth them out
+     * later. */
     if (((cre->ec->loop_id == loop_id) && (new_len < dist)) ||
         ((cre->ec->loop_id != loop_id) && (new_len < dist / 10))) {
       closest_cre = cre;
@@ -1033,12 +1034,12 @@ void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance)
           len2 = len_v2(vec2);
           /* Because this smoothing applies on geometries of different scales in the same scene,
            * some small scale features (e.g. the "tails" on the inner ring of a torus geometry)
-           * could be completely erased if the tolerance value is set for accomondating the entire
+           * could be completely erased if the tolerance value is set for accommodating the entire
            * scene. Those situations typically result in (ratio << 0), looks like this:
            *                         1---2
            * 3-------------------------------4
-           * (this sort of long zig zag obviously are "features" that can't be erased)
-           * setting a ratio of -10 turned out to be a reasonabe threshold in tests. */
+           * (this sort of long zigzag obviously are "features" that can't be erased)
+           * setting a ratio of -10 turned out to be a reasonable threshold in tests. */
           if (ratio < len2 && ratio > -len2 * 10) {
             /* We only remove p3 if p4 is on the extension of p1->p2. */
             if ((eci4 = eci3->next) &&

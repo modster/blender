@@ -130,7 +130,7 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *spl,
                                                         double *from,
                                                         double *to);
 
-static void lineart_add_edge_to_list(LineartPendingEdges *pe, LineartEdge *e);
+static void lineart_add_edge_to_array(LineartPendingEdges *pe, LineartEdge *e);
 
 static LineartCache *lineart_init_cache(void);
 
@@ -493,16 +493,6 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
                                            "Task Pool");
   int i;
 
-  /* The "last" entry is used to store worker progress in the whole list.
-   * These list themselves are single-direction linked, with list.first being the head. */
-  rb->contour.last = rb->contour.first;
-  rb->crease.last = rb->crease.first;
-  rb->intersection.last = rb->intersection.first;
-  rb->material.last = rb->material.first;
-  rb->edge_mark.last = rb->edge_mark.first;
-  rb->floating.last = rb->floating.first;
-  rb->light_contour.last = rb->light_contour.first;
-
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
   for (i = 0; i < thread_count; i++) {
@@ -764,7 +754,7 @@ static bool lineart_edge_match(LineartTriangle *tri, LineartEdge *e, int v1, int
           (tri->v[v2] == e->v1 && tri->v[v1] == e->v2));
 }
 
-static void lineart_discard_duplicated_edges(LineartEdge *old_e, int v1id, int v2id)
+static void lineart_discard_duplicated_edges(LineartEdge *old_e)
 {
   LineartEdge *e = old_e;
   while (e->flags & LRT_EDGE_FLAG_NEXT_IS_DUPLICATION) {
@@ -833,7 +823,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
     old_e = ta->e[e_num]; \
     new_flag = old_e->flags; \
     old_e->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
-    lineart_discard_duplicated_edges(old_e, old_e->v1->index, old_e->v2->index); \
+    lineart_discard_duplicated_edges(old_e); \
     INCREASE_EDGE \
     e->v1 = (v1_link); \
     e->v2 = (v2_link); \
@@ -843,7 +833,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
     e->object_ref = ob; \
     e->t1 = ((old_e->t1 == tri) ? (new_tri) : (old_e->t1)); \
     e->t2 = ((old_e->t2 == tri) ? (new_tri) : (old_e->t2)); \
-    lineart_add_edge_to_list(&rb->pending_edges, e); \
+    lineart_add_edge_to_array(&rb->pending_edges, e); \
   }
 
 #define RELINK_EDGE(e_num, new_tri) \
@@ -856,15 +846,15 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
 #define REMOVE_TRIANGLE_EDGE \
   if (ta->e[0]) { \
     ta->e[0]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
-    lineart_discard_duplicated_edges(ta->e[0], ta->e[0]->v1->index, ta->e[0]->v2->index); \
+    lineart_discard_duplicated_edges(ta->e[0]); \
   } \
   if (ta->e[1]) { \
     ta->e[1]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
-    lineart_discard_duplicated_edges(ta->e[1], ta->e[1]->v1->index, ta->e[1]->v2->index); \
+    lineart_discard_duplicated_edges(ta->e[1]); \
   } \
   if (ta->e[2]) { \
     ta->e[2]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
-    lineart_discard_duplicated_edges(ta->e[2], ta->e[2]->v1->index, ta->e[2]->v2->index); \
+    lineart_discard_duplicated_edges(ta->e[2]); \
   }
 
   switch (in0 + in1 + in2) {
@@ -929,7 +919,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges, e);
+          lineart_add_edge_to_array(&rb->pending_edges, e);
         }
         /* NOTE: inverting `e->v1/v2` (left/right point) doesn't matter as long as
          * `tri->edge` and `tri->v` has the same sequence. and the winding direction
@@ -978,7 +968,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges, e);
+          lineart_add_edge_to_array(&rb->pending_edges, e);
         }
         e->v1 = &vt[0];
         e->v2 = &vt[1];
@@ -1019,7 +1009,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges, e);
+          lineart_add_edge_to_array(&rb->pending_edges, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1094,7 +1084,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges, e);
+          lineart_add_edge_to_array(&rb->pending_edges, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1146,7 +1136,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges, e);
+          lineart_add_edge_to_array(&rb->pending_edges, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1195,7 +1185,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_add_edge_to_list(&rb->pending_edges, e);
+          lineart_add_edge_to_array(&rb->pending_edges, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1758,7 +1748,7 @@ static void loose_data_sum_reduce(const void *__restrict UNUSED(userdata),
   lineart_join_loose_edge_arr(final, loose_chunk);
 }
 
-static void lineart_add_edge_to_list(LineartPendingEdges *pe, LineartEdge *e)
+static void lineart_add_edge_to_array(LineartPendingEdges *pe, LineartEdge *e)
 {
   if (pe->next >= pe->max || !pe->max) {
     if (!pe->max) {
@@ -1778,14 +1768,14 @@ static void lineart_add_edge_to_list(LineartPendingEdges *pe, LineartEdge *e)
   pe->next++;
 }
 
-static void lineart_add_edge_to_list_thread(LineartObjectInfo *obi, LineartEdge *e)
+static void lineart_add_edge_to_array_thread(LineartObjectInfo *obi, LineartEdge *e)
 {
-  lineart_add_edge_to_list(&obi->pending_edges, e);
+  lineart_add_edge_to_array(&obi->pending_edges, e);
 }
 
 /* Note: For simplicity, this function doesn't actually do anything if you already have data in
  * #pe.  */
-static void lineart_finalize_object_edge_list_reserve(LineartPendingEdges *pe, int count)
+static void lineart_finalize_object_edge_array_reserve(LineartPendingEdges *pe, int count)
 {
   if (pe->max || pe->array) {
     return;
@@ -1797,11 +1787,8 @@ static void lineart_finalize_object_edge_list_reserve(LineartPendingEdges *pe, i
   pe->array = new_array;
 }
 
-static void lineart_finalize_object_edge_list(LineartPendingEdges *pe, LineartObjectInfo *obi)
+static void lineart_finalize_object_edge_array(LineartPendingEdges *pe, LineartObjectInfo *obi)
 {
-  if (!obi->pending_edges.array) {
-    return;
-  }
   memcpy(&pe->array[pe->next],
          obi->pending_edges.array,
          sizeof(LineartEdge *) * obi->pending_edges.next);
@@ -2059,11 +2046,6 @@ static void lineart_geometry_object_load(LineartObjectInfo *ob_info, LineartRend
 
   BLI_task_parallel_range(
       0, me->totvert, &vert_data, lineart_mvert_transform_task, &vert_settings);
-  /* Register a global index increment. See #lineart_triangle_share_edge() and
-   * #lineart_main_load_geometries() for detailed. It's okay that global_vindex might eventually
-   * overflow, in such large scene it's virtually impossible for two vertex of the same numeric
-   * index to come close together. */
-  ob_info->global_i_offset = me->totvert;
 
   /* Convert all mesh triangles into lineart triangles.
    * Also create an edge map to get connectivity between edges and triangles. */
@@ -2199,7 +2181,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *ob_info, LineartRend
       BLI_addtail(&la_edge->segments, la_seg);
       if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
           usage == OBJECT_LRT_NO_INTERSECTION) {
-        lineart_add_edge_to_list_thread(ob_info, la_edge);
+        lineart_add_edge_to_array_thread(ob_info, la_edge);
       }
 
       if (edge_added) {
@@ -2226,7 +2208,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *ob_info, LineartRend
       BLI_addtail(&la_edge->segments, la_seg);
       if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
           usage == OBJECT_LRT_NO_INTERSECTION) {
-        lineart_add_edge_to_list_thread(ob_info, la_edge);
+        lineart_add_edge_to_array_thread(ob_info, la_edge);
       }
       la_edge++;
       la_seg++;
@@ -2556,7 +2538,7 @@ static void lineart_main_load_geometries(
       edge_count += obi->pending_edges.next;
     }
   }
-  lineart_finalize_object_edge_list_reserve(&rb->pending_edges, edge_count);
+  lineart_finalize_object_edge_array_reserve(&rb->pending_edges, edge_count);
 
   for (int i = 0; i < thread_count; i++) {
     for (LineartObjectInfo *obi = olti[i].pending; obi; obi = obi->next) {
@@ -2574,8 +2556,7 @@ static void lineart_main_load_geometries(
        * same numeric index to come close together. */
       obi->global_i_offset = global_i;
       global_i += v_count;
-
-      lineart_finalize_object_edge_list(&rb->pending_edges, obi);
+      lineart_finalize_object_edge_array(&rb->pending_edges, obi);
     }
   }
 
@@ -3347,14 +3328,6 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   if (rb == NULL) {
     return;
   }
-
-  memset(&rb->contour, 0, sizeof(ListBase));
-  memset(&rb->crease, 0, sizeof(ListBase));
-  memset(&rb->intersection, 0, sizeof(ListBase));
-  memset(&rb->edge_mark, 0, sizeof(ListBase));
-  memset(&rb->material, 0, sizeof(ListBase));
-  memset(&rb->floating, 0, sizeof(ListBase));
-  memset(&rb->light_contour, 0, sizeof(ListBase));
 
   BLI_listbase_clear(&rb->chains);
   BLI_listbase_clear(&rb->wasted_cuts);
