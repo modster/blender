@@ -872,8 +872,9 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
 
     float new_len = rb->use_geometry_space_chain ? len_v3v3(cre->eci->gpos, eci->gpos) :
                                                    len_v2v2(cre->eci->pos, eci->pos);
-    /* If the vertex is not from the same contour loop, then we tighten up the range, this way we
-     * could chain small loops better and later smooth out. */
+    /* Even if the vertex is not from the same contour loop, we try to chain it still if the
+     * distance is small enough. This way we can better chain smaller loops and smooth them out
+     * later. */
     if (((cre->ec->loop_id == loop_id) && (new_len < dist)) ||
         ((cre->ec->loop_id != loop_id) && (new_len < dist / 10))) {
       closest_cre = cre;
@@ -1083,21 +1084,29 @@ void MOD_lineart_chain_clear_picked_flag(LineartCache *lc)
 void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance)
 {
   LISTBASE_FOREACH (LineartEdgeChain *, ec, &rb->chains) {
+    /* Go through the chain two times, once from each direction. */
     for (int times = 0; times < 2; times++) {
       for (LineartEdgeChainItem *eci = ec->chain.first, *next_eci = eci->next; eci;
            eci = next_eci) {
         LineartEdgeChainItem *eci2, *eci3, *eci4;
 
-        /* Not enough point to do simplify. */
         if ((!(eci2 = eci->next)) || (!(eci3 = eci2->next))) {
+          /* Not enough points to simplify. */
           next_eci = eci->next;
           continue;
         }
-
         /* No need to care for different line types/occlusion and so on, because at this stage they
-         * are all the same within a chain. */
+         * are all the same within a chain.
+         *
+         * We need to simplify a chain from this:
+         * 1-----------2
+         *        3-----------4
+         * to this:
+         * 1-----------2--_
+         *                 `--4 */
 
-        /* If p3 is within the p1-p2 segment of a width of "tolerance"  */
+        /* If p3 is within the p1-p2 segment of a width of "tolerance", in other words, p3 is
+         * approximately on the segment of p1-p2. */
         if (dist_to_line_segment_v2(eci3->pos, eci->pos, eci2->pos) < tolerance) {
           float vec2[2], vec3[2], v2n[2], ratio, len2;
           sub_v2_v2v2(vec2, eci2->pos, eci->pos);
@@ -1105,9 +1114,16 @@ void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance)
           normalize_v2_v2(v2n, vec2);
           ratio = dot_v2v2(v2n, vec3);
           len2 = len_v2(vec2);
-          /* Don't remove a feature when the sharp turn stretches far behind. */
+          /* Because this smoothing applies on geometries of different scales in the same scene,
+           * some small scale features (e.g. the "tails" on the inner ring of a torus geometry)
+           * could be completely erased if the tolerance value is set for accommodating the entire
+           * scene. Those situations typically result in (ratio << 0), looks like this:
+           *                         1---2
+           * 3-------------------------------4
+           * (this sort of long zigzag obviously are "features" that can't be erased)
+           * setting a ratio of -10 turned out to be a reasonable threshold in tests. */
           if (ratio < len2 && ratio > -len2 * 10) {
-            /* And if p4 is on the extension of p1-p2 , we remove p3. */
+            /* We only remove p3 if p4 is on the extension of p1->p2. */
             if ((eci4 = eci3->next) &&
                 (dist_to_line_v2(eci4->pos, eci->pos, eci2->pos) < tolerance)) {
               BLI_remlink(&ec->chain, eci3);
@@ -1115,7 +1131,9 @@ void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance)
               continue;
             }
             if (!eci4) {
-              /* See if the last segment's direction is reversed, if so remove that. */
+              /* See if the last segment's direction is reversed, if so remove that.
+               * Basically we don't need to preserve p3 if the entire chain looked like this:
+               * ...----1----3===2 */
               if (len_v2(vec2) > len_v2(vec3)) {
                 BLI_remlink(&ec->chain, eci3);
               }

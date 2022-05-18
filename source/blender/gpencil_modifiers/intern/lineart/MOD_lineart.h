@@ -335,19 +335,7 @@ typedef struct LineartRenderBuffer {
 
   int triangle_size;
 
-  /* Although using ListBase here, LineartEdge is single linked list.
-   * list.last is used to store worker progress along the list.
-   * See lineart_main_occlusion_begin() for more info. */
-  ListBase contour;
-  ListBase intersection;
-  ListBase crease;
-  ListBase material;
-  ListBase edge_mark;
-  ListBase floating;
-  ListBase light_contour;
-  ListBase shadow;
-
-  /* Note: Data here are allocated with MEM_xxx call instead of in pool. */
+  /* Note: Data inside #pending_edges are allocated with MEM_xxx call instead of in pool. */
   struct LineartPendingEdges pending_edges;
   int scheduled_count;
 
@@ -480,19 +468,8 @@ typedef struct LineartRenderTaskInfo {
 
   int thread_id;
 
-  /* These lists only denote the part of the main edge list that the thread should iterate over.
-   * Be careful to not iterate outside of these bounds as it is not thread safe to do so. */
-  ListBase contour;
-  ListBase intersection;
-  ListBase crease;
-  ListBase material;
-  ListBase edge_mark;
-  ListBase floating;
-  ListBase light_contour;
-  ListBase shadow;
-
-  /* Here it doesn't really hold memory, it just stores a refernce to a portion in
-   * rb->pending_edges. */
+  /* #pending_edges here only stores a refernce to a portion in LineartRenderbuffer::pending_edges,
+   * assigned by the occlusion scheduler. */
   struct LineartPendingEdges pending_edges;
 
 } LineartRenderTaskInfo;
@@ -521,18 +498,7 @@ typedef struct LineartObjectInfo {
 
   bool free_use_mesh;
 
-  /* Threads will add lines inside here, when all threads are done, we combine those into the
-   * ones in LineartRenderBuffer. */
-  ListBase contour;
-  ListBase intersection;
-  ListBase crease;
-  ListBase material;
-  ListBase edge_mark;
-  ListBase floating;
-  ListBase light_contour;
-  ListBase shadow;
-
-  /* Note: Data here are allocated with MEM_xxx call instead of in pool. */
+  /* Note: Data inside #pending_edges are allocated with MEM_xxx call instead of in pool. */
   struct LineartPendingEdges pending_edges;
 
 } LineartObjectInfo;
@@ -631,7 +597,7 @@ typedef struct LineartBoundingArea {
  * r_aligned: True when 1) a and b is exactly on the same straight line and 2) a and b share a
  * common end-point.
  *
- * Important: if r_aligned is true, r_ratio will be either 0 or 1 depending on which point from
+ * IMPORTANT: if r_aligned is true, r_ratio will be either 0 or 1 depending on which point from
  * segment a is shared with segment b. If it's a1 then r_ratio is 0, else then r_ratio is 1. This
  * extra information is needed for line art occlusion stage to work correctly in such cases.
  */
