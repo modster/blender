@@ -765,7 +765,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
   get_filename_component(sycl_compiler_compiler_name ${SYCL_COMPILER} NAME_WE)
 
   if(NOT OCLOC_INSTALL_DIR)
-    set(OCLOC_INSTALL_DIR ${sycl_compiler_root}/../lib/ocloc)
+    cmake_path(SET OCLOC_INSTALL_DIR NORMALIZE "${sycl_compiler_root}/../lib/ocloc")
   endif()
   if(WITH_CYCLES_ONEAPI_BINARIES AND NOT EXISTS ${OCLOC_INSTALL_DIR})
     message(FATAL_ERROR "WITH_CYCLES_ONEAPI_BINARIES requires ocloc but ${OCLOC_INSTALL_DIR} directory doesn't exist."
