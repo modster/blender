@@ -730,10 +730,10 @@ static std::vector<sycl::device> oneapi_available_devices()
 
   std::vector<sycl::device> available_devices;
   for (const sycl::platform &platform : oneapi_platforms) {
-    const std::string &platform_name = platform.get_info<sycl::info::platform::name>();
     // ignore OpenCL platforms to avoid using the same devices through both Level-Zero and OpenCL
-    if (platform_name.find("OpenCL") != std::string::npos)
+    if (platform.get_backend() == sycl::backend::opencl) {
       continue;
+    }
 
     const std::vector<sycl::device> &oneapi_devices =
         (allow_all_devices || allow_host) ? platform.get_devices(sycl::info::device_type::all) :
@@ -749,7 +749,7 @@ static std::vector<sycl::device> oneapi_available_devices()
         // For now we support all Intel(R) Arc(TM) devices
         // and any future GPU with more than 128 execution units
         // official support can be broaden to older and smaller GPUs once ready
-        if (device.is_gpu()) {
+        if (device.is_gpu() && platform.get_backend() == sycl::backend::ext_oneapi_level_zero) {
           ze_device_handle_t ze_device = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(
               device);
           ze_device_properties_t props = {ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES};
