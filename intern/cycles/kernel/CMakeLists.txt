@@ -764,6 +764,14 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
   get_filename_component(sycl_compiler_root ${SYCL_COMPILER} DIRECTORY)
   get_filename_component(sycl_compiler_compiler_name ${SYCL_COMPILER} NAME_WE)
 
+  if(NOT OCLOC_INSTALL_DIR)
+    set(OCLOC_INSTALL_DIR ${sycl_compiler_root}/../lib/ocloc)
+  endif()
+  if(WITH_CYCLES_ONEAPI_BINARIES AND NOT EXISTS OCLOC_INSTALL_DIR)
+    message(FATAL_ERROR "WITH_CYCLES_ONEAPI_BINARIES requires ocloc but ${OCLOC_INSTALL_DIR} directory doesn't exist."
+                        " A different ocloc directory can be set using OCLOC_INSTALL_DIR cmake variable.")
+  endif()
+
   if(UNIX AND NOT APPLE)
     if(NOT WITH_CXX11_ABI)
       check_library_exists(sycl
@@ -805,7 +813,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
         OUTPUT ${cycles_kernel_oneapi_lib}
         COMMAND ${CMAKE_COMMAND} -E env
                 "LIB=${sycl_compiler_root}/../lib"
-                "PATH=${sycl_compiler_root}/../lib/ocloc;${sycl_compiler_root};$ENV{PATH}"
+                "PATH=${OCLOC_INSTALL_DIR};${sycl_compiler_root};$ENV{PATH}"
                 ${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
@@ -823,8 +831,8 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
         COMMAND ${CMAKE_COMMAND} -E env
-                "LD_LIBRARY_PATH=${sycl_compiler_root}/../lib:${sycl_compiler_root}/../lib/ocloc/lib64:${sycl_compiler_root}/../lib/ocloc/lib64/intel-opencl:${sycl_compiler_root}/../lib/igc/lib64:$ENV{LD_LIBRARY_PATH}"
-                "PATH=${sycl_compiler_root}/../lib/ocloc/bin:${sycl_compiler_root}:$ENV{PATH}"
+                "LD_LIBRARY_PATH=${sycl_compiler_root}/../lib:${OCLOC_INSTALL_DIR}/lib64:${OCLOC_INSTALL_DIR}/lib64/intel-opencl:${sycl_compiler_root}/../lib/igc/lib64:$ENV{LD_LIBRARY_PATH}"
+                "PATH=${OCLOC_INSTALL_DIR}/bin:${sycl_compiler_root}:$ENV{PATH}"
                 ${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
