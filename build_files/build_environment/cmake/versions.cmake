@@ -502,3 +502,11 @@ set(LEVEL_ZERO_URI https://github.com/oneapi-src/level-zero/archive/refs/tags/${
 set(LEVEL_ZERO_HASH c39bb05a8e5898aa6c444e1704105b93d3f1888b9c333f8e7e73825ffbfb2617)
 set(LEVEL_ZERO_HASH_TYPE SHA256)
 set(LEVEL_ZERO_FILE level-zero-${LEVEL_ZERO_VERSION}.tar.gz)
+
+set(DPCPP_VERSION 20220501)
+set(DPCPP_URI https://github.com/intel/llvm/archive/refs/tags/sycl-nightly/${DPCPP_VERSION}.tar.gz)
+set(DPCPP_HASH b1a0f28cdebc37099dad8794f55c0e0ee634431c1b7cdc1b2e96c50b9a8b049d)
+set(DPCPP_HASH_TYPE SHA256)
+set(DPCPP_FILE DPCPP-${DPCPP_VERSION}.tar.gz)
+
+
