@@ -310,31 +310,42 @@ void GHOST_Wintab::getInput(std::vector<GHOST_WintabInfoWin32> &outWintabInfo)
   outWintabInfo.reserve(numPackets);
 
   for (int i = 0; i < numPackets; i++) {
+    static GHOST_WintabInfoWin32 lastPacket;
+    static bool first = true;
     const PACKET pkt = m_pkts[i];
     GHOST_WintabInfoWin32 out;
-
-    /* % 3 for multiple devices ("DualTrack"). */
-    switch (pkt.pkCursor % 3) {
-      case 0:
-        /* Puck - processed as mouse. */
-        out.tabletData.Active = GHOST_kTabletModeNone;
-        break;
-      case 1:
-        out.tabletData.Active = GHOST_kTabletModeStylus;
-        break;
-      case 2:
-        out.tabletData.Active = GHOST_kTabletModeEraser;
-        break;
+    if (!first) {
+      out = lastPacket;
     }
 
-    out.x = pkt.pkX;
-    out.y = pkt.pkY;
+    /* % 3 for multiple devices ("DualTrack"). */
+    if (pkt.pkChanged | PK_CURSOR) {
+      switch (pkt.pkCursor % 3) {
+        case 0:
+          /* Puck - processed as mouse. */
+          out.tabletData.Active = GHOST_kTabletModeNone;
+          break;
+        case 1:
+          out.tabletData.Active = GHOST_kTabletModeStylus;
+          break;
+        case 2:
+          out.tabletData.Active = GHOST_kTabletModeEraser;
+          break;
+      }
+    }
 
-    if (m_maxPressure > 0) {
+    if (pkt.pkChanged | PK_X) {
+      out.x = pkt.pkX;
+    }
+    if (pkt.pkChanged | PK_Y) {
+      out.y = pkt.pkY;
+    }
+
+    if (pkt.pkChanged | PK_NORMAL_PRESSURE && m_maxPressure > 0) {
       out.tabletData.Pressure = (float)pkt.pkNormalPressure / (float)m_maxPressure;
     }
 
-    if ((m_maxAzimuth > 0) && (m_maxAltitude > 0)) {
+    if (pkt.pkChanged | PK_ORIENTATION && (m_maxAzimuth > 0) && (m_maxAltitude > 0)) {
       /* From the wintab spec:
        * orAzimuth: Specifies the clockwise rotation of the cursor about the z axis through a
        * full circular range.
@@ -362,34 +373,44 @@ void GHOST_Wintab::getInput(std::vector<GHOST_WintabInfoWin32> &outWintabInfo)
       out.tabletData.Ytilt = (float)(sin(M_PI_2 - azmRad) * vecLen);
     }
 
-    out.time = pkt.pkTime;
+    if (pkt.pkChanged | PK_TIME) {
+      out.time = pkt.pkTime;
+    }
 
-    /* Some Wintab libraries don't handle relative button input, so we track button presses
-     * manually. */
-    DWORD buttonsChanged = m_buttons ^ pkt.pkButtons;
-    /* We only needed the prior button state to compare to current, so we can overwrite it now. */
-    m_buttons = pkt.pkButtons;
+    if (pkt.pkChanged | PK_BUTTONS) {
+      /* Some Wintab libraries don't handle relative button input, so we track button presses
+       * manually. */
+      DWORD buttonsChanged = m_buttons ^ pkt.pkButtons;
+      /* We only needed the prior button state to compare to current, so we can overwrite it now.
+       */
+      m_buttons = pkt.pkButtons;
 
-    /* Iterate over button flag indices until all flags are clear. */
-    for (WORD buttonIndex = 0; buttonsChanged; buttonIndex++, buttonsChanged >>= 1) {
-      if (buttonsChanged & 1) {
-        GHOST_TButtonMask button = mapWintabToGhostButton(pkt.pkCursor, buttonIndex);
+      /* Iterate over button flag indices until all flags are clear. */
+      for (WORD buttonIndex = 0; buttonsChanged; buttonIndex++, buttonsChanged >>= 1) {
+        if (buttonsChanged & 1) {
+          GHOST_TButtonMask button = mapWintabToGhostButton(pkt.pkCursor, buttonIndex);
 
-        if (button != GHOST_kButtonMaskNone) {
-          /* If this is not the first button found, push info for the prior Wintab button. */
-          if (out.button != GHOST_kButtonMaskNone) {
-            outWintabInfo.push_back(out);
+          if (button != GHOST_kButtonMaskNone) {
+            /* If this is not the first button found, push info for the prior Wintab button. */
+            if (out.button != GHOST_kButtonMaskNone) {
+              outWintabInfo.push_back(out);
+            }
+
+            out.button = button;
+
+            DWORD buttonFlag = 1 << buttonIndex;
+            out.type = pkt.pkButtons & buttonFlag ? GHOST_kEventButtonDown : GHOST_kEventButtonUp;
           }
-
-          out.button = button;
-
-          DWORD buttonFlag = 1 << buttonIndex;
-          out.type = pkt.pkButtons & buttonFlag ? GHOST_kEventButtonDown : GHOST_kEventButtonUp;
         }
       }
     }
 
     outWintabInfo.push_back(out);
+    lastPacket = out;
+    // Reset button data since they represent changed values.
+    lastPacket.button = GHOST_kButtonMaskNone;
+    lastPacket.type = GHOST_kEventCursorMove;
+    first = false;
   }
 
   if (!outWintabInfo.empty()) {
