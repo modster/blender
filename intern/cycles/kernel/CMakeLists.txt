@@ -717,6 +717,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     ${SRC_UTIL_HEADERS}
   )
 
+  # SYCL_CPP_FLAGS is a variable that the user can set to pass extra compiler options
   set(sycl_compiler_flags
       ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_KERNEL_DEVICE_ONEAPI}
       -fsycl
@@ -727,11 +728,12 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       -ffast-math
       -DNDEBUG
       -O2
+      -mllvm -inlinedefault-threshold=400
       -o ${cycles_kernel_oneapi_lib}
       -I${CMAKE_CURRENT_SOURCE_DIR}/..
       -I${LEVEL_ZERO_INCLUDE_DIR}
       ${LEVEL_ZERO_LIBRARY}
-      ${ONEAPI_DPCPP_FLAGS}
+      ${SYCL_CPP_FLAGS}
       )
 
 
@@ -739,13 +741,26 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     list(APPEND sycl_compiler_flags -DWITH_ONEAPI_SYCL_HOST_ENABLED)
   endif()
 
-  set (CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS "-internal_options '-ze-opt-large-register-file -ze-opt-regular-grf-kernel integrator_intersect'")
+  # Set defaults for spir64 and spir64_gen options
+  if (NOT DEFINED CYCLES_ONEAPI_SYCL_OPTIONS_spir64)
+    set(CYCLES_ONEAPI_SYCL_OPTIONS_spir64 "-internal_options '-ze-opt-large-register-file -ze-opt-regular-grf-kernel integrator_intersect'")
+  endif()
+  if (NOT DEFINED CYCLES_ONEAPI_SYCL_OPTIONS_spir64_gen)
+    SET (CYCLES_ONEAPI_SYCL_OPTIONS_spir64_gen "-device ${CYCLES_ONEAPI_SPIR64_GEN_DEVICES} ${CYCLES_ONEAPI_SYCL_OPTIONS_spir64}" CACHE STRING "Extra build options for spir64_gen target")
+  endif()
+
   if (WITH_CYCLES_ONEAPI_BINARIES)
-    list(APPEND sycl_compiler_flags
-      -fsycl-targets=spir64,spir64_gen
-      -Xsycl-target-backend=spir64 "${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}"
-      -Xsycl-target-backend=spir64_gen "-device ${CYCLES_ONEAPI_AOT_TARGETS} --format zebin ${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}")
+    # Iterate over all targest and their options
+    list (JOIN CYCLES_ONEAPI_SYCL_TARGETS "," targets_string)
+    list (APPEND sycl_compiler_flags -fsycl-targets=${targets_string})
+    foreach(target ${CYCLES_ONEAPI_SYCL_TARGETS})
+      if(DEFINED CYCLES_ONEAPI_SYCL_OPTIONS_${target})
+        list (APPEND sycl_compiler_flags -Xsycl-target-backend=${target} "${CYCLES_ONEAPI_SYCL_OPTIONS_${target}}")
+      endif()
+    endforeach()
   else()
+    # If AOT is disabled, build for spir64
+    set (CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS "-internal_options '-ze-opt-large-register-file -ze-opt-regular-grf-kernel integrator_intersect'")
     list(APPEND sycl_compiler_flags
       -fsycl-targets=spir64
       -Xsycl-target-backend=spir64 "${CYCLES_ONEAPI_GPU_COMPILATION_OPTIONS}")
