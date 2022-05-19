@@ -26,6 +26,7 @@ SET(_sycl_search_dirs
 FIND_PROGRAM(SYCL_COMPILER
   NAMES
     dpcpp
+    clang++
   HINTS
     ${_sycl_search_dirs}
   PATH_SUFFIXES
