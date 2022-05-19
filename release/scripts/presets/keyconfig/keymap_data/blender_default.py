@@ -6611,7 +6611,7 @@ def km_image_editor_tool_uv_scale(params):
 # ------------------------------------------------------------------------------
 # Tool System (Clip Editor)
 
-def _template_items_clip_tool_mouse_selection(params, use_release = False):
+def _template_items_clip_tool_mouse_selection(params, use_release=False):
     return [
         ("clip.select", {"type": params.select_mouse, "value": 'RELEASE' if use_release else 'PRESS'},
             {"properties": [
@@ -6633,11 +6633,11 @@ def _template_items_clip_tool_tweak_selection(params):
         items.append(
             ("clip.select", {"type": 'LEFTMOUSE', "value": 'PRESS'},
                 {"properties": [
-                        ("extend", False),
-                        ("deselect_all", True),
-                        ("activate_selected", True),
-                    ]
-                }
+                    ("extend", False),
+                    ("deselect_all", True),
+                    ("activate_selected", True),
+                ]
+            }
             )
         )
 
@@ -6666,10 +6666,10 @@ def km_clip_editor_tool_select_box(params):
         "Clip Editor: Select Box",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-                *_template_items_clip_tool_mouse_selection(params, params.select_mouse == 'LEFTMOUSE'),
-                *_template_items_tool_select_actions_simple(
-                    "clip.select_box", type=params.tool_mouse, value='CLICK_DRAG'),
-            ]
+            *_template_items_clip_tool_mouse_selection(params, params.select_mouse == 'LEFTMOUSE'),
+            *_template_items_tool_select_actions_simple(
+                "clip.select_box", type=params.tool_mouse, value='CLICK_DRAG'),
+        ]
         },
     )
 
@@ -6679,10 +6679,10 @@ def km_clip_editor_tool_select_lasso(params):
         "Clip Editor: Select Lasso",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-                *_template_items_clip_tool_mouse_selection(params, params.select_mouse == 'LEFTMOUSE'),
-                *_template_items_tool_select_actions_simple(
-                    "clip.select_lasso", type=params.tool_mouse, value='PRESS'),
-            ]
+            *_template_items_clip_tool_mouse_selection(params, params.select_mouse == 'LEFTMOUSE'),
+            *_template_items_tool_select_actions_simple(
+                "clip.select_lasso", type=params.tool_mouse, value='PRESS'),
+        ]
         },
     )
 
@@ -6692,11 +6692,11 @@ def km_clip_editor_tool_select_circle(params):
         "Clip Editor: Select Circle",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-                *_template_items_clip_tool_mouse_selection(params, params.select_mouse == 'LEFTMOUSE'),
-                *_template_items_tool_select_actions_simple(
-                    "clip.select_circle", type=params.tool_mouse, value='PRESS',
-                    properties=[("wait_for_input", False)]),
-            ]
+            *_template_items_clip_tool_mouse_selection(params, params.select_mouse == 'LEFTMOUSE'),
+            *_template_items_tool_select_actions_simple(
+                "clip.select_circle", type=params.tool_mouse, value='PRESS',
+                properties=[("wait_for_input", False)]),
+        ]
         },
     )
 
@@ -6706,9 +6706,9 @@ def km_clip_editor_tool_add_marker_tweak(params):
         "Clip Editor: Add Marker and Tweak",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-                *_template_items_clip_tool_tweak(params),
-                ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ]
+            *_template_items_clip_tool_tweak(params),
+            ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        ]
         },
     )
 
