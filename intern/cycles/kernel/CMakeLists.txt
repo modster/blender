@@ -820,10 +820,17 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       # The open source SYCL compiler just goes by clang++ and does not have such a script.
       # Set the variables manually.
       string(REPLACE /Redist/ /Tools/ MSVC_TOOLS_DIR ${MSVC_REDIST_DIR})
+      if(NOT CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION) # case for Ninja on Windows
+        get_filename_component(cmake_mt_dir ${CMAKE_MT} DIRECTORY)
+        string(REPLACE /bin/ /Lib/ WINDOWS_KIT_DIR ${cmake_mt_dir})
+        cmake_path(SET WINDOWS_KIT_DIR NORMALIZE "${WINDOWS_KIT_DIR}/../")
+      else()
+        set(WINDOWS_KIT_DIR ${WINDOWS_KITS_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION})
+      endif()
       list(APPEND sycl_compiler_flags
-	      -L "${MSVC_TOOLS_DIR}/lib/x64"
-	      -L "${WINDOWS_KITS_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64"
-	      -L "${WINDOWS_KITS_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/ucrt/x64")
+                  -L "${MSVC_TOOLS_DIR}/lib/x64"
+                  -L "${WINDOWS_KIT_DIR}/um/x64"
+                  -L "${WINDOWS_KIT_DIR}/ucrt/x64")
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
         COMMAND ${CMAKE_COMMAND} -E env
