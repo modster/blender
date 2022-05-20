@@ -531,7 +531,7 @@ static uint mesh_cd_calc_gpu_layers_vcol_used(const Mesh *me_query,
                     layer_i;
     }
 
-    /* Note: this is not the same as the layer_i below. */
+    /* NOTE: this is not the same as the layer_i below. */
     if (layer_i != -1) {
       layer = (domain == ATTR_DOMAIN_POINT ? cd_vdata : cd_ldata)->layers + layer_i;
     }
@@ -544,7 +544,7 @@ static uint mesh_cd_calc_gpu_layers_vcol_used(const Mesh *me_query,
     return -1;
   }
 
-  /* Note: this is the logical index into the color attribute list,
+  /* NOTE: this is the logical index into the color attribute list,
    * not the customdata index. */
   int vcol_i = BKE_id_attribute_to_index(
       (ID *)me_query, layer, ATTR_DOMAIN_MASK_COLOR, CD_MASK_COLOR_ALL);
@@ -701,7 +701,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
             break;
           }
 
-          /* Note: attr->type will always be CD_PROP_COLOR even for
+          /* NOTE: attr->type will always be CD_PROP_COLOR even for
            * CD_PROP_BYTE_COLOR layers, see node_shader_gpu_vertex_color in
            * node_shader_vertex_color.cc.
            */
@@ -1822,9 +1822,7 @@ void DRW_mesh_batch_cache_create_requested(struct TaskGraph *task_graph,
     do_uvcage = !editmesh_eval_final->runtime.is_original;
   }
 
-  const int required_mode = BKE_subsurf_modifier_eval_required_mode(DRW_state_is_scene_render(),
-                                                                    is_editmode);
-  const bool do_subdivision = BKE_subsurf_modifier_can_do_gpu_subdiv(scene, ob, me, required_mode);
+  const bool do_subdivision = BKE_subsurf_modifier_has_gpu_subdiv(me);
 
   MeshBufferList *mbuflist = &cache->final.buff;
 
