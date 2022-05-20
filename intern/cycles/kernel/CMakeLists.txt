@@ -743,7 +743,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
 
   # Set defaults for spir64 and spir64_gen options
   if (NOT DEFINED CYCLES_ONEAPI_SYCL_OPTIONS_spir64)
-    set(CYCLES_ONEAPI_SYCL_OPTIONS_spir64 "-internal_options '-ze-opt-large-register-file -ze-opt-regular-grf-kernel integrator_intersect'")
+    set(CYCLES_ONEAPI_SYCL_OPTIONS_spir64 "--format zebin -internal_options '-ze-opt-large-register-file -ze-opt-regular-grf-kernel integrator_intersect'")
   endif()
   if (NOT DEFINED CYCLES_ONEAPI_SYCL_OPTIONS_spir64_gen)
     SET (CYCLES_ONEAPI_SYCL_OPTIONS_spir64_gen "-device ${CYCLES_ONEAPI_SPIR64_GEN_DEVICES} ${CYCLES_ONEAPI_SYCL_OPTIONS_spir64}" CACHE STRING "Extra build options for spir64_gen target")
