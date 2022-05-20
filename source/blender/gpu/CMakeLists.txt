@@ -314,6 +314,7 @@ set(GLSL_SRC
 
   shaders/compositor/compositor_alpha_crop.glsl
   shaders/compositor/compositor_blur.glsl
+  shaders/compositor/compositor_box_mask.glsl
   shaders/compositor/compositor_convert.glsl
   shaders/compositor/compositor_ellipse_mask.glsl
   shaders/compositor/compositor_filter.glsl
@@ -555,6 +556,7 @@ set(SRC_SHADER_CREATE_INFOS
 
   shaders/compositor/infos/compositor_alpha_crop_info.hh
   shaders/compositor/infos/compositor_blur_info.hh
+  shaders/compositor/infos/compositor_box_mask_info.hh
   shaders/compositor/infos/compositor_convert_info.hh
   shaders/compositor/infos/compositor_ellipse_mask_info.hh
   shaders/compositor/infos/compositor_filter_info.hh
