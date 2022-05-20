@@ -834,8 +834,8 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
         COMMAND ${CMAKE_COMMAND} -E env
-                "LIB=${sycl_compiler_root}/../lib"
-                "PATH=${OCLOC_INSTALL_DIR};${sycl_compiler_root};$ENV{PATH}"
+                "LIB=${sycl_compiler_root}/../lib" # for compiler to find sycl.lib
+                "PATH=${OCLOC_INSTALL_DIR};${sycl_compiler_root}"
                 ${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
@@ -850,11 +850,14 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     else()
       # The open source SYCL compiler just goes by clang++ and does not have such a script.
       # Set the variables manually.
+      if(NOT IGC_INSTALL_DIR)
+        cmake_path(SET IGC_INSTALL_DIR NORMALIZE "${sycl_compiler_root}/../lib/igc")
+      endif()
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
         COMMAND ${CMAKE_COMMAND} -E env
-                "LD_LIBRARY_PATH=${sycl_compiler_root}/../lib:${OCLOC_INSTALL_DIR}/lib64:${OCLOC_INSTALL_DIR}/lib64/intel-opencl:${sycl_compiler_root}/../lib/igc/lib64:$ENV{LD_LIBRARY_PATH}"
-                "PATH=${OCLOC_INSTALL_DIR}/bin:${sycl_compiler_root}:$ENV{PATH}"
+                "LD_LIBRARY_PATH=${sycl_compiler_root}/../lib:${OCLOC_INSTALL_DIR}/lib:${IGC_INSTALL_DIR}/lib"
+                "PATH=${OCLOC_INSTALL_DIR}/bin:${sycl_compiler_root}:$ENV{PATH}" # env PATH is for compiler to find ld
                 ${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
