@@ -52,7 +52,7 @@ class FilterOperation : public NodeOperation {
 
     float kernel[3][3];
     get_filter_kernel(kernel);
-    GPU_shader_uniform_mat3(shader, "kernel", kernel);
+    GPU_shader_uniform_mat3_as_mat4(shader, "kernel", kernel);
 
     const Result &input_image = get_input("Image");
     input_image.bind_as_texture(shader, "input_image");

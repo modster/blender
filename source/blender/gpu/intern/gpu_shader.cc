@@ -7,6 +7,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_math_matrix.h"
 #include "BLI_string_utils.h"
 
 #include "GPU_capabilities.h"
@@ -711,16 +712,17 @@ void GPU_shader_uniform_2iv(GPUShader *sh, const char *name, const int data[2])
   GPU_shader_uniform_vector_int(sh, loc, 2, 1, data);
 }
 
-void GPU_shader_uniform_mat3(GPUShader *sh, const char *name, const float data[3][3])
-{
-  const int loc = GPU_shader_get_uniform(sh, name);
-  GPU_shader_uniform_vector(sh, loc, 9, 1, (const float *)data);
-}
-
 void GPU_shader_uniform_mat4(GPUShader *sh, const char *name, const float data[4][4])
 {
   const int loc = GPU_shader_get_uniform(sh, name);
   GPU_shader_uniform_vector(sh, loc, 16, 1, (const float *)data);
+}
+
+void GPU_shader_uniform_mat3_as_mat4(GPUShader *sh, const char *name, const float data[3][3])
+{
+  float matrix[4][4];
+  copy_m4_m3(matrix, data);
+  GPU_shader_uniform_mat4(sh, name, matrix);
 }
 
 void GPU_shader_uniform_2fv_array(GPUShader *sh, const char *name, int len, const float (*val)[2])

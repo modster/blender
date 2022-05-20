@@ -50,7 +50,7 @@ void RealizeOnDomainProcessorOperation::execute()
   const float3x3 inverse_transformation = transformation.inverted();
 
   /* Set the inverse of the transform to the shader. */
-  GPU_shader_uniform_mat3(shader, "inverse_transformation", inverse_transformation.ptr());
+  GPU_shader_uniform_mat3_as_mat4(shader, "inverse_transformation", inverse_transformation.ptr());
 
   /* The texture sampler should use bilinear interpolation for both the bilinear and bicubic
    * cases, as the logic used by the bicubic realization shader expects textures to use bilinear

@@ -5,7 +5,7 @@
 
 GPU_SHADER_CREATE_INFO(compositor_realize_on_domain_shared)
     .local_group_size(16, 16)
-    .push_constant(Type::MAT3, "inverse_transformation")
+    .push_constant(Type::MAT4, "inverse_transformation")
     .sampler(0, ImageType::FLOAT_2D, "input_sampler")
     .compute_source("compositor_realize_on_domain.glsl");
 
