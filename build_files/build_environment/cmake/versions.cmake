@@ -509,4 +509,53 @@ set(DPCPP_HASH b1a0f28cdebc37099dad8794f55c0e0ee634431c1b7cdc1b2e96c50b9a8b049d)
 set(DPCPP_HASH_TYPE SHA256)
 set(DPCPP_FILE DPCPP-${DPCPP_VERSION}.tar.gz)
 
+########################
+### DPCPP DEPS BEGIN ###
+########################
+# The following deps are build time requirements for dpcpp, when possible
+# the source in the dpcpp source tree for the version chosen is documented
+# by each dep, these will only have to be downloaded and unpacked, dpcpp
+# will take care of building them, unpack is being done in dpcpp_deps.cmake
+
+# Source llvm/lib/SYCLLowerIR/CMakeLists.txt
+set(VCINTRINSICS_VERSION 8b6e209fe1269a2c6470b36dfbaa0e051d2a100f)
+set(VCINTRINSICS_URI https://github.com/intel/vc-intrinsics/archive/${VCINTRINSICS_VERSION}.tar.gz)
+set(VCINTRINSICS_HASH 19fb13ac32f7138c6ab9f015ba1025a42a4775ef845ff4af4df6d4ff4f4bbb29)
+set(VCINTRINSICS_HASH_TYPE SHA256)
+set(VCINTRINSICS_FILE vc-intrinsics-${VCINTRINSICS_VERSION}.tar.gz)
+
+# Source opencl/CMakeLists.txt
+set(OPENCLHEADERS_VERSION dcd5bede6859d26833cd85f0d6bbcee7382dc9b3)
+set(OPENCLHEADERS_URI https://github.com/KhronosGroup/OpenCL-Headers/archive/${OPENCLHEADERS_VERSION}.tar.gz)
+set(OPENCLHEADERS_HASH ca8090359654e94f2c41e946b7e9d826253d795ae809ce7c83a7d3c859624693)
+set(OPENCLHEADERS_HASH_TYPE SHA256)
+set(OPENCLHEADERS_FILE opencl_headers-${OPENCLHEADERS_VERSION}.tar.gz)
+
+# Source opencl/CMakeLists.txt
+set(ICDLOADER_VERSION aec3952654832211636fc4af613710f80e203b0a)
+set(ICDLOADER_URI https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/${ICDLOADER_VERSION}.tar.gz)
+set(ICDLOADER_HASH e1880551d67bd8dc31d13de63b94bbfd6b1f315b6145dad1ffcd159b89bda93c)
+set(ICDLOADER_HASH_TYPE SHA256)
+set(ICDLOADER_FILE icdloader-${ICDLOADER_VERSION}.tar.gz)
+
+# Source sycl/cmake/modules/AddBoostMp11Headers.cmake
+# Using external MP11 here, getting AddBoostMp11Headers.cmake to recognize
+# our copy in boost directly was more trouble than it was worth.
+set(MP11_VERSION 7bc4e1ae9b36ec8ee635c3629b59ec525bbe82b9)
+set(MP11_URI https://github.com/boostorg/mp11/archive/${MP11_VERSION}.tar.gz)
+set(MP11_HASH 071ee2bd3952ec89882edb3af25dd1816f6b61723f66e42eea32f4d02ceef426)
+set(MP11_HASH_TYPE SHA256)
+set(MP11_FILE mp11-${MP11_VERSION}.tar.gz)
+
+# Source llvm-spirv/CMakeLists.txt (repo)
+# Source llvm-spirv/spirv-headers-tag.conf (hash)
+set(SPIRV_HEADERS_VERSION 4995a2f2723c401eb0ea3e10c81298906bf1422b)
+set(SPIRV_HEADERS_URI https://github.com/KhronosGroup/SPIRV-Headers/archive/${SPIRV_HEADERS_VERSION}.tar.gz)
+set(SPIRV_HEADERS_HASH 2c9fe1bbd74a74fdabe40a7ffb322527dfc008c79e1d19d3cf41a5f006d9ab60)
+set(SPIRV_HEADERS_HASH_TYPE SHA256)
+set(SPIRV_HEADERS_FILE SPIR-V-Headers-${SPIRV_HEADERS_VERSION}.tar.gz)
+
+######################
+### DPCPP DEPS END ###
+######################
 

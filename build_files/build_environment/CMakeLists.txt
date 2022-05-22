@@ -96,7 +96,10 @@ include(cmake/fmt.cmake)
 include(cmake/robinmap.cmake)
 if(NOT APPLE)
   include(cmake/xr_openxr.cmake)
-  include(cmake/dpcpp.cmake)
+  if(NOT WIN32 OR BUILD_MODE STREQUAL Release)
+    include(cmake/dpcpp.cmake)
+    include(cmake/dpcpp_deps.cmake)
+  endif()
 endif()
 
 # OpenColorIO and dependencies.
