@@ -31,7 +31,7 @@ set(DPCPP_EXTRA_ARGS
   -DOpenCL_HEADERS=file://${PACKAGE_DIR}/${OPENCLHEADERS_FILE}
   -DOpenCL_LIBRARY_SRC=file://${PACKAGE_DIR}/${ICDLOADER_FILE}
   -DBOOST_MP11_SOURCE_DIR=${BUILD_DIR}/mp11/src/external_mp11/
-  -DLEVEL_ZERO_LIBRARY=${LIBDIR}/level-zero/lib/ze_loader${LIBEXT}
+  -DLEVEL_ZERO_LIBRARY=${LIBDIR}/level-zero/lib/${LIBPREFIX}ze_loader${SHAREDLIBEXT}
   -DLEVEL_ZERO_INCLUDE_DIR=${LIBDIR}/level-zero/include
   -DLLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR=${BUILD_DIR}/spirvheaders/src/external_spirvheaders/
   # Below here is copied from an invocation of buildbot/config.py
