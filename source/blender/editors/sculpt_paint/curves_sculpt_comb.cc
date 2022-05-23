@@ -37,6 +37,8 @@
 
 #include "UI_interface.h"
 
+#include "WM_api.h"
+
 /**
  * The code below uses a prefix naming convention to indicate the coordinate space:
  * cu: Local space of the curves object that is being edited.
@@ -67,7 +69,7 @@ class CombOperation : public CurvesSculptStrokeOperation {
   friend struct CombOperationExecutor;
 
  public:
-  void on_stroke_extended(bContext *C, const StrokeExtension &stroke_extension) override;
+  void on_stroke_extended(const bContext &C, const StrokeExtension &stroke_extension) override;
 };
 
 /**
@@ -76,21 +78,21 @@ class CombOperation : public CurvesSculptStrokeOperation {
  */
 struct CombOperationExecutor {
   CombOperation *self_ = nullptr;
-  bContext *C_ = nullptr;
-  Depsgraph *depsgraph_ = nullptr;
-  Scene *scene_ = nullptr;
-  Object *object_ = nullptr;
+  const Depsgraph *depsgraph_ = nullptr;
+  const Scene *scene_ = nullptr;
   ARegion *region_ = nullptr;
-  View3D *v3d_ = nullptr;
-  RegionView3D *rv3d_ = nullptr;
+  const View3D *v3d_ = nullptr;
+  const RegionView3D *rv3d_ = nullptr;
 
-  CurvesSculpt *curves_sculpt_ = nullptr;
-  Brush *brush_ = nullptr;
-  float brush_radius_re_;
+  const CurvesSculpt *curves_sculpt_ = nullptr;
+  const Brush *brush_ = nullptr;
+  float brush_radius_base_re_;
+  float brush_radius_factor_;
   float brush_strength_;
 
   eBrushFalloffShape falloff_shape_;
 
+  Object *object_ = nullptr;
   Curves *curves_id_ = nullptr;
   CurvesGeometry *curves_ = nullptr;
 
@@ -110,24 +112,24 @@ struct CombOperationExecutor {
 
   BVHTreeFromMesh surface_bvh_;
 
-  void execute(CombOperation &self, bContext *C, const StrokeExtension &stroke_extension)
+  void execute(CombOperation &self, const bContext &C, const StrokeExtension &stroke_extension)
   {
     self_ = &self;
 
     BLI_SCOPED_DEFER([&]() { self_->brush_pos_last_re_ = stroke_extension.mouse_position; });
 
-    C_ = C;
-    depsgraph_ = CTX_data_depsgraph_pointer(C);
-    scene_ = CTX_data_scene(C);
-    object_ = CTX_data_active_object(C);
-    region_ = CTX_wm_region(C);
-    v3d_ = CTX_wm_view3d(C);
-    rv3d_ = CTX_wm_region_view3d(C);
+    depsgraph_ = CTX_data_depsgraph_pointer(&C);
+    scene_ = CTX_data_scene(&C);
+    object_ = CTX_data_active_object(&C);
+    region_ = CTX_wm_region(&C);
+    v3d_ = CTX_wm_view3d(&C);
+    rv3d_ = CTX_wm_region_view3d(&C);
 
     curves_sculpt_ = scene_->toolsettings->curves_sculpt;
-    brush_ = BKE_paint_brush(&curves_sculpt_->paint);
-    brush_radius_re_ = BKE_brush_size_get(scene_, brush_);
-    brush_strength_ = BKE_brush_alpha_get(scene_, brush_);
+    brush_ = BKE_paint_brush_for_read(&curves_sculpt_->paint);
+    brush_radius_base_re_ = BKE_brush_size_get(scene_, brush_);
+    brush_radius_factor_ = brush_radius_factor(*brush_, stroke_extension);
+    brush_strength_ = brush_strength_get(*scene_, *brush_, stroke_extension);
 
     curves_to_world_mat_ = object_->obmat;
     world_to_curves_mat_ = curves_to_world_mat_.inverted();
@@ -173,10 +175,10 @@ struct CombOperationExecutor {
     EnumerableThreadSpecific<Vector<int>> changed_curves;
 
     if (falloff_shape_ == PAINT_FALLOFF_SHAPE_TUBE) {
-      this->comb_projected(changed_curves);
+      this->comb_projected_with_symmetry(changed_curves);
     }
     else if (falloff_shape_ == PAINT_FALLOFF_SHAPE_SPHERE) {
-      this->comb_spherical(changed_curves);
+      this->comb_spherical_with_symmetry(changed_curves);
     }
     else {
       BLI_assert_unreachable();
@@ -186,20 +188,34 @@ struct CombOperationExecutor {
 
     curves_->tag_positions_changed();
     DEG_id_tag_update(&curves_id_->id, ID_RECALC_GEOMETRY);
+    WM_main_add_notifier(NC_GEOM | ND_DATA, &curves_id_->id);
     ED_region_tag_redraw(region_);
   }
 
   /**
    * Do combing in screen space.
    */
-  void comb_projected(EnumerableThreadSpecific<Vector<int>> &r_changed_curves)
+  void comb_projected_with_symmetry(EnumerableThreadSpecific<Vector<int>> &r_changed_curves)
   {
+    const Vector<float4x4> symmetry_brush_transforms = get_symmetry_brush_transforms(
+        eCurvesSymmetryType(curves_id_->symmetry));
+    for (const float4x4 &brush_transform : symmetry_brush_transforms) {
+      this->comb_projected(r_changed_curves, brush_transform);
+    }
+  }
+
+  void comb_projected(EnumerableThreadSpecific<Vector<int>> &r_changed_curves,
+                      const float4x4 &brush_transform)
+  {
+    const float4x4 brush_transform_inv = brush_transform.inverted();
+
     MutableSpan<float3> positions_cu = curves_->positions_for_write();
 
     float4x4 projection;
     ED_view3d_ob_project_mat_get(rv3d_, object_, projection.values);
 
-    const float brush_radius_sq_re = pow2f(brush_radius_re_);
+    const float brush_radius_re = brush_radius_base_re_ * brush_radius_factor_;
+    const float brush_radius_sq_re = pow2f(brush_radius_re);
 
     threading::parallel_for(curves_->curves_range(), 256, [&](const IndexRange curves_range) {
       Vector<int> &local_changed_curves = r_changed_curves.local();
@@ -207,7 +223,7 @@ struct CombOperationExecutor {
         bool curve_changed = false;
         const IndexRange points = curves_->points_for_curve(curve_i);
         for (const int point_i : points.drop_front(1)) {
-          const float3 old_pos_cu = positions_cu[point_i];
+          const float3 old_pos_cu = brush_transform_inv * positions_cu[point_i];
 
           /* Find the position of the point in screen space. */
           float2 old_pos_re;
@@ -223,7 +239,7 @@ struct CombOperationExecutor {
           const float distance_to_brush_re = std::sqrt(distance_to_brush_sq_re);
           /* A falloff that is based on how far away the point is from the stroke. */
           const float radius_falloff = BKE_brush_curve_strength(
-              brush_, distance_to_brush_re, brush_radius_re_);
+              brush_, distance_to_brush_re, brush_radius_re);
           /* Combine the falloff and brush strength. */
           const float weight = brush_strength_ * radius_falloff;
 
@@ -232,7 +248,8 @@ struct CombOperationExecutor {
           float3 new_position_wo;
           ED_view3d_win_to_3d(
               v3d_, region_, curves_to_world_mat_ * old_pos_cu, new_position_re, new_position_wo);
-          const float3 new_position_cu = world_to_curves_mat_ * new_position_wo;
+          const float3 new_position_cu = brush_transform *
+                                         (world_to_curves_mat_ * new_position_wo);
           positions_cu[point_i] = new_position_cu;
 
           curve_changed = true;
@@ -247,10 +264,8 @@ struct CombOperationExecutor {
   /**
    * Do combing in 3D space.
    */
-  void comb_spherical(EnumerableThreadSpecific<Vector<int>> &r_changed_curves)
+  void comb_spherical_with_symmetry(EnumerableThreadSpecific<Vector<int>> &r_changed_curves)
   {
-    MutableSpan<float3> positions_cu = curves_->positions_for_write();
-
     float4x4 projection;
     ED_view3d_ob_project_mat_get(rv3d_, object_, projection.values);
 
@@ -268,10 +283,26 @@ struct CombOperationExecutor {
     const float3 brush_start_cu = world_to_curves_mat_ * brush_start_wo;
     const float3 brush_end_cu = world_to_curves_mat_ * brush_end_wo;
 
-    const float3 brush_diff_cu = brush_end_cu - brush_start_cu;
+    const float brush_radius_cu = self_->brush_3d_.radius_cu * brush_radius_factor_;
 
-    const float brush_radius_cu = self_->brush_3d_.radius_cu;
+    const Vector<float4x4> symmetry_brush_transforms = get_symmetry_brush_transforms(
+        eCurvesSymmetryType(curves_id_->symmetry));
+    for (const float4x4 &brush_transform : symmetry_brush_transforms) {
+      this->comb_spherical(r_changed_curves,
+                           brush_transform * brush_start_cu,
+                           brush_transform * brush_end_cu,
+                           brush_radius_cu);
+    }
+  }
+
+  void comb_spherical(EnumerableThreadSpecific<Vector<int>> &r_changed_curves,
+                      const float3 &brush_start_cu,
+                      const float3 &brush_end_cu,
+                      const float brush_radius_cu)
+  {
+    MutableSpan<float3> positions_cu = curves_->positions_for_write();
     const float brush_radius_sq_cu = pow2f(brush_radius_cu);
+    const float3 brush_diff_cu = brush_end_cu - brush_start_cu;
 
     threading::parallel_for(curves_->curves_range(), 256, [&](const IndexRange curves_range) {
       Vector<int> &local_changed_curves = r_changed_curves.local();
@@ -314,7 +345,7 @@ struct CombOperationExecutor {
   void initialize_spherical_brush_reference_point()
   {
     std::optional<CurvesBrush3D> brush_3d = sample_curves_3d_brush(
-        *C_, *object_, brush_pos_re_, brush_radius_re_);
+        *depsgraph_, *region_, *v3d_, *rv3d_, *object_, brush_pos_re_, brush_radius_base_re_);
     if (brush_3d.has_value()) {
       self_->brush_3d_ = *brush_3d;
     }
@@ -353,11 +384,11 @@ struct CombOperationExecutor {
       threading::parallel_for(changed_curves.index_range(), 256, [&](const IndexRange range) {
         for (const int curve_i : changed_curves.as_span().slice(range)) {
           const IndexRange points = curves_->points_for_curve(curve_i);
-          for (const int segment_i : IndexRange(points.size() - 1)) {
-            const float3 &p1_cu = positions_cu[points[segment_i]];
-            float3 &p2_cu = positions_cu[points[segment_i] + 1];
+          for (const int segment_i : points.drop_back(1)) {
+            const float3 &p1_cu = positions_cu[segment_i];
+            float3 &p2_cu = positions_cu[segment_i + 1];
             const float3 direction = math::normalize(p2_cu - p1_cu);
-            const float expected_length_cu = expected_lengths_cu[points[segment_i]];
+            const float expected_length_cu = expected_lengths_cu[segment_i];
             p2_cu = p1_cu + direction * expected_length_cu;
           }
         }
@@ -366,7 +397,7 @@ struct CombOperationExecutor {
   }
 };
 
-void CombOperation::on_stroke_extended(bContext *C, const StrokeExtension &stroke_extension)
+void CombOperation::on_stroke_extended(const bContext &C, const StrokeExtension &stroke_extension)
 {
   CombOperationExecutor executor;
   executor.execute(*this, C, stroke_extension);

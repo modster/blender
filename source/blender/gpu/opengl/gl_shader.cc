@@ -530,6 +530,11 @@ std::string GLShader::vertex_interface_declare(const ShaderCreateInfo &info) con
     }
     ss << "in " << to_string(attr.type) << " " << attr.name << ";\n";
   }
+  /* NOTE(D4490): Fix a bug where shader without any vertex attributes do not behave correctly. */
+  if (GPU_type_matches_ex(GPU_DEVICE_APPLE, GPU_OS_MAC, GPU_DRIVER_ANY, GPU_BACKEND_OPENGL) &&
+      info.vertex_inputs_.is_empty()) {
+    ss << "in float gpu_dummy_workaround;\n";
+  }
   ss << "\n/* Interfaces. */\n";
   for (const StageInterfaceInfo *iface : info.vertex_out_interfaces_) {
     print_interface(ss, "out", *iface);
@@ -871,7 +876,7 @@ static char *glsl_patch_default_get()
 static char *glsl_patch_compute_get()
 {
   /** Used for shader patching. Init once. */
-  static char patch[512] = "\0";
+  static char patch[2048] = "\0";
   if (patch[0] != '\0') {
     return patch;
   }
@@ -883,6 +888,8 @@ static char *glsl_patch_compute_get()
 
   /* Array compat. */
   STR_CONCAT(patch, slen, "#define gpu_Array(_type) _type[]\n");
+
+  STR_CONCAT(patch, slen, datatoc_glsl_shader_defines_glsl);
 
   BLI_assert(slen < sizeof(patch));
   return patch;

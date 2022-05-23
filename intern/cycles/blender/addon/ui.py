@@ -1082,8 +1082,18 @@ class CYCLES_OBJECT_PT_motion_blur(CyclesButtonsPanel, Panel):
 
 
 def has_geometry_visibility(ob):
-    return ob and ((ob.type in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META', 'LIGHT', 'VOLUME', 'POINTCLOUD', 'CURVES'}) or
-                   (ob.instance_type == 'COLLECTION' and ob.instance_collection))
+    return ob and (
+        (ob.type in {
+            'MESH',
+            'CURVE',
+            'SURFACE',
+            'FONT',
+            'META',
+            'LIGHT',
+            'VOLUME',
+            'POINTCLOUD',
+            'CURVES',
+        }) or (ob.instance_type == 'COLLECTION' and ob.instance_collection))
 
 
 class CYCLES_OBJECT_PT_shading(CyclesButtonsPanel, Panel):
@@ -1446,27 +1456,9 @@ class CYCLES_WORLD_PT_surface(CyclesButtonsPanel, Panel):
         layout.use_property_split = True
 
         world = context.world
-        view_layer = context.view_layer
 
         if not panel_node_draw(layout, world, 'OUTPUT_WORLD', 'Surface'):
             layout.prop(world, "color")
-
-        row = layout.row(align=True)
-        row.use_property_decorate = False
-
-        sub = row.column(align=True)
-        sub.prop_search(
-            world,
-            "lightgroup",
-            view_layer,
-            "lightgroups",
-            text="Light Group",
-            results_are_suggestions=True,
-        )
-
-        sub = row.column(align=True)
-        sub.active = bool(world.lightgroup) and not any(lg.name == world.lightgroup for lg in view_layer.lightgroups)
-        sub.operator("scene.view_layer_add_lightgroup", icon='ADD', text="").name = world.lightgroup
 
 
 class CYCLES_WORLD_PT_volume(CyclesButtonsPanel, Panel):
@@ -1614,6 +1606,40 @@ class CYCLES_WORLD_PT_settings_volume(CyclesButtonsPanel, Panel):
         sub = col.column()
         sub.active = not cworld.homogeneous_volume
         sub.prop(cworld, "volume_step_size")
+
+
+class CYCLES_WORLD_PT_settings_light_group(CyclesButtonsPanel, Panel):
+    bl_label = "Light Group"
+    bl_parent_id = "CYCLES_WORLD_PT_settings"
+    bl_context = "world"
+
+    @classmethod
+    def poll(cls, context):
+        return context.world and CyclesButtonsPanel.poll(context)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        world = context.world
+        view_layer = context.view_layer
+
+        row = layout.row(align=True)
+
+        sub = row.column(align=True)
+        sub.prop_search(
+            world,
+            "lightgroup",
+            view_layer,
+            "lightgroups",
+            text="Light Group",
+            results_are_suggestions=True,
+        )
+
+        sub = row.column(align=True)
+        sub.active = bool(world.lightgroup) and not any(lg.name == world.lightgroup for lg in view_layer.lightgroups)
+        sub.operator("scene.view_layer_add_lightgroup", icon='ADD', text="").name = world.lightgroup
 
 
 class CYCLES_MATERIAL_PT_preview(CyclesButtonsPanel, Panel):
@@ -2308,6 +2334,7 @@ classes = (
     CYCLES_WORLD_PT_settings,
     CYCLES_WORLD_PT_settings_surface,
     CYCLES_WORLD_PT_settings_volume,
+    CYCLES_WORLD_PT_settings_light_group,
     CYCLES_MATERIAL_PT_preview,
     CYCLES_MATERIAL_PT_surface,
     CYCLES_MATERIAL_PT_volume,

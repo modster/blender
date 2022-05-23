@@ -896,8 +896,10 @@ static void rna_wmKeyMapItem_map_type_set(PointerRNA *ptr, int value)
   }
 }
 
-/* assumes value to be an enum from rna_enum_event_type_items */
-/* function makes sure keymodifiers are only valid keys, ESC keeps it unaltered */
+/**
+ * Assumes value to be an enum from rna_enum_event_type_items.
+ * Function makes sure keymodifiers are only valid keys, ESC keeps it unaltered.
+ */
 static void rna_wmKeyMapItem_keymodifier_set(PointerRNA *ptr, int value)
 {
   wmKeyMapItem *kmi = ptr->data;
@@ -1155,9 +1157,7 @@ static int rna_wmKeyMapItem_idname_length(PointerRNA *ptr)
 {
   wmKeyMapItem *kmi = ptr->data;
   char pyname[OP_MAX_TYPENAME];
-
-  WM_operator_py_idname(pyname, kmi->idname);
-  return strlen(pyname);
+  return WM_operator_py_idname(pyname, kmi->idname);
 }
 
 static void rna_wmKeyMapItem_idname_set(PointerRNA *ptr, const char *value)

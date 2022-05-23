@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 /** \file
  * \ingroup gpu
  */
@@ -561,7 +563,7 @@ void gpu::MTLTexture::update_sub(
         return;
       }
 
-      /* Check Format writeability. */
+      /* Check Format write-ability. */
       if (mtl_format_get_writeable_view_format(destination_format) == MTLPixelFormatInvalid) {
         MTL_LOG_ERROR(
             "[Error]: Updating texture -- destination MTLPixelFormat '%d' does not support write "
@@ -1161,7 +1163,7 @@ void gpu::MTLTexture::mip_range_set(int min, int max)
 {
   BLI_assert(min <= max && min >= 0 && max <= mipmaps_);
 
-  /* Note:
+  /* NOTE:
    * - mip_min_ and mip_max_ are used to Clamp LODs during sampling.
    * - Given functions like Framebuffer::recursive_downsample modifies the mip range
    *   between each layer, we do not want to be re-baking the texture.
@@ -1767,8 +1769,8 @@ void gpu::MTLTexture::ensure_baked()
       /* CUBE TEXTURES */
       case GPU_TEXTURE_CUBE:
       case GPU_TEXTURE_CUBE_ARRAY: {
-        /* Note: For a cubemap 'Texture::d_' refers to total number of faces, not just array slices
-         */
+        /* NOTE: For a cube-map 'Texture::d_' refers to total number of faces,
+         * not just array slices. */
         BLI_assert(this->w_ > 0 && this->h_ > 0);
         this->texture_descriptor_ = [[MTLTextureDescriptor alloc] init];
         this->texture_descriptor_.pixelFormat = mtl_format;

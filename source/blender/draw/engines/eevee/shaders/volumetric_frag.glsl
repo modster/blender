@@ -8,7 +8,7 @@
 
 flat in int slice;
 
-/* Warning: these are not attributes, these are global vars. */
+/* WARNING: these are not attributes, these are global vars. */
 vec3 worldPosition = vec3(0.0);
 vec3 objectPosition = vec3(0.0);
 vec3 viewPosition = vec3(0.0);
@@ -80,8 +80,8 @@ void main()
   volumeOrco = OrcoTexCoFactors[0].xyz + objectPosition * OrcoTexCoFactors[1].xyz;
 
   if (any(lessThan(volumeOrco, vec3(0.0))) || any(greaterThan(volumeOrco, vec3(1.0)))) {
-    /* Note: Discard is not an explicit return in Metal prior to versions 2.3.
-     * adding return after discard ensures consistent behaviour and avoids GPU
+    /* NOTE: Discard is not an explicit return in Metal prior to versions 2.3.
+     * adding return after discard ensures consistent behavior and avoids GPU
      * side-effects where control flow continues with undefined values. */
     discard;
     return;
@@ -154,15 +154,6 @@ vec2 attr_load_vec2(sampler3D tex)
 float attr_load_float(sampler3D tex)
 {
   return texture(tex, grid_coordinates()).r;
-}
-vec4 attr_load_color(sampler3D tex)
-{
-  return texture(tex, grid_coordinates());
-}
-vec3 attr_load_uv(sampler3D attr)
-{
-  attr_id += 1;
-  return vec3(0);
 }
 
 /* TODO(@fclem): These implementation details should concern the DRWManager and not be a fix on

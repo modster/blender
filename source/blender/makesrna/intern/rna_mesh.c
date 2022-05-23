@@ -560,7 +560,7 @@ static void rna_MeshVertex_undeformed_co_get(PointerRNA *ptr, float values[3])
 {
   Mesh *me = rna_mesh(ptr);
   MVert *mvert = (MVert *)ptr->data;
-  float(*orco)[3] = CustomData_get_layer(&me->vdata, CD_ORCO);
+  const float(*orco)[3] = CustomData_get_layer(&me->vdata, CD_ORCO);
 
   if (orco) {
     /* orco is normalized to 0..1, we do inverse to match mvert->co */
@@ -626,9 +626,10 @@ static void rna_CustomDataLayer_clone_set(PointerRNA *ptr, CustomData *data, int
 
 static bool rna_MEdge_freestyle_edge_mark_get(PointerRNA *ptr)
 {
-  Mesh *me = rna_mesh(ptr);
-  MEdge *medge = (MEdge *)ptr->data;
-  FreestyleEdge *fed = CustomData_get(&me->edata, (int)(medge - me->medge), CD_FREESTYLE_EDGE);
+  const Mesh *me = rna_mesh(ptr);
+  const MEdge *medge = (MEdge *)ptr->data;
+  const FreestyleEdge *fed = CustomData_get(
+      &me->edata, (int)(medge - me->medge), CD_FREESTYLE_EDGE);
 
   return fed && (fed->flag & FREESTYLE_EDGE_MARK) != 0;
 }
@@ -652,9 +653,10 @@ static void rna_MEdge_freestyle_edge_mark_set(PointerRNA *ptr, bool value)
 
 static bool rna_MPoly_freestyle_face_mark_get(PointerRNA *ptr)
 {
-  Mesh *me = rna_mesh(ptr);
-  MPoly *mpoly = (MPoly *)ptr->data;
-  FreestyleFace *ffa = CustomData_get(&me->pdata, (int)(mpoly - me->mpoly), CD_FREESTYLE_FACE);
+  const Mesh *me = rna_mesh(ptr);
+  const MPoly *mpoly = (MPoly *)ptr->data;
+  const FreestyleFace *ffa = CustomData_get(
+      &me->pdata, (int)(mpoly - me->mpoly), CD_FREESTYLE_FACE);
 
   return ffa && (ffa->flag & FREESTYLE_FACE_MARK) != 0;
 }
@@ -1636,7 +1638,7 @@ static PointerRNA rna_Mesh_uv_layers_new(struct Mesh *me,
   PointerRNA ptr;
   CustomData *ldata;
   CustomDataLayer *cdl = NULL;
-  int index = ED_mesh_uv_texture_add(me, name, false, do_init, reports);
+  int index = ED_mesh_uv_add(me, name, false, do_init, reports);
 
   if (index != -1) {
     ldata = rna_mesh_ldata_helper(me);
@@ -1649,7 +1651,7 @@ static PointerRNA rna_Mesh_uv_layers_new(struct Mesh *me,
 
 static void rna_Mesh_uv_layers_remove(struct Mesh *me, ReportList *reports, CustomDataLayer *layer)
 {
-  if (ED_mesh_uv_texture_remove_named(me, layer->name) == false) {
+  if (ED_mesh_uv_remove_named(me, layer->name) == false) {
     BKE_reportf(reports, RPT_ERROR, "Texture layer '%s' not found", layer->name);
   }
 }

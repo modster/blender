@@ -895,12 +895,14 @@ char *WM_prop_pystring_assign(struct bContext *C,
                               int index);
 /**
  * Convert: `some.op` -> `SOME_OT_op` or leave as-is.
+ * \return the length of `dst`.
  */
-void WM_operator_bl_idname(char *to, const char *from);
+size_t WM_operator_bl_idname(char *dst, const char *src) ATTR_NONNULL(1, 2);
 /**
  * Convert: `SOME_OT_op` -> `some.op` or leave as-is.
+ * \return the length of `dst`.
  */
-void WM_operator_py_idname(char *to, const char *from);
+size_t WM_operator_py_idname(char *dst, const char *src) ATTR_NONNULL(1, 2);
 /**
  * Sanity check to ensure #WM_operator_bl_idname won't fail.
  * \returns true when there are no problems with \a idname, otherwise report an error.
@@ -1196,7 +1198,7 @@ struct ID *WM_drag_get_local_ID_from_event(const struct wmEvent *event, short id
 bool WM_drag_is_ID_type(const struct wmDrag *drag, int idcode);
 
 /**
- * \note: Does not store \a asset in any way, so it's fine to pass a temporary.
+ * \note Does not store \a asset in any way, so it's fine to pass a temporary.
  */
 wmDragAsset *WM_drag_create_asset_data(const struct AssetHandle *asset,
                                        struct AssetMetaData *metadata,
@@ -1228,7 +1230,7 @@ void WM_drag_free_imported_drag_ID(struct Main *bmain,
 struct wmDragAssetCatalog *WM_drag_get_asset_catalog_data(const struct wmDrag *drag);
 
 /**
- * \note: Does not store \a asset in any way, so it's fine to pass a temporary.
+ * \note Does not store \a asset in any way, so it's fine to pass a temporary.
  */
 void WM_drag_add_asset_list_item(wmDrag *drag,
                                  const struct bContext *C,
@@ -1322,8 +1324,7 @@ const char *WM_jobs_name(const struct wmWindowManager *wm, const void *owner);
  * Time that job started.
  */
 double WM_jobs_starttime(const struct wmWindowManager *wm, const void *owner);
-void *WM_jobs_customdata(struct wmWindowManager *wm, const void *owner);
-void *WM_jobs_customdata_from_type(struct wmWindowManager *wm, int job_type);
+void *WM_jobs_customdata_from_type(struct wmWindowManager *wm, const void *owner, int job_type);
 
 bool WM_jobs_is_running(const struct wmJob *wm_job);
 bool WM_jobs_is_stopped(const wmWindowManager *wm, const void *owner);

@@ -85,6 +85,7 @@ set(SRC
   GPU_buffers.h
   GPU_capabilities.h
   GPU_common.h
+  GPU_common_types.h
   GPU_compute.h
   GPU_context.h
   GPU_debug.h
@@ -189,6 +190,7 @@ set(METAL_SRC
   metal/mtl_backend.mm
   metal/mtl_context.mm
   metal/mtl_debug.mm
+  metal/mtl_state.mm
   metal/mtl_texture.mm
   metal/mtl_texture_util.mm
 
@@ -197,6 +199,7 @@ set(METAL_SRC
   metal/mtl_common.hh
   metal/mtl_context.hh
   metal/mtl_debug.hh
+  metal/mtl_state.hh
   metal/mtl_texture.hh
 )
 
@@ -301,7 +304,13 @@ set(GLSL_SRC
 
   shaders/gpu_shader_codegen_lib.glsl
 
-  shaders/gpu_shader_geometry.glsl
+  shaders/common/gpu_shader_common_color_ramp.glsl
+  shaders/common/gpu_shader_common_color_utils.glsl
+  shaders/common/gpu_shader_common_curves.glsl
+  shaders/common/gpu_shader_common_hash.glsl
+  shaders/common/gpu_shader_common_math.glsl
+  shaders/common/gpu_shader_common_math_utils.glsl
+  shaders/common/gpu_shader_common_mix_rgb.glsl
 
   shaders/material/gpu_shader_material_add_shader.glsl
   shaders/material/gpu_shader_material_ambient_occlusion.glsl
@@ -315,8 +324,7 @@ set(GLSL_SRC
   shaders/material/gpu_shader_material_bump.glsl
   shaders/material/gpu_shader_material_camera.glsl
   shaders/material/gpu_shader_material_clamp.glsl
-  shaders/material/gpu_shader_material_color_ramp.glsl
-  shaders/material/gpu_shader_material_color_util.glsl
+  shaders/material/gpu_shader_material_combine_color.glsl
   shaders/material/gpu_shader_material_combine_hsv.glsl
   shaders/material/gpu_shader_material_combine_rgb.glsl
   shaders/material/gpu_shader_material_combine_xyz.glsl
@@ -324,7 +332,6 @@ set(GLSL_SRC
   shaders/material/gpu_shader_material_displacement.glsl
   shaders/material/gpu_shader_material_eevee_specular.glsl
   shaders/material/gpu_shader_material_emission.glsl
-  shaders/material/gpu_shader_material_float_curve.glsl
   shaders/material/gpu_shader_material_fractal_noise.glsl
   shaders/material/gpu_shader_material_fresnel.glsl
   shaders/material/gpu_shader_material_gamma.glsl
@@ -333,7 +340,6 @@ set(GLSL_SRC
   shaders/material/gpu_shader_material_glossy.glsl
   shaders/material/gpu_shader_material_hair_info.glsl
   shaders/material/gpu_shader_material_hair.glsl
-  shaders/material/gpu_shader_material_hash.glsl
   shaders/material/gpu_shader_material_holdout.glsl
   shaders/material/gpu_shader_material_hue_sat_val.glsl
   shaders/material/gpu_shader_material_invert.glsl
@@ -342,9 +348,6 @@ set(GLSL_SRC
   shaders/material/gpu_shader_material_light_path.glsl
   shaders/material/gpu_shader_material_mapping.glsl
   shaders/material/gpu_shader_material_map_range.glsl
-  shaders/material/gpu_shader_material_math.glsl
-  shaders/material/gpu_shader_material_math_util.glsl
-  shaders/material/gpu_shader_material_mix_rgb.glsl
   shaders/material/gpu_shader_material_mix_shader.glsl
   shaders/material/gpu_shader_material_noise.glsl
   shaders/material/gpu_shader_material_normal.glsl
@@ -357,8 +360,8 @@ set(GLSL_SRC
   shaders/material/gpu_shader_material_point_info.glsl
   shaders/material/gpu_shader_material_principled.glsl
   shaders/material/gpu_shader_material_refraction.glsl
-  shaders/material/gpu_shader_material_rgb_curves.glsl
   shaders/material/gpu_shader_material_rgb_to_bw.glsl
+  shaders/material/gpu_shader_material_separate_color.glsl
   shaders/material/gpu_shader_material_separate_hsv.glsl
   shaders/material/gpu_shader_material_separate_rgb.glsl
   shaders/material/gpu_shader_material_separate_xyz.glsl
@@ -381,10 +384,10 @@ set(GLSL_SRC
   shaders/material/gpu_shader_material_tex_wave.glsl
   shaders/material/gpu_shader_material_tex_white_noise.glsl
   shaders/material/gpu_shader_material_toon.glsl
+  shaders/material/gpu_shader_material_transform_utils.glsl
   shaders/material/gpu_shader_material_translucent.glsl
   shaders/material/gpu_shader_material_transparent.glsl
   shaders/material/gpu_shader_material_uv_map.glsl
-  shaders/material/gpu_shader_material_vector_curves.glsl
   shaders/material/gpu_shader_material_vector_displacement.glsl
   shaders/material/gpu_shader_material_vector_math.glsl
   shaders/material/gpu_shader_material_vector_rotate.glsl
@@ -441,11 +444,23 @@ list(APPEND SRC ${glsl_source_list_file})
 list(APPEND INC ${CMAKE_CURRENT_BINARY_DIR})
 
 set(SRC_SHADER_CREATE_INFOS
+  ../draw/engines/basic/shaders/infos/basic_depth_info.hh
+  ../draw/engines/eevee_next/shaders/infos/eevee_material_info.hh
+  ../draw/engines/eevee_next/shaders/infos/eevee_velocity_info.hh
   ../draw/engines/gpencil/shaders/infos/gpencil_info.hh
   ../draw/engines/gpencil/shaders/infos/gpencil_vfx_info.hh
+  ../draw/engines/overlay/shaders/infos/antialiasing_info.hh
   ../draw/engines/overlay/shaders/infos/armature_info.hh
-  ../draw/engines/overlay/shaders/infos/grid_info.hh
+  ../draw/engines/overlay/shaders/infos/background_info.hh
   ../draw/engines/overlay/shaders/infos/edit_mode_info.hh
+  ../draw/engines/overlay/shaders/infos/extra_info.hh
+  ../draw/engines/overlay/shaders/infos/facing_info.hh
+  ../draw/engines/overlay/shaders/infos/grid_info.hh
+  ../draw/engines/overlay/shaders/infos/outline_info.hh
+  ../draw/engines/overlay/shaders/infos/paint_info.hh
+  ../draw/engines/overlay/shaders/infos/sculpt_info.hh
+  ../draw/engines/overlay/shaders/infos/volume_info.hh
+  ../draw/engines/overlay/shaders/infos/wireframe_info.hh
   ../draw/engines/select/shaders/infos/select_id_info.hh
   ../draw/engines/workbench/shaders/infos/workbench_composite_info.hh
   ../draw/engines/workbench/shaders/infos/workbench_effect_antialiasing_info.hh
@@ -482,15 +497,19 @@ set(SRC_SHADER_CREATE_INFOS
   shaders/infos/gpu_shader_2D_point_varying_size_varying_color_info.hh
   shaders/infos/gpu_shader_2D_smooth_color_info.hh
   shaders/infos/gpu_shader_2D_uniform_color_info.hh
+  shaders/infos/gpu_shader_2D_widget_info.hh
   shaders/infos/gpu_shader_3D_depth_only_info.hh
   shaders/infos/gpu_shader_3D_flat_color_info.hh
+  shaders/infos/gpu_shader_3D_image_info.hh
   shaders/infos/gpu_shader_3D_image_modulate_alpha_info.hh
   shaders/infos/gpu_shader_3D_point_info.hh
+  shaders/infos/gpu_shader_3D_polyline_info.hh
   shaders/infos/gpu_shader_3D_smooth_color_info.hh
   shaders/infos/gpu_shader_3D_uniform_color_info.hh
   shaders/infos/gpu_shader_gpencil_stroke_info.hh
   shaders/infos/gpu_shader_instance_varying_color_varying_size_info.hh
   shaders/infos/gpu_shader_keyframe_shape_info.hh
+  shaders/infos/gpu_shader_line_dashed_uniform_color_info.hh
   shaders/infos/gpu_shader_simple_lighting_info.hh
   shaders/infos/gpu_shader_text_info.hh
   shaders/infos/gpu_srgb_to_framebuffer_space_info.hh
@@ -553,7 +572,7 @@ if(WITH_GPU_SHADER_BUILDER)
     if(WIN32)
       # We can re-use the manifest from tests.exe here since it's
       # rather generic and just selects the appropriate common
-      # controls version. 
+      # controls version.
       set(MANIFEST "${CMAKE_BINARY_DIR}/tests.exe.manifest")
     endif()
     add_executable(shader_builder

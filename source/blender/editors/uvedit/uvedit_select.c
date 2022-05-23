@@ -653,6 +653,9 @@ void uvedit_uv_select_shared_vert(const Scene *scene,
   e_first = e_iter = l->e;
   do {
     BMLoop *l_radial_iter = e_iter->l;
+    if (!l_radial_iter) {
+      continue; /* Skip wire edges with no loops. */
+    }
     do {
       if (l_radial_iter->v == l->v) {
         if (uvedit_face_visible_test(scene, l_radial_iter->f)) {
@@ -1019,8 +1022,13 @@ bool uv_find_nearest_vert_multi(Scene *scene,
   return found;
 }
 
-bool ED_uvedit_nearest_uv(
-    const Scene *scene, Object *obedit, const float co[2], float *dist_sq, float r_uv[2])
+static bool uvedit_nearest_uv(const Scene *scene,
+                              Object *obedit,
+                              const float co[2],
+                              const float scale[2],
+                              const bool ignore_selected,
+                              float *dist_sq,
+                              float r_uv[2])
 {
   BMEditMesh *em = BKE_editmesh_from_object(obedit);
   BMIter iter;
@@ -1035,8 +1043,14 @@ bool ED_uvedit_nearest_uv(
     BMLoop *l_iter, *l_first;
     l_iter = l_first = BM_FACE_FIRST_LOOP(efa);
     do {
+      if (ignore_selected && uvedit_uv_select_test(scene, l_iter, cd_loop_uv_offset)) {
+        continue;
+      }
+
       const float *uv = ((const MLoopUV *)BM_ELEM_CD_GET_VOID_P(l_iter, cd_loop_uv_offset))->uv;
-      const float dist_test = len_squared_v2v2(co, uv);
+      float co_tmp[2];
+      mul_v2_v2v2(co_tmp, scale, uv);
+      const float dist_test = len_squared_v2v2(co, co_tmp);
       if (dist_best > dist_test) {
         dist_best = dist_test;
         uv_best = uv;
@@ -1052,17 +1066,27 @@ bool ED_uvedit_nearest_uv(
   return false;
 }
 
-bool ED_uvedit_nearest_uv_multi(const Scene *scene,
+bool ED_uvedit_nearest_uv_multi(const View2D *v2d,
+                                const Scene *scene,
                                 Object **objects,
                                 const uint objects_len,
-                                const float co[2],
+                                const int mval[2],
+                                const bool ignore_selected,
                                 float *dist_sq,
                                 float r_uv[2])
 {
   bool found = false;
+
+  float scale[2], offset[2];
+  UI_view2d_scale_get(v2d, &scale[0], &scale[1]);
+  UI_view2d_view_to_region_fl(v2d, 0.0f, 0.0f, &offset[0], &offset[1]);
+
+  float co[2];
+  sub_v2_v2v2(co, (float[2]){UNPACK2(mval)}, offset);
+
   for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
     Object *obedit = objects[ob_index];
-    if (ED_uvedit_nearest_uv(scene, obedit, co, dist_sq, r_uv)) {
+    if (uvedit_nearest_uv(scene, obedit, co, scale, ignore_selected, dist_sq, r_uv)) {
       found = true;
     }
   }
@@ -2624,7 +2648,7 @@ static int uv_select_exec(bContext *C, wmOperator *op)
   RNA_float_get_array(op->ptr, "location", co);
 
   struct SelectPick_Params params = {0};
-  ED_select_pick_params_from_operator(op, &params);
+  ED_select_pick_params_from_operator(op->ptr, &params);
 
   const bool changed = uv_mouse_select(C, co, &params);
 
@@ -2659,6 +2683,7 @@ void UV_OT_select(wmOperatorType *ot)
   ot->exec = uv_select_exec;
   ot->invoke = uv_select_invoke;
   ot->poll = ED_operator_uvedit; /* requires space image */
+  ot->get_name = ED_select_pick_get_name;
 
   /* properties */
   PropertyRNA *prop;
@@ -3828,6 +3853,7 @@ void UV_OT_select_circle(wmOperatorType *ot)
   ot->exec = uv_circle_select_exec;
   ot->poll = ED_operator_uvedit_space_image; /* requires space image */
   ot->cancel = WM_gesture_circle_cancel;
+  ot->get_name = ED_select_circle_get_name;
 
   /* flags */
   ot->flag = OPTYPE_UNDO;

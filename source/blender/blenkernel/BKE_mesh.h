@@ -204,6 +204,7 @@ bool BKE_mesh_material_index_used(struct Mesh *me, short index);
 void BKE_mesh_material_index_clear(struct Mesh *me);
 void BKE_mesh_material_remap(struct Mesh *me, const unsigned int *remap, unsigned int remap_len);
 void BKE_mesh_smooth_flag_set(struct Mesh *me, bool use_smooth);
+void BKE_mesh_auto_smooth_flag_set(struct Mesh *me, bool use_auto_smooth, float auto_smooth_angle);
 
 /**
  * Needed after converting a mesh with subsurf optimal display to mesh.
@@ -893,6 +894,14 @@ struct Mesh *BKE_mesh_merge_verts(struct Mesh *mesh,
                                   int tot_vtargetmap,
                                   int merge_mode);
 
+/**
+ * Account for custom-data such as UV's becoming detached because of of imprecision
+ * in custom-data interpolation.
+ * Without running this operation subdivision surface can cause UV's to be disconnected,
+ * see: T81065.
+ */
+void BKE_mesh_merge_customdata_for_apply_modifier(struct Mesh *me);
+
 /* Flush flags. */
 
 /**
@@ -923,13 +932,6 @@ void BKE_mesh_flush_select_from_polys_ex(struct MVert *mvert,
                                          const struct MPoly *mpoly,
                                          int totpoly);
 void BKE_mesh_flush_select_from_polys(struct Mesh *me);
-void BKE_mesh_flush_select_from_verts_ex(const struct MVert *mvert,
-                                         int totvert,
-                                         const struct MLoop *mloop,
-                                         struct MEdge *medge,
-                                         int totedge,
-                                         struct MPoly *mpoly,
-                                         int totpoly);
 void BKE_mesh_flush_select_from_verts(struct Mesh *me);
 
 /* spatial evaluation */

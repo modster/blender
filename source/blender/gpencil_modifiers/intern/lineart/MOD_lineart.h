@@ -122,17 +122,13 @@ typedef struct LineartEdge {
   /** We only need link node kind of list here. */
   struct LineartEdge *next;
   struct LineartVert *v1, *v2;
-  /**
-   * Local vertex index for two ends, not pouting in #RenderVert because all verts are loaded, so
-   * as long as fewer than half of the mesh edges are becoming a feature line, we save more memory.
-   */
-  int v1_obindex, v2_obindex;
+
   struct LineartTriangle *t1, *t2;
   ListBase segments;
   char min_occ;
 
   /** Also for line type determination on chaining. */
-  unsigned char flags;
+  uint16_t flags;
   unsigned char intersection_mask;
 
   /**
@@ -158,6 +154,8 @@ typedef struct LineartEdgeChain {
 
   /** Chain now only contains one type of segments */
   int type;
+  /** Will only connect chains that has the same loop id. */
+  int loop_id;
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
 
@@ -171,7 +169,7 @@ typedef struct LineartEdgeChainItem {
   /** For restoring position to 3d space. */
   float gpos[3];
   float normal[3];
-  unsigned char line_type;
+  uint16_t line_type;
   char occlusion;
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
@@ -189,6 +187,12 @@ typedef struct LineartChainRegisterEntry {
   char is_left;
 } LineartChainRegisterEntry;
 
+typedef struct LineartAdjacentEdge {
+  unsigned int v1;
+  unsigned int v2;
+  unsigned int e;
+} LineartAdjacentEdge;
+
 enum eLineArtTileRecursiveLimit {
   /* If tile gets this small, it's already much smaller than a pixel. No need to continue
    * splitting. */
@@ -199,6 +203,12 @@ enum eLineArtTileRecursiveLimit {
 
 #define LRT_TILE_SPLITTING_TRIANGLE_LIMIT 100
 #define LRT_TILE_EDGE_COUNT_INITIAL 32
+
+typedef struct LineartPendingEdges {
+  LineartEdge **array;
+  int max;
+  int next;
+} LineartPendingEdges;
 
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
@@ -244,15 +254,9 @@ typedef struct LineartRenderBuffer {
 
   int triangle_size;
 
-  /* Although using ListBase here, LineartEdge is single linked list.
-   * list.last is used to store worker progress along the list.
-   * See lineart_main_occlusion_begin() for more info. */
-  ListBase contour;
-  ListBase intersection;
-  ListBase crease;
-  ListBase material;
-  ListBase edge_mark;
-  ListBase floating;
+  /* Note: Data inside #pending_edges are allocated with MEM_xxx call instead of in pool. */
+  struct LineartPendingEdges pending_edges;
+  int scheduled_count;
 
   ListBase chains;
 
@@ -358,14 +362,11 @@ typedef struct LineartRenderTaskInfo {
 
   int thread_id;
 
-  /* These lists only denote the part of the main edge list that the thread should iterate over.
-   * Be careful to not iterate outside of these bounds as it is not thread safe to do so. */
-  ListBase contour;
-  ListBase intersection;
-  ListBase crease;
-  ListBase material;
-  ListBase edge_mark;
-  ListBase floating;
+  /**
+   * #pending_edges here only stores a reference to a portion in
+   * LineartRenderbuffer::pending_edges, assigned by the occlusion scheduler.
+   */
+  struct LineartPendingEdges pending_edges;
 
 } LineartRenderTaskInfo;
 
@@ -383,20 +384,14 @@ typedef struct LineartObjectInfo {
 
   bool free_use_mesh;
 
-  /* Threads will add lines inside here, when all threads are done, we combine those into the
-   * ones in LineartRenderBuffer. */
-  ListBase contour;
-  ListBase intersection;
-  ListBase crease;
-  ListBase material;
-  ListBase edge_mark;
-  ListBase floating;
+  /* Note: Data inside #pending_edges are allocated with MEM_xxx call instead of in pool. */
+  struct LineartPendingEdges pending_edges;
 
 } LineartObjectInfo;
 
 typedef struct LineartObjectLoadTaskInfo {
   struct LineartRenderBuffer *rb;
-  struct Depsgraph *dg;
+  int thread_id;
   /* LinkNode styled list */
   LineartObjectInfo *pending;
   /* Used to spread the load across several threads. This can not overflow. */
@@ -481,7 +476,7 @@ typedef struct LineartBoundingArea {
  * r_aligned: True when 1) a and b is exactly on the same straight line and 2) a and b share a
  * common end-point.
  *
- * Important: if r_aligned is true, r_ratio will be either 0 or 1 depending on which point from
+ * IMPORTANT: if r_aligned is true, r_ratio will be either 0 or 1 depending on which point from
  * segment a is shared with segment b. If it's a1 then r_ratio is 0, else then r_ratio is 1. This
  * extra information is needed for line art occlusion stage to work correctly in such cases.
  */

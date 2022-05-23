@@ -75,6 +75,7 @@ static void foreach_libblock_remap_callback_skip(const ID *UNUSED(id_owner),
 {
   ID *id = *id_ptr;
   BLI_assert(id != NULL);
+
   if (is_indirect) {
     id->runtime.remap.skipped_indirect++;
   }
@@ -82,8 +83,9 @@ static void foreach_libblock_remap_callback_skip(const ID *UNUSED(id_owner),
     id->runtime.remap.skipped_direct++;
   }
   else {
-    BLI_assert(0);
+    BLI_assert_unreachable();
   }
+
   if (cb_flag & IDWALK_CB_USER) {
     id->runtime.remap.skipped_refcounted++;
   }
@@ -131,8 +133,8 @@ static void foreach_libblock_remap_callback_apply(ID *id_owner,
       id_us_min(old_id);
     }
     if (new_id != NULL && (force_user_refcount || (new_id->tag & LIB_TAG_NO_MAIN) == 0)) {
-      /* We do not want to handle LIB_TAG_INDIRECT/LIB_TAG_EXTERN here. */
-      new_id->us++;
+      /* Do not handle LIB_TAG_INDIRECT/LIB_TAG_EXTERN here. */
+      id_us_plus_no_lib(new_id);
     }
   }
   else if (cb_flag & IDWALK_CB_USER_ONE) {
@@ -409,7 +411,7 @@ static void libblock_remap_data_update_tags(ID *old_id, ID *new_id, void *user_d
     /* XXX We may not want to always 'transfer' fake-user from old to new id...
      *     Think for now it's desired behavior though,
      *     we can always add an option (flag) to control this later if needed. */
-    if (old_id && (old_id->flag & LIB_FAKEUSER)) {
+    if (old_id != NULL && (old_id->flag & LIB_FAKEUSER) && new_id != NULL) {
       id_fake_user_clear(old_id);
       id_fake_user_set(new_id);
     }
@@ -417,7 +419,7 @@ static void libblock_remap_data_update_tags(ID *old_id, ID *new_id, void *user_d
     id_us_clear_real(old_id);
   }
 
-  if (new_id && (new_id->tag & LIB_TAG_INDIRECT) &&
+  if (new_id != NULL && (new_id->tag & LIB_TAG_INDIRECT) &&
       (new_id->runtime.remap.status & ID_REMAP_IS_LINKED_DIRECT)) {
     new_id->tag &= ~LIB_TAG_INDIRECT;
     new_id->flag &= ~LIB_INDIRECT_WEAK_LINK;
@@ -553,7 +555,6 @@ static void libblock_remap_foreach_idpair_cb(ID *old_id, ID *new_id, void *user_
                new_id ? new_id->name : "<NULL>",
                new_id,
                old_id->us - skipped_refcounted);
-    BLI_assert(0);
   }
 
   const int skipped_direct = old_id->runtime.remap.skipped_direct;

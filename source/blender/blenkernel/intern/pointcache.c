@@ -833,8 +833,8 @@ static void ptcache_rigidbody_interpolate(int index,
         memcpy(orn, data + 3, sizeof(float[4]));
       }
       else {
-        PTCACHE_DATA_TO(data, BPHYS_DATA_LOCATION, index, pos);
-        PTCACHE_DATA_TO(data, BPHYS_DATA_ROTATION, index, orn);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_LOCATION, 0, pos);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_ROTATION, 0, orn);
       }
 
       const float t = (cfra - cfra1) / (cfra2 - cfra1);
@@ -1450,7 +1450,7 @@ static PTCacheFile *ptcache_file_open(PTCacheID *pid, int mode, int cfra)
 {
   PTCacheFile *pf;
   FILE *fp = NULL;
-  char filename[MAX_PTCACHE_FILE];
+  char filepath[MAX_PTCACHE_FILE];
 
 #ifndef DURIAN_POINTCACHE_LIB_OK
   /* don't allow writing for linked objects */
@@ -1465,20 +1465,20 @@ static PTCacheFile *ptcache_file_open(PTCacheID *pid, int mode, int cfra)
     }
   }
 
-  ptcache_filename(pid, filename, cfra, true, true);
+  ptcache_filename(pid, filepath, cfra, true, true);
 
   if (mode == PTCACHE_FILE_READ) {
-    fp = BLI_fopen(filename, "rb");
+    fp = BLI_fopen(filepath, "rb");
   }
   else if (mode == PTCACHE_FILE_WRITE) {
     /* Will create the dir if needs be, same as "//textures" is created. */
-    BLI_make_existing_file(filename);
+    BLI_make_existing_file(filepath);
 
-    fp = BLI_fopen(filename, "wb");
+    fp = BLI_fopen(filepath, "wb");
   }
   else if (mode == PTCACHE_FILE_UPDATE) {
-    BLI_make_existing_file(filename);
-    fp = BLI_fopen(filename, "rb+");
+    BLI_make_existing_file(filepath);
+    fp = BLI_fopen(filepath, "rb+");
   }
 
   if (!fp) {

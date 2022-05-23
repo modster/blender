@@ -583,7 +583,7 @@ static void object_blend_write(BlendWriter *writer, ID *id, const void *id_addre
   }
 
   BKE_particle_system_blend_write(writer, &ob->particlesystem);
-  BKE_modifier_blend_write(writer, &ob->modifiers);
+  BKE_modifier_blend_write(writer, &ob->id, &ob->modifiers);
   BKE_gpencil_modifier_blend_write(writer, &ob->greasepencil_modifiers);
   BKE_shaderfx_blend_write(writer, &ob->shader_fx);
 
@@ -2114,7 +2114,7 @@ static const char *get_obdata_defname(int type)
     case OB_SPEAKER:
       return DATA_("Speaker");
     case OB_CURVES:
-      return DATA_("HairCurves");
+      return DATA_("Curves");
     case OB_POINTCLOUD:
       return DATA_("PointCloud");
     case OB_VOLUME:

@@ -56,17 +56,16 @@ static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
+#ifdef WITH_GMP
   GeometryNodeBooleanOperation operation = (GeometryNodeBooleanOperation)params.node().custom1;
   const bool use_self = params.get_input<bool>("Self Intersection");
   const bool hole_tolerant = params.get_input<bool>("Hole Tolerant");
 
-#ifndef WITH_GMP
-  params.error_message_add(NodeWarningType::Error,
-                           TIP_("Disabled, Blender was compiled without GMP"));
-#endif
-
   Vector<const Mesh *> meshes;
   Vector<const float4x4 *> transforms;
+
+  VectorSet<Material *> materials;
+  Vector<Array<short>> material_remaps;
 
   GeometrySet set_a;
   if (operation == GEO_NODE_BOOLEAN_DIFFERENCE) {
@@ -78,6 +77,10 @@ static void node_geo_exec(GeoNodeExecParams params)
     if (mesh_in_a != nullptr) {
       meshes.append(mesh_in_a);
       transforms.append(nullptr);
+      for (Material *material : Span(mesh_in_a->mat, mesh_in_a->totcol)) {
+        materials.add(material);
+      }
+      material_remaps.append({});
     }
   }
 
@@ -90,6 +93,25 @@ static void node_geo_exec(GeoNodeExecParams params)
   }
 
   for (const bke::GeometryInstanceGroup &set_group : set_groups) {
+    const Mesh *mesh = set_group.geometry_set.get_mesh_for_read();
+    if (mesh != nullptr) {
+      for (Material *material : Span(mesh->mat, mesh->totcol)) {
+        materials.add(material);
+      }
+    }
+  }
+  for (const bke::GeometryInstanceGroup &set_group : set_groups) {
+    const Mesh *mesh = set_group.geometry_set.get_mesh_for_read();
+    if (mesh != nullptr) {
+      Array<short> map(mesh->totcol);
+      for (const int i : IndexRange(mesh->totcol)) {
+        map[i] = materials.index_of(mesh->mat[i]);
+      }
+      material_remaps.append(std::move(map));
+    }
+  }
+
+  for (const bke::GeometryInstanceGroup &set_group : set_groups) {
     const Mesh *mesh_in = set_group.geometry_set.get_mesh_for_read();
     if (mesh_in != nullptr) {
       meshes.append_n_times(mesh_in, set_group.transforms.size());
@@ -99,10 +121,29 @@ static void node_geo_exec(GeoNodeExecParams params)
     }
   }
 
-  Mesh *result = blender::meshintersect::direct_mesh_boolean(
-      meshes, transforms, float4x4::identity(), {}, use_self, hole_tolerant, operation);
+  Mesh *result = blender::meshintersect::direct_mesh_boolean(meshes,
+                                                             transforms,
+                                                             float4x4::identity(),
+                                                             material_remaps,
+                                                             use_self,
+                                                             hole_tolerant,
+                                                             operation);
+  if (!result) {
+    params.set_default_remaining_outputs();
+    return;
+  }
+
+  MEM_SAFE_FREE(result->mat);
+  result->mat = (Material **)MEM_malloc_arrayN(materials.size(), sizeof(Material *), __func__);
+  result->totcol = materials.size();
+  MutableSpan(result->mat, result->totcol).copy_from(materials);
 
   params.set_output("Mesh", GeometrySet::create_with_mesh(result));
+#else
+  params.error_message_add(NodeWarningType::Error,
+                           TIP_("Disabled, Blender was compiled without GMP"));
+  params.set_default_remaining_outputs();
+#endif
 }
 
 }  // namespace blender::nodes::node_geo_boolean_cc

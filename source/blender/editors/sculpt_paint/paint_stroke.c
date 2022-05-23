@@ -172,8 +172,8 @@ static void paint_draw_line_cursor(bContext *C, int x, int y, void *customdata)
 
   immUniform1i("colors_len", 2); /* "advanced" mode */
   const float alpha = (float)paint->paint_cursor_col[3] / 255.0f;
-  immUniformArray4fv(
-      "colors", (float *)(float[][4]){{0.0f, 0.0f, 0.0f, alpha}, {1.0f, 1.0f, 1.0f, alpha}}, 2);
+  immUniform4f("color", 0.0f, 0.0f, 0.0f, alpha);
+  immUniform4f("color2", 1.0f, 1.0f, 1.0f, alpha);
   immUniform1f("dash_width", 6.0f);
   immUniform1f("dash_factor", 0.5f);
 
@@ -922,6 +922,8 @@ PaintStroke *paint_stroke_new(bContext *C,
   }
 
   BKE_paint_set_overlay_override(br->overlay_flags);
+
+  ups->start_pixel_radius = BKE_brush_size_get(CTX_data_scene(C), br);
 
   return stroke;
 }

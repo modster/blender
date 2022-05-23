@@ -1040,6 +1040,24 @@ static void rna_RegionView3D_quadview_clip_update(Main *UNUSED(main),
   }
 }
 
+/**
+ * After the rotation changes, either clear the view axis
+ * or update it not to be aligned to an axis, without this the viewport will show
+ * text that doesn't match the rotation.
+ */
+static void rna_RegionView3D_view_rotation_set_validate_view_axis(RegionView3D *rv3d)
+{
+  /* Never rotate from a "User" view into an axis aligned view,
+   * otherwise rotation could be aligned by accident - giving unexpected behavior. */
+  if (!RV3D_VIEW_IS_AXIS(rv3d->view)) {
+    return;
+  }
+  /* Keep this small as script authors wont expect the assigned value to change. */
+  const float eps_quat = 1e-6f;
+  ED_view3d_quat_to_axis_view_and_reset_quat(
+      rv3d->viewquat, eps_quat, &rv3d->view, &rv3d->view_axis_roll);
+}
+
 static void rna_RegionView3D_view_location_get(PointerRNA *ptr, float *values)
 {
   RegionView3D *rv3d = (RegionView3D *)(ptr->data);
@@ -1062,6 +1080,7 @@ static void rna_RegionView3D_view_rotation_set(PointerRNA *ptr, const float *val
 {
   RegionView3D *rv3d = (RegionView3D *)(ptr->data);
   invert_qt_qt(rv3d->viewquat, values);
+  rna_RegionView3D_view_rotation_set_validate_view_axis(rv3d);
 }
 
 static void rna_RegionView3D_view_matrix_set(PointerRNA *ptr, const float *values)
@@ -1070,12 +1089,39 @@ static void rna_RegionView3D_view_matrix_set(PointerRNA *ptr, const float *value
   float mat[4][4];
   invert_m4_m4(mat, (float(*)[4])values);
   ED_view3d_from_m4(mat, rv3d->ofs, rv3d->viewquat, &rv3d->dist);
+  rna_RegionView3D_view_rotation_set_validate_view_axis(rv3d);
 }
 
 static bool rna_RegionView3D_is_orthographic_side_view_get(PointerRNA *ptr)
 {
+  /* NOTE: only checks axis alignment, not orthographic,
+   * we may deprecate the current name to reflect this. */
   RegionView3D *rv3d = (RegionView3D *)(ptr->data);
   return RV3D_VIEW_IS_AXIS(rv3d->view);
+}
+
+static void rna_RegionView3D_is_orthographic_side_view_set(PointerRNA *ptr, int value)
+{
+  RegionView3D *rv3d = (RegionView3D *)(ptr->data);
+  const bool was_axis_view = RV3D_VIEW_IS_AXIS(rv3d->view);
+  if (value) {
+    /* Already axis aligned, nothing to do. */
+    if (was_axis_view) {
+      return;
+    }
+    /* Use a large value as we always want to set this to the closest axis. */
+    const float eps_quat = FLT_MAX;
+    ED_view3d_quat_to_axis_view_and_reset_quat(
+        rv3d->viewquat, eps_quat, &rv3d->view, &rv3d->view_axis_roll);
+  }
+  else {
+    /* Only allow changing from axis-views to user view as camera view for e.g.
+     * doesn't make sense to update. */
+    if (!was_axis_view) {
+      return;
+    }
+    rv3d->view = RV3D_VIEW_USER;
+  }
 }
 
 static IDProperty **rna_View3DShading_idprops(PointerRNA *ptr)
@@ -1515,12 +1561,8 @@ static void rna_SpaceView3D_mirror_xr_session_update(Main *main,
 static int rna_SpaceView3D_icon_from_show_object_viewport_get(PointerRNA *ptr)
 {
   const View3D *v3d = (View3D *)ptr->data;
-  /* Ignore selection values when view is off,
-   * intent is to show if visible objects aren't selectable. */
-  const int view_value = (v3d->object_type_exclude_viewport != 0);
-  const int select_value = (v3d->object_type_exclude_select &
-                            ~v3d->object_type_exclude_viewport) != 0;
-  return ICON_VIS_SEL_11 + (view_value << 1) + select_value;
+  return rna_object_type_visibility_icon_get_common(v3d->object_type_exclude_viewport,
+                                                    &v3d->object_type_exclude_select);
 }
 
 static char *rna_View3DShading_path(PointerRNA *UNUSED(ptr))
@@ -3296,7 +3338,7 @@ static struct IDFilterEnumPropertyItem rna_enum_space_file_id_filter_categories[
     {FILTER_ID_AR | FILTER_ID_CU_LEGACY | FILTER_ID_LT | FILTER_ID_MB | FILTER_ID_ME |
          FILTER_ID_CV | FILTER_ID_PT | FILTER_ID_VO,
      "category_geometry",
-     ICON_NODETREE,
+     ICON_GEOMETRY_NODES,
      "Geometry",
      "Show meshes, curves, lattice, armatures and metaballs data"},
     {FILTER_ID_LS | FILTER_ID_MA | FILTER_ID_NT | FILTER_ID_TE,
@@ -4997,68 +5039,15 @@ static void rna_def_space_view3d(BlenderRNA *brna)
   RNA_def_property_update(
       prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_mirror_xr_session_update");
 
-  {
-    struct {
-      const char *name;
-      int type_mask;
-      const char *identifier[2];
-    } info[] = {
-        {"Mesh", (1 << OB_MESH), {"show_object_viewport_mesh", "show_object_select_mesh"}},
-        {"Curve",
-         (1 << OB_CURVES_LEGACY),
-         {"show_object_viewport_curve", "show_object_select_curve"}},
-        {"Surface", (1 << OB_SURF), {"show_object_viewport_surf", "show_object_select_surf"}},
-        {"Meta", (1 << OB_MBALL), {"show_object_viewport_meta", "show_object_select_meta"}},
-        {"Font", (1 << OB_FONT), {"show_object_viewport_font", "show_object_select_font"}},
-        {"Hair Curves",
-         (1 << OB_CURVES),
-         {"show_object_viewport_curves", "show_object_select_curves"}},
-        {"Point Cloud",
-         (1 << OB_POINTCLOUD),
-         {"show_object_viewport_pointcloud", "show_object_select_pointcloud"}},
-        {"Volume", (1 << OB_VOLUME), {"show_object_viewport_volume", "show_object_select_volume"}},
-        {"Armature",
-         (1 << OB_ARMATURE),
-         {"show_object_viewport_armature", "show_object_select_armature"}},
-        {"Lattice",
-         (1 << OB_LATTICE),
-         {"show_object_viewport_lattice", "show_object_select_lattice"}},
-        {"Empty", (1 << OB_EMPTY), {"show_object_viewport_empty", "show_object_select_empty"}},
-        {"Grease Pencil",
-         (1 << OB_GPENCIL),
-         {"show_object_viewport_grease_pencil", "show_object_select_grease_pencil"}},
-        {"Camera", (1 << OB_CAMERA), {"show_object_viewport_camera", "show_object_select_camera"}},
-        {"Light", (1 << OB_LAMP), {"show_object_viewport_light", "show_object_select_light"}},
-        {"Speaker",
-         (1 << OB_SPEAKER),
-         {"show_object_viewport_speaker", "show_object_select_speaker"}},
-        {"Light Probe",
-         (1 << OB_LIGHTPROBE),
-         {"show_object_viewport_light_probe", "show_object_select_light_probe"}},
-    };
+  rna_def_object_type_visibility_flags_common(srna,
+                                              NC_SPACE | ND_SPACE_VIEW3D | NS_VIEW3D_SHADING);
 
-    const char *view_mask_member[2] = {
-        "object_type_exclude_viewport",
-        "object_type_exclude_select",
-    };
-    for (int mask_index = 0; mask_index < 2; mask_index++) {
-      for (int type_index = 0; type_index < ARRAY_SIZE(info); type_index++) {
-        prop = RNA_def_property(
-            srna, info[type_index].identifier[mask_index], PROP_BOOLEAN, PROP_NONE);
-        RNA_def_property_boolean_negative_sdna(
-            prop, NULL, view_mask_member[mask_index], info[type_index].type_mask);
-        RNA_def_property_ui_text(prop, info[type_index].name, "");
-        RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D | NS_VIEW3D_SHADING, NULL);
-      }
-    }
-
-    /* Helper for drawing the icon. */
-    prop = RNA_def_property(srna, "icon_from_show_object_viewport", PROP_INT, PROP_NONE);
-    RNA_def_property_int_funcs(
-        prop, "rna_SpaceView3D_icon_from_show_object_viewport_get", NULL, NULL);
-    RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-    RNA_def_property_ui_text(prop, "Visibility Icon", "");
-  }
+  /* Helper for drawing the icon. */
+  prop = RNA_def_property(srna, "icon_from_show_object_viewport", PROP_INT, PROP_NONE);
+  RNA_def_property_int_funcs(
+      prop, "rna_SpaceView3D_icon_from_show_object_viewport_get", NULL, NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Visibility Icon", "");
 
   /* Nested Structs */
   prop = RNA_def_property(srna, "shading", PROP_POINTER, PROP_NONE);
@@ -5134,10 +5123,18 @@ static void rna_def_space_view3d(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Is Perspective", "");
   RNA_def_property_flag(prop, PROP_EDITABLE);
 
+  /* WARNING: Using "orthographic" in this name isn't correct and could be changed. */
   prop = RNA_def_property(srna, "is_orthographic_side_view", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "view", 0);
-  RNA_def_property_boolean_funcs(prop, "rna_RegionView3D_is_orthographic_side_view_get", NULL);
-  RNA_def_property_ui_text(prop, "Is Axis Aligned", "Is current view an orthographic side view");
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_RegionView3D_is_orthographic_side_view_get",
+                                 "rna_RegionView3D_is_orthographic_side_view_set");
+  RNA_def_property_ui_text(
+      prop,
+      "Is Axis Aligned",
+      "Is current view aligned to an axis "
+      "(does not check the view is orthographic use \"is_perspective\" for that). "
+      "Assignment sets the \"view_rotation\" to the closest axis aligned view");
 
   /* This isn't directly accessible from the UI, only an operator. */
   prop = RNA_def_property(srna, "use_clip_planes", PROP_BOOLEAN, PROP_NONE);
@@ -5463,6 +5460,17 @@ static void rna_def_space_image(BlenderRNA *brna)
   RNA_def_property_boolean_funcs(prop, "rna_SpaceImageEditor_show_maskedit_get", NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Show Mask Editor", "Show Mask editing related properties");
+
+  /* Gizmo Toggles. */
+  prop = RNA_def_property(srna, "show_gizmo", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SI_GIZMO_HIDE);
+  RNA_def_property_ui_text(prop, "Show Gizmo", "Show gizmos of all types");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
+
+  prop = RNA_def_property(srna, "show_gizmo_navigate", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SI_GIZMO_HIDE_NAVIGATE);
+  RNA_def_property_ui_text(prop, "Navigate Gizmo", "Viewport navigation gizmo");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
 
   /* Overlays */
   prop = RNA_def_property(srna, "overlay", PROP_POINTER, PROP_NONE);

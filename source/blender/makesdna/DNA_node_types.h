@@ -499,7 +499,13 @@ typedef struct bNodeTree {
 
   int type;
 
-  char _pad1[4];
+  /**
+   * Used to cache run-time information of the node tree.
+   * #eNodeTreeRuntimeFlag.
+   */
+  uint8_t runtime_flag;
+
+  char _pad1[3];
 
   /**
    * Sockets in groups have unique identifiers, adding new sockets always
@@ -600,6 +606,11 @@ typedef enum eNodeTreeExecutionMode {
   NTREE_EXECUTION_MODE_TILED = 0,
   NTREE_EXECUTION_MODE_FULL_FRAME = 1,
 } eNodeTreeExecutionMode;
+
+typedef enum eNodeTreeRuntimeFlag {
+  /** There is a node that references an image with animation. */
+  NTREE_RUNTIME_FLAG_HAS_IMAGE_ANIMATION = 1 << 0,
+} eNodeTreeRuntimeFlag;
 
 /* socket value structs for input buttons
  * DEPRECATED now using ID properties
@@ -854,6 +865,12 @@ typedef struct NodeTwoFloats {
 typedef struct NodeVertexCol {
   char name[64];
 } NodeVertexCol;
+
+typedef struct NodeCMPCombSepColor {
+  /* CMPNodeCombSepColorMode */
+  uint8_t mode;
+  uint8_t ycc_mode;
+} NodeCMPCombSepColor;
 
 /** Defocus blur node. */
 typedef struct NodeDefocus {
@@ -1485,6 +1502,11 @@ typedef struct NodeFunctionCompare {
   char _pad[1];
 } NodeFunctionCompare;
 
+typedef struct NodeCombSepColor {
+  /* NodeCombSepColorMode */
+  int8_t mode;
+} NodeCombSepColor;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
@@ -1877,6 +1899,16 @@ typedef enum CMPNodeDenoisePrefilter {
   CMP_NODE_DENOISE_PREFILTER_ACCURATE = 2
 } CMPNodeDenoisePrefilter;
 
+/* Color combine/separate modes */
+
+typedef enum CMPNodeCombSepColorMode {
+  CMP_NODE_COMBSEP_COLOR_RGB = 0,
+  CMP_NODE_COMBSEP_COLOR_HSV = 1,
+  CMP_NODE_COMBSEP_COLOR_HSL = 2,
+  CMP_NODE_COMBSEP_COLOR_YCC = 3,
+  CMP_NODE_COMBSEP_COLOR_YUV = 4,
+} CMPNodeCombSepColorMode;
+
 #define CMP_NODE_PLANETRACKDEFORM_MBLUR_SAMPLES_MAX 64
 
 /* Point Density shader node */
@@ -2134,6 +2166,12 @@ typedef enum GeometryNodeScaleElementsMode {
   GEO_NODE_SCALE_ELEMENTS_UNIFORM = 0,
   GEO_NODE_SCALE_ELEMENTS_SINGLE_AXIS = 1,
 } GeometryNodeScaleElementsMode;
+
+typedef enum NodeCombSepColorMode {
+  NODE_COMBSEP_COLOR_RGB = 0,
+  NODE_COMBSEP_COLOR_HSV = 1,
+  NODE_COMBSEP_COLOR_HSL = 2,
+} NodeCombSepColorMode;
 
 #ifdef __cplusplus
 }
