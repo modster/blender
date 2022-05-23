@@ -559,3 +559,55 @@ set(SPIRV_HEADERS_FILE SPIR-V-Headers-${SPIRV_HEADERS_VERSION}.tar.gz)
 ### DPCPP DEPS END ###
 ######################
 
+##########################################
+### Intel Graphics Compiler DEPS BEGIN ###
+##########################################
+# The following deps are build time requirements for the intel graphics
+# compiler, the versions used are taken from the following location
+# https://github.com/intel/intel-graphics-compiler/releases
+
+set(IGC_VERSION 1.0.11222)
+set(IGC_URI https://github.com/intel/intel-graphics-compiler/archive/refs/tags/igc-${IGC_VERSION}.tar.gz)
+set(IGC_HASH d92f0608dcbb52690855685f9447282e5c09c0ba98ae35fabf114fcf8b1e9fcf)
+set(IGC_HASH_TYPE SHA256)
+set(IGC_FILE igc-${IGC_VERSION}.tar.gz)
+
+set(IGC_LLVM_VERSION llvmorg-11.1.0)
+set(IGC_LLVM_URI https://github.com/llvm/llvm-project/archive/refs/tags/${IGC_LLVM_VERSION}.tar.gz)
+set(IGC_LLVM_HASH 53a0719f3f4b0388013cfffd7b10c7d5682eece1929a9553c722348d1f866e79)
+set(IGC_LLVM_HASH_TYPE SHA256)
+set(IGC_LLVM_FILE ${IGC_LLVM_VERSION}.tar.gz)
+
+set(IGC_OPENCL_CLANG_VERSION bbdd1587f577397a105c900be114b56755d1f7dc)
+set(IGC_OPENCL_CLANG_URI https://github.com/intel/opencl-clang/archive/${IGC_OPENCL_CLANG_VERSION}.tar.gz)
+set(IGC_OPENCL_CLANG_HASH d08315f1b0d8a6fef33de2b3e6aa7356534c324910634962c72523d970773efc)
+set(IGC_OPENCL_CLANG_HASH_TYPE SHA256)
+set(IGC_OPENCL_CLANG_FILE opencl-clang-${IGC_OPENCL_CLANG_VERSION}.tar.gz)
+
+set(IGC_VCINTRINSICS_VERSION v0.4.0)
+set(IGC_VCINTRINSICS_URI https://github.com/intel/vc-intrinsics/archive/refs/tags/${IGC_VCINTRINSICS_VERSION}.tar.gz)
+set(IGC_VCINTRINSICS_HASH c8b92682ad5031cf9d5b82a40e7d5c0e763cd9278660adbcaa69aab988e4b589)
+set(IGC_VCINTRINSICS_HASH_TYPE SHA256)
+set(IGC_VCINTRINSICS_FILE vc-intrinsics-${IGC_VCINTRINSICS_VERSION}.tar.gz)
+
+set(IGC_SPIRV_HEADERS_VERSION sdk-1.3.204.1)
+set(IGC_SPIRV_HEADERS_URI https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/${IGC_SPIRV_HEADERS_VERSION}.tar.gz)
+set(IGC_SPIRV_HEADERS_HASH 262864053968c217d45b24b89044a7736a32361894743dd6cfe788df258c746c)
+set(IGC_SPIRV_HEADERS_HASH_TYPE SHA256)
+set(IGC_SPIRV_HEADERS_FILE SPIR-V-Headers-${IGC_SPIRV_HEADERS_VERSION}.tar.gz)
+
+set(IGC_SPIRV_TOOLS_VERSION sdk-1.3.204.1)
+set(IGC_SPIRV_TOOLS_URI https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/${IGC_SPIRV_TOOLS_VERSION}.tar.gz)
+set(IGC_SPIRV_TOOLS_HASH 6e19900e948944243024aedd0a201baf3854b377b9cc7a386553bc103b087335)
+set(IGC_SPIRV_TOOLS_HASH_TYPE SHA256)
+set(IGC_SPIRV_TOOLS_FILE SPIR-V-Tools-${IGC_SPIRV_TOOLS_VERSION}.tar.gz)
+
+set(IGC_SPIRV_TRANSLATOR_VERSION 99420daab98998a7e36858befac9c5ed109d4920)
+set(IGC_SPIRV_TRANSLATOR_URI https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/${IGC_SPIRV_TRANSLATOR_VERSION}.tar.gz)
+set(IGC_SPIRV_TRANSLATOR_HASH 77dfb4ddb6bfb993535562c02ddea23f0a0d1c5a0258c1afe7e27c894ff783a8)
+set(IGC_SPIRV_TRANSLATOR_HASH_TYPE SHA256)
+set(IGC_SPIRV_TRANSLATOR_FILE SPIR-V-Translator-${IGC_SPIRV_TRANSLATOR_VERSION}.tar.gz)
+
+########################################
+### Intel Graphics Compiler DEPS END ###
+########################################
