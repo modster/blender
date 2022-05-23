@@ -2365,10 +2365,18 @@ static void lineart_geometry_object_load(LineartObjectInfo *ob_info,
       la_edge->v2 = &la_v_arr[loose_data.loose_array[i]->v2];
       la_edge->flags = LRT_EDGE_FLAG_LOOSE;
       la_edge->object_ref = orig_ob;
+      la_edge->from_shadow = (LineartEdge *)LRT_EDGE_IDENTIFIER(ob_info, la_edge);
       BLI_addtail(&la_edge->segments, la_seg);
       if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
           usage == OBJECT_LRT_NO_INTERSECTION) {
         lineart_add_edge_to_array_thread(ob_info, la_edge);
+        if (shadow_eln) {
+          LineartEdge *shadow_e = lineart_find_matching_edge(shadow_eln,
+                                                             (uint64_t)la_edge->from_shadow);
+          if (shadow_e) {
+            lineart_register_shadow_cuts(re_buf, la_edge, shadow_e);
+          }
+        }
       }
       la_edge++;
       la_seg++;
