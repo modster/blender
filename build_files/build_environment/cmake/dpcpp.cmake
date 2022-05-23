@@ -73,7 +73,6 @@ ExternalProject_Add(external_dpcpp
   #CONFIGURE_COMMAND ${PYTHON_BINARY} ${BUILD_DIR}/dpcpp/src/external_dpcpp/buildbot/configure.py ${DPCPP_CONFIGURE_ARGS}
   #BUILD_COMMAND echo "." #${PYTHON_BINARY} ${BUILD_DIR}/dpcpp/src/external_dpcpp/buildbot/compile.py
   PATCH_COMMAND ${PATCH_CMD} -p 1 -d ${BUILD_DIR}/dpcpp/src/external_dpcpp < ${PATCH_DIR}/dpcpp.diff
-  INSTALL_COMMAND echo "."
   INSTALL_DIR ${LIBDIR}/dpcpp
 )
 

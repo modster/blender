@@ -103,6 +103,8 @@ if(NOT APPLE)
   endif()
   if(NOT WIN32)
     include(cmake/igc.cmake)
+    include(cmake/gmmlib.cmake)
+    include(cmake/ocloc.cmake)
   endif()
 endif()
 

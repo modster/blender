@@ -611,3 +611,15 @@ set(IGC_SPIRV_TRANSLATOR_FILE SPIR-V-Translator-${IGC_SPIRV_TRANSLATOR_VERSION}.
 ########################################
 ### Intel Graphics Compiler DEPS END ###
 ########################################
+
+set(GMMLIB_VERSION intel-gmmlib-22.1.2)
+set(GMMLIB_URI https://github.com/intel/gmmlib/archive/refs/tags/${GMMLIB_VERSION}.tar.gz)
+set(GMMLIB_HASH 3b9a6d5e7e3f5748b3d0a2fb0e980ae943907fece0980bd9c0508e71c838e334)
+set(GMMLIB_HASH_TYPE SHA256)
+set(GMMLIB_FILE ${INTEL_GMMLIB_VERSION}.tar.gz)
+
+set(OCLOC_VERSION 22.20.23198)
+set(OCLOC_URI https://github.com/intel/compute-runtime/archive/refs/tags/${OCLOC_VERSION}.tar.gz)
+set(OCLOC_HASH ab22b8bf2560a57fdd3def0e35a62ca75991406f959c0263abb00cd6cd9ae998)
+set(OCLOC_HASH_TYPE SHA256)
+set(OCLOC_FILE ocloc-${OCLOC_VERSION}.tar.gz)

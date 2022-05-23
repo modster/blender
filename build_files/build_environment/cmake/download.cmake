@@ -114,4 +114,6 @@ download_source(IGC_VCINTRINSICS)
 download_source(IGC_SPIRV_HEADERS)
 download_source(IGC_SPIRV_TOOLS)
 download_source(IGC_SPIRV_TRANSLATOR)
+download_source(INTEL_GMMLIB)
+download_source(OCLOC)
 
