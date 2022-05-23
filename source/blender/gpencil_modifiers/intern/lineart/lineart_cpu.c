@@ -3289,7 +3289,7 @@ static LineartVert *lineart_triangle_share_point(const LineartTriangle *l,
 }
 
 static bool lineart_triangle_2v_intersection_math(
-    LineartVert *v1, LineartVert *v2, LineartTriangle *t2, float *last, float *rv)
+    LineartVert *v1, LineartVert *v2, LineartTriangle *t2, double *last, double *rv)
 {
   double Lv[3];
   double Rv[3];
@@ -3324,17 +3324,17 @@ static bool lineart_triangle_2v_intersection_math(
     return false;
   }
 
-  copy_v3fl_v3db(rv, gloc);
+  copy_v3_v3_db(rv, gloc);
 
   return true;
 }
 
 static bool lineart_triangle_intersect_math(LineartTriangle *tri,
                                             LineartTriangle *t2,
-                                            float *v1,
-                                            float *v2)
+                                            double *v1,
+                                            double *v2)
 {
-  float *next = v1, *last = NULL;
+  double *next = v1, *last = NULL;
   LineartVert *sv1, *sv2;
 
   LineartVert *share = lineart_triangle_share_point(t2, tri);
@@ -3345,7 +3345,7 @@ static bool lineart_triangle_intersect_math(LineartTriangle *tri,
 
     lineart_triangle_get_other_verts(tri, share, &sv1, &sv2);
 
-    copy_v3fl_v3db(v1, share->gloc);
+    copy_v3_v3_db(v1, share->gloc);
 
     if (!lineart_triangle_2v_intersection_math(sv1, sv2, t2, 0, v2)) {
       lineart_triangle_get_other_verts(t2, share, &sv1, &sv2);
@@ -3403,8 +3403,8 @@ static bool lineart_triangle_intersect_math(LineartTriangle *tri,
 }
 
 static void lineart_add_isec_thread(LineartIsecThread *th,
-                                    const float *v1,
-                                    const float *v2,
+                                    const double *v1,
+                                    const double *v2,
                                     LineartTriangle *tri1,
                                     LineartTriangle *tri2)
 {
@@ -3418,8 +3418,8 @@ static void lineart_add_isec_thread(LineartIsecThread *th,
     th->array = new_array;
   }
   LineartIsecSingle *is = &th->array[th->current];
-  copy_v3_v3(is->v1, v1);
-  copy_v3_v3(is->v2, v2);
+  copy_v3fl_v3db(is->v1, v1);
+  copy_v3fl_v3db(is->v2, v2);
   is->tri1 = tri1;
   is->tri2 = tri2;
   th->current++;
@@ -3550,7 +3550,7 @@ static void lineart_triangle_intersect_in_bounding_area(LineartTriangle *tri,
 
     /* If we do need to compute intersection, then finally do it. */
 
-    float iv1[3], iv2[3];
+    double iv1[3], iv2[3];
     if (lineart_triangle_intersect_math(tri, testing_triangle, iv1, iv2)) {
       lineart_add_isec_thread(th, iv1, iv2, tri, testing_triangle);
     }
