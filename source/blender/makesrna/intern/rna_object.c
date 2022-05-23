@@ -2942,6 +2942,22 @@ static void rna_def_object_lineart(BlenderRNA *brna)
       "Silhouette Group",
       "Objects with the same silhouette group numbers will be drawn as a continuous shape");
   RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_object_lineart_update");
+
+  prop = RNA_def_property(srna, "use_intersection_priority_override", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", OBJECT_LRT_OWN_INTERSECTION_PRIORITY);
+  RNA_def_property_ui_text(
+      prop,
+      "Use Intersection Priority",
+      "Use this object's intersection priority to override collection setting");
+  RNA_def_property_update(prop, 0, "rna_object_lineart_update");
+
+  prop = RNA_def_property(srna, "intersection_priority", PROP_INT, PROP_NONE);
+  RNA_def_property_range(prop, 0, 255);
+  RNA_def_property_ui_text(prop,
+                           "Intersection Priority",
+                           "The intersection line will be included into the object with the "
+                           "higher intersection priority value");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_object_lineart_update");
 }
 
 static void rna_def_object_visibility(StructRNA *srna)

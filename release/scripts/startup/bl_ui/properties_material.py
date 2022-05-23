@@ -294,6 +294,12 @@ class MATERIAL_PT_lineart(MaterialButtonsPanel, Panel):
         subrow = row.row()
         subrow.active = lineart.use_silhouette_group_override
         subrow.prop(lineart, "mat_silhouette_group", text="")
+            
+        row = layout.row(heading="Intersection Priority")
+        row.prop(lineart, "use_intersection_priority_override", text="")
+        subrow = row.row()
+        subrow.active = lineart.use_intersection_priority_override
+        subrow.prop(lineart, "intersection_priority", text="")
 
 
 classes = (

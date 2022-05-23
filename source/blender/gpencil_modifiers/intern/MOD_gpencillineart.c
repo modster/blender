@@ -351,8 +351,6 @@ static void edge_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *col = uiLayoutColumn(layout, true);
 
-  uiItemR(col, ptr, "use_contour", 0, IFACE_("Contour"), ICON_NONE);
-
   uiLayout *sub = uiLayoutRowWithHeading(col, false, IFACE_("Outline"));
   uiItemR(sub, ptr, "use_contour", 0, "", ICON_NONE);
   uiLayout *entry = uiLayoutRow(sub, false);

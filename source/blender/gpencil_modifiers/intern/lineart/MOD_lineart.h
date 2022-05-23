@@ -46,6 +46,7 @@ typedef struct LineartTriangle {
   int target_reference;
 
   unsigned char silhouette_group;
+  unsigned char intersection_priority;
 
   /**
    * Only use single link list, because we don't need to go back in order.
@@ -480,7 +481,8 @@ typedef struct LineartRenderTaskInfo {
 } LineartRenderTaskInfo;
 
 #define LRT_OBINDEX_SHIFT 20
-#define LRT_OBINDEX_LOWER 0x0fffff /* Lower 20 bits. */
+#define LRT_OBINDEX_LOWER 0x0fffff    /* Lower 20 bits. */
+#define LRT_OBINDEX_HIGHER 0xFFF00000 /* Higher 12 bits. */
 #define LRT_EDGE_IDENTIFIER(obi, e) \
   (((uint64_t)((obi->obindex << 0) | (e->v1->index & LRT_OBINDEX_LOWER)) << 32) | \
    ((obi->obindex << 0) | (e->v2->index & LRT_OBINDEX_LOWER)))
@@ -496,6 +498,7 @@ typedef struct LineartObjectInfo {
   int usage;
   uint8_t override_intersection_mask;
   uint8_t silhouette_group;
+  uint8_t intersection_priority;
   int global_i_offset;
 
   /* Shifted LRT_OBINDEX_SHIFT bits to be combined with object triangle index. */

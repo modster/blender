@@ -41,6 +41,7 @@ enum eCollectionLineArt_Usage {
 enum eCollectionLineArt_Flags {
   COLLECTION_LRT_USE_INTERSECTION_MASK = (1 << 0),
   COLLECTION_LRT_USE_SILHOUETTE_GROUP = (1 << 1),
+  COLLECTION_LRT_USE_INTERSECTION_PRIORITY = (1 << 2),
 };
 
 typedef struct Collection {
@@ -64,7 +65,8 @@ typedef struct Collection {
   unsigned char lineart_flags; /* eCollectionLineArt_Flags */
   unsigned char lineart_intersection_mask;
   unsigned char lineart_silhouette_group;
-  char _pad[5];
+  unsigned char lineart_intersection_priority;
+  char _pad[4];
 
   int16_t color_tag;
 

@@ -80,12 +80,17 @@ class COLLECTION_PT_lineart_collection(CollectionButtonsPanel, Panel):
             if i == 3:
                 row = col.row(align=True)
                 
-            
         row = layout.row(heading="Silouette Group")
         row.prop(collection, "use_lineart_silhouette_group", text="")
         subrow = row.row()
         subrow.active = collection.use_lineart_silhouette_group
         subrow.prop(collection, "lineart_silhouette_group", text="")
+        
+        row = layout.row(heading="Intersection Priority")
+        row.prop(collection, "use_lineart_intersection_priority", text="")
+        subrow = row.row()
+        subrow.active = collection.use_lineart_intersection_priority
+        subrow.prop(collection, "lineart_intersection_priority", text="")
 
 
 classes = (

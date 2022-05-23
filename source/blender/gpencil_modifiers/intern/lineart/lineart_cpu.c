@@ -765,6 +765,8 @@ static void lineart_triangle_post(LineartTriangle *tri, LineartTriangle *orig)
   tri->intersection_mask = orig->intersection_mask;
   tri->material_mask_bits = orig->material_mask_bits;
   tri->mat_occlusion = orig->mat_occlusion;
+  tri->silhouette_group = orig->silhouette_group;
+  tri->intersection_priority = orig->intersection_priority;
 }
 
 static void lineart_triangle_set_cull_flag(LineartTriangle *tri, uchar flag)
@@ -1906,6 +1908,10 @@ static void lineart_load_tri_task(void *__restrict userdata,
   tri->silhouette_group = ((mat && (mat->lineart.flags & LRT_MATERIAL_CUSTOM_SILHOUETTE_GROUP)) ?
                                mat->lineart.mat_silhouette_group :
                                ob_info->silhouette_group);
+  tri->intersection_priority = ((mat && (mat->lineart.flags &
+                                         LRT_MATERIAL_CUSTOM_INTERSECTION_PRIORITY)) ?
+                                    mat->lineart.intersection_priority :
+                                    ob_info->intersection_priority);
   tri->flags |= (mat && (mat->blend_flag & MA_BL_CULL_BACKFACE)) ?
                     LRT_TRIANGLE_MAT_BACK_FACE_CULLING :
                     0;
@@ -2430,13 +2436,33 @@ static uchar lineart_silhouette_group_check(Collection *c, Object *ob)
   }
 
   LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
-    uchar result = lineart_intersection_mask_check(cc->collection, ob);
+    uchar result = lineart_silhouette_group_check(cc->collection, ob);
     if (result) {
       return result;
     }
   }
   if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
     if (c->lineart_flags & COLLECTION_LRT_USE_SILHOUETTE_GROUP) {
+      return c->lineart_silhouette_group;
+    }
+  }
+  return 0;
+}
+
+static uchar lineart_intersection_priority_check(Collection *c, Object *ob)
+{
+  if (ob->lineart.flags & OBJECT_LRT_OWN_INTERSECTION_PRIORITY) {
+    return ob->lineart.intersection_priority;
+  }
+
+  LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
+    uchar result = lineart_intersection_priority_check(cc->collection, ob);
+    if (result) {
+      return result;
+    }
+  }
+  if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
+    if (c->lineart_flags & COLLECTION_LRT_USE_INTERSECTION_PRIORITY) {
       return c->lineart_silhouette_group;
     }
   }
@@ -2570,6 +2596,7 @@ static void lineart_object_load_single_instance(LineartRenderBuffer *rb,
   obi->usage = lineart_usage_check(scene->master_collection, ob, is_render);
   obi->override_intersection_mask = lineart_intersection_mask_check(scene->master_collection, ob);
   obi->silhouette_group = lineart_silhouette_group_check(scene->master_collection, ob);
+  obi->intersection_priority = lineart_intersection_priority_check(scene->master_collection, ob);
   Mesh *use_mesh;
 
   if (obi->usage == OBJECT_LRT_EXCLUDE) {
@@ -4669,6 +4696,27 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
       e->intersection_mask = (is->tri1->intersection_mask | is->tri2->intersection_mask);
       BLI_addtail(&e->segments, es);
 
+      int obi1 = (e->t1->target_reference & LRT_OBINDEX_HIGHER);
+      int obi2 = (e->t2->target_reference & LRT_OBINDEX_HIGHER);
+      LineartElementLinkNode *eln1 = lineart_find_matching_eln(&rb->line_buffer_pointers, obi1);
+      LineartElementLinkNode *eln2 = obi1 == obi2 ? eln1 :
+                                                    lineart_find_matching_eln(
+                                                        &rb->line_buffer_pointers, obi2);
+      Object *ob1 = eln1 ? eln1->object_ref : NULL;
+      Object *ob2 = eln2 ? eln2->object_ref : NULL;
+      if (e->t1->intersection_priority > e->t2->intersection_priority) {
+        e->object_ref = ob1;
+      }
+      else if (e->t1->intersection_priority < e->t2->intersection_priority) {
+        e->object_ref = ob2;
+      }
+      else { /* equal priority */
+        if (ob1 == ob2) {
+          /* object_ref should be ambigious if intersection lines comes from different objects. */
+          e->object_ref = ob1;
+        }
+      }
+
       lineart_add_edge_to_array(&rb->pending_edges, e);
 
       v += 2;
@@ -6290,7 +6338,7 @@ static void lineart_gpencil_generate(LineartCache *cache,
     if (ec->level > level_end || ec->level < level_start) {
       continue;
     }
-    if (orig_ob && orig_ob != ec->object_ref && ec->type != LRT_EDGE_FLAG_INTERSECTION) {
+    if (orig_ob && orig_ob != ec->object_ref) {
       continue;
     }
     if (orig_col && ec->object_ref) {

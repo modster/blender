@@ -217,7 +217,9 @@ typedef struct ObjectLineArt {
   float crease_threshold;
 
   unsigned char silhouette_group;
-  char _pad[7];
+  unsigned char intersection_priority;
+
+  char _pad[6];
 } ObjectLineArt;
 
 /**
@@ -235,6 +237,7 @@ enum eObjectLineArt_Usage {
 enum eObjectLineArt_Flags {
   OBJECT_LRT_OWN_CREASE = (1 << 0),
   OBJECT_LRT_OWN_SILHOUETTE_GROUP = (1 << 1),
+  OBJECT_LRT_OWN_INTERSECTION_PRIORITY = (1 << 2),
 };
 
 typedef struct Object {

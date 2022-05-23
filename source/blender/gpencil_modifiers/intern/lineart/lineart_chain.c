@@ -17,13 +17,16 @@
 
 #define LRT_OTHER_VERT(e, vt) ((vt) == (e)->v1 ? (e)->v2 : ((vt) == (e)->v2 ? (e)->v1 : NULL))
 
+struct Object;
+
 /* Get a connected line, only for lines who has the exact given vert, or (in the case of
  * intersection lines) who has a vert that has the exact same position. */
 static LineartEdge *lineart_line_get_connected(LineartBoundingArea *ba,
                                                LineartVert *vt,
                                                LineartVert **new_vt,
                                                int match_flag,
-                                               unsigned char match_isec_mask)
+                                               unsigned char match_isec_mask,
+                                               struct Object *match_isec_object)
 {
   for (int i = 0; i < ba->line_count; i++) {
     LineartEdge *n_e = ba->linked_lines[i];
@@ -46,6 +49,9 @@ static LineartEdge *lineart_line_get_connected(LineartBoundingArea *ba,
     }
 
     if (n_e->flags & LRT_EDGE_FLAG_INTERSECTION) {
+      if (n_e->object_ref != match_isec_object) {
+        continue;
+      }
       if (vt->fbcoord[0] == n_e->v1->fbcoord[0] && vt->fbcoord[1] == n_e->v1->fbcoord[1]) {
         *new_vt = LRT_OTHER_VERT(n_e, n_e->v1);
         return n_e;
@@ -235,7 +241,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                 es->silhouette_group,
                                 e->v1->index);
     while (ba && (new_e = lineart_line_get_connected(
-                      ba, new_vt, &new_vt, e->flags, ec->intersection_mask))) {
+                      ba, new_vt, &new_vt, e->flags, ec->intersection_mask, ec->object_ref))) {
       new_e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
 
       if (new_e->t1 || new_e->t2) {
@@ -389,7 +395,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     ba = MOD_lineart_get_bounding_area(rb, e->v2->fbcoord[0], e->v2->fbcoord[1]);
     new_vt = e->v2;
     while (ba && (new_e = lineart_line_get_connected(
-                      ba, new_vt, &new_vt, e->flags, ec->intersection_mask))) {
+                      ba, new_vt, &new_vt, e->flags, ec->intersection_mask, ec->object_ref))) {
       new_e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
 
       if (new_e->t1 || new_e->t2) {

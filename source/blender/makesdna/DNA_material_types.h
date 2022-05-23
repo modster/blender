@@ -153,7 +153,7 @@ typedef struct MaterialLineArt {
   /** Maximum 255 groups of contour. */
   unsigned char mat_silhouette_group;
 
-  unsigned char _pad[1];
+  unsigned char intersection_priority;
 } MaterialLineArt;
 
 typedef enum eMaterialLineArtFlags {
@@ -162,6 +162,7 @@ typedef enum eMaterialLineArtFlags {
   /* Deprecated, kept for versioning code. */
   LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS = (1 << 1),
   LRT_MATERIAL_CUSTOM_SILHOUETTE_GROUP = (1 << 2),
+  LRT_MATERIAL_CUSTOM_INTERSECTION_PRIORITY = (1 << 3),
 } eMaterialLineArtFlags;
 
 typedef struct Material {
