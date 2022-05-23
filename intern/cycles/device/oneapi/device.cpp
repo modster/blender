@@ -106,8 +106,6 @@ bool device_oneapi_init()
 #  elif __linux__
   setenv("SYCL_CACHE_PERSISTENT", "1", false);
   setenv("SYCL_CACHE_THRESHOLD", "0", false);
-  setenv("SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS", "0", false);
-  setenv("SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS", "1", false);
 #  endif
 
   return true;
