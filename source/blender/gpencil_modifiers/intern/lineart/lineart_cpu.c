@@ -53,20 +53,21 @@
 
 #include "lineart_intern.h"
 
+#include "atomic_ops.h"
+
 typedef struct LineartIsecSingle {
   float v1[3], v2[3];
   LineartTriangle *tri1, *tri2;
 } LineartIsecSingle;
+
 typedef struct LineartIsecThread {
   int thread_id;
-  /* Thread triangle data. */
-  /* Used to roughly spread the load. */
-  int count_pending;
-  /* An array of triangle element link nodes. */
-  LineartElementLinkNode **pending_triangle_nodes;
-  /* Count of above array. */
-  int current_pending;
-  int max_pending;
+
+  /* Scheduled work range. */
+  LineartElementLinkNode *pending_from;
+  LineartElementLinkNode *pending_to;
+  int index_from;
+  int index_to;
 
   /* Thread intersection result data. */
   LineartIsecSingle *array;
@@ -77,6 +78,7 @@ typedef struct LineartIsecThread {
   /* For individual thread reference.*/
   LineartRenderBuffer *rb;
 } LineartIsecThread;
+
 typedef struct LineartIsecData {
   LineartRenderBuffer *rb;
   LineartIsecThread *threads;
@@ -109,16 +111,6 @@ static bool lineart_get_edge_bounding_areas(LineartRenderBuffer *rb,
                                             int *colbegin,
                                             int *colend);
 
-static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
-                                                LineartBoundingArea *root_ba,
-                                                LineartTriangle *tri,
-                                                double *LRUB,
-                                                int recursive,
-                                                int recursive_level,
-                                                bool do_intersection,
-                                                bool do_lock,
-                                                LineartIsecThread *th);
-
 static bool lineart_triangle_edge_image_space_occlusion(SpinLock *spl,
                                                         const LineartTriangle *tri,
                                                         const LineartEdge *e,
@@ -133,6 +125,19 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *spl,
                                                         double *to);
 
 static void lineart_add_edge_to_array(LineartPendingEdges *pe, LineartEdge *e);
+
+static void lineart_bounding_area_link_triangle_cas(LineartRenderBuffer *rb,
+                                                    LineartBoundingArea *root_ba,
+                                                    LineartTriangle *tri,
+                                                    double *LRUB,
+                                                    int recursive,
+                                                    int recursive_level,
+                                                    bool do_intersection,
+                                                    struct LineartIsecThread *th);
+
+static void lineart_free_bounding_area_memory(LineartBoundingArea *ba, bool recursive);
+
+static void lineart_free_bounding_area_memories(LineartRenderBuffer *rb);
 
 static LineartCache *lineart_init_cache(void);
 
@@ -378,29 +383,17 @@ BLI_INLINE bool lineart_occlusion_is_adjacent_intersection(LineartEdge *e, Linea
           (v2->base.flag && v2->intersecting_with == tri));
 }
 
-static void lineart_bounding_area_triangle_add(LineartRenderBuffer *rb,
-                                               LineartBoundingArea *ba,
-                                               LineartTriangle *tri)
-{ /* In case of too many triangles concentrating in one point, do not add anymore, these triangles
-   * will be either narrower than a single pixel, or will still be added into the list of other
-   * less dense areas. */
-  if (ba->triangle_count >= 65535) {
-    return;
-  }
-  if (ba->triangle_count >= ba->max_triangle_count) {
-    LineartTriangle **new_array = lineart_mem_acquire_thread(
-        &rb->render_data_pool, sizeof(LineartTriangle *) * ba->max_triangle_count * 2);
-    memcpy(new_array, ba->linked_triangles, sizeof(LineartTriangle *) * ba->max_triangle_count);
-    ba->max_triangle_count *= 2;
-    ba->linked_triangles = new_array;
-  }
-  ba->linked_triangles[ba->triangle_count] = tri;
-  ba->triangle_count++;
+static void lineart_bounding_area_triangle_reallocate(LineartBoundingArea *ba)
+{
+  LineartTriangle **new_array = MEM_callocN(sizeof(LineartTriangle *) * ba->max_triangle_count * 2,
+                                            "new ba_triangle_array");
+  memcpy(new_array, ba->linked_triangles, sizeof(LineartTriangle *) * ba->max_triangle_count);
+  ba->max_triangle_count *= 2;
+  MEM_freeN(ba->linked_triangles);
+  ba->linked_triangles = new_array;
 }
 
-static void lineart_bounding_area_line_add(LineartRenderBuffer *rb,
-                                           LineartBoundingArea *ba,
-                                           LineartEdge *edge)
+static void lineart_bounding_area_line_add(LineartBoundingArea *ba, LineartEdge *e)
 {
   /* In case of too many lines concentrating in one point, do not add anymore, these lines will
    * be either shorter than a single pixel, or will still be added into the list of other less
@@ -409,13 +402,14 @@ static void lineart_bounding_area_line_add(LineartRenderBuffer *rb,
     return;
   }
   if (ba->line_count >= ba->max_line_count) {
-    LineartEdge **new_array = lineart_mem_acquire(&rb->render_data_pool,
-                                                  sizeof(LineartEdge *) * ba->max_line_count * 2);
+    LineartEdge **new_array = MEM_mallocN(sizeof(LineartEdge *) * ba->max_line_count * 2,
+                                          "new ba_line_array");
     memcpy(new_array, ba->linked_lines, sizeof(LineartEdge *) * ba->max_line_count);
     ba->max_line_count *= 2;
+    MEM_freeN(ba->linked_lines);
     ba->linked_lines = new_array;
   }
-  ba->linked_lines[ba->line_count] = edge;
+  ba->linked_lines[ba->line_count] = e;
   ba->line_count++;
 }
 
@@ -1775,6 +1769,7 @@ static void lineart_join_loose_edge_arr(LooseEdgeData *loose_data, LooseEdgeData
          sizeof(MEdge *) * to_be_joined->loose_count);
   loose_data->loose_count += to_be_joined->loose_count;
   MEM_freeN(to_be_joined->loose_array);
+  to_be_joined->loose_array = NULL;
 }
 
 static void lineart_add_loose_edge(LooseEdgeData *loose_data, MEdge *e)
@@ -2280,7 +2275,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *ob_info,
     shadow_eln = lineart_find_matching_eln(shadow_elns, ob_info->obindex);
   }
 
-  // Start of the edge/seg arr
+  /* Start of the edge/seg arr */
   LineartEdge *la_edge;
   LineartEdgeSegment *la_seg;
   la_edge = la_edge_arr;
@@ -2560,16 +2555,20 @@ static void lineart_object_load_single_instance(LineartRenderBuffer *rb,
                                                 float use_mat[4][4],
                                                 bool is_render,
                                                 LineartObjectLoadTaskInfo *olti,
-                                                int thread_count)
+                                                int thread_count,
+                                                int obindex)
 {
   LineartObjectInfo *obi = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
   obi->usage = lineart_usage_check(scene->master_collection, ob, is_render);
   obi->override_intersection_mask = lineart_intersection_mask_check(scene->master_collection, ob);
+  obi->silhouette_group = lineart_silhouette_group_check(scene->master_collection, ob);
   Mesh *use_mesh;
 
   if (obi->usage == OBJECT_LRT_EXCLUDE) {
     return;
   }
+
+  obi->obindex = obindex << LRT_OBINDEX_SHIFT;
 
   /* Prepare the matrix used for transforming this specific object (instance). This has to be
    * done before mesh boundbox check because the function needs that. */
@@ -2672,6 +2671,10 @@ static void lineart_main_load_geometries(
   bool is_render = eval_mode == DAG_EVAL_RENDER;
 
   FOREACH_SCENE_OBJECT_BEGIN (scene, ob) {
+    /* Do the increment even for discarded objects, so that in different culling conditions we can
+     * get the same reference to the same object. */
+    obindex++;
+
     Object *eval_ob = DEG_get_evaluated_object(depsgraph, ob);
 
     if (!eval_ob) {
@@ -2679,17 +2682,34 @@ static void lineart_main_load_geometries(
     }
 
     if (BKE_object_visibility(eval_ob, eval_mode) & OB_VISIBLE_SELF) {
-      lineart_object_load_single_instance(
-          rb, depsgraph, scene, eval_ob, eval_ob, eval_ob->obmat, is_render, olti, thread_count);
+      lineart_object_load_single_instance(rb,
+                                          depsgraph,
+                                          scene,
+                                          eval_ob,
+                                          eval_ob,
+                                          eval_ob->obmat,
+                                          is_render,
+                                          olti,
+                                          thread_count,
+                                          obindex);
     }
     if (allow_duplicates) {
       ListBase *dupli = object_duplilist(depsgraph, scene, eval_ob);
       LISTBASE_FOREACH (DupliObject *, dob, dupli) {
+        obindex++;
         if (BKE_object_visibility(eval_ob, eval_mode) &
             (OB_VISIBLE_PARTICLES | OB_VISIBLE_INSTANCES)) {
           Object *ob_ref = (dob->type & OB_DUPLIPARTS) ? eval_ob : dob->ob;
-          lineart_object_load_single_instance(
-              rb, depsgraph, scene, dob->ob, ob_ref, dob->mat, is_render, olti, thread_count);
+          lineart_object_load_single_instance(rb,
+                                              depsgraph,
+                                              scene,
+                                              dob->ob,
+                                              ob_ref,
+                                              dob->mat,
+                                              is_render,
+                                              olti,
+                                              thread_count,
+                                              obindex);
         }
       }
       free_object_duplilist(dupli);
@@ -3370,21 +3390,44 @@ static void lineart_add_isec_thread(LineartIsecThread *th,
   th->current++;
 }
 
-static void lineart_add_eln_thread(LineartIsecThread *th, LineartElementLinkNode *eln)
-{
-  if (th->current_pending == th->max_pending) {
+#define LRT_ISECT_TRIANGLE_PER_THREAD 4096;
 
-    LineartElementLinkNode **new_array = MEM_mallocN(
-        sizeof(LineartElementLinkNode *) * th->max_pending * 2, "LineartIsecSingle");
-    memcpy(
-        new_array, th->pending_triangle_nodes, sizeof(LineartElementLinkNode *) * th->max_pending);
-    th->max_pending *= 2;
-    MEM_freeN(th->pending_triangle_nodes);
-    th->pending_triangle_nodes = new_array;
+static bool lineart_schedule_new_triangle_task(LineartIsecThread *th)
+{
+  LineartRenderBuffer *rb = th->rb;
+  int remaining = LRT_ISECT_TRIANGLE_PER_THREAD;
+
+  BLI_spin_lock(&rb->lock_task);
+  LineartElementLinkNode *eln = rb->isect_scheduled_up_to;
+
+  if (!eln) {
+    BLI_spin_unlock(&rb->lock_task);
+    return false;
   }
-  th->pending_triangle_nodes[th->current_pending] = eln;
-  th->count_pending += eln->element_count;
-  th->current_pending++;
+
+  th->pending_from = eln;
+  th->index_from = rb->isect_scheduled_up_to_index;
+
+  while (remaining > 0 && eln) {
+    int remaining_this_eln = eln->element_count - rb->isect_scheduled_up_to_index;
+    int added_count = MIN2(remaining, remaining_this_eln);
+    remaining -= added_count;
+    if (remaining || added_count == remaining_this_eln) {
+      eln = eln->next;
+      rb->isect_scheduled_up_to = eln;
+      rb->isect_scheduled_up_to_index = 0;
+    }
+    else {
+      rb->isect_scheduled_up_to_index += added_count;
+    }
+  }
+
+  th->pending_to = eln ? eln : rb->triangle_buffer_pointers.last;
+  th->index_to = rb->isect_scheduled_up_to_index;
+
+  BLI_spin_unlock(&rb->lock_task);
+
+  return true;
 }
 
 static void lineart_init_isec_thread(LineartIsecData *d, LineartRenderBuffer *rb, int thread_count)
@@ -3392,6 +3435,10 @@ static void lineart_init_isec_thread(LineartIsecData *d, LineartRenderBuffer *rb
   d->threads = MEM_callocN(sizeof(LineartIsecThread) * thread_count, "LineartIsecThread arr");
   d->rb = rb;
   d->thread_count = thread_count;
+
+  rb->isect_scheduled_up_to = rb->triangle_buffer_pointers.first;
+  rb->isect_scheduled_up_to_index = 0;
+
   for (int i = 0; i < thread_count; i++) {
     LineartIsecThread *it = &d->threads[i];
     it->array = MEM_mallocN(sizeof(LineartIsecSingle) * 100, "LineartIsecSingle arr");
@@ -3403,26 +3450,9 @@ static void lineart_init_isec_thread(LineartIsecData *d, LineartRenderBuffer *rb
 #define OBJ_PER_ISEC_THREAD 8 /* Largely arbitrary, no need to be big. */
   for (int i = 0; i < thread_count; i++) {
     LineartIsecThread *it = &d->threads[i];
-    it->pending_triangle_nodes = MEM_mallocN(
-        sizeof(LineartElementLinkNode *) * OBJ_PER_ISEC_THREAD, "LineartIsec eln arr");
-    it->max_pending = OBJ_PER_ISEC_THREAD;
-    it->current_pending = 0;
     it->rb = rb;
   }
 #undef OBJ_PER_ISEC_THREAD
-
-  for (LineartElementLinkNode *eln = rb->triangle_buffer_pointers.first; eln; eln = eln->next) {
-    /* Find threads with least triangle count inside. */
-    LineartIsecThread *min_tri = &d->threads[0];
-    for (int i = 0; i < thread_count; i++) {
-      LineartIsecThread *it = &d->threads[i];
-      if (min_tri->count_pending > it->count_pending) {
-        min_tri = it;
-      }
-    }
-    /* Assign it. */
-    lineart_add_eln_thread(min_tri, eln);
-  }
 }
 
 static void lineart_destroy_isec_thread(LineartIsecData *d)
@@ -3430,16 +3460,19 @@ static void lineart_destroy_isec_thread(LineartIsecData *d)
   for (int i = 0; i < d->thread_count; i++) {
     LineartIsecThread *it = &d->threads[i];
     MEM_freeN(it->array);
-    MEM_freeN(it->pending_triangle_nodes);
   }
   MEM_freeN(d->threads);
 }
 
-static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
-                                                        LineartTriangle *tri,
+static void lineart_triangle_intersect_in_bounding_area(LineartTriangle *tri,
                                                         LineartBoundingArea *ba,
-                                                        LineartIsecThread *th)
+                                                        LineartIsecThread *th,
+                                                        int up_to)
 {
+  if (!th) {
+    return;
+  }
+
   /* Testing_triangle->testing[0] is used to store pairing triangle reference.
    * See definition of LineartTriangleThread for more info. */
   LineartTriangle *testing_triangle;
@@ -3447,18 +3480,12 @@ static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
 
   double *G0 = tri->v[0]->gloc, *G1 = tri->v[1]->gloc, *G2 = tri->v[2]->gloc;
 
-  /* If this is not the smallest subdiv bounding area. */
-  if (ba->child) {
-    lineart_triangle_intersect_in_bounding_area(rb, tri, &ba->child[0], th);
-    lineart_triangle_intersect_in_bounding_area(rb, tri, &ba->child[1], th);
-    lineart_triangle_intersect_in_bounding_area(rb, tri, &ba->child[2], th);
-    lineart_triangle_intersect_in_bounding_area(rb, tri, &ba->child[3], th);
-    return;
-  }
-
   /* If this _is_ the smallest subdiv bounding area, then do the intersections there. */
-  for (int i = 0; i < ba->triangle_count; i++) {
-    testing_triangle = ba->linked_triangles[i];
+  for (int i = 0; i < up_to; i++) {
+    do {
+      testing_triangle = (LineartTriangle *)lineart_atomic_load(&ba->linked_triangles[i]);
+    } while (UNLIKELY(testing_triangle == NULL));
+
     tt = (LineartTriangleThread *)testing_triangle;
 
     if (testing_triangle == tri || tt->testing_e[th->thread_id] == (LineartEdge *)tri) {
@@ -3487,7 +3514,6 @@ static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
     }
 
     /* If we do need to compute intersection, then finally do it. */
-    /* lineart_triangle_intersect(rb, tri, testing_triangle); */
 
     float iv1[3], iv2[3];
     if (lineart_triangle_intersect_math(tri, testing_triangle, iv1, iv2)) {
@@ -3561,6 +3587,7 @@ static void lineart_destroy_render_data_keep_init(LineartRenderBuffer *rb)
   for (int i = 0; i < rb->bounding_area_initial_count; i++) {
     lineart_end_bounding_area_recursive(&rb->initial_bounding_areas[i]);
   }
+  lineart_free_bounding_area_memories(rb);
 
   lineart_mem_destroy(&rb->render_data_pool);
 }
@@ -3576,6 +3603,8 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
   lineart_destroy_render_data_keep_init(rb);
+
+  lineart_mem_destroy(&rb->render_data_pool);
 }
 
 void MOD_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
@@ -3765,6 +3794,14 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
   int row, col;
   LineartBoundingArea *ba;
 
+  /* Always make sure the shortest side has at least LRT_BA_ROWS tiles. */
+  if (rb->w > rb->h) {
+    sp_w = sp_h * rb->w / rb->h;
+  }
+  else {
+    sp_h = sp_w * rb->h / rb->w;
+  }
+
   /* Because NDC (Normalized Device Coordinates) range is (-1,1),
    * so the span for each initial tile is double of that in the (0,1) range. */
   double span_w = (double)1 / sp_w * 2.0;
@@ -3782,12 +3819,10 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
     BLI_spin_init(&rb->initial_bounding_areas[i].lock);
   }
 
-  int i_ba = 0;
-
   /* Initialize tiles. */
   for (row = 0; row < sp_h; row++) {
     for (col = 0; col < sp_w; col++) {
-      ba = &rb->initial_bounding_areas[row * LRT_BA_ROWS + col];
+      ba = &rb->initial_bounding_areas[row * rb->tile_count_x + col];
 
       /* Set the four direction limits. */
       ba->l = span_w * col - 1.0;
@@ -3801,38 +3836,12 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
       /* Init linked_triangles array. */
       ba->max_triangle_count = LRT_TILE_SPLITTING_TRIANGLE_LIMIT;
       ba->max_line_count = LRT_TILE_EDGE_COUNT_INITIAL;
-      ba->linked_triangles = lineart_mem_acquire(
-          &rb->render_data_pool, sizeof(LineartTriangle *) * ba->max_triangle_count);
-      ba->linked_lines = lineart_mem_acquire(&rb->render_data_pool,
-                                             sizeof(LineartEdge *) * ba->max_line_count);
+      ba->linked_triangles = MEM_callocN(sizeof(LineartTriangle *) * ba->max_triangle_count,
+                                         "ba_linked_triangles");
+      ba->linked_lines = MEM_callocN(sizeof(LineartEdge *) * ba->max_line_count,
+                                     "ba_linked_lines");
 
-      /* Spatial lock assignment. */
       BLI_spin_init(&ba->lock);
-      i_ba++;
-
-      /* Link adjacent ones. */
-      if (row) {
-        lineart_list_append_pointer_pool(
-            &ba->up,
-            &rb->render_data_pool,
-            &rb->initial_bounding_areas[(row - 1) * LRT_BA_ROWS + col]);
-      }
-      if (col) {
-        lineart_list_append_pointer_pool(&ba->lp,
-                                         &rb->render_data_pool,
-                                         &rb->initial_bounding_areas[row * LRT_BA_ROWS + col - 1]);
-      }
-      if (row != sp_h - 1) {
-        lineart_list_append_pointer_pool(
-            &ba->bp,
-            &rb->render_data_pool,
-            &rb->initial_bounding_areas[(row + 1) * LRT_BA_ROWS + col]);
-      }
-      if (col != sp_w - 1) {
-        lineart_list_append_pointer_pool(&ba->rp,
-                                         &rb->render_data_pool,
-                                         &rb->initial_bounding_areas[row * LRT_BA_ROWS + col + 1]);
-      }
     }
   }
 }
@@ -3994,6 +4003,38 @@ static void lineart_bounding_areas_connect_recursive(LineartRenderBuffer *rb,
 static void lineart_main_bounding_areas_connect_post(LineartRenderBuffer *rb)
 {
   int total_tile_initial = rb->tile_count_x * rb->tile_count_y;
+  int tiles_per_row = rb->tile_count_x;
+
+  for (int row = 0; row < rb->tile_count_y; row++) {
+    for (int col = 0; col < rb->tile_count_x; col++) {
+      LineartBoundingArea *ba = &rb->initial_bounding_areas[row * tiles_per_row + col];
+      /* Link adjacent ones. */
+      if (row) {
+        lineart_list_append_pointer_pool(
+            &ba->up,
+            &rb->render_data_pool,
+            &rb->initial_bounding_areas[(row - 1) * tiles_per_row + col]);
+      }
+      if (col) {
+        lineart_list_append_pointer_pool(
+            &ba->lp,
+            &rb->render_data_pool,
+            &rb->initial_bounding_areas[row * tiles_per_row + col - 1]);
+      }
+      if (row != rb->tile_count_y - 1) {
+        lineart_list_append_pointer_pool(
+            &ba->bp,
+            &rb->render_data_pool,
+            &rb->initial_bounding_areas[(row + 1) * tiles_per_row + col]);
+      }
+      if (col != rb->tile_count_x - 1) {
+        lineart_list_append_pointer_pool(
+            &ba->rp,
+            &rb->render_data_pool,
+            &rb->initial_bounding_areas[row * tiles_per_row + col + 1]);
+      }
+    }
+  }
   for (int i = 0; i < total_tile_initial; i++) {
     lineart_bounding_areas_connect_recursive(rb, &rb->initial_bounding_areas[i]);
   }
@@ -4006,9 +4047,9 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
                                         LineartBoundingArea *root,
                                         int recursive_level)
 {
-  LineartBoundingArea *ba = lineart_mem_acquire_thread(&rb->render_data_pool,
-                                                       sizeof(LineartBoundingArea) * 4);
+  root->child = lineart_mem_acquire_thread(&rb->render_data_pool, sizeof(LineartBoundingArea) * 4);
   LineartTriangle *tri;
+  LineartBoundingArea *ba = root->child;
 
   ba[0].l = root->cx;
   ba[0].r = root->r;
@@ -4038,45 +4079,42 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
   ba[3].cx = (ba[3].l + ba[3].r) / 2;
   ba[3].cy = (ba[3].u + ba[3].b) / 2;
 
-  root->child = ba;
-
-  /* Do this in post add_triangle() now to avoid cross thread accessing. */
-  /* lineart_bounding_areas_connect_new(rb, root); */
-
-  /* Init linked_triangles array and lock reference. */
+  /* Init linked_triangles array and locks. */
   for (int i = 0; i < 4; i++) {
     ba[i].max_triangle_count = LRT_TILE_SPLITTING_TRIANGLE_LIMIT;
     ba[i].max_line_count = LRT_TILE_EDGE_COUNT_INITIAL;
-    ba[i].linked_triangles = lineart_mem_acquire_thread(
-        &rb->render_data_pool, sizeof(LineartTriangle *) * LRT_TILE_SPLITTING_TRIANGLE_LIMIT);
-    ba[i].linked_lines = lineart_mem_acquire_thread(
-        &rb->render_data_pool, sizeof(LineartEdge *) * LRT_TILE_EDGE_COUNT_INITIAL);
+    ba[i].linked_triangles = MEM_callocN(sizeof(LineartTriangle *) * ba[i].max_triangle_count,
+                                         "ba_linked_triangles");
+    ba[i].linked_lines = MEM_callocN(sizeof(LineartEdge *) * ba[i].max_line_count,
+                                     "ba_linked_lines");
     BLI_spin_init(&ba[i].lock);
   }
 
   for (int i = 0; i < root->triangle_count; i++) {
-    tri = root->linked_triangles[i];
-    LineartBoundingArea *cba = root->child;
+    do {
+      tri = (LineartTriangle *)lineart_atomic_load(&root->linked_triangles[i]);
+      /* Need to wait for worker threads to fill in the last few triangles. */
+    } while (UNLIKELY(tri == NULL));
     double b[4];
     b[0] = MIN3(tri->v[0]->fbcoord[0], tri->v[1]->fbcoord[0], tri->v[2]->fbcoord[0]);
     b[1] = MAX3(tri->v[0]->fbcoord[0], tri->v[1]->fbcoord[0], tri->v[2]->fbcoord[0]);
     b[2] = MAX3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
     b[3] = MIN3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
-    if (LRT_BOUND_AREA_CROSSES(b, &cba[0].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &cba[0], tri, b, 0, recursive_level + 1, false, false, NULL);
+    if (LRT_BOUND_AREA_CROSSES(b, &ba[0].l)) {
+      lineart_bounding_area_link_triangle_cas(
+          rb, &ba[0], tri, b, 0, recursive_level + 1, false, NULL);
     }
-    if (LRT_BOUND_AREA_CROSSES(b, &cba[1].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &cba[1], tri, b, 0, recursive_level + 1, false, false, NULL);
+    if (LRT_BOUND_AREA_CROSSES(b, &ba[1].l)) {
+      lineart_bounding_area_link_triangle_cas(
+          rb, &ba[1], tri, b, 0, recursive_level + 1, false, NULL);
     }
-    if (LRT_BOUND_AREA_CROSSES(b, &cba[2].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &cba[2], tri, b, 0, recursive_level + 1, false, false, NULL);
+    if (LRT_BOUND_AREA_CROSSES(b, &ba[2].l)) {
+      lineart_bounding_area_link_triangle_cas(
+          rb, &ba[2], tri, b, 0, recursive_level + 1, false, NULL);
     }
-    if (LRT_BOUND_AREA_CROSSES(b, &cba[3].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &cba[3], tri, b, 0, recursive_level + 1, false, false, NULL);
+    if (LRT_BOUND_AREA_CROSSES(b, &ba[3].l)) {
+      lineart_bounding_area_link_triangle_cas(
+          rb, &ba[3], tri, b, 0, recursive_level + 1, false, NULL);
     }
   }
 }
@@ -4162,49 +4200,25 @@ static bool lineart_bounding_area_triangle_intersect(LineartRenderBuffer *fb,
  * 1) Link triangles with bounding areas for later occlusion test.
  * 2) Test triangles with existing(added previously) triangles for intersection lines.
  */
-static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
-                                                LineartBoundingArea *root_ba,
-                                                LineartTriangle *tri,
-                                                double *LRUB,
-                                                int recursive,
-                                                int recursive_level,
-                                                bool do_intersection,
-                                                bool do_lock,
-                                                struct LineartIsecThread *th)
+static void lineart_bounding_area_link_triangle_cas(LineartRenderBuffer *rb,
+                                                    LineartBoundingArea *root_ba,
+                                                    LineartTriangle *tri,
+                                                    double *LRUB,
+                                                    int recursive,
+                                                    int recursive_level,
+                                                    bool do_intersection,
+                                                    struct LineartIsecThread *th)
 {
   if (!lineart_bounding_area_triangle_intersect(rb, tri, root_ba)) {
     return;
   }
 
-  /* Lock is spatial, pre-assigned during initial bounding area creation. We lock the entire
-   * bounding area r/w access for now, so whether we split or do anything inside the bounding
-   * area, it's not relevant to other threads. */
-  if (do_lock) {
-    BLI_spin_lock(&root_ba->lock);
-  }
+  LineartBoundingArea *old_ba = root_ba;
 
-  if (root_ba->child == NULL) {
-    lineart_bounding_area_triangle_add(rb, root_ba, tri);
-    /* If splitting doesn't improve triangle separation, then shouldn't allow splitting
-     * anymore. Here we use recursive limit. This is especially useful in orthographic render,
-     * where a lot of faces could easily line up perfectly in image space,
-     * which can not be separated by simply slicing the image tile. */
-    if (root_ba->triangle_count >= LRT_TILE_SPLITTING_TRIANGLE_LIMIT && recursive &&
-        recursive_level < rb->tile_recursive_level) {
-      lineart_bounding_area_split(rb, root_ba, recursive_level);
-    }
-    if (recursive && do_intersection && rb->use_intersections) {
-      lineart_triangle_intersect_in_bounding_area(rb, tri, root_ba, th);
-    }
-    if (do_lock) {
-      BLI_spin_unlock(&root_ba->lock);
-    }
-  }
-  else {
-    if (do_lock) {
-      BLI_spin_unlock(&root_ba->lock);
-    }
-    LineartBoundingArea *ba = root_ba->child;
+  if (old_ba->child) {
+    /* Wait for splitting thread to fully initialize child tiles. */
+    BLI_spin_lock(&old_ba->lock);
+    BLI_spin_unlock(&old_ba->lock);
     double *B1 = LRUB;
     double b[4];
     if (!LRUB) {
@@ -4214,21 +4228,87 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
       b[3] = MIN3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
       B1 = b;
     }
-    if (LRT_BOUND_AREA_CROSSES(B1, &ba[0].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &ba[0], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
+    /* continue adding into the child */
+    for (int iba = 0; iba < 4; iba++) {
+      if (LRT_BOUND_AREA_CROSSES(B1, &old_ba->child[iba].l)) {
+        lineart_bounding_area_link_triangle_cas(
+            rb, &old_ba->child[iba], tri, B1, recursive, recursive_level + 1, do_intersection, th);
+      }
     }
-    if (LRT_BOUND_AREA_CROSSES(B1, &ba[1].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &ba[1], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
+    return;
+  }
+
+  while (1) {
+    uint32_t old_tri_index = old_ba->triangle_count;
+    uint32_t new_tri_index = old_tri_index + 1;
+    uint32_t max_triangles = old_ba->max_triangle_count;
+    if (old_tri_index < max_triangles) {
+      uint32_t success_old_index = atomic_cas_uint32(
+          &old_ba->triangle_count, old_tri_index, new_tri_index);
+      if (success_old_index != old_tri_index) {
+        /* Too bad, other threads grabbed this index, we retry. */
+        continue;
+      }
+      /* Successfully grabbed a viable index to insert the triangle into.
+       * Insert into [old_tri_index] for correct array offset starting from [0]. */
+      lineart_atomic_store(&old_ba->linked_triangles[old_tri_index], tri);
+
+      /* Do intersections in place. */
+      if (rb->use_intersections) {
+        lineart_triangle_intersect_in_bounding_area(tri, old_ba, th, old_tri_index - 1);
+      }
+      break;
     }
-    if (LRT_BOUND_AREA_CROSSES(B1, &ba[2].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &ba[2], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
+    else { /* We need to wait for either splitting or array extension to be done. */
+
+      /* Splitting/extending can only be operated by one thread. */
+      BLI_spin_lock(&old_ba->lock);
+
+      if (recursive_level < rb->tile_recursive_level) {
+        if (!old_ba->child) {
+          /* old_ba->child==NULL, means we are the thread that's doing the splitting. */
+          lineart_bounding_area_split(rb, old_ba, recursive_level);
+        } /* Otherwise other thread has completed the splitting process. */
+      }
+      else {
+        if (max_triangles == old_ba->max_triangle_count) {
+          /* Means we are the thread that's doing the extension. */
+          lineart_bounding_area_triangle_reallocate(old_ba);
+        } /* Otherwise other thread has completed the extending the array. */
+      }
+
+      /* Job done, allow other threads to add into new tile. */
+      BLI_spin_unlock(&old_ba->lock);
+
+      /* Of course we still have our own triangle needs to be added. */
+      lineart_bounding_area_link_triangle_cas(
+          rb, root_ba, tri, LRUB, recursive, recursive_level, do_intersection, th);
+
+      break;
     }
-    if (LRT_BOUND_AREA_CROSSES(B1, &ba[3].l)) {
-      lineart_bounding_area_link_triangle(
-          rb, &ba[3], tri, B1, recursive, recursive_level + 1, do_intersection, true, th);
+  }
+}
+
+static void lineart_free_bounding_area_memory(LineartBoundingArea *ba, bool recursive)
+{
+  if (ba->linked_lines) {
+    MEM_freeN(ba->linked_lines);
+  }
+  if (ba->linked_triangles) {
+    MEM_freeN(ba->linked_triangles);
+  }
+  if (recursive && ba->child) {
+    for (int i = 0; i < 4; i++) {
+      lineart_free_bounding_area_memory(&ba->child[i], recursive);
+    }
+  }
+}
+static void lineart_free_bounding_area_memories(LineartRenderBuffer *rb)
+{
+  for (int i = 0; i < rb->tile_count_y; i++) {
+    for (int j = 0; j < rb->tile_count_x; j++) {
+      lineart_free_bounding_area_memory(&rb->initial_bounding_areas[i * rb->tile_count_x + j],
+                                        true);
     }
   }
 }
@@ -4238,7 +4318,7 @@ static void lineart_bounding_area_link_edge(LineartRenderBuffer *rb,
                                             LineartEdge *e)
 {
   if (root_ba->child == NULL) {
-    lineart_bounding_area_line_add(rb, root_ba, e);
+    lineart_bounding_area_line_add(root_ba, e);
   }
   else {
     if (lineart_bounding_area_edge_intersect(
@@ -4268,19 +4348,20 @@ static void lineart_clear_linked_edges_recursive(LineartRenderBuffer *rb,
       lineart_clear_linked_edges_recursive(rb, &root_ba->child[i]);
     }
   }
-  else {
-    root_ba->line_count = 0;
-    root_ba->max_line_count = 128;
-    root_ba->linked_lines = lineart_mem_acquire(&rb->render_data_pool,
-                                                sizeof(LineartEdge *) * root_ba->max_line_count);
+  if (root_ba->linked_lines) {
+    MEM_freeN(root_ba->linked_lines);
   }
+  root_ba->line_count = 0;
+  root_ba->max_line_count = 128;
+  root_ba->linked_lines = MEM_callocN(sizeof(LineartEdge *) * root_ba->max_line_count,
+                                      "cleared lineart edges");
 }
 static void lineart_clear_linked_edges(LineartRenderBuffer *rb)
 {
   LineartBoundingArea *ba = rb->initial_bounding_areas;
-  for (int i = 0; i < rb->tile_count_x; i++) {
+  for (int i = 0; i < rb->tile_count_y; i++) {
     for (int j = 0; j < rb->tile_count_x; j++) {
-      lineart_clear_linked_edges_recursive(rb, &ba[i * LRT_BA_ROWS + j]);
+      lineart_clear_linked_edges_recursive(rb, &ba[i * rb->tile_count_x + j]);
     }
   }
 }
@@ -4297,7 +4378,7 @@ static void lineart_main_link_lines(LineartRenderBuffer *rb)
       for (row = r1; row != r2 + 1; row++) {
         for (col = c1; col != c2 + 1; col++) {
           lineart_bounding_area_link_edge(
-              rb, &rb->initial_bounding_areas[row * LRT_BA_ROWS + col], e);
+              rb, &rb->initial_bounding_areas[row * rb->tile_count_x + col], e);
         }
       }
     }
@@ -4426,7 +4507,7 @@ LineartBoundingArea *MOD_lineart_get_parent_bounding_area(LineartRenderBuffer *r
     row = 0;
   }
 
-  return &rb->initial_bounding_areas[row * LRT_BA_ROWS + col];
+  return &rb->initial_bounding_areas[row * rb->tile_count_x + col];
 }
 
 static LineartBoundingArea *lineart_get_bounding_area(LineartRenderBuffer *rb, double x, double y)
@@ -4448,7 +4529,7 @@ static LineartBoundingArea *lineart_get_bounding_area(LineartRenderBuffer *rb, d
     c = rb->tile_count_x - 1;
   }
 
-  iba = &rb->initial_bounding_areas[r * LRT_BA_ROWS + c];
+  iba = &rb->initial_bounding_areas[r * rb->tile_count_x + c];
   while (iba->child) {
     if (x > iba->cx) {
       if (y > iba->cy) {
@@ -4481,35 +4562,39 @@ LineartBoundingArea *MOD_lineart_get_bounding_area(LineartRenderBuffer *rb, doub
 
 static void lineart_add_triangles_worker(TaskPool *__restrict UNUSED(pool), LineartIsecThread *th)
 {
-  for (int ei = 0; ei < th->current_pending; ei++) {
-    LineartElementLinkNode *eln = th->pending_triangle_nodes[ei];
-    LineartTriangle *tri = eln->pointer;
-    int i, lim = eln->element_count;
-    int x1, x2, y1, y2;
-    int r, co;
-    LineartRenderBuffer *rb = th->rb;
-
-    for (i = 0; i < lim; i++) {
-      if ((tri->flags & LRT_CULL_USED) || (tri->flags & LRT_CULL_DISCARD)) {
-        tri = (void *)(((uchar *)tri) + rb->triangle_size);
-        continue;
-      }
-      if (lineart_get_triangle_bounding_areas(rb, tri, &y1, &y2, &x1, &x2)) {
-        for (co = x1; co <= x2; co++) {
-          for (r = y1; r <= y2; r++) {
-            lineart_bounding_area_link_triangle(rb,
-                                                &rb->initial_bounding_areas[r * LRT_BA_ROWS + co],
-                                                tri,
-                                                0,
-                                                1,
-                                                0,
-                                                (!(tri->flags & LRT_TRIANGLE_NO_INTERSECTION)),
-                                                true,
-                                                th);
-          }
+  LineartRenderBuffer *rb = th->rb;
+  int _dir_control = 0;
+  while (lineart_schedule_new_triangle_task(th)) {
+    for (LineartElementLinkNode *eln = th->pending_from; eln != th->pending_to->next;
+         eln = eln->next) {
+      int index_start = eln == th->pending_from ? th->index_from : 0;
+      int index_end = eln == th->pending_to ? th->index_to : eln->element_count;
+      LineartTriangle *tri = (void *)(((uchar *)eln->pointer) + rb->triangle_size * index_start);
+      for (int ei = index_start; ei < index_end; ei++) {
+        int x1, x2, y1, y2;
+        int r, co;
+        if ((tri->flags & LRT_CULL_USED) || (tri->flags & LRT_CULL_DISCARD)) {
+          tri = (void *)(((uchar *)tri) + rb->triangle_size);
+          continue;
         }
-      } /* Else throw away. */
-      tri = (void *)(((uchar *)tri) + rb->triangle_size);
+        if (lineart_get_triangle_bounding_areas(rb, tri, &y1, &y2, &x1, &x2)) {
+          _dir_control++;
+          for (co = x1; co <= x2; co++) {
+            for (r = y1; r <= y2; r++) {
+              lineart_bounding_area_link_triangle_cas(
+                  rb,
+                  &rb->initial_bounding_areas[r * rb->tile_count_x + co],
+                  tri,
+                  0,
+                  1,
+                  0,
+                  (!(tri->flags & LRT_TRIANGLE_NO_INTERSECTION)),
+                  th);
+            }
+          }
+        } /* Else throw away. */
+        tri = (void *)(((uchar *)tri) + rb->triangle_size);
+      }
     }
   }
 }
@@ -4520,7 +4605,6 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
   double ZMax = rb->far_clip;
   double ZMin = rb->near_clip;
 
-  int total_lines = 0;
   for (int i = 0; i < d->thread_count; i++) {
     LineartIsecThread *th = &d->threads[i];
     if (G.debug_value == 4000) {
@@ -4529,47 +4613,31 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
     if (!th->current) {
       continue;
     }
-    total_lines += th->current;
-  }
-
-  if (!total_lines) {
-    return;
-  }
-
-  /* We don't care about removing duplicated vert in this method, chaning can handle that,
-   * and it saves us from using locks and look up tables. */
-  LineartVert *v = lineart_mem_acquire(rb->edge_data_pool, sizeof(LineartVert) * total_lines * 2);
-  LineartEdge *e = lineart_mem_acquire(rb->edge_data_pool, sizeof(LineartEdge) * total_lines);
-  LineartEdgeSegment *es = lineart_mem_acquire(rb->edge_data_pool,
-                                               sizeof(LineartEdgeSegment) * total_lines);
-
-  LineartElementLinkNode *eln = lineart_mem_acquire(rb->edge_data_pool,
-                                                    sizeof(LineartElementLinkNode));
-  eln->element_count = total_lines;
-  eln->pointer = e;
-  eln->flags |= LRT_ELEMENT_INTERSECTION_DATA;
-  BLI_addhead(&rb->line_buffer_pointers, eln);
-
-  for (int i = 0; i < d->thread_count; i++) {
-    LineartIsecThread *th = &d->threads[i];
-    if (!th->current) {
-      continue;
-    }
+    /* We don't care about removing duplicated vert in this method, chaning can handle that, and it
+     * saves us from using locks and look up tables. */
+    LineartVertIntersection *v = lineart_mem_acquire(
+        &rb->render_data_pool, sizeof(LineartVertIntersection) * th->current * 2);
+    LineartEdge *e = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdge) * th->current);
+    LineartEdgeSegment *es = lineart_mem_acquire(&rb->render_data_pool,
+                                                 sizeof(LineartEdgeSegment) * th->current);
     for (int j = 0; j < th->current; j++) {
-      LineartVert *v1 = v;
-      LineartVert *v2 = v + 1;
+      LineartVertIntersection *v1i = v;
+      LineartVertIntersection *v2i = v + 1;
       LineartIsecSingle *is = &th->array[j];
+      v1i->intersecting_with = is->tri1;
+      v2i->intersecting_with = is->tri2;
+      LineartVert *v1 = (LineartVert *)v1i;
+      LineartVert *v2 = (LineartVert *)v2i;
+      v1->flag |= LRT_VERT_HAS_INTERSECTION_DATA;
+      v2->flag |= LRT_VERT_HAS_INTERSECTION_DATA;
       copy_v3db_v3fl(v1->gloc, is->v1);
       copy_v3db_v3fl(v2->gloc, is->v2);
       /* The intersection line has been generated only in geometry space, so we need to
        * transform them as well. */
       mul_v4_m4v3_db(v1->fbcoord, rb->view_projection, v1->gloc);
       mul_v4_m4v3_db(v2->fbcoord, rb->view_projection, v2->gloc);
-
-      if (rb->cam_is_persp) {
-        mul_v3db_db(v1->fbcoord, (1 / v1->fbcoord[3]));
-        mul_v3db_db(v2->fbcoord, (1 / v2->fbcoord[3]));
-      }
+      mul_v3db_db(v1->fbcoord, (1 / v1->fbcoord[3]));
+      mul_v3db_db(v2->fbcoord, (1 / v2->fbcoord[3]));
 
       v1->fbcoord[0] -= rb->shift_x * 2;
       v1->fbcoord[1] -= rb->shift_y * 2;
@@ -4593,7 +4661,7 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
       e->intersection_mask = (is->tri1->intersection_mask | is->tri2->intersection_mask);
       BLI_addtail(&e->segments, es);
 
-      lineart_add_edge_to_list(&rb->pending_edges, e);
+      lineart_add_edge_to_array(&rb->pending_edges, e);
 
       v += 2;
       e++;
@@ -4607,8 +4675,6 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
  */
 static void lineart_main_add_triangles(LineartRenderBuffer *rb)
 {
-  int i;
-
   double t_start;
   if (G.debug_value == 4000) {
     t_start = PIL_check_seconds_timer();
@@ -4618,7 +4684,7 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
   lineart_init_isec_thread(&d, rb, rb->thread_count);
 
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
-  for (i = 0; i < rb->thread_count; i++) {
+  for (int i = 0; i < rb->thread_count; i++) {
     BLI_task_pool_push(tp, (TaskRunFunction)lineart_add_triangles_worker, &d.threads[i], 0, NULL);
   }
   BLI_task_pool_work_and_wait(tp);
@@ -5889,7 +5955,7 @@ static void lineart_transform_and_add_shadow(LineartRenderBuffer *rb,
   }
   LineartEdge *e = eeln->pointer;
   for (int i = 0; i < eeln->element_count; i++) {
-    lineart_add_edge_to_list(&rb->pending_edges, &e[i]);
+    lineart_add_edge_to_array(&rb->pending_edges, &e[i]);
   }
   BLI_addtail(&rb->vertex_buffer_pointers, veln);
   BLI_addtail(&rb->line_buffer_pointers, eeln);
@@ -5932,11 +5998,12 @@ static void lineart_make_enclosed_shapes(LineartRenderBuffer *rb, LineartRenderB
     }
   }
 
-  lineart_finalize_object_edge_list_reserve(&shadow_rb->pending_edges, shadow_eeln->element_count);
+  lineart_finalize_object_edge_array_reserve(&shadow_rb->pending_edges,
+                                             shadow_eeln->element_count);
 
   LineartEdge *se = shadow_eeln->pointer;
   for (int i = 0; i < shadow_eeln->element_count; i++) {
-    lineart_add_edge_to_list(&shadow_rb->pending_edges, &se[i]);
+    lineart_add_edge_to_array(&shadow_rb->pending_edges, &se[i]);
   }
 
   shadow_rb->scheduled_count = 0;
