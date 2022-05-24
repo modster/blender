@@ -73,7 +73,7 @@ class GPDataRuntime {
  * of where to find the stroke in the frame and it's size.
  * This class is only meant to facilitate the handling of individual strokes.
  */
-class GPStroke : NonCopyable, NonMovable {
+class GPStroke {
  public:
   GPStroke(CurvesGeometry *geometry, int num_points, int offset)
       : geometry_(geometry), points_num_(num_points), offset_(offset){};
@@ -101,6 +101,16 @@ class GPStroke : NonCopyable, NonMovable {
   MutableSpan<float3> points_positions_for_write() const
   {
     return {geometry_->positions_for_write().begin() + offset_, points_num_};
+  }
+
+  void transform(float4x4 matrix)
+  {
+    threading::parallel_for(
+        points_positions_for_write().index_range(), 512, [&](const IndexRange range) {
+          for (float3 &position : points_positions_for_write().slice(range)) {
+            position = matrix * position;
+          }
+        });
   }
 
  private:
@@ -221,6 +231,17 @@ class GPFrame : public ::GPFrame {
       return 0;
     }
     return this->strokes->point_num;
+  }
+
+  Vector<GPStroke> strokes_for_write()
+  {
+    Vector<GPStroke> strokes;
+    for (const int i : this->strokes_as_curves().offsets().drop_back(1).index_range()) {
+      int offset = this->strokes_as_curves().offsets()[i];
+      int length = this->strokes_as_curves().offsets()[i + 1] - offset;
+      strokes.append({reinterpret_cast<CurvesGeometry *>(this->strokes), length, offset});
+    }
+    return strokes;
   }
 
   GPStroke add_new_stroke(int new_points_num)
@@ -1013,14 +1034,14 @@ TEST(gpencil_proposal, TimeBigGPDataCopy)
   free_old_gpencil_data(old_data_copy);
 }
 
-TEST(gpencil_proposal, TimeBigGPDataInsertFrame)
+TEST(gpencil_proposal, TimeInsertFrame)
 {
   int layers_num = 100, frames_num = 1000, strokes_num = 10, points_num = 10;
   GPData data = build_gpencil_data(layers_num, frames_num, strokes_num, points_num);
   data.set_active_layer(7);
 
   {
-    SCOPED_TIMER("TimeBigGPDataInsertFrame");
+    SCOPED_TIMER("TimeInsertFrame");
     data.add_frame_on_active_layer(347);
   }
 
@@ -1045,11 +1066,55 @@ TEST(gpencil_proposal, TimeBigGPDataInsertFrame)
   }
 
   {
-    SCOPED_TIMER("TimeBigGPDataOldInsertFrame");
+    SCOPED_TIMER("TimeOldInsertFrame");
     insert_new_frame_old_gpencil_data(old_data, 347);
   }
 
   EXPECT_EQ(BLI_listbase_count(&gpl_active->frames), 1000);
+
+  free_old_gpencil_data(old_data);
+}
+
+TEST(gpencil_proposal, TimeMultiFrameTransformStrokes)
+{
+  int layers_num = 1, frames_num = 1000, strokes_num = 100, points_num = 100;
+  GPData data = build_gpencil_data(layers_num, frames_num, strokes_num, points_num);
+  data.set_active_layer(0);
+
+  float4x4 translate_mat = float4x4::from_location({1.0f, 2.0f, 3.0f});
+  {
+    SCOPED_TIMER("TimeMultiFrameTransformStrokes");
+    IndexMask indices_frames = data.frames_on_active_layer();
+    for (const int i : indices_frames) {
+      GPFrame &gpf = data.frames_for_write(i);
+      Vector<GPStroke> gpf_strokes = gpf.strokes_for_write();
+      MutableSpan<GPStroke> strokes_span = gpf_strokes.as_mutable_span();
+      threading::parallel_for(strokes_span.index_range(), 256, [&](const IndexRange range) {
+        for (GPStroke &stroke : strokes_span.slice(range)) {
+          stroke.transform(translate_mat);
+        }
+      });
+    }
+  }
+
+  bGPdata *old_data = build_old_gpencil_data(layers_num, frames_num, strokes_num, points_num);
+  BKE_gpencil_layer_active_set(old_data, reinterpret_cast<bGPDlayer *>(old_data->layers.first));
+
+  float matrix[4][4], loc[3] = {1.0f, 2.0f, 3.0f};
+  unit_m4(matrix);
+  copy_v3_v3(matrix[3], loc);
+  {
+    SCOPED_TIMER("TimeOldMultiFrameTransformStrokes");
+    bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(old_data);
+    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl_active->frames) {
+      LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+        for (int i = 0; i < gps->totpoints; i++) {
+          bGPDspoint *pt = &gps->points[i];
+          mul_m4_v3(matrix, &pt->x);
+        }
+      }
+    }
+  }
 
   free_old_gpencil_data(old_data);
 }
