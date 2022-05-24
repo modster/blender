@@ -780,7 +780,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
   get_filename_component(sycl_compiler_compiler_name ${SYCL_COMPILER} NAME_WE)
 
   if(NOT OCLOC_INSTALL_DIR)
-    cmake_path(SET OCLOC_INSTALL_DIR NORMALIZE "${sycl_compiler_root}/../lib/ocloc")
+    get_filename_component(OCLOC_INSTALL_DIR "${sycl_compiler_root}/../lib/ocloc" ABSOLUTE)
   endif()
   if(WITH_CYCLES_ONEAPI_BINARIES AND NOT EXISTS ${OCLOC_INSTALL_DIR})
     message(FATAL_ERROR "WITH_CYCLES_ONEAPI_BINARIES requires ocloc but ${OCLOC_INSTALL_DIR} directory doesn't exist."
@@ -823,7 +823,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       if(NOT CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION) # case for Ninja on Windows
         get_filename_component(cmake_mt_dir ${CMAKE_MT} DIRECTORY)
         string(REPLACE /bin/ /Lib/ WINDOWS_KIT_DIR ${cmake_mt_dir})
-        cmake_path(SET WINDOWS_KIT_DIR NORMALIZE "${WINDOWS_KIT_DIR}/../")
+        get_filename_component(WINDOWS_KIT_DIR "${WINDOWS_KIT_DIR}/../" ABSOLUTE)
       else()
         set(WINDOWS_KIT_DIR ${WINDOWS_KITS_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION})
       endif()
@@ -851,14 +851,14 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       # The open source SYCL compiler just goes by clang++ and does not have such a script.
       # Set the variables manually.
       if(NOT IGC_INSTALL_DIR)
-        cmake_path(SET IGC_INSTALL_DIR NORMALIZE "${sycl_compiler_root}/../lib/igc")
+        get_filename_component(IGC_INSTALL_DIR "${sycl_compiler_root}/../lib/igc" ABSOLUTE)
       endif()
       add_custom_command(
         OUTPUT ${cycles_kernel_oneapi_lib}
         COMMAND ${CMAKE_COMMAND} -E env
                 "LD_LIBRARY_PATH=${sycl_compiler_root}/../lib:${OCLOC_INSTALL_DIR}/lib:${IGC_INSTALL_DIR}/lib"
                 "PATH=${OCLOC_INSTALL_DIR}/bin:${sycl_compiler_root}:$ENV{PATH}" # env PATH is for compiler to find ld
-                ${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}
+                ${SYCL_COMPILER} $<$<CONFIG:Debug>:-g>$<$<CONFIG:RelWithDebInfo>:-g> ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
   endif()
