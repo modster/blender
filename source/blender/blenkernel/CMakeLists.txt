@@ -295,6 +295,7 @@ set(SRC
   intern/type_conversions.cc
   intern/undo_system.c
   intern/unit.c
+  intern/uv_islands.cc
   intern/vfont.c
   intern/vfontdata_freetype.c
   intern/volume.cc

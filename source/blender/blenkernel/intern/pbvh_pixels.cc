@@ -15,6 +15,7 @@
 #include "BLI_task.h"
 
 #include "BKE_image_wrappers.hh"
+#include "BKE_uv_islands.hh"
 
 #include "bmesh.h"
 
@@ -26,7 +27,26 @@ namespace blender::bke::pbvh::pixels {
  * During debugging this check could be enabled.
  * It will write to each image pixel that is covered by the PBVH.
  */
-constexpr bool USE_WATERTIGHT_CHECK = false;
+constexpr bool USE_WATERTIGHT_CHECK = true;
+
+/* -------------------------------------------------------------------- */
+
+/** \name UV Islands
+ * \{ */
+
+/** Build UV islands from PBVH primitives. */
+static uv_islands::UVIslands build_uv_islands(const PBVH &pbvh, const MLoopUV *mloopuv)
+{
+  uv_islands::UVIslands islands(pbvh.looptri, pbvh.totprim, mloopuv);
+  uv_islands::UVIslandsMask uv_masks(float2(0.0, 0.0), ushort2(256, 256));
+  uv_masks.add(islands);
+  uv_masks.dilate();
+  islands.extract_borders(pbvh.mloop);
+  islands.extend_borders(uv_masks, pbvh.looptri, pbvh.totprim, pbvh.mloop);
+  return islands;
+}
+
+/** \} */
 
 /**
  * Calculate the delta of two neighbor UV coordinates in the given image buffer.
@@ -293,6 +313,8 @@ static void update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image
     NodeData *node_data = static_cast<NodeData *>(node->pixels.node_data);
     init_triangles(pbvh, node, node_data, mesh->mloop);
   }
+
+  uv_islands::UVIslands islands = build_uv_islands(*pbvh, ldata_uv);
 
   EncodePixelsUserData user_data;
   user_data.pbvh = pbvh;
