@@ -18,7 +18,7 @@ CCL_NAMESPACE_BEGIN
  * attributes for performance, mainly for GPU performance to avoid bringing in
  * heavy volume interpolation code. */
 
-ccl_device_inline float primitive_surface_attribute_float(KernelGlobals kg,
+ccl_device_forceinline float primitive_surface_attribute_float(KernelGlobals kg,
                                                           ccl_private const ShaderData *sd,
                                                           const AttributeDescriptor desc,
                                                           ccl_private float *dx,
@@ -49,7 +49,7 @@ ccl_device_inline float primitive_surface_attribute_float(KernelGlobals kg,
   }
 }
 
-ccl_device_inline float2 primitive_surface_attribute_float2(KernelGlobals kg,
+ccl_device_forceinline float2 primitive_surface_attribute_float2(KernelGlobals kg,
                                                             ccl_private const ShaderData *sd,
                                                             const AttributeDescriptor desc,
                                                             ccl_private float2 *dx,
@@ -80,7 +80,7 @@ ccl_device_inline float2 primitive_surface_attribute_float2(KernelGlobals kg,
   }
 }
 
-ccl_device_inline float3 primitive_surface_attribute_float3(KernelGlobals kg,
+ccl_device_forceinline float3 primitive_surface_attribute_float3(KernelGlobals kg,
                                                             ccl_private const ShaderData *sd,
                                                             const AttributeDescriptor desc,
                                                             ccl_private float3 *dx,
@@ -149,13 +149,13 @@ ccl_device_forceinline float4 primitive_surface_attribute_float4(KernelGlobals k
  * attributes for performance, mainly for GPU performance to avoid bringing in
  * heavy volume interpolation code. */
 
-ccl_device_inline bool primitive_is_volume_attribute(ccl_private const ShaderData *sd,
+ccl_device_forceinline bool primitive_is_volume_attribute(ccl_private const ShaderData *sd,
                                                      const AttributeDescriptor desc)
 {
   return sd->type == PRIMITIVE_VOLUME;
 }
 
-ccl_device_inline float primitive_volume_attribute_float(KernelGlobals kg,
+ccl_device_forceinline float primitive_volume_attribute_float(KernelGlobals kg,
                                                          ccl_private const ShaderData *sd,
                                                          const AttributeDescriptor desc)
 {
@@ -167,7 +167,7 @@ ccl_device_inline float primitive_volume_attribute_float(KernelGlobals kg,
   }
 }
 
-ccl_device_inline float3 primitive_volume_attribute_float3(KernelGlobals kg,
+ccl_device_forceinline float3 primitive_volume_attribute_float3(KernelGlobals kg,
                                                            ccl_private const ShaderData *sd,
                                                            const AttributeDescriptor desc)
 {
@@ -179,7 +179,7 @@ ccl_device_inline float3 primitive_volume_attribute_float3(KernelGlobals kg,
   }
 }
 
-ccl_device_inline float4 primitive_volume_attribute_float4(KernelGlobals kg,
+ccl_device_forceinline float4 primitive_volume_attribute_float4(KernelGlobals kg,
                                                            ccl_private const ShaderData *sd,
                                                            const AttributeDescriptor desc)
 {
@@ -194,7 +194,7 @@ ccl_device_inline float4 primitive_volume_attribute_float4(KernelGlobals kg,
 
 /* Default UV coordinate */
 
-ccl_device_inline float3 primitive_uv(KernelGlobals kg, ccl_private const ShaderData *sd)
+ccl_device_forceinline float3 primitive_uv(KernelGlobals kg, ccl_private const ShaderData *sd)
 {
   const AttributeDescriptor desc = find_attribute(kg, sd, ATTR_STD_UV);
 
@@ -262,7 +262,7 @@ ccl_device float3 primitive_tangent(KernelGlobals kg, ccl_private ShaderData *sd
 
 /* Motion vector for motion pass */
 
-ccl_device_inline float4 primitive_motion_vector(KernelGlobals kg,
+ccl_device_forceinline float4 primitive_motion_vector(KernelGlobals kg,
                                                  ccl_private const ShaderData *sd)
 {
   /* center position */
