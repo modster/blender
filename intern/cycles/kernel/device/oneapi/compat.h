@@ -37,7 +37,7 @@
 #define ccl_noinline
 #define ccl_inline_constant const constexpr
 #define ccl_static_constant const
-#define ccl_device_forceinline inline
+#define ccl_device_forceinline __attribute__((always_inline))
 #define ccl_device_noinline ccl_device ccl_noinline
 #define ccl_device_noinline_cpu ccl_device
 #define ccl_device_inline_method ccl_device
@@ -186,8 +186,6 @@ ccl_always_inline float3 make_float3(float x)
 #define fminf(x, y) sycl::fmin((x), (y))
 #define fmodf(x, y) sycl::fmod((x), (y))
 #define lgammaf(x) sycl::lgamma((x))
-
-#define __forceinline inline
 
 /* Types */
 #include "util/half.h"

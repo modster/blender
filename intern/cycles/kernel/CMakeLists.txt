@@ -728,7 +728,6 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       -ffast-math
       -DNDEBUG
       -O2
-      -mllvm -inlinedefault-threshold=400
       -o ${cycles_kernel_oneapi_lib}
       -I${CMAKE_CURRENT_SOURCE_DIR}/..
       -I${LEVEL_ZERO_INCLUDE_DIR}
