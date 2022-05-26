@@ -835,7 +835,7 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
         COMMAND ${CMAKE_COMMAND} -E env
                 "LIB=${sycl_compiler_root}/../lib" # for compiler to find sycl.lib
                 "PATH=${OCLOC_INSTALL_DIR};${sycl_compiler_root}"
-                ${SYCL_COMPILER} $<$<CONFIG:Debug,RelWithDebInfo>:-g> ${sycl_compiler_flags}
+                ${SYCL_COMPILER} $<$<CONFIG:Debug>:-g>$<$<CONFIG:RelWithDebInfo>:-g> ${sycl_compiler_flags}
         DEPENDS ${cycles_oneapi_kernel_sources})
     endif()
   else()
