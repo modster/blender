@@ -228,27 +228,6 @@ static void image_foreach_cache(ID *id,
   key.offset_in_ID = offsetof(Image, cache);
   function_callback(id, &key, (void **)&image->cache, 0, user_data);
 
-#if 0
-  auto gputexture_offset = [image](int target, int eye) {
-    constexpr size_t base_offset = offsetof(Image, gputexture);
-    struct GPUTexture **first = &image->gputexture[0][0];
-    const size_t array_offset = sizeof(*first) * (&image->gputexture[target][eye] - first);
-    return base_offset + array_offset;
-  };
-
-// TODO(jbakker): need to check how this is actually used not the GPU textures are shared we might need to reinvalidate this.
-  for (int eye = 0; eye < 2; eye++) {
-    for (int a = 0; a < TEXTARGET_COUNT; a++) {
-      GPUTexture *texture = image->gputexture[a][eye];
-      if (texture == nullptr) {
-        continue;
-      }
-      key.offset_in_ID = gputexture_offset(a, eye);
-      function_callback(id, &key, (void **)&image->gputexture[a][eye], 0, user_data);
-    }
-  }
-#endif
-
   key.offset_in_ID = offsetof(Image, rr);
   function_callback(id, &key, (void **)&image->rr, 0, user_data);
 

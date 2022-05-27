@@ -12,10 +12,12 @@
 #include "BLI_linklist.h"
 #include "BLI_listbase.h"
 #include "BLI_map.hh"
+#include "BLI_path_util.h"
 #include "BLI_threads.h"
 #include "BLI_utility_mixins.hh"
 
 #include "DNA_image_types.h"
+#include "DNA_space_types.h"
 #include "DNA_userdef_types.h"
 
 #include "IMB_colormanagement.h"
@@ -109,12 +111,15 @@ struct ImageGPUTextureStore {
 
   void remove_unused()
   {
+    int entries_removed = 0;
     for (auto it : entries.items()) {
       if (it.value.flags.in_use) {
         continue;
       }
       entries.remove(it.key);
+      entries_removed++;
     }
+    // printf("%s: %d entries removed\n", __func__, entries_removed);
   }
 
   void set_mipmap(const bool mipmap)
@@ -126,6 +131,7 @@ struct ImageGPUTextureStore {
 
   void clear()
   {
+    // printf("%s: %lld entries removed\n", __func__, entries.size());
     entries.clear();
   }
 
@@ -166,7 +172,10 @@ struct ImageGPUTextureStore {
     }
     if (add_filepath) {
       // TODO: use absolute filepath.
-      result << "FILE:" << image.filepath << ",";
+      char filepath[FILE_MAX];
+      BLI_strncpy(filepath, image.filepath, sizeof(filepath));
+      BLI_path_abs(filepath, ID_BLEND_PATH_FROM_GLOBAL(&image.id));
+      result << "FILE:" << filepath << ",";
     }
 
     return result.str();
@@ -175,7 +184,10 @@ struct ImageGPUTextureStore {
   Entry &operator[](Image &image)
   {
     std::string key = create_key(image);
-    return entries.lookup_or_add_default(key);
+    Entry &entry = entries.lookup_or_add_default(key);
+    // printf("%s: %s => key %s = entry<%p>\n", __func__, image.id.name, key.c_str(), &entry);
+    entry.tag_used();
+    return entry;
   }
 };
 
