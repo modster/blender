@@ -129,10 +129,46 @@ struct ImageGPUTextureStore {
     entries.clear();
   }
 
-  std::string create_key(const Image &image) const
+  std::string create_key(Image &image) const
   {
+    bool add_ptr = false;
+    bool add_filepath = false;
+
+    switch (image.source) {
+      case IMA_SRC_FILE:
+        if (BKE_image_is_dirty(&image)) {
+          add_ptr = true;
+        }
+        else {
+          add_filepath = true;
+        }
+        break;
+      case IMA_SRC_SEQUENCE:
+        add_ptr = true;
+        break;
+      case IMA_SRC_MOVIE:
+        add_ptr = true;
+        break;
+      case IMA_SRC_GENERATED:
+        add_ptr = true;
+        break;
+      case IMA_SRC_VIEWER:
+        add_ptr = true;
+        break;
+      case IMA_SRC_TILED:
+        add_ptr = true;
+        break;
+    }
+
     std::stringstream result;
-    result << "ID:" << image.id.name;
+    if (add_ptr) {
+      result << "PTR:" << &image << ",";
+    }
+    if (add_filepath) {
+      // TODO: use absolute filepath.
+      result << "FILE:" << image.filepath << ",";
+    }
+
     return result.str();
   }
 

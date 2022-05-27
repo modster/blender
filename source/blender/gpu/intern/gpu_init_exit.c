@@ -6,7 +6,10 @@
  */
 
 #include "GPU_init_exit.h" /* interface */
+
 #include "BKE_global.h"
+#include "BKE_image.h"
+
 #include "BLI_sys_types.h"
 #include "GPU_batch.h"
 #include "GPU_buffers.h"
@@ -59,6 +62,9 @@ void GPU_exit(void)
 
   gpu_shader_dependency_exit();
   gpu_shader_create_info_exit();
+
+  /* TODO: Can be considered as a bad call. Perhaps BKE should not own the ImageGPUTextureStore. */
+  BKE_image_free_all_gputextures(NULL);
 
   initialized = false;
 }
