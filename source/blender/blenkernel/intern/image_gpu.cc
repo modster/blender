@@ -11,7 +11,9 @@
 #include "BLI_boxpack_2d.h"
 #include "BLI_linklist.h"
 #include "BLI_listbase.h"
+#include "BLI_map.hh"
 #include "BLI_threads.h"
+#include "BLI_utility_mixins.hh"
 
 #include "DNA_image_types.h"
 #include "DNA_userdef_types.h"
@@ -33,13 +35,133 @@
 
 using namespace blender::bke::image::partial_update;
 
+namespace blender::bke::image::gpu {
+struct ImageGPUTextureStore {
+  class Entry : NonCopyable {
+   public:
+    GPUTexture *gputextures[TEXTARGET_COUNT][2];
+    struct {
+      bool in_use : 1;
+    } flags;
+
+    Entry()
+    {
+      for (int target = 0; target < TEXTARGET_COUNT; target++) {
+        for (int eye = 0; eye < 2; eye++) {
+          gputextures[target][eye] = nullptr;
+        }
+      }
+    }
+
+    Entry(Entry &&other)
+    {
+      for (int target = 0; target < TEXTARGET_COUNT; target++) {
+        for (int eye = 0; eye < 2; eye++) {
+          gputextures[target][eye] = other.gputextures[target][eye];
+          other.gputextures[target][eye] = nullptr;
+        }
+      }
+      flags.in_use = other.flags.in_use;
+    };
+
+    virtual ~Entry()
+    {
+      clear();
+    }
+
+    void set_mipmap(const bool mipmap)
+    {
+      for (int eye = 0; eye < 2; eye++) {
+        if (gputextures[TEXTARGET_2D][eye]) {
+          GPU_texture_mipmap_mode(gputextures[TEXTARGET_2D][eye], mipmap, true);
+        }
+        if (gputextures[TEXTARGET_2D_ARRAY][eye]) {
+          GPU_texture_mipmap_mode(gputextures[TEXTARGET_2D_ARRAY][eye], mipmap, true);
+        }
+      }
+    }
+
+    void tag_used()
+    {
+      flags.in_use = true;
+    }
+
+    void clear()
+    {
+      for (int target = 0; target < TEXTARGET_COUNT; target++) {
+        for (int eye = 0; eye < 2; eye++) {
+          GPU_TEXTURE_FREE_SAFE(gputextures[target][eye]);
+        }
+      }
+    }
+  };
+
+  using Entries = Map<std::string, Entry>;
+
+  Entries entries;
+
+  void reset_usage()
+  {
+    for (Entry &entry : entries.values()) {
+      entry.flags.in_use = false;
+    }
+  }
+
+  void remove_unused()
+  {
+    for (auto it : entries.items()) {
+      if (it.value.flags.in_use) {
+        continue;
+      }
+      entries.remove(it.key);
+    }
+  }
+
+  void set_mipmap(const bool mipmap)
+  {
+    for (Entry &entry : entries.values()) {
+      entry.set_mipmap(mipmap);
+    }
+  }
+
+  void clear()
+  {
+    entries.clear();
+  }
+
+  std::string create_key(const Image &image) const
+  {
+    std::stringstream result;
+    result << "ID:" << image.id.name;
+    return result.str();
+  }
+
+  Entry &operator[](Image &image)
+  {
+    std::string key = create_key(image);
+    return entries.lookup_or_add_default(key);
+  }
+};
+
+static ImageGPUTextureStore g_texture_store;
+
+}  // namespace blender::bke::image::gpu
+
 extern "C" {
+
+using namespace blender::bke::image::gpu;
 
 /* Prototypes. */
 static void gpu_free_unused_buffers();
 static void image_free_gpu(Image *ima, const bool immediate);
-static void image_update_gputexture_ex(
-    Image *ima, ImageTile *tile, ImBuf *ibuf, int x, int y, int w, int h);
+static void image_update_gputexture_ex(Image *ima,
+                                       ImageGPUTextureStore::Entry &entry,
+                                       ImageTile *tile,
+                                       ImBuf *ibuf,
+                                       int x,
+                                       int y,
+                                       int w,
+                                       int h);
 
 bool BKE_image_has_gpu_texture_premultiplied_alpha(Image *image, ImBuf *ibuf)
 {
@@ -77,9 +199,11 @@ static int smaller_power_of_2_limit(int num)
   return power_of_2_min_i(GPU_texture_size_with_limit(num));
 }
 
-static GPUTexture *gpu_texture_create_tile_mapping(Image *ima, const int multiview_eye)
+static GPUTexture *gpu_texture_create_tile_mapping(Image *ima,
+                                                   ImageGPUTextureStore::Entry &entry,
+                                                   const int multiview_eye)
 {
-  GPUTexture *tilearray = ima->gputexture[TEXTARGET_2D_ARRAY][multiview_eye];
+  GPUTexture *tilearray = entry.gputextures[TEXTARGET_2D_ARRAY][multiview_eye];
 
   if (tilearray == nullptr) {
     return nullptr;
@@ -249,7 +373,7 @@ static GPUTexture *gpu_texture_create_tile_array(Image *ima, ImBuf *main_ibuf)
 /** \name Regular gpu texture
  * \{ */
 
-static GPUTexture **get_image_gpu_texture_ptr(Image *ima,
+static GPUTexture **get_image_gpu_texture_ptr(ImageGPUTextureStore::Entry &entry,
                                               eGPUTextureTarget textarget,
                                               const int multiview_eye)
 {
@@ -258,7 +382,7 @@ static GPUTexture **get_image_gpu_texture_ptr(Image *ima,
   BLI_assert(ELEM(multiview_eye, 0, 1));
 
   if (in_range) {
-    return &(ima->gputexture[textarget][multiview_eye]);
+    return &entry.gputextures[textarget][multiview_eye];
   }
   return nullptr;
 }
@@ -278,7 +402,9 @@ static GPUTexture *image_gpu_texture_error_create(eGPUTextureTarget textarget)
 }
 
 static void image_gpu_texture_partial_update_changes_available(
-    Image *image, PartialUpdateChecker<ImageTileData>::CollectResult &changes)
+    Image *image,
+    ImageGPUTextureStore::Entry &entry,
+    PartialUpdateChecker<ImageTileData>::CollectResult &changes)
 {
   while (changes.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
     /* Calculate the clipping region with the tile buffer.
@@ -294,6 +420,7 @@ static void image_gpu_texture_partial_update_changes_available(
     }
 
     image_update_gputexture_ex(image,
+                               entry,
                                changes.tile_data.tile,
                                changes.tile_data.tile_buffer,
                                clipped_update_region.xmin,
@@ -307,14 +434,15 @@ static void image_gpu_texture_try_partial_update(Image *image, ImageUser *iuser)
 {
   PartialUpdateChecker<ImageTileData> checker(image, iuser, image->runtime.partial_update_user);
   PartialUpdateChecker<ImageTileData>::CollectResult changes = checker.collect_changes();
+  ImageGPUTextureStore::Entry &entry = g_texture_store[*image];
   switch (changes.get_result_code()) {
     case ePartialUpdateCollectResult::FullUpdateNeeded: {
-      image_free_gpu(image, true);
+      entry.clear();
       break;
     }
 
     case ePartialUpdateCollectResult::PartialChangesDetected: {
-      image_gpu_texture_partial_update_changes_available(image, changes);
+      image_gpu_texture_partial_update_changes_available(image, entry, changes);
       break;
     }
 
@@ -371,7 +499,8 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
   if (current_view >= 2) {
     current_view = 0;
   }
-  GPUTexture **tex = get_image_gpu_texture_ptr(ima, textarget, current_view);
+  ImageGPUTextureStore::Entry &entry = g_texture_store[*ima];
+  GPUTexture **tex = get_image_gpu_texture_ptr(entry, textarget, current_view);
   if (*tex) {
     return *tex;
   }
@@ -398,7 +527,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
     *tex = gpu_texture_create_tile_array(ima, ibuf_intern);
   }
   else if (textarget == TEXTARGET_TILE_MAPPING) {
-    *tex = gpu_texture_create_tile_mapping(ima, iuser ? iuser->multiview_eye : 0);
+    *tex = gpu_texture_create_tile_mapping(ima, entry, iuser ? iuser->multiview_eye : 0);
   }
   else {
     const bool use_high_bitdepth = (ima->flag & IMA_HIGH_BITDEPTH);
@@ -491,8 +620,10 @@ void BKE_image_free_unused_gpu_textures()
 /** \name Deletion
  * \{ */
 
-static void image_free_gpu(Image *ima, const bool immediate)
+static void image_free_gpu(Image *UNUSED(ima), const bool UNUSED(immediate))
 {
+// TODO(jbakker)...
+#if 0
   for (int eye = 0; eye < 2; eye++) {
     for (int i = 0; i < TEXTARGET_COUNT; i++) {
       if (ima->gputexture[i][eye] != nullptr) {
@@ -511,6 +642,7 @@ static void image_free_gpu(Image *ima, const bool immediate)
   }
 
   ima->gpuflag &= ~IMA_GPU_MIPMAP_COMPLETE;
+#endif
 }
 
 void BKE_image_free_gputextures(Image *ima)
@@ -518,13 +650,9 @@ void BKE_image_free_gputextures(Image *ima)
   image_free_gpu(ima, BLI_thread_is_main());
 }
 
-void BKE_image_free_all_gputextures(Main *bmain)
+void BKE_image_free_all_gputextures(Main *UNUSED(bmain))
 {
-  if (bmain) {
-    LISTBASE_FOREACH (Image *, ima, &bmain->images) {
-      BKE_image_free_gputextures(ima);
-    }
-  }
+  blender::bke::image::gpu::g_texture_store.clear();
 }
 
 void BKE_image_free_anim_gputextures(Main *bmain)
@@ -538,8 +666,9 @@ void BKE_image_free_anim_gputextures(Main *bmain)
   }
 }
 
-void BKE_image_free_old_gputextures(Main *bmain)
+void BKE_image_free_old_gputextures(Main *UNUSED(bmain))
 {
+
   static int lasttime = 0;
   int ctime = (int)PIL_check_seconds_timer();
 
@@ -558,20 +687,8 @@ void BKE_image_free_old_gputextures(Main *bmain)
 
   lasttime = ctime;
 
-  LISTBASE_FOREACH (Image *, ima, &bmain->images) {
-    if ((ima->flag & IMA_NOCOLLECT) == 0 && ctime - ima->lastused > U.textimeout) {
-      /* If it's in GL memory, deallocate and set time tag to current time
-       * This gives textures a "second chance" to be used before dying. */
-      if (BKE_image_has_opengl_texture(ima)) {
-        BKE_image_free_gputextures(ima);
-        ima->lastused = ctime;
-      }
-      /* Otherwise, just kill the buffers */
-      else {
-        BKE_image_free_buffers(ima);
-      }
-    }
-  }
+  blender::bke::image::gpu::g_texture_store.remove_unused();
+  blender::bke::image::gpu::g_texture_store.reset_usage();
 }
 
 /** \} */
@@ -802,18 +919,24 @@ static void gpu_texture_update_from_ibuf(
   GPU_texture_unbind(tex);
 }
 
-static void image_update_gputexture_ex(
-    Image *ima, ImageTile *tile, ImBuf *ibuf, int x, int y, int w, int h)
+static void image_update_gputexture_ex(Image *ima,
+                                       ImageGPUTextureStore::Entry &entry,
+                                       ImageTile *tile,
+                                       ImBuf *ibuf,
+                                       int x,
+                                       int y,
+                                       int w,
+                                       int h)
 {
   const int eye = 0;
-  GPUTexture *tex = ima->gputexture[TEXTARGET_2D][eye];
+  GPUTexture *tex = entry.gputextures[TEXTARGET_2D][eye];
   /* Check if we need to update the main gputexture. */
   if (tex != nullptr && tile == ima->tiles.first) {
     gpu_texture_update_from_ibuf(tex, ima, ibuf, nullptr, x, y, w, h);
   }
 
   /* Check if we need to update the array gputexture. */
-  tex = ima->gputexture[TEXTARGET_2D_ARRAY][eye];
+  tex = entry.gputextures[TEXTARGET_2D_ARRAY][eye];
   if (tex != nullptr) {
     gpu_texture_update_from_ibuf(tex, ima, ibuf, tile, x, y, w, h);
   }
@@ -847,30 +970,9 @@ void BKE_image_update_gputexture_delayed(struct Image *ima,
   }
 }
 
-void BKE_image_paint_set_mipmap(Main *bmain, bool mipmap)
+void BKE_image_paint_set_mipmap(bool mipmap)
 {
-  LISTBASE_FOREACH (Image *, ima, &bmain->images) {
-    if (BKE_image_has_opengl_texture(ima)) {
-      if (ima->gpuflag & IMA_GPU_MIPMAP_COMPLETE) {
-        for (int a = 0; a < TEXTARGET_COUNT; a++) {
-          if (ELEM(a, TEXTARGET_2D, TEXTARGET_2D_ARRAY)) {
-            for (int eye = 0; eye < 2; eye++) {
-              GPUTexture *tex = ima->gputexture[a][eye];
-              if (tex != nullptr) {
-                GPU_texture_mipmap_mode(tex, mipmap, true);
-              }
-            }
-          }
-        }
-      }
-      else {
-        BKE_image_free_gputextures(ima);
-      }
-    }
-    else {
-      ima->gpuflag &= ~IMA_GPU_MIPMAP_COMPLETE;
-    }
-  }
+  blender::bke::image::gpu::g_texture_store.set_mipmap(mipmap);
 }
 
 /** \} */

@@ -180,12 +180,6 @@ static void image_copy_data(Main *UNUSED(bmain), ID *id_dst, const ID *id_src, c
 
   BLI_duplicatelist(&image_dst->tiles, &image_src->tiles);
 
-  for (int eye = 0; eye < 2; eye++) {
-    for (int i = 0; i < TEXTARGET_COUNT; i++) {
-      image_dst->gputexture[i][eye] = nullptr;
-    }
-  }
-
   if ((flag & LIB_ID_COPY_NO_PREVIEW) == 0) {
     BKE_previewimg_id_copy(&image_dst->id, &image_src->id);
   }
@@ -234,6 +228,7 @@ static void image_foreach_cache(ID *id,
   key.offset_in_ID = offsetof(Image, cache);
   function_callback(id, &key, (void **)&image->cache, 0, user_data);
 
+#if 0
   auto gputexture_offset = [image](int target, int eye) {
     constexpr size_t base_offset = offsetof(Image, gputexture);
     struct GPUTexture **first = &image->gputexture[0][0];
@@ -241,6 +236,7 @@ static void image_foreach_cache(ID *id,
     return base_offset + array_offset;
   };
 
+// TODO(jbakker): need to check how this is actually used not the GPU textures are shared we might need to reinvalidate this.
   for (int eye = 0; eye < 2; eye++) {
     for (int a = 0; a < TEXTARGET_COUNT; a++) {
       GPUTexture *texture = image->gputexture[a][eye];
@@ -251,6 +247,7 @@ static void image_foreach_cache(ID *id,
       function_callback(id, &key, (void **)&image->gputexture[a][eye], 0, user_data);
     }
   }
+#endif
 
   key.offset_in_ID = offsetof(Image, rr);
   function_callback(id, &key, (void **)&image->rr, 0, user_data);
@@ -328,11 +325,6 @@ static void image_blend_write(BlendWriter *writer, ID *id, const void *id_addres
   BLI_listbase_clear(&ima->anims);
   ima->runtime.partial_update_register = nullptr;
   ima->runtime.partial_update_user = nullptr;
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 2; j++) {
-      ima->gputexture[i][j] = nullptr;
-    }
-  }
 
   ImagePackedFile *imapf;
 
@@ -771,18 +763,6 @@ bool BKE_image_scale(Image *image, int width, int height)
   BKE_image_release_ibuf(image, ibuf, lock);
 
   return (ibuf != nullptr);
-}
-
-bool BKE_image_has_opengl_texture(Image *ima)
-{
-  for (int eye = 0; eye < 2; eye++) {
-    for (int i = 0; i < TEXTARGET_COUNT; i++) {
-      if (ima->gputexture[i][eye] != nullptr) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 static int image_get_tile_number_from_iuser(Image *ima, const ImageUser *iuser)
@@ -2847,20 +2827,6 @@ void BKE_image_init_imageuser(Image *ima, ImageUser *iuser)
 
 static void image_free_tile(Image *ima, ImageTile *tile)
 {
-  for (int i = 0; i < TEXTARGET_COUNT; i++) {
-    /* Only two textures depends on all tiles, so if this is a secondary tile we can keep the other
-     * two. */
-    if (tile != ima->tiles.first && !(ELEM(i, TEXTARGET_2D_ARRAY, TEXTARGET_TILE_MAPPING))) {
-      continue;
-    }
-
-    for (int eye = 0; eye < 2; eye++) {
-      if (ima->gputexture[i][eye] != nullptr) {
-        GPU_texture_free(ima->gputexture[i][eye]);
-        ima->gputexture[i][eye] = nullptr;
-      }
-    }
-  }
   BKE_image_partial_update_mark_full_update(ima);
 
   if (BKE_image_is_multiview(ima)) {
@@ -3196,17 +3162,6 @@ ImageTile *BKE_image_add_tile(struct Image *ima, int tile_number, const char *la
     BLI_strncpy(tile->label, label, sizeof(tile->label));
   }
 
-  for (int eye = 0; eye < 2; eye++) {
-    /* Reallocate GPU tile array. */
-    if (ima->gputexture[TEXTARGET_2D_ARRAY][eye] != nullptr) {
-      GPU_texture_free(ima->gputexture[TEXTARGET_2D_ARRAY][eye]);
-      ima->gputexture[TEXTARGET_2D_ARRAY][eye] = nullptr;
-    }
-    if (ima->gputexture[TEXTARGET_TILE_MAPPING][eye] != nullptr) {
-      GPU_texture_free(ima->gputexture[TEXTARGET_TILE_MAPPING][eye]);
-      ima->gputexture[TEXTARGET_TILE_MAPPING][eye] = nullptr;
-    }
-  }
   BKE_image_partial_update_mark_full_update(ima);
 
   return tile;
@@ -3259,17 +3214,6 @@ void BKE_image_reassign_tile(struct Image *ima, ImageTile *tile, int new_tile_nu
     IMB_freeImBuf(ibuf);
   }
 
-  for (int eye = 0; eye < 2; eye++) {
-    /* Reallocate GPU tile array. */
-    if (ima->gputexture[TEXTARGET_2D_ARRAY][eye] != nullptr) {
-      GPU_texture_free(ima->gputexture[TEXTARGET_2D_ARRAY][eye]);
-      ima->gputexture[TEXTARGET_2D_ARRAY][eye] = nullptr;
-    }
-    if (ima->gputexture[TEXTARGET_TILE_MAPPING][eye] != nullptr) {
-      GPU_texture_free(ima->gputexture[TEXTARGET_TILE_MAPPING][eye]);
-      ima->gputexture[TEXTARGET_TILE_MAPPING][eye] = nullptr;
-    }
-  }
   BKE_image_partial_update_mark_full_update(ima);
 }
 

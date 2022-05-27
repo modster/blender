@@ -191,16 +191,16 @@ static int rna_Image_gl_load(
   return 0; /* GL_NO_ERROR */
 }
 
-static int rna_Image_gl_touch(
-    Image *image, ReportList *reports, int frame, int layer_index, int pass_index)
+static int rna_Image_gl_touch(Image *image,
+                              ReportList *reports,
+                              int UNUSED(frame),
+                              int UNUSED(layer_index),
+                              int UNUSED(pass_index))
 {
   int error = 0; /* GL_NO_ERROR */
 
   BKE_image_tag_time(image);
-
-  if (image->gputexture[TEXTARGET_2D][0] == NULL) {
-    error = rna_Image_gl_load(image, reports, frame, layer_index, pass_index);
-  }
+  BKE_image_partial_update_mark_full_update(image);
 
   return error;
 }

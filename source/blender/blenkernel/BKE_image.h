@@ -326,11 +326,6 @@ bool BKE_image_scale(struct Image *image, int width, int height);
 bool BKE_image_has_alpha(struct Image *image);
 
 /**
- * Check if texture has GPU texture code.
- */
-bool BKE_image_has_opengl_texture(struct Image *ima);
-
-/**
  * Get tile index for tiled images.
  */
 void BKE_image_get_tile_label(struct Image *ima,
@@ -525,7 +520,7 @@ void BKE_image_update_gputexture_delayed(struct Image *ima,
  * temporary disabling/enabling mipmapping on all images for quick texture
  * updates with glTexSubImage2D. images that didn't change don't have to be re-uploaded to OpenGL.
  */
-void BKE_image_paint_set_mipmap(struct Main *bmain, bool mipmap);
+void BKE_image_paint_set_mipmap(bool mipmap);
 
 /**
  * Delayed free of OpenGL buffers by main thread.

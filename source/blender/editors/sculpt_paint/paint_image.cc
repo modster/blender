@@ -801,7 +801,7 @@ void ED_object_texture_paint_mode_enter_ex(Main *bmain, Scene *scene, Object *ob
   if (U.glreslimit != 0) {
     BKE_image_free_all_gputextures(bmain);
   }
-  BKE_image_paint_set_mipmap(bmain, false);
+  BKE_image_paint_set_mipmap(false);
 
   toggle_paint_cursor(scene, true);
 
@@ -826,7 +826,7 @@ void ED_object_texture_paint_mode_exit_ex(Main *bmain, Scene *scene, Object *ob)
   if (U.glreslimit != 0) {
     BKE_image_free_all_gputextures(bmain);
   }
-  BKE_image_paint_set_mipmap(bmain, true);
+  BKE_image_paint_set_mipmap(true);
   toggle_paint_cursor(scene, false);
 
   Mesh *me = BKE_mesh_from_object(ob);
