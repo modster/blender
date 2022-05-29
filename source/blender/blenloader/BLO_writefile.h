@@ -44,6 +44,7 @@ struct BlendFileWriteParams {
   uint use_save_versions : 1;
   /** On write, restore paths after editing them (see #BLO_WRITE_PATH_REMAP_RELATIVE). */
   uint use_save_as_copy : 1;
+  uint use_legacy_mesh_format : 1;
   uint use_userdef : 1;
   const struct BlendThumbnail *thumb;
 };
