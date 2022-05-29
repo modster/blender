@@ -5,6 +5,8 @@
  * \ingroup bke
  */
 
+#include <algorithm>
+
 #include "MEM_guardedalloc.h"
 
 /* Allow using deprecated functionality for .blend file I/O. */
@@ -28,6 +30,7 @@
 #include "BLI_math.h"
 #include "BLI_math_vector.hh"
 #include "BLI_memarena.h"
+#include "BLI_span.hh"
 #include "BLI_string.h"
 #include "BLI_task.hh"
 #include "BLI_utildefines.h"
@@ -61,6 +64,8 @@
 #include "BLO_read_write.h"
 
 using blender::float3;
+using blender::IndexRange;
+using blender::MutableSpan;
 using blender::Vector;
 
 static void mesh_clear_geometry(Mesh *mesh);
@@ -244,6 +249,33 @@ static void mesh_blend_write(BlendWriter *writer, ID *id, const void *id_address
     CustomData_blend_write_prepare(mesh->edata, edge_layers);
     CustomData_blend_write_prepare(mesh->ldata, loop_layers);
     CustomData_blend_write_prepare(mesh->pdata, poly_layers);
+  }
+
+  if (BLO_write_use_legacy_mesh_format(writer)) {
+    MutableSpan<MEdge> edges(mesh->medge, mesh->totedge);
+    const float *edge_bevel = (const float *)CustomData_get_layer(&mesh->edata, CD_BWEIGHT);
+    if (edge_bevel == nullptr) {
+      for (const int i : edges.index_range()) {
+        edges[i].bweight = 0;
+      }
+    }
+    else {
+      for (const int i : edges.index_range()) {
+        edges[i].bweight = std::clamp(edge_bevel[i], 0.0f, 1.0f) / 255.0f;
+      }
+    }
+    MutableSpan<MVert> verts(mesh->mvert, mesh->totvert);
+    const float *vert_bevel = (const float *)CustomData_get_layer(&mesh->edata, CD_BWEIGHT);
+    if (vert_bevel == nullptr) {
+      for (const int i : verts.index_range()) {
+        verts[i].bweight = 0;
+      }
+    }
+    else {
+      for (const int i : verts.index_range()) {
+        verts[i].bweight = std::clamp(vert_bevel[i], 0.0f, 1.0f) / 255.0f;
+      }
+    }
   }
 
   BLO_write_id_struct(writer, Mesh, id_address, &mesh->id);
