@@ -1111,7 +1111,7 @@ static int mesh_customdata_bevel_weight_vertex_state(bContext *C)
   const Object *object = ED_object_context(C);
 
   if (object && object->type == OB_MESH) {
-    const Mesh *mesh = object->data;
+    const Mesh *mesh = static_cast<Mesh *>(object->data);
     if (!ID_IS_LINKED(mesh)) {
       const CustomData *data = GET_CD_DATA(mesh, vdata);
       return CustomData_has_layer(data, CD_BWEIGHT);
@@ -1168,12 +1168,12 @@ void MESH_OT_customdata_bevel_weight_vertex_clear(wmOperatorType *ot)
 
 static int mesh_customdata_bevel_weight_edge_state(bContext *C)
 {
-  Object *ob = ED_object_context(C);
+  const Object *ob = ED_object_context(C);
 
   if (ob && ob->type == OB_MESH) {
-    Mesh *me = ob->data;
-    if (!ID_IS_LINKED(me)) {
-      CustomData *data = GET_CD_DATA(me, edata);
+    const Mesh *mesh = static_cast<Mesh *>(ob->data);
+    if (!ID_IS_LINKED(mesh)) {
+      const CustomData *data = GET_CD_DATA(mesh, edata);
       return CustomData_has_layer(data, CD_BWEIGHT);
     }
   }
