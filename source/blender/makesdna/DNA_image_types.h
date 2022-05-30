@@ -105,14 +105,6 @@ typedef struct ImageTile {
 #define IMA_SHOW_STEREO (1 << 4)
 /* #define IMA_UNUSED_5         (1 << 5) */
 
-/* Used to get the correct gpu texture from an Image datablock. */
-typedef enum eGPUTextureTarget {
-  TEXTARGET_2D = 0,
-  TEXTARGET_2D_ARRAY,
-  TEXTARGET_TILE_MAPPING,
-  TEXTARGET_COUNT,
-} eGPUTextureTarget;
-
 /* Defined in BKE_image.h. */
 struct PartialUpdateRegister;
 struct PartialUpdateUser;
@@ -137,8 +129,6 @@ typedef struct Image {
 
   /** Not written in file. */
   struct MovieCache *cache;
-  /** Not written in file 3 = TEXTARGET_COUNT, 2 = stereo eyes. */
-  // struct GPUTexture *gputexture[3][2];
 
   /* sources from: */
   ListBase anims;

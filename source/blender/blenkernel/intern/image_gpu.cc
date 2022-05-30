@@ -38,6 +38,15 @@
 using namespace blender::bke::image::partial_update;
 
 namespace blender::bke::image::gpu {
+
+/* Used to get the correct gpu texture from an Image datablock. */
+typedef enum eGPUTextureTarget {
+  TEXTARGET_2D = 0,
+  TEXTARGET_2D_ARRAY,
+  TEXTARGET_TILE_MAPPING,
+  TEXTARGET_COUNT,
+} eGPUTextureTarget;
+
 struct ImageGPUTextureStore {
   class Entry : NonCopyable {
    public:

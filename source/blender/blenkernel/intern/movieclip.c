@@ -1642,12 +1642,7 @@ static void free_buffers(MovieClip *clip)
 
   MovieClip_RuntimeGPUTexture *tex;
   for (tex = clip->runtime.gputextures.first; tex; tex = tex->next) {
-    for (int i = 0; i < TEXTARGET_COUNT; i++) {
-      if (tex->gputexture[i] != NULL) {
-        GPU_texture_free(tex->gputexture[i]);
-        tex->gputexture[i] = NULL;
-      }
-    }
+    GPU_TEXTURE_FREE_SAFE(tex->gputexture);
   }
   BLI_freelistN(&clip->runtime.gputextures);
 }
@@ -2035,9 +2030,7 @@ void BKE_movieclip_eval_selection_update(struct Depsgraph *depsgraph, MovieClip 
 /** \name GPU textures
  * \{ */
 
-static GPUTexture **movieclip_get_gputexture_ptr(MovieClip *clip,
-                                                 MovieClipUser *cuser,
-                                                 eGPUTextureTarget textarget)
+static GPUTexture **movieclip_get_gputexture_ptr(MovieClip *clip, MovieClipUser *cuser)
 {
   /* Check if we have an existing entry for that clip user. */
   MovieClip_RuntimeGPUTexture *tex;
@@ -2051,16 +2044,13 @@ static GPUTexture **movieclip_get_gputexture_ptr(MovieClip *clip,
   if (tex == NULL) {
     tex = (MovieClip_RuntimeGPUTexture *)MEM_mallocN(sizeof(MovieClip_RuntimeGPUTexture),
                                                      __func__);
-
-    for (int i = 0; i < TEXTARGET_COUNT; i++) {
-      tex->gputexture[i] = NULL;
-    }
+    tex->gputexture = NULL;
 
     memcpy(&tex->user, cuser, sizeof(MovieClipUser));
     BLI_addtail(&clip->runtime.gputextures, tex);
   }
 
-  return &tex->gputexture[textarget];
+  return &tex->gputexture;
 }
 
 GPUTexture *BKE_movieclip_get_gpu_texture(MovieClip *clip, MovieClipUser *cuser)
@@ -2069,7 +2059,7 @@ GPUTexture *BKE_movieclip_get_gpu_texture(MovieClip *clip, MovieClipUser *cuser)
     return NULL;
   }
 
-  GPUTexture **tex = movieclip_get_gputexture_ptr(clip, cuser, TEXTARGET_2D);
+  GPUTexture **tex = movieclip_get_gputexture_ptr(clip, cuser);
   if (*tex) {
     return *tex;
   }
@@ -2105,13 +2095,7 @@ void BKE_movieclip_free_gputexture(struct MovieClip *clip)
   while (BLI_listbase_count(&clip->runtime.gputextures) > MOVIECLIP_NUM_GPUTEXTURES) {
     MovieClip_RuntimeGPUTexture *tex = (MovieClip_RuntimeGPUTexture *)BLI_pophead(
         &clip->runtime.gputextures);
-    for (int i = 0; i < TEXTARGET_COUNT; i++) {
-      /* free glsl image binding */
-      if (tex->gputexture[i]) {
-        GPU_texture_free(tex->gputexture[i]);
-        tex->gputexture[i] = NULL;
-      }
-    }
+    GPU_TEXTURE_FREE_SAFE(tex->gputexture);
     MEM_freeN(tex);
   }
 }
