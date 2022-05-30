@@ -3206,7 +3206,6 @@ void WM_OT_save_as_mainfile(wmOperatorType *ot)
       false,
       "Legacy Mesh Format",
       "Save mesh data with a legacy format that can be read by earlier versions");
-  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 static int wm_save_mainfile_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
