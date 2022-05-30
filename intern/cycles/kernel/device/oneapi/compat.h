@@ -187,6 +187,8 @@ ccl_always_inline float3 make_float3(float x)
 #define fmodf(x, y) sycl::fmod((x), (y))
 #define lgammaf(x) sycl::lgamma((x))
 
+#define __forceinline __attribute__((always_inline))
+
 /* Types */
 #include "util/half.h"
 #include "util/types.h"
