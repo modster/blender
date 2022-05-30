@@ -40,7 +40,6 @@ class GpuEvalOutput : public VolatileEvalOutput<GLVertexBuffer,
                 const StencilTable *varying_stencils,
                 const vector<const StencilTable *> &all_face_varying_stencils,
                 const int face_varying_width,
-                const int vertex_data_width,
                 const PatchTable *patch_table,
                 EvaluatorCache *evaluator_cache = NULL);
 
@@ -51,6 +50,8 @@ class GpuEvalOutput : public VolatileEvalOutput<GLVertexBuffer,
   void wrapPatchParamBuffer(OpenSubdiv_Buffer *patch_param_buffer) override;
 
   void wrapSrcBuffer(OpenSubdiv_Buffer *src_buffer) override;
+
+  void wrapSrcVertexDataBuffer(OpenSubdiv_Buffer *src_buffer) override;
 
   void fillFVarPatchArraysBuffer(const int face_varying_channel,
                                  OpenSubdiv_Buffer *patch_arrays_buffer) override;

@@ -480,6 +480,7 @@ void DRW_viewport_data_free(DRWData *drw_data)
     MEM_freeN(drw_data->obinfos_ubo);
   }
   DRW_volume_ubos_pool_free(drw_data->volume_grids_ubos);
+  DRW_curves_ubos_pool_free(drw_data->curves_ubos);
   MEM_freeN(drw_data);
 }
 
@@ -1676,7 +1677,7 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
   DRW_globals_update();
 
   drw_debug_init();
-  DRW_curves_init();
+  DRW_curves_init(DST.vmempool);
   DRW_volume_init(DST.vmempool);
   DRW_smoke_init(DST.vmempool);
 
@@ -2048,7 +2049,7 @@ void DRW_render_object_iter(
     void (*callback)(void *vedata, Object *ob, RenderEngine *engine, struct Depsgraph *depsgraph))
 {
   const DRWContextState *draw_ctx = DRW_context_state_get();
-  DRW_curves_init();
+  DRW_curves_init(DST.vmempool);
   DRW_volume_init(DST.vmempool);
   DRW_smoke_init(DST.vmempool);
 
@@ -2105,7 +2106,7 @@ void DRW_custom_pipeline(DrawEngineType *draw_engine_type,
 
   drw_manager_init(&DST, NULL, NULL);
 
-  DRW_curves_init();
+  DRW_curves_init(DST.vmempool);
   DRW_volume_init(DST.vmempool);
   DRW_smoke_init(DST.vmempool);
 
@@ -2140,7 +2141,7 @@ void DRW_cache_restart(void)
 
   DST.buffer_finish_called = false;
 
-  DRW_curves_init();
+  DRW_curves_init(DST.vmempool);
   DRW_volume_init(DST.vmempool);
   DRW_smoke_init(DST.vmempool);
 }
@@ -2459,7 +2460,7 @@ void DRW_draw_select_loop(struct Depsgraph *depsgraph,
 
   /* Init engines */
   drw_engines_init();
-  DRW_curves_init();
+  DRW_curves_init(DST.vmempool);
   DRW_volume_init(DST.vmempool);
   DRW_smoke_init(DST.vmempool);
 
@@ -2633,7 +2634,7 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
 
   /* Init engines */
   drw_engines_init();
-  DRW_curves_init();
+  DRW_curves_init(DST.vmempool);
   DRW_volume_init(DST.vmempool);
   DRW_smoke_init(DST.vmempool);
 

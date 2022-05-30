@@ -45,7 +45,6 @@ GpuEvalOutput::GpuEvalOutput(const StencilTable *vertex_stencils,
                              const StencilTable *varying_stencils,
                              const vector<const StencilTable *> &all_face_varying_stencils,
                              const int face_varying_width,
-                             const int vertex_data_width,
                              const PatchTable *patch_table,
                              VolatileEvalOutput::EvaluatorCache *evaluator_cache)
     : VolatileEvalOutput<GLVertexBuffer,
@@ -56,7 +55,6 @@ GpuEvalOutput::GpuEvalOutput(const StencilTable *vertex_stencils,
                                              varying_stencils,
                                              all_face_varying_stencils,
                                              face_varying_width,
-                                             vertex_data_width,
                                              patch_table,
                                              evaluator_cache)
 {
@@ -83,6 +81,12 @@ void GpuEvalOutput::wrapPatchParamBuffer(OpenSubdiv_Buffer *patch_param_buffer)
 void GpuEvalOutput::wrapSrcBuffer(OpenSubdiv_Buffer *src_buffer)
 {
   GLVertexBuffer *vertex_buffer = getSrcBuffer();
+  src_buffer->wrap_device_handle(src_buffer, vertex_buffer->BindVBO());
+}
+
+void GpuEvalOutput::wrapSrcVertexDataBuffer(OpenSubdiv_Buffer *src_buffer)
+{
+  GLVertexBuffer *vertex_buffer = getSrcVertexDataBuffer();
   src_buffer->wrap_device_handle(src_buffer, vertex_buffer->BindVBO());
 }
 
