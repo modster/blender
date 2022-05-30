@@ -252,18 +252,6 @@ static void mesh_blend_write(BlendWriter *writer, ID *id, const void *id_address
   }
 
   if (BLO_write_use_legacy_mesh_format(writer)) {
-    MutableSpan<MEdge> edges(mesh->medge, mesh->totedge);
-    const float *edge_bevel = (const float *)CustomData_get_layer(&mesh->edata, CD_BWEIGHT);
-    if (edge_bevel == nullptr) {
-      for (const int i : edges.index_range()) {
-        edges[i].bweight = 0;
-      }
-    }
-    else {
-      for (const int i : edges.index_range()) {
-        edges[i].bweight = std::clamp(edge_bevel[i], 0.0f, 1.0f) * 255.0f;
-      }
-    }
     MutableSpan<MVert> verts(mesh->mvert, mesh->totvert);
     const float *vert_bevel = (const float *)CustomData_get_layer(&mesh->vdata, CD_BWEIGHT);
     if (vert_bevel == nullptr) {
@@ -272,8 +260,22 @@ static void mesh_blend_write(BlendWriter *writer, ID *id, const void *id_address
       }
     }
     else {
+      mesh->cd_flag |= ME_CDFLAG_VERT_BWEIGHT;
       for (const int i : verts.index_range()) {
         verts[i].bweight = std::clamp(vert_bevel[i], 0.0f, 1.0f) * 255.0f;
+      }
+    }
+    MutableSpan<MEdge> edges(mesh->medge, mesh->totedge);
+    const float *edge_bevel = (const float *)CustomData_get_layer(&mesh->edata, CD_BWEIGHT);
+    if (edge_bevel == nullptr) {
+      for (const int i : edges.index_range()) {
+        edges[i].bweight = 0;
+      }
+    }
+    else {
+      mesh->cd_flag |= ME_CDFLAG_EDGE_BWEIGHT;
+      for (const int i : edges.index_range()) {
+        edges[i].bweight = std::clamp(edge_bevel[i], 0.0f, 1.0f) * 255.0f;
       }
     }
   }
