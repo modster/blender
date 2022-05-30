@@ -86,8 +86,8 @@ bool device_oneapi_init()
 
   // NOTE(sirgienko) we need to enable JIT cache from here and
   // right now this cache policy is controlled by env. variables
-  // NOTE(hallade) we also enable immediate command lists + device scope events
-  // as they improve stability as of intel/llvm sycl-nighly/20220501.
+  // NOTE(hallade) we also disable use of copy engine as it
+  // improves stability as of intel/llvm sycl-nightly/20220529.
   // All these env variable can be set beforehand by end-users and
   // will in that case -not- be overwritten.
 #  ifdef _WIN32
@@ -97,15 +97,13 @@ bool device_oneapi_init()
   if (getenv("SYCL_CACHE_TRESHOLD") == nullptr) {
     _putenv_s("SYCL_CACHE_THRESHOLD", "0");
   }
-  if (getenv("SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS") == nullptr) {
-    _putenv_s("SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS", "0");
-  }
-  if (getenv("SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS") == nullptr) {
-    _putenv_s("SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS", "1");
+  if (getenv("SYCL_PI_LEVEL_ZERO_USE_COPY_ENGINE_FOR_IN_ORDER_QUEUE") == nullptr) {
+    _putenv_s("SYCL_PI_LEVEL_ZERO_USE_COPY_ENGINE_FOR_IN_ORDER_QUEUE", "0");
   }
 #  elif __linux__
   setenv("SYCL_CACHE_PERSISTENT", "1", false);
   setenv("SYCL_CACHE_THRESHOLD", "0", false);
+  setenv("SYCL_PI_LEVEL_ZERO_USE_COPY_ENGINE_FOR_IN_ORDER_QUEUE", "0", false);
 #  endif
 
   return true;
