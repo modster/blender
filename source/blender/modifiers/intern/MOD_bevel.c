@@ -74,6 +74,10 @@ static void requiredDataMask(Object *UNUSED(ob),
   if (bmd->defgrp_name[0] != '\0') {
     r_cddata_masks->vmask |= CD_MASK_MDEFORMVERT;
   }
+  if (bmd->lim_flags & MOD_BEVEL_WEIGHT) {
+    r_cddata_masks->vmask |= CD_MASK_BWEIGHT;
+    r_cddata_masks->emask |= CD_MASK_BWEIGHT;
+  }
 }
 
 /*
@@ -166,6 +170,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       if (BM_edge_is_manifold(e)) {
         if (bmd->lim_flags & MOD_BEVEL_WEIGHT) {
           weight = BM_elem_float_data_get(&bm->edata, e, CD_BWEIGHT);
+          printf("weight: %.3f\n", weight);
           if (weight == 0.0f) {
             continue;
           }
