@@ -846,8 +846,13 @@ static void file_read_reports_finalize(BlendFileReadReport *bf_reports)
                 bf_reports->count.missing_obproxies);
   }
   else {
-    BLI_assert(bf_reports->count.missing_obdata == 0);
-    BLI_assert(bf_reports->count.missing_obproxies == 0);
+    if (bf_reports->count.missing_obdata != 0 || bf_reports->count.missing_obproxies != 0) {
+      CLOG_ERROR(&LOG,
+                 "%d local ObjectData and %d local Object proxies are reported to be missing, "
+                 "this should never happen",
+                 bf_reports->count.missing_obdata,
+                 bf_reports->count.missing_obproxies);
+    }
   }
 
   if (bf_reports->resynced_lib_overrides_libraries_count != 0) {
@@ -3206,7 +3211,6 @@ void WM_OT_save_as_mainfile(wmOperatorType *ot)
       false,
       "Legacy Mesh Format",
       "Save mesh data with a legacy format that can be read by earlier versions");
-  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 static int wm_save_mainfile_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
