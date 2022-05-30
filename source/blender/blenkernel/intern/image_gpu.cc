@@ -701,7 +701,7 @@ void BKE_image_free_gputextures(Image *ima)
 
 void BKE_image_free_all_gputextures(Main *UNUSED(bmain))
 {
-  blender::bke::image::gpu::g_texture_store.clear();
+  g_texture_store.clear();
 }
 
 void BKE_image_free_anim_gputextures(Main *bmain)
@@ -715,7 +715,7 @@ void BKE_image_free_anim_gputextures(Main *bmain)
   }
 }
 
-void BKE_image_free_old_gputextures(Main *UNUSED(bmain))
+void BKE_image_free_old_gputextures()
 {
 
   static int lasttime = 0;
@@ -736,8 +736,8 @@ void BKE_image_free_old_gputextures(Main *UNUSED(bmain))
 
   lasttime = ctime;
 
-  blender::bke::image::gpu::g_texture_store.remove_unused();
-  blender::bke::image::gpu::g_texture_store.reset_usage();
+  g_texture_store.remove_unused();
+  g_texture_store.reset_usage();
 }
 
 /** \} */
@@ -1021,7 +1021,7 @@ void BKE_image_update_gputexture_delayed(struct Image *ima,
 
 void BKE_image_paint_set_mipmap(bool mipmap)
 {
-  blender::bke::image::gpu::g_texture_store.set_mipmap(mipmap);
+  g_texture_store.set_mipmap(mipmap);
 }
 
 /** \} */

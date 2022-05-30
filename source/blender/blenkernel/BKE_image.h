@@ -293,7 +293,7 @@ void BKE_image_free_all_gputextures(struct Main *bmain);
  * Same as above but only free animated images.
  */
 void BKE_image_free_anim_gputextures(struct Main *bmain);
-void BKE_image_free_old_gputextures(struct Main *bmain);
+void BKE_image_free_old_gputextures();
 
 /**
  * Pack image to memory.

@@ -1563,7 +1563,7 @@ void view3d_main_region_draw(const bContext *C, ARegion *region)
 
   DRW_cache_free_old_subdiv();
   DRW_cache_free_old_batches(bmain);
-  BKE_image_free_old_gputextures(bmain);
+  BKE_image_free_old_gputextures();
   GPU_pass_cache_garbage_collect();
 
   /* No depth test for drawing action zones afterwards. */
