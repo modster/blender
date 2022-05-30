@@ -170,7 +170,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       if (BM_edge_is_manifold(e)) {
         if (bmd->lim_flags & MOD_BEVEL_WEIGHT) {
           weight = BM_elem_float_data_get(&bm->edata, e, CD_BWEIGHT);
-          printf("weight: %.3f\n", weight);
           if (weight == 0.0f) {
             continue;
           }
