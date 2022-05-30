@@ -846,8 +846,13 @@ static void file_read_reports_finalize(BlendFileReadReport *bf_reports)
                 bf_reports->count.missing_obproxies);
   }
   else {
-    BLI_assert(bf_reports->count.missing_obdata == 0);
-    BLI_assert(bf_reports->count.missing_obproxies == 0);
+    if (bf_reports->count.missing_obdata != 0 || bf_reports->count.missing_obproxies != 0) {
+      CLOG_ERROR(&LOG,
+                 "%d local ObjectData and %d local Object proxies are reported to be missing, "
+                 "this should never happen",
+                 bf_reports->count.missing_obdata,
+                 bf_reports->count.missing_obproxies);
+    }
   }
 
   if (bf_reports->resynced_lib_overrides_libraries_count != 0) {
@@ -1714,6 +1719,7 @@ static bool wm_file_write(bContext *C,
                           int fileflags,
                           eBLO_WritePathRemap remap_mode,
                           bool use_save_as_copy,
+                          const bool use_legacy_mesh_format,
                           ReportList *reports)
 {
   Main *bmain = CTX_data_main(C);
@@ -1825,6 +1831,7 @@ static bool wm_file_write(bContext *C,
                          .remap_mode = remap_mode,
                          .use_save_versions = true,
                          .use_save_as_copy = use_save_as_copy,
+                         .use_legacy_mesh_format = use_legacy_mesh_format,
                          .thumb = thumb,
                      },
                      reports)) {
@@ -3060,6 +3067,9 @@ static int wm_save_as_mainfile_exec(bContext *C, wmOperator *op)
   const bool is_save_as = (op->type->invoke == wm_save_as_mainfile_invoke);
   const bool use_save_as_copy = (RNA_struct_property_is_set(op->ptr, "copy") &&
                                  RNA_boolean_get(op->ptr, "copy"));
+  const bool use_legacy_mesh_format = (RNA_struct_property_is_set(op->ptr,
+                                                                  "use_legacy_mesh_format") &&
+                                       RNA_boolean_get(op->ptr, "use_legacy_mesh_format"));
 
   /* We could expose all options to the users however in most cases remapping
    * existing relative paths is a good default.
@@ -3103,7 +3113,8 @@ static int wm_save_as_mainfile_exec(bContext *C, wmOperator *op)
   /* set compression flag */
   SET_FLAG_FROM_TEST(fileflags, RNA_boolean_get(op->ptr, "compress"), G_FILE_COMPRESS);
 
-  const bool ok = wm_file_write(C, path, fileflags, remap_mode, use_save_as_copy, op->reports);
+  const bool ok = wm_file_write(
+      C, path, fileflags, remap_mode, use_save_as_copy, use_legacy_mesh_format, op->reports);
 
   if ((op->flag & OP_IS_INVOKE) == 0) {
     /* OP_IS_INVOKE is set when the operator is called from the GUI.
@@ -3194,6 +3205,12 @@ void WM_OT_save_as_mainfile(wmOperatorType *ot)
       "Save Copy",
       "Save a copy of the actual working state but does not make saved file active");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(
+      ot->srna,
+      "use_legacy_mesh_format",
+      false,
+      "Legacy Mesh Format",
+      "Save mesh data with a legacy format that can be read by earlier versions");
 }
 
 static int wm_save_mainfile_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
