@@ -19,10 +19,10 @@ CCL_NAMESPACE_BEGIN
  * heavy volume interpolation code. */
 
 ccl_device_forceinline float primitive_surface_attribute_float(KernelGlobals kg,
-                                                          ccl_private const ShaderData *sd,
-                                                          const AttributeDescriptor desc,
-                                                          ccl_private float *dx,
-                                                          ccl_private float *dy)
+                                                               ccl_private const ShaderData *sd,
+                                                               const AttributeDescriptor desc,
+                                                               ccl_private float *dx,
+                                                               ccl_private float *dy)
 {
   if (sd->type & PRIMITIVE_TRIANGLE) {
     if (subd_triangle_patch(kg, sd) == ~0)
@@ -50,10 +50,10 @@ ccl_device_forceinline float primitive_surface_attribute_float(KernelGlobals kg,
 }
 
 ccl_device_forceinline float2 primitive_surface_attribute_float2(KernelGlobals kg,
-                                                            ccl_private const ShaderData *sd,
-                                                            const AttributeDescriptor desc,
-                                                            ccl_private float2 *dx,
-                                                            ccl_private float2 *dy)
+                                                                 ccl_private const ShaderData *sd,
+                                                                 const AttributeDescriptor desc,
+                                                                 ccl_private float2 *dx,
+                                                                 ccl_private float2 *dy)
 {
   if (sd->type & PRIMITIVE_TRIANGLE) {
     if (subd_triangle_patch(kg, sd) == ~0)
@@ -81,10 +81,10 @@ ccl_device_forceinline float2 primitive_surface_attribute_float2(KernelGlobals k
 }
 
 ccl_device_forceinline float3 primitive_surface_attribute_float3(KernelGlobals kg,
-                                                            ccl_private const ShaderData *sd,
-                                                            const AttributeDescriptor desc,
-                                                            ccl_private float3 *dx,
-                                                            ccl_private float3 *dy)
+                                                                 ccl_private const ShaderData *sd,
+                                                                 const AttributeDescriptor desc,
+                                                                 ccl_private float3 *dx,
+                                                                 ccl_private float3 *dy)
 {
   if (sd->type & PRIMITIVE_TRIANGLE) {
     if (subd_triangle_patch(kg, sd) == ~0)
@@ -150,14 +150,14 @@ ccl_device_forceinline float4 primitive_surface_attribute_float4(KernelGlobals k
  * heavy volume interpolation code. */
 
 ccl_device_forceinline bool primitive_is_volume_attribute(ccl_private const ShaderData *sd,
-                                                     const AttributeDescriptor desc)
+                                                          const AttributeDescriptor desc)
 {
   return sd->type == PRIMITIVE_VOLUME;
 }
 
 ccl_device_forceinline float primitive_volume_attribute_float(KernelGlobals kg,
-                                                         ccl_private const ShaderData *sd,
-                                                         const AttributeDescriptor desc)
+                                                              ccl_private const ShaderData *sd,
+                                                              const AttributeDescriptor desc)
 {
   if (primitive_is_volume_attribute(sd, desc)) {
     return volume_attribute_value_to_float(volume_attribute_float4(kg, sd, desc));
@@ -168,8 +168,8 @@ ccl_device_forceinline float primitive_volume_attribute_float(KernelGlobals kg,
 }
 
 ccl_device_forceinline float3 primitive_volume_attribute_float3(KernelGlobals kg,
-                                                           ccl_private const ShaderData *sd,
-                                                           const AttributeDescriptor desc)
+                                                                ccl_private const ShaderData *sd,
+                                                                const AttributeDescriptor desc)
 {
   if (primitive_is_volume_attribute(sd, desc)) {
     return volume_attribute_value_to_float3(volume_attribute_float4(kg, sd, desc));
@@ -180,8 +180,8 @@ ccl_device_forceinline float3 primitive_volume_attribute_float3(KernelGlobals kg
 }
 
 ccl_device_forceinline float4 primitive_volume_attribute_float4(KernelGlobals kg,
-                                                           ccl_private const ShaderData *sd,
-                                                           const AttributeDescriptor desc)
+                                                                ccl_private const ShaderData *sd,
+                                                                const AttributeDescriptor desc)
 {
   if (primitive_is_volume_attribute(sd, desc)) {
     return volume_attribute_float4(kg, sd, desc);
@@ -263,7 +263,7 @@ ccl_device float3 primitive_tangent(KernelGlobals kg, ccl_private ShaderData *sd
 /* Motion vector for motion pass */
 
 ccl_device_forceinline float4 primitive_motion_vector(KernelGlobals kg,
-                                                 ccl_private const ShaderData *sd)
+                                                      ccl_private const ShaderData *sd)
 {
   /* center position */
   float3 center;
