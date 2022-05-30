@@ -336,11 +336,13 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
     /* Currently only register lit/shade, see
        LineartEdgeSegment::shadow_mask_bits for details. */
     if (shadow_bits == LRT_SHADOW_MASK_ENCLOSED_SHAPE) {
-      if (es->shadow_mask_bits == LRT_SHADOW_MASK_LIT || e->flags & LRT_EDGE_FLAG_LIGHT_CONTOUR) {
-        es->shadow_mask_bits = LRT_SHADOW_MASK_INHIBITED;
+      if (es->shadow_mask_bits & LRT_SHADOW_MASK_LIT || e->flags & LRT_EDGE_FLAG_LIGHT_CONTOUR) {
+        es->shadow_mask_bits &= ~LRT_SHADOW_MASK_LIT;
+        es->shadow_mask_bits |= LRT_SHADOW_MASK_INHIBITED;
       }
-      else if (es->shadow_mask_bits == LRT_SHADOW_MASK_SHADED) {
-        es->shadow_mask_bits = LRT_SHADOW_MASK_LIT;
+      else if (es->shadow_mask_bits & LRT_SHADOW_MASK_SHADED) {
+        es->shadow_mask_bits &= ~LRT_SHADOW_MASK_SHADED;
+        es->shadow_mask_bits |= LRT_SHADOW_MASK_LIT;
       }
     }
     else {
@@ -4098,7 +4100,6 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
   LineartBoundingArea *ba = lineart_mem_acquire_thread(&rb->render_data_pool,
                                                        sizeof(LineartBoundingArea) * 4);
   LineartTriangle *tri;
-  LineartBoundingArea *ba = root->child;
 
   ba[0].l = root->cx;
   ba[0].r = root->r;
@@ -6421,9 +6422,9 @@ static void lineart_gpencil_generate(LineartCache *cache,
       if (ec->shadow_mask_bits != LRT_SHADOW_MASK_UNDEFINED) {
         /* TODO(Yiming): Give a behaviour option for how to display undefined shadow info. */
         if ((shaodow_selection == LRT_SHADOW_FILTER_LIT &&
-             ec->shadow_mask_bits != LRT_SHADOW_MASK_LIT) ||
+             (!(ec->shadow_mask_bits & LRT_SHADOW_MASK_LIT))) ||
             (shaodow_selection == LRT_SHADOW_FILTER_SHADED &&
-             ec->shadow_mask_bits != LRT_SHADOW_MASK_SHADED)) {
+             (!(ec->shadow_mask_bits & LRT_SHADOW_MASK_SHADED)))) {
           continue;
         }
       }
