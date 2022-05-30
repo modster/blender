@@ -119,7 +119,6 @@ struct ImageGPUTextureStore {
       entries.remove(it.key);
       entries_removed++;
     }
-    // printf("%s: %d entries removed\n", __func__, entries_removed);
   }
 
   void set_mipmap(const bool mipmap)
@@ -131,10 +130,14 @@ struct ImageGPUTextureStore {
 
   void clear()
   {
-    // printf("%s: %lld entries removed\n", __func__, entries.size());
     entries.clear();
   }
 
+  /**
+   * Create a lookup key for the given image.
+   *
+   * Equal keys will map to the same set of GPUTextures.
+   */
   std::string create_key(Image &image) const
   {
     bool add_ptr = false;
@@ -142,7 +145,7 @@ struct ImageGPUTextureStore {
 
     switch (image.source) {
       case IMA_SRC_FILE:
-        if (BKE_image_is_dirty(&image)) {
+        if (BKE_image_is_dirty(&image) || BKE_image_has_packedfile(&image)) {
           add_ptr = true;
         }
         else {
@@ -171,7 +174,6 @@ struct ImageGPUTextureStore {
       result << "PTR:" << &image << ",";
     }
     if (add_filepath) {
-      // TODO: use absolute filepath.
       char filepath[FILE_MAX];
       BLI_strncpy(filepath, image.filepath, sizeof(filepath));
       BLI_path_abs(filepath, ID_BLEND_PATH_FROM_GLOBAL(&image.id));
@@ -185,7 +187,6 @@ struct ImageGPUTextureStore {
   {
     std::string key = create_key(image);
     Entry &entry = entries.lookup_or_add_default(key);
-    // printf("%s: %s => key %s = entry<%p>\n", __func__, image.id.name, key.c_str(), &entry);
     entry.tag_used();
     return entry;
   }
