@@ -261,11 +261,11 @@ static void mesh_blend_write(BlendWriter *writer, ID *id, const void *id_address
     }
     else {
       for (const int i : edges.index_range()) {
-        edges[i].bweight = std::clamp(edge_bevel[i], 0.0f, 1.0f) / 255.0f;
+        edges[i].bweight = std::clamp(edge_bevel[i], 0.0f, 1.0f) * 255.0f;
       }
     }
     MutableSpan<MVert> verts(mesh->mvert, mesh->totvert);
-    const float *vert_bevel = (const float *)CustomData_get_layer(&mesh->edata, CD_BWEIGHT);
+    const float *vert_bevel = (const float *)CustomData_get_layer(&mesh->vdata, CD_BWEIGHT);
     if (vert_bevel == nullptr) {
       for (const int i : verts.index_range()) {
         verts[i].bweight = 0;
@@ -273,7 +273,7 @@ static void mesh_blend_write(BlendWriter *writer, ID *id, const void *id_address
     }
     else {
       for (const int i : verts.index_range()) {
-        verts[i].bweight = std::clamp(vert_bevel[i], 0.0f, 1.0f) / 255.0f;
+        verts[i].bweight = std::clamp(vert_bevel[i], 0.0f, 1.0f) * 255.0f;
       }
     }
   }
