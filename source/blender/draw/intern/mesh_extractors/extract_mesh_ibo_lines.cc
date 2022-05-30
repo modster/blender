@@ -184,7 +184,7 @@ static void extract_lines_loose_geom_subdiv(const DRWSubdivCache *subdiv_cache,
   const MEdge *medge = mr->medge;
 
   for (DRWSubdivLooseEdge edge : loose_edges) {
-    *flags_data++ = (medge[edge.coarse_edge_index].flag & ME_HIDE) != 0;
+    *flags_data++ = mr->edge_hide && mr->edge_hide[edge.coarse_edge_index];
   }
 
   GPUIndexBuf *ibo = static_cast<GPUIndexBuf *>(buffer);

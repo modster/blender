@@ -181,8 +181,7 @@ static void extract_points_iter_subdiv_common(GPUIndexBufBuilder *elb,
       }
     }
     else {
-      const MVert *mv = &mr->mvert[coarse_vertex_index];
-      if (mr->use_hide && (mv->flag & ME_HIDE)) {
+      if (mr->use_hide && mr->vert_hide && mr->vert_hide[coarse_vertex_index]) {
         GPU_indexbuf_set_point_restart(elb, coarse_vertex_index);
         continue;
       }
