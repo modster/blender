@@ -83,7 +83,8 @@ void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb
 #define LRT_BOUND_AREA_CROSSES(b1, b2) \
   ((b1)[0] < (b2)[1] && (b1)[1] > (b2)[0] && (b1)[3] < (b2)[2] && (b1)[2] > (b2)[3])
 
-/* Initial bounding area row/column count */
+/* Initial bounding area row/column count, setting 10 is tested to be realitvely optimal for the
+ * performance under current CAS algorithm. */
 #define LRT_BA_ROWS 10
 
 #ifdef __cplusplus

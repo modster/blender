@@ -1846,6 +1846,11 @@ static void lineart_finalize_object_edge_array_reserve(LineartPendingEdges *pe, 
 
 static void lineart_finalize_object_edge_array(LineartPendingEdges *pe, LineartObjectInfo *obi)
 {
+  /* In case of line art "occlusion only" or contour not enabled, it's possible for an object to
+   * not produce any feature lines. */
+  if (!obi->pending_edges.array) {
+    return;
+  }
   memcpy(&pe->array[pe->next],
          obi->pending_edges.array,
          sizeof(LineartEdge *) * obi->pending_edges.next);
@@ -2615,6 +2620,11 @@ static void lineart_object_load_single_instance(LineartRenderBuffer *rb,
   }
   if (ob->type == OB_MESH) {
     use_mesh = BKE_object_get_evaluated_mesh(ob);
+    if (use_mesh->edit_mesh) {
+      /* If the object is being edited, then the mesh is not evaluated fully into the final
+       * result, do not load them. */
+      return;
+    }
   }
   else {
     use_mesh = BKE_mesh_new_from_object(depsgraph, ob, true, true);
@@ -3425,7 +3435,7 @@ static void lineart_add_isec_thread(LineartIsecThread *th,
   th->current++;
 }
 
-#define LRT_ISECT_TRIANGLE_PER_THREAD 4096;
+#define LRT_ISECT_TRIANGLE_PER_THREAD 4096
 
 static bool lineart_schedule_new_triangle_task(LineartIsecThread *th)
 {
@@ -3465,6 +3475,11 @@ static bool lineart_schedule_new_triangle_task(LineartIsecThread *th)
   return true;
 }
 
+/* This function initializes two things:
+ * 1) Triangle array scheduling info, for each worker thread to get it's chunk from the scheduler.
+ * 2) Per-thread intersection result array. Does not store actual #LineartEdge, these results will
+ * be finalized by #lineart_create_edges_from_isec_data
+ */
 static void lineart_init_isec_thread(LineartIsecData *d, LineartRenderBuffer *rb, int thread_count)
 {
   d->threads = MEM_callocN(sizeof(LineartIsecThread) * thread_count, "LineartIsecThread arr");
@@ -3480,14 +3495,8 @@ static void lineart_init_isec_thread(LineartIsecData *d, LineartRenderBuffer *rb
     it->max = 100;
     it->current = 0;
     it->thread_id = i;
-  }
-
-#define OBJ_PER_ISEC_THREAD 8 /* Largely arbitrary, no need to be big. */
-  for (int i = 0; i < thread_count; i++) {
-    LineartIsecThread *it = &d->threads[i];
     it->rb = rb;
   }
-#undef OBJ_PER_ISEC_THREAD
 }
 
 static void lineart_destroy_isec_thread(LineartIsecData *d)
@@ -3504,6 +3513,8 @@ static void lineart_triangle_intersect_in_bounding_area(LineartTriangle *tri,
                                                         LineartIsecThread *th,
                                                         int up_to)
 {
+  BLI_assert(th != NULL);
+
   if (!th) {
     return;
   }
@@ -3518,7 +3529,7 @@ static void lineart_triangle_intersect_in_bounding_area(LineartTriangle *tri,
   /* If this _is_ the smallest subdiv bounding area, then do the intersections there. */
   for (int i = 0; i < up_to; i++) {
     do {
-      testing_triangle = (LineartTriangle *)lineart_atomic_load(&ba->linked_triangles[i]);
+      testing_triangle = (LineartTriangle *)atomic_load_z((size_t *)&ba->linked_triangles[i]);
     } while (UNLIKELY(testing_triangle == NULL));
 
     tt = (LineartTriangleThread *)testing_triangle;
@@ -4076,13 +4087,16 @@ static void lineart_main_bounding_areas_connect_post(LineartRenderBuffer *rb)
 }
 
 /**
- * Subdivide a tile after one tile contains too many triangles.
+ * Subdivide a tile after one tile contains too many triangles, then re-link triangles into all the
+ * child tiles.
  */
 static void lineart_bounding_area_split(LineartRenderBuffer *rb,
                                         LineartBoundingArea *root,
                                         int recursive_level)
 {
-  root->child = lineart_mem_acquire_thread(&rb->render_data_pool, sizeof(LineartBoundingArea) * 4);
+
+  LineartBoundingArea *ba = lineart_mem_acquire_thread(&rb->render_data_pool,
+                                                       sizeof(LineartBoundingArea) * 4);
   LineartTriangle *tri;
   LineartBoundingArea *ba = root->child;
 
@@ -4127,7 +4141,7 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
 
   for (int i = 0; i < root->triangle_count; i++) {
     do {
-      tri = (LineartTriangle *)lineart_atomic_load(&root->linked_triangles[i]);
+      tri = (LineartTriangle *)atomic_load_z((size_t *)&root->linked_triangles[i]);
       /* Need to wait for worker threads to fill in the last few triangles. */
     } while (UNLIKELY(tri == NULL));
     double b[4];
@@ -4135,6 +4149,9 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
     b[1] = MAX3(tri->v[0]->fbcoord[0], tri->v[1]->fbcoord[0], tri->v[2]->fbcoord[0]);
     b[2] = MAX3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
     b[3] = MIN3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
+
+    /* Re-link triangles into child tiles, not doing intersection lines during this because this
+     * batch of triangles are all tested with each other for intersecctions. */
     if (LRT_BOUND_AREA_CROSSES(b, &ba[0].l)) {
       lineart_bounding_area_link_triangle_cas(
           rb, &ba[0], tri, b, 0, recursive_level + 1, false, NULL);
@@ -4152,6 +4169,10 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
           rb, &ba[3], tri, b, 0, recursive_level + 1, false, NULL);
     }
   }
+
+  /* At this point the child tiles are fully initialized and it's safe for new triangles to be
+   * inserted, so assign root->child for #lineart_bounding_area_link_triangle_cas to use. */
+  root->child = ba;
 }
 
 static bool lineart_bounding_area_edge_intersect(LineartRenderBuffer *UNUSED(fb),
@@ -4232,8 +4253,17 @@ static bool lineart_bounding_area_triangle_intersect(LineartRenderBuffer *fb,
 }
 
 /**
- * 1) Link triangles with bounding areas for later occlusion test.
- * 2) Test triangles with existing(added previously) triangles for intersection lines.
+ * This function does two things:
+ *
+ * 1) Builds a quad-tree under rb->InitialBoundingAreas to achieve good geometry separation for
+ * fast overlapping test between triangles and lines. This acceleration structure makes the
+ * occlusion stage much faster.
+ *
+ * 2) Test triangles with other triangles that are previously linked into each tile
+ * (#LineartBoundingArea) for intersection lines. When splitting the tile into 4 children and
+ * re-linking triangles into the child tiles, intersections are inhibited so we don't get
+ * duplicated intersection lines.
+ *
  */
 static void lineart_bounding_area_link_triangle_cas(LineartRenderBuffer *rb,
                                                     LineartBoundingArea *root_ba,
@@ -4251,9 +4281,8 @@ static void lineart_bounding_area_link_triangle_cas(LineartRenderBuffer *rb,
   LineartBoundingArea *old_ba = root_ba;
 
   if (old_ba->child) {
-    /* Wait for splitting thread to fully initialize child tiles. */
-    BLI_spin_lock(&old_ba->lock);
-    BLI_spin_unlock(&old_ba->lock);
+    /* If old_ba->child is not NULL, then tile splitting is fully finished, safe to directly insert
+     * into child tiles. */
     double *B1 = LRUB;
     double b[4];
     if (!LRUB) {
@@ -4263,7 +4292,7 @@ static void lineart_bounding_area_link_triangle_cas(LineartRenderBuffer *rb,
       b[3] = MIN3(tri->v[0]->fbcoord[1], tri->v[1]->fbcoord[1], tri->v[2]->fbcoord[1]);
       B1 = b;
     }
-    /* continue adding into the child */
+    /* Continue adding into the child. */
     for (int iba = 0; iba < 4; iba++) {
       if (LRT_BOUND_AREA_CROSSES(B1, &old_ba->child[iba].l)) {
         lineart_bounding_area_link_triangle_cas(
@@ -4277,20 +4306,27 @@ static void lineart_bounding_area_link_triangle_cas(LineartRenderBuffer *rb,
     uint32_t old_tri_index = old_ba->triangle_count;
     uint32_t new_tri_index = old_tri_index + 1;
     uint32_t max_triangles = old_ba->max_triangle_count;
+
+    /* If there are still space left in this tile for insertion. */
     if (old_tri_index < max_triangles) {
+
+      /* Use atomic compare and swap to get a index, we can't use atomic increment here because it
+       * could overflow the index when multiple threads are incrementing. */
       uint32_t success_old_index = atomic_cas_uint32(
           &old_ba->triangle_count, old_tri_index, new_tri_index);
+
       if (success_old_index != old_tri_index) {
         /* Too bad, other threads grabbed this index, we retry. */
         continue;
       }
+
       /* Successfully grabbed a viable index to insert the triangle into.
        * Insert into [old_tri_index] for correct array offset starting from [0]. */
-      lineart_atomic_store(&old_ba->linked_triangles[old_tri_index], tri);
+      atomic_store_z((size_t *)&old_ba->linked_triangles[old_tri_index], (size_t)tri);
 
       /* Do intersections in place. */
-      if (rb->use_intersections) {
-        lineart_triangle_intersect_in_bounding_area(tri, old_ba, th, old_tri_index - 1);
+      if (do_intersection && rb->use_intersections) {
+        lineart_triangle_intersect_in_bounding_area(tri, old_ba, th, old_tri_index);
       }
       break;
     }
@@ -4727,7 +4763,8 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
 }
 
 /**
- * Sequentially add triangles into render buffer. This also does intersection along the way.
+ * Sequentially add triangles into render buffer, intersection lines between those triangles will
+ * also be computed at the same time.
  */
 static void lineart_main_add_triangles(LineartRenderBuffer *rb)
 {
@@ -4736,6 +4773,8 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
     t_start = PIL_check_seconds_timer();
   }
 
+  /* Initialize per-thread data for thread task scheduling information and storing intersection
+   * results.  */
   LineartIsecData d = {0};
   lineart_init_isec_thread(&d, rb, rb->thread_count);
 
@@ -4754,7 +4793,7 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
 
   if (G.debug_value == 4000) {
     double t_elapsed = PIL_check_seconds_timer() - t_start;
-    printf("Line art intersection time: %lf\n", t_elapsed);
+    printf("Line art intersection time: %f\n", t_elapsed);
   }
 }
 
