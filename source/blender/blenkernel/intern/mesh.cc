@@ -64,7 +64,8 @@
 
 using blender::float3;
 using blender::MutableSpan;
-using blender::VArray using blender::Vector;
+using blender::VArray;
+using blender::Vector;
 
 static void mesh_clear_geometry(Mesh *mesh);
 static void mesh_tessface_clear_intern(Mesh *mesh, int free_customdata);
@@ -277,7 +278,7 @@ static void mesh_blend_write(BlendWriter *writer, ID *id, const void *id_address
   }
 
   if (BLO_write_use_legacy_mesh_format(writer)) {
-    prepare_legacy_bevel_weight_data_for_writing(*mesh);
+    prepare_legacy_hide_data_for_writing(*mesh);
   }
 
   BLO_write_id_struct(writer, Mesh, id_address, &mesh->id);
