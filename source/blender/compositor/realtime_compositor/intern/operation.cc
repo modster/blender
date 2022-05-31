@@ -8,15 +8,15 @@
 #include "BLI_vector.hh"
 
 #include "COM_context.hh"
-#include "COM_conversion_processor_operation.hh"
+#include "COM_conversion_operation.hh"
 #include "COM_domain.hh"
 #include "COM_input_descriptor.hh"
 #include "COM_operation.hh"
-#include "COM_processor_operation.hh"
-#include "COM_realize_on_domain_processor_operation.hh"
-#include "COM_reduce_to_single_value_processor_operation.hh"
+#include "COM_realize_on_domain_operation.hh"
+#include "COM_reduce_to_single_value_operation.hh"
 #include "COM_result.hh"
 #include "COM_shader_pool.hh"
+#include "COM_simple_operation.hh"
 #include "COM_texture_pool.hh"
 
 namespace blender::realtime_compositor {
@@ -81,28 +81,27 @@ void Operation::add_and_evaluate_input_processors()
 {
   /* Add and evaluate reduce to single value input processors if needed. */
   for (const StringRef &identifier : results_mapped_to_inputs_.keys()) {
-    ProcessorOperation *single_value = ReduceToSingleValueProcessorOperation::construct_if_needed(
+    SimpleOperation *single_value = ReduceToSingleValueOperation::construct_if_needed(
         context(), get_input(identifier));
     add_and_evaluate_input_processor(identifier, single_value);
   }
 
   /* Add and evaluate conversion input processors if needed. */
   for (const StringRef &identifier : results_mapped_to_inputs_.keys()) {
-    ProcessorOperation *conversion = ConversionProcessorOperation::construct_if_needed(
+    SimpleOperation *conversion = ConversionOperation::construct_if_needed(
         context(), get_input(identifier), get_input_descriptor(identifier));
     add_and_evaluate_input_processor(identifier, conversion);
   }
 
   /* Add and evaluate realize on domain input processors if needed. */
   for (const StringRef &identifier : results_mapped_to_inputs_.keys()) {
-    ProcessorOperation *realize_on_domain = RealizeOnDomainProcessorOperation::construct_if_needed(
+    SimpleOperation *realize_on_domain = RealizeOnDomainOperation::construct_if_needed(
         context(), get_input(identifier), get_input_descriptor(identifier), compute_domain());
     add_and_evaluate_input_processor(identifier, realize_on_domain);
   }
 }
 
-void Operation::add_and_evaluate_input_processor(StringRef identifier,
-                                                 ProcessorOperation *processor)
+void Operation::add_and_evaluate_input_processor(StringRef identifier, SimpleOperation *processor)
 {
   /* Allow null inputs to facilitate construct_if_needed pattern of addition. For instance, see the
    * implementation of the add_and_evaluate_input_processors method. */
@@ -120,7 +119,7 @@ void Operation::add_and_evaluate_input_processor(StringRef identifier,
 
   /* Map the input result of the processor and add it to the processors vector. */
   processor->map_input_to_result(&result);
-  processors.append(std::unique_ptr<ProcessorOperation>(processor));
+  processors.append(std::unique_ptr<SimpleOperation>(processor));
 
   /* Switch the result mapped to the input to be the output result of the processor. */
   switch_result_mapped_to_input(identifier, &processor->get_result());
@@ -181,7 +180,7 @@ void Operation::evaluate_input_processors()
   /* The input processors are already added, so just go over the input processors and evaluate
    * them. */
   for (const ProcessorsVector &processors : input_processors_.values()) {
-    for (const std::unique_ptr<ProcessorOperation> &processor : processors) {
+    for (const std::unique_ptr<SimpleOperation> &processor : processors) {
       processor->evaluate();
     }
   }

@@ -5,7 +5,7 @@
 #include "GPU_shader.h"
 
 #include "COM_context.hh"
-#include "COM_conversion_processor_operation.hh"
+#include "COM_conversion_operation.hh"
 #include "COM_input_descriptor.hh"
 #include "COM_result.hh"
 #include "COM_utilities.hh"
@@ -13,10 +13,10 @@
 namespace blender::realtime_compositor {
 
 /* -------------------------------------------------------------------------------------------------
- *  Convert Processor Operation.
+ *  Conversion Operation.
  */
 
-void ConversionProcessorOperation::execute()
+void ConversionOperation::execute()
 {
   Result &result = get_result();
   const Result &input = get_input();
@@ -42,31 +42,32 @@ void ConversionProcessorOperation::execute()
   GPU_shader_unbind();
 }
 
-ProcessorOperation *ConversionProcessorOperation::construct_if_needed(
-    Context &context, const Result &input_result, const InputDescriptor &input_descriptor)
+SimpleOperation *ConversionOperation::construct_if_needed(Context &context,
+                                                          const Result &input_result,
+                                                          const InputDescriptor &input_descriptor)
 {
   ResultType result_type = input_result.type();
   ResultType expected_type = input_descriptor.type;
 
   /* If the result type differs from the expected type, return an instance of an appropriate
-   * conversion processor. Otherwise, return a null pointer. */
+   * conversion operation. Otherwise, return a null pointer. */
   if (result_type == ResultType::Float && expected_type == ResultType::Vector) {
-    return new ConvertFloatToVectorProcessorOperation(context);
+    return new ConvertFloatToVectorOperation(context);
   }
   else if (result_type == ResultType::Float && expected_type == ResultType::Color) {
-    return new ConvertFloatToColorProcessorOperation(context);
+    return new ConvertFloatToColorOperation(context);
   }
   else if (result_type == ResultType::Color && expected_type == ResultType::Float) {
-    return new ConvertColorToFloatProcessorOperation(context);
+    return new ConvertColorToFloatOperation(context);
   }
   else if (result_type == ResultType::Color && expected_type == ResultType::Vector) {
-    return new ConvertColorToVectorProcessorOperation(context);
+    return new ConvertColorToVectorOperation(context);
   }
   else if (result_type == ResultType::Vector && expected_type == ResultType::Float) {
-    return new ConvertVectorToFloatProcessorOperation(context);
+    return new ConvertVectorToFloatOperation(context);
   }
   else if (result_type == ResultType::Vector && expected_type == ResultType::Color) {
-    return new ConvertVectorToColorProcessorOperation(context);
+    return new ConvertVectorToColorOperation(context);
   }
   else {
     return nullptr;
@@ -74,11 +75,11 @@ ProcessorOperation *ConversionProcessorOperation::construct_if_needed(
 }
 
 /* -------------------------------------------------------------------------------------------------
- *  Convert Float To Vector Processor Operation.
+ *  Convert Float To Vector Operation.
  */
 
-ConvertFloatToVectorProcessorOperation::ConvertFloatToVectorProcessorOperation(Context &context)
-    : ConversionProcessorOperation(context)
+ConvertFloatToVectorOperation::ConvertFloatToVectorOperation(Context &context)
+    : ConversionOperation(context)
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Float;
@@ -86,22 +87,22 @@ ConvertFloatToVectorProcessorOperation::ConvertFloatToVectorProcessorOperation(C
   populate_result(Result(ResultType::Vector, texture_pool()));
 }
 
-void ConvertFloatToVectorProcessorOperation::execute_single(const Result &input, Result &output)
+void ConvertFloatToVectorOperation::execute_single(const Result &input, Result &output)
 {
   output.set_vector_value(float3(input.get_float_value()));
 }
 
-GPUShader *ConvertFloatToVectorProcessorOperation::get_conversion_shader() const
+GPUShader *ConvertFloatToVectorOperation::get_conversion_shader() const
 {
   return shader_pool().acquire("compositor_convert_float_to_vector");
 }
 
 /* -------------------------------------------------------------------------------------------------
- *  Convert Float To Color Processor Operation.
+ *  Convert Float To Color Operation.
  */
 
-ConvertFloatToColorProcessorOperation::ConvertFloatToColorProcessorOperation(Context &context)
-    : ConversionProcessorOperation(context)
+ConvertFloatToColorOperation::ConvertFloatToColorOperation(Context &context)
+    : ConversionOperation(context)
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Float;
@@ -109,24 +110,24 @@ ConvertFloatToColorProcessorOperation::ConvertFloatToColorProcessorOperation(Con
   populate_result(Result(ResultType::Color, texture_pool()));
 }
 
-void ConvertFloatToColorProcessorOperation::execute_single(const Result &input, Result &output)
+void ConvertFloatToColorOperation::execute_single(const Result &input, Result &output)
 {
   float4 color = float4(input.get_float_value());
   color[3] = 1.0f;
   output.set_color_value(color);
 }
 
-GPUShader *ConvertFloatToColorProcessorOperation::get_conversion_shader() const
+GPUShader *ConvertFloatToColorOperation::get_conversion_shader() const
 {
   return shader_pool().acquire("compositor_convert_float_to_color");
 }
 
 /* -------------------------------------------------------------------------------------------------
- *  Convert Color To Float Processor Operation.
+ *  Convert Color To Float Operation.
  */
 
-ConvertColorToFloatProcessorOperation::ConvertColorToFloatProcessorOperation(Context &context)
-    : ConversionProcessorOperation(context)
+ConvertColorToFloatOperation::ConvertColorToFloatOperation(Context &context)
+    : ConversionOperation(context)
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Color;
@@ -134,23 +135,23 @@ ConvertColorToFloatProcessorOperation::ConvertColorToFloatProcessorOperation(Con
   populate_result(Result(ResultType::Float, texture_pool()));
 }
 
-void ConvertColorToFloatProcessorOperation::execute_single(const Result &input, Result &output)
+void ConvertColorToFloatOperation::execute_single(const Result &input, Result &output)
 {
   float4 color = input.get_color_value();
   output.set_float_value((color[0] + color[1] + color[2]) / 3.0f);
 }
 
-GPUShader *ConvertColorToFloatProcessorOperation::get_conversion_shader() const
+GPUShader *ConvertColorToFloatOperation::get_conversion_shader() const
 {
   return shader_pool().acquire("compositor_convert_color_to_float");
 }
 
 /* -------------------------------------------------------------------------------------------------
- *  Convert Color To Vector Processor Operation.
+ *  Convert Color To Vector Operation.
  */
 
-ConvertColorToVectorProcessorOperation::ConvertColorToVectorProcessorOperation(Context &context)
-    : ConversionProcessorOperation(context)
+ConvertColorToVectorOperation::ConvertColorToVectorOperation(Context &context)
+    : ConversionOperation(context)
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Color;
@@ -158,23 +159,23 @@ ConvertColorToVectorProcessorOperation::ConvertColorToVectorProcessorOperation(C
   populate_result(Result(ResultType::Vector, texture_pool()));
 }
 
-void ConvertColorToVectorProcessorOperation::execute_single(const Result &input, Result &output)
+void ConvertColorToVectorOperation::execute_single(const Result &input, Result &output)
 {
   float4 color = input.get_color_value();
   output.set_vector_value(float3(color));
 }
 
-GPUShader *ConvertColorToVectorProcessorOperation::get_conversion_shader() const
+GPUShader *ConvertColorToVectorOperation::get_conversion_shader() const
 {
   return shader_pool().acquire("compositor_convert_color_to_vector");
 }
 
 /* -------------------------------------------------------------------------------------------------
- *  Convert Vector To Float Processor Operation.
+ *  Convert Vector To Float Operation.
  */
 
-ConvertVectorToFloatProcessorOperation::ConvertVectorToFloatProcessorOperation(Context &context)
-    : ConversionProcessorOperation(context)
+ConvertVectorToFloatOperation::ConvertVectorToFloatOperation(Context &context)
+    : ConversionOperation(context)
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Vector;
@@ -182,23 +183,23 @@ ConvertVectorToFloatProcessorOperation::ConvertVectorToFloatProcessorOperation(C
   populate_result(Result(ResultType::Float, texture_pool()));
 }
 
-void ConvertVectorToFloatProcessorOperation::execute_single(const Result &input, Result &output)
+void ConvertVectorToFloatOperation::execute_single(const Result &input, Result &output)
 {
   float3 vector = input.get_vector_value();
   output.set_float_value((vector[0] + vector[1] + vector[2]) / 3.0f);
 }
 
-GPUShader *ConvertVectorToFloatProcessorOperation::get_conversion_shader() const
+GPUShader *ConvertVectorToFloatOperation::get_conversion_shader() const
 {
   return shader_pool().acquire("compositor_convert_vector_to_float");
 }
 
 /* -------------------------------------------------------------------------------------------------
- *  Convert Vector To Color Processor Operation.
+ *  Convert Vector To Color Operation.
  */
 
-ConvertVectorToColorProcessorOperation::ConvertVectorToColorProcessorOperation(Context &context)
-    : ConversionProcessorOperation(context)
+ConvertVectorToColorOperation::ConvertVectorToColorOperation(Context &context)
+    : ConversionOperation(context)
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = ResultType::Vector;
@@ -206,12 +207,12 @@ ConvertVectorToColorProcessorOperation::ConvertVectorToColorProcessorOperation(C
   populate_result(Result(ResultType::Color, texture_pool()));
 }
 
-void ConvertVectorToColorProcessorOperation::execute_single(const Result &input, Result &output)
+void ConvertVectorToColorOperation::execute_single(const Result &input, Result &output)
 {
   output.set_color_value(float4(input.get_vector_value(), 1.0f));
 }
 
-GPUShader *ConvertVectorToColorProcessorOperation::get_conversion_shader() const
+GPUShader *ConvertVectorToColorOperation::get_conversion_shader() const
 {
   return shader_pool().acquire("compositor_convert_vector_to_color");
 }

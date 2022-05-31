@@ -13,8 +13,8 @@ namespace blender::realtime_compositor {
 class InputDescriptor {
  public:
   /* The type of input. This may be different that the type of result that the operation will
-   * receive for the input, in which case, an implicit conversion input processor operation will
-   * be added to convert it to the required type. */
+   * receive for the input, in which case, an implicit conversion operation will be added as an
+   * input processor to convert it to the required type. */
   ResultType type;
   /* If true, then the input does not need to be realized on the domain of the operation before its
    * execution. See the discussion in COM_domain.hh for more information. */

@@ -17,11 +17,12 @@
 
 namespace blender::realtime_compositor {
 
-/* Forward declares processor operation because it is used in the operation definition.  */
-class ProcessorOperation;
+/* Forward declare simple operation because it is used in the operation definition.  */
+class SimpleOperation;
 
-/* A type representing a vector of processor operations. */
-using ProcessorsVector = Vector<std::unique_ptr<ProcessorOperation>>;
+/* A type representing a vector of simple operations that store the input processors for a
+ * particular input. */
+using ProcessorsVector = Vector<std::unique_ptr<SimpleOperation>>;
 
 /* ------------------------------------------------------------------------------------------------
  * Operation
@@ -35,9 +36,10 @@ using ProcessorsVector = Vector<std::unique_ptr<ProcessorOperation>>;
  * appropriate type. Those results are then allocated and computed by derived classes in their
  * execute method.
  *
- * Each input may have one or more input processor operations, which are applied on the inputs
- * before the operation is executed. And thus the effective input of the operation is the result of
- * the last input processor if one exists. Input processors are added and evaluated by calling the
+ * Each input may have one or more input processors, which are simple operations that process the
+ * inputs before the operation is executed, see the discussion in COM_simple_operation.hh for more
+ * information. And thus the effective input of the operation is the result of the last input
+ * processor if one exists. Input processors are added and evaluated by calling the
  * add_and_evaluate_input_processors method, which provides a default implementation that does
  * things like implicit conversion, domain realization, and more. This default implementation can,
  * however, be overridden, extended, or removed. Once the input processors are added and evaluated
@@ -69,11 +71,11 @@ class Operation {
    * linked results before evaluating the operation by calling the map_input_to_result method. */
   Map<StringRef, Result *> results_mapped_to_inputs_;
   /* A mapping between each input of the operation identified by its identifier and an ordered list
-   * of input processor operations to be applied on that input. This is initialized the first time
-   * the input processors are evaluated by calling the add_and_evaluate_input_processors method.
-   * Further evaluations will evaluate the processors directly without the need to add them again.
-   * The input_processors_added_ member indicates whether the processors were already added and can
-   * be evaluated directly or need to be added and evaluated. */
+   * of simple operations to process that input. This is initialized the first time the input
+   * processors are evaluated by calling the add_and_evaluate_input_processors method. Further
+   * evaluations will evaluate the processors directly without the need to add them again. The
+   * input_processors_added_ member indicates whether the processors were already added and can be
+   * evaluated directly or need to be added and evaluated. */
   Map<StringRef, ProcessorsVector> input_processors_;
   /* True if the input processors were already added and can be evaluated directly. False if the
    * input processors are not yet added and needs to be added. */
@@ -118,7 +120,7 @@ class Operation {
    *   mapped to the input if no previous processors exists.
    * - Switch the result mapped to the input to be the output result of the processor.
    * - Evaluate the processor. */
-  void add_and_evaluate_input_processor(StringRef identifier, ProcessorOperation *processor);
+  void add_and_evaluate_input_processor(StringRef identifier, SimpleOperation *processor);
 
   /* This method should allocate the operation results, execute the operation, and compute the
    * output results. */

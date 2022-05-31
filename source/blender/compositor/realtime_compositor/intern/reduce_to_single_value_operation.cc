@@ -7,14 +7,13 @@
 
 #include "COM_context.hh"
 #include "COM_input_descriptor.hh"
-#include "COM_reduce_to_single_value_processor_operation.hh"
+#include "COM_reduce_to_single_value_operation.hh"
 #include "COM_result.hh"
 
 namespace blender::realtime_compositor {
 
-ReduceToSingleValueProcessorOperation::ReduceToSingleValueProcessorOperation(Context &context,
-                                                                             ResultType type)
-    : ProcessorOperation(context)
+ReduceToSingleValueOperation::ReduceToSingleValueOperation(Context &context, ResultType type)
+    : SimpleOperation(context)
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = type;
@@ -22,7 +21,7 @@ ReduceToSingleValueProcessorOperation::ReduceToSingleValueProcessorOperation(Con
   populate_result(Result(type, texture_pool()));
 }
 
-void ReduceToSingleValueProcessorOperation::execute()
+void ReduceToSingleValueOperation::execute()
 {
   /* Download the input pixel from the GPU texture. */
   const Result &input = get_input();
@@ -48,22 +47,22 @@ void ReduceToSingleValueProcessorOperation::execute()
   MEM_freeN(pixel);
 }
 
-ProcessorOperation *ReduceToSingleValueProcessorOperation::construct_if_needed(
-    Context &context, const Result &input_result)
+SimpleOperation *ReduceToSingleValueOperation::construct_if_needed(Context &context,
+                                                                   const Result &input_result)
 {
-  /* Input result is already a single value, the processor is not needed. */
+  /* Input result is already a single value, the operation is not needed. */
   if (input_result.is_single_value()) {
     return nullptr;
   }
 
-  /* The input is a full sized texture can can't be reduced to a single value, the processor is not
+  /* The input is a full sized texture can can't be reduced to a single value, the operation is not
    * needed. */
   if (input_result.domain().size != int2(1)) {
     return nullptr;
   }
 
   /* The input is a texture of a single pixel and can be reduced to a single value. */
-  return new ReduceToSingleValueProcessorOperation(context, input_result.type());
+  return new ReduceToSingleValueOperation(context, input_result.type());
 }
 
 }  // namespace blender::realtime_compositor

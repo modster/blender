@@ -10,16 +10,16 @@
 #include "COM_context.hh"
 #include "COM_domain.hh"
 #include "COM_input_descriptor.hh"
-#include "COM_realize_on_domain_processor_operation.hh"
+#include "COM_realize_on_domain_operation.hh"
 #include "COM_result.hh"
 #include "COM_utilities.hh"
 
 namespace blender::realtime_compositor {
 
-RealizeOnDomainProcessorOperation::RealizeOnDomainProcessorOperation(Context &context,
-                                                                     Domain domain,
-                                                                     ResultType type)
-    : ProcessorOperation(context), domain_(domain)
+RealizeOnDomainOperation::RealizeOnDomainOperation(Context &context,
+                                                   Domain domain,
+                                                   ResultType type)
+    : SimpleOperation(context), domain_(domain)
 {
   InputDescriptor input_descriptor;
   input_descriptor.type = type;
@@ -27,7 +27,7 @@ RealizeOnDomainProcessorOperation::RealizeOnDomainProcessorOperation(Context &co
   populate_result(Result(type, texture_pool()));
 }
 
-void RealizeOnDomainProcessorOperation::execute()
+void RealizeOnDomainOperation::execute()
 {
   Result &input = get_input();
   Result &result = get_result();
@@ -76,7 +76,7 @@ void RealizeOnDomainProcessorOperation::execute()
   GPU_shader_unbind();
 }
 
-GPUShader *RealizeOnDomainProcessorOperation::get_realization_shader()
+GPUShader *RealizeOnDomainOperation::get_realization_shader()
 {
   switch (get_result().type()) {
     case ResultType::Color:
@@ -91,41 +91,41 @@ GPUShader *RealizeOnDomainProcessorOperation::get_realization_shader()
   return nullptr;
 }
 
-Domain RealizeOnDomainProcessorOperation::compute_domain()
+Domain RealizeOnDomainOperation::compute_domain()
 {
   return domain_;
 }
 
-ProcessorOperation *RealizeOnDomainProcessorOperation::construct_if_needed(
+SimpleOperation *RealizeOnDomainOperation::construct_if_needed(
     Context &context,
     const Result &input_result,
     const InputDescriptor &input_descriptor,
     const Domain &operation_domain)
 {
-  /* This input wants to skip realization, the processor is not needed. */
+  /* This input wants to skip realization, the operation is not needed. */
   if (input_descriptor.skip_realization) {
     return nullptr;
   }
 
   /* The input expects a single value and if no single value is provided, it will be ignored and a
-   * default value will be used, so no need to realize it and the processor is not needed. */
+   * default value will be used, so no need to realize it and the operation is not needed. */
   if (input_descriptor.expects_single_value) {
     return nullptr;
   }
 
-  /* Input result is a single value and does not need realization, the processor is not needed. */
+  /* Input result is a single value and does not need realization, the operation is not needed. */
   if (input_result.is_single_value()) {
     return nullptr;
   }
 
   /* The input have an identical domain to the operation domain, so no need to realize it and the
-   * processor is not needed. */
+   * operation is not needed. */
   if (input_result.domain() == operation_domain) {
     return nullptr;
   }
 
   /* Otherwise, realization is needed. */
-  return new RealizeOnDomainProcessorOperation(context, operation_domain, input_descriptor.type);
+  return new RealizeOnDomainOperation(context, operation_domain, input_descriptor.type);
 }
 
 }  // namespace blender::realtime_compositor
