@@ -1040,7 +1040,7 @@ void BKE_mesh_flush_hidden_from_polys(Mesh *me)
 
   const VArray<bool> face_hide = component.attribute_get_for_read<bool>(
       ".face_hide", ATTR_DOMAIN_FACE, false);
-  if (face_hide.is_single() && face_hide.get_internal_single()) {
+  if (face_hide.is_single() && !face_hide.get_internal_single()) {
     component.attribute_try_delete(".vert_hide");
     component.attribute_try_delete(".edge_hide");
     return;

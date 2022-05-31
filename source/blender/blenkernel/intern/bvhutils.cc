@@ -22,10 +22,13 @@
 #include "BKE_bvhutils.h"
 #include "BKE_customdata.h"
 #include "BKE_editmesh.h"
+#include "BKE_geometry_set.hh"
 #include "BKE_mesh.h"
 #include "BKE_mesh_runtime.h"
 
 #include "MEM_guardedalloc.h"
+
+using blender::VArray;
 
 /* -------------------------------------------------------------------- */
 /** \name BVHCache
@@ -1181,11 +1184,11 @@ static BLI_bitmap *loose_edges_map_get(const MEdge *medge,
 }
 
 static BLI_bitmap *looptri_no_hidden_map_get(const MPoly *mpoly,
-                                             const bool *face_hide,
+                                             const VArray<bool> &face_hide,
                                              const int looptri_len,
                                              int *r_looptri_active_len)
 {
-  if (face_hide == nullptr) {
+  if (face_hide.is_single() && !face_hide.get_internal_single()) {
     return nullptr;
   }
   BLI_bitmap *looptri_mask = BLI_BITMAP_NEW(looptri_len, __func__);
@@ -1279,13 +1282,17 @@ BVHTree *BKE_bvhtree_from_mesh_get(struct BVHTreeFromMesh *data,
           0.0f, tree_type, 6, mesh->mvert, mesh->mface, mesh->totface, nullptr, -1);
       break;
 
-    case BVHTREE_FROM_LOOPTRI_NO_HIDDEN:
+    case BVHTREE_FROM_LOOPTRI_NO_HIDDEN: {
+      MeshComponent component;
+      component.replace(const_cast<Mesh *>(mesh), GeometryOwnershipType::ReadOnly);
+
       mask = looptri_no_hidden_map_get(
           mesh->mpoly,
-          (const bool *)CustomData_get_layer_named(&mesh->pdata, CD_PROP_BOOL, ".face_hide"),
+          component.attribute_get_for_read<bool>(".face_hide", ATTR_DOMAIN_FACE, false),
           looptri_len,
           &mask_bits_act_len);
       ATTR_FALLTHROUGH;
+    }
     case BVHTREE_FROM_LOOPTRI:
       data->tree = bvhtree_from_mesh_looptri_create_tree(0.0f,
                                                          tree_type,
