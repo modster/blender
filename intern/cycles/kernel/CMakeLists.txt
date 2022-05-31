@@ -867,6 +867,23 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     endif()
   endif()
 
+  # install dynamic libraries required at runtime
+  if(WIN32)
+    set(SYCL_RUNTIME_DEPENDENCIES
+        sycl.dll
+        pi_level_zero.dll
+    )
+    delayed_install("${sycl_compiler_root}" "${SYCL_RUNTIME_DEPENDENCIES}" ${CMAKE_INSTALL_PREFIX})
+  elseif(UNIX AND NOT APPLE)
+    file(GLOB SYCL_RUNTIME_DEPENDENCIES
+              ${sycl_compiler_root}/../lib/libsycl.so
+              ${sycl_compiler_root}/../lib/libsycl.so.[0-9]
+              ${sycl_compiler_root}/../lib/libsycl.so.[0-9].[0-9].[0-9]-[0-9]
+    )
+    list(APPEND SYCL_RUNTIME_DEPENDENCIES ${sycl_compiler_root}/../lib/libpi_level_zero.so)
+    delayed_install("" "${SYCL_RUNTIME_DEPENDENCIES}" ${CYCLES_INSTALL_PATH}/lib)
+  endif()
+
   delayed_install("${CMAKE_CURRENT_BINARY_DIR}" "${cycles_kernel_oneapi_lib}" ${CYCLES_INSTALL_PATH}/lib)
   add_custom_target(cycles_kernel_oneapi ALL DEPENDS ${cycles_kernel_oneapi_lib})
 endif()
