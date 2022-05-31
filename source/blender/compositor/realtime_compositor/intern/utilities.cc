@@ -92,9 +92,9 @@ int number_of_inputs_linked_to_output_conditioned(DOutputSocket output,
   return count;
 }
 
-bool is_gpu_material_node(DNode node)
+bool is_shader_node(DNode node)
 {
-  return node->typeinfo()->get_compositor_gpu_material_node;
+  return node->typeinfo()->get_compositor_shader_node;
 }
 
 InputDescriptor input_descriptor_from_input_socket(const InputSocketRef *socket)

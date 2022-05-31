@@ -13,7 +13,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -40,9 +40,9 @@ static void node_composit_init_valtorgb(bNodeTree *UNUSED(ntree), bNode *node)
 
 using namespace blender::realtime_compositor;
 
-class ColorRampGPUMaterialNode : public GPUMaterialNode {
+class ColorRampShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -116,9 +116,9 @@ class ColorRampGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new ColorRampGPUMaterialNode(node);
+  return new ColorRampShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_color_ramp_cc
@@ -134,7 +134,7 @@ void register_node_type_cmp_valtorgb()
   node_type_size(&ntype, 240, 200, 320);
   node_type_init(&ntype, file_ns::node_composit_init_valtorgb);
   node_type_storage(&ntype, "ColorBand", node_free_standard_storage, node_copy_standard_storage);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }
@@ -153,9 +153,9 @@ static void cmp_node_rgbtobw_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class RGBToBWGPUMaterialNode : public GPUMaterialNode {
+class RGBToBWShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -174,9 +174,9 @@ class RGBToBWGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new RGBToBWGPUMaterialNode(node);
+  return new RGBToBWShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_rgb_to_bw_cc
@@ -190,7 +190,7 @@ void register_node_type_cmp_rgbtobw()
   cmp_node_type_base(&ntype, CMP_NODE_RGBTOBW, "RGB to BW", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_rgbtobw_declare;
   node_type_size_preset(&ntype, NODE_SIZE_SMALL);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

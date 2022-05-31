@@ -15,13 +15,13 @@ namespace blender::realtime_compositor {
 using namespace nodes::derived_node_tree_types;
 
 /* ------------------------------------------------------------------------------------------------
- * GPU Material Node
+ * Shader Node
  *
  * A class that represents a node in a GPU material. The GPU node stacks for inputs and outputs are
  * stored and populated during construction. Derived class should implement the compile method to
  * implement the node and link it to the GPU material. The GPU material compiler is expected to
  * initialize the input links of the node before invoking the compile method. */
-class GPUMaterialNode {
+class ShaderNode {
  private:
   /* The node that this operation represents. */
   DNode node_;
@@ -37,9 +37,9 @@ class GPUMaterialNode {
 
  public:
   /* Construct the node by populating both its inputs and outputs. */
-  GPUMaterialNode(DNode node);
+  ShaderNode(DNode node);
 
-  virtual ~GPUMaterialNode() = default;
+  virtual ~ShaderNode() = default;
 
   /* Compile the node by adding the appropriate GPU material graph nodes and linking the
    * appropriate resources. */

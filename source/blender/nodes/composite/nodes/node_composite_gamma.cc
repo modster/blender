@@ -7,7 +7,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -31,9 +31,9 @@ static void cmp_node_gamma_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class GammaGPUMaterialNode : public GPUMaterialNode {
+class GammaShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -44,9 +44,9 @@ class GammaGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new GammaGPUMaterialNode(node);
+  return new GammaShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_gamma_cc
@@ -59,7 +59,7 @@ void register_node_type_cmp_gamma()
 
   cmp_node_type_base(&ntype, CMP_NODE_GAMMA, "Gamma", NODE_CLASS_OP_COLOR);
   ntype.declare = file_ns::cmp_node_gamma_declare;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

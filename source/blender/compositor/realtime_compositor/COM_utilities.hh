@@ -38,8 +38,8 @@ bool is_output_linked_to_node_conditioned(DOutputSocket output,
 int number_of_inputs_linked_to_output_conditioned(DOutputSocket output,
                                                   FunctionRef<bool(DInputSocket)> condition);
 
-/* A node is a GPU material node if it defines a method to get a GPU material node operation. */
-bool is_gpu_material_node(DNode node);
+/* A node is a shader node if it defines a method to get a shader node operation. */
+bool is_shader_node(DNode node);
 
 /* Get the input descriptor of the given input socket. */
 InputDescriptor input_descriptor_from_input_socket(const InputSocketRef *socket);

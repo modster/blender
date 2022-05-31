@@ -7,7 +7,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -28,9 +28,9 @@ static void cmp_node_sepyuva_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class SeparateYUVAGPUMaterialNode : public GPUMaterialNode {
+class SeparateYUVAShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -41,9 +41,9 @@ class SeparateYUVAGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new SeparateYUVAGPUMaterialNode(node);
+  return new SeparateYUVAShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_separate_yuva_cc
@@ -56,7 +56,7 @@ void register_node_type_cmp_sepyuva()
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPYUVA_LEGACY, "Separate YUVA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_sepyuva_declare;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }
@@ -80,9 +80,9 @@ static void cmp_node_combyuva_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class CombineYUVAGPUMaterialNode : public GPUMaterialNode {
+class CombineYUVAShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -93,9 +93,9 @@ class CombineYUVAGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new CombineYUVAGPUMaterialNode(node);
+  return new CombineYUVAShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_combine_yuva_cc
@@ -108,7 +108,7 @@ void register_node_type_cmp_combyuva()
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBYUVA_LEGACY, "Combine YUVA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_combyuva_declare;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

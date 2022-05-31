@@ -9,7 +9,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -48,9 +48,9 @@ static void node_composit_init_huecorrect(bNodeTree *UNUSED(ntree), bNode *node)
 
 using namespace blender::realtime_compositor;
 
-class HueCorrectGPUMaterialNode : public GPUMaterialNode {
+class HueCorrectShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -88,9 +88,9 @@ class HueCorrectGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new HueCorrectGPUMaterialNode(node);
+  return new HueCorrectShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_huecorrect_cc
@@ -106,7 +106,7 @@ void register_node_type_cmp_huecorrect()
   node_type_size(&ntype, 320, 140, 500);
   node_type_init(&ntype, file_ns::node_composit_init_huecorrect);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

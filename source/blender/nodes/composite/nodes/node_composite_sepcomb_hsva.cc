@@ -7,7 +7,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -28,9 +28,9 @@ static void cmp_node_sephsva_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class SeparateHSVAGPUMaterialNode : public GPUMaterialNode {
+class SeparateHSVAShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -41,9 +41,9 @@ class SeparateHSVAGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new SeparateHSVAGPUMaterialNode(node);
+  return new SeparateHSVAShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_separate_hsva_cc
@@ -56,7 +56,7 @@ void register_node_type_cmp_sephsva()
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPHSVA_LEGACY, "Separate HSVA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_sephsva_declare;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }
@@ -80,9 +80,9 @@ static void cmp_node_combhsva_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class CombineHSVAGPUMaterialNode : public GPUMaterialNode {
+class CombineHSVAShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -93,9 +93,9 @@ class CombineHSVAGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new CombineHSVAGPUMaterialNode(node);
+  return new CombineHSVAShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_combine_hsva_cc
@@ -108,7 +108,7 @@ void register_node_type_cmp_combhsva()
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBHSVA_LEGACY, "Combine HSVA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_combhsva_declare;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

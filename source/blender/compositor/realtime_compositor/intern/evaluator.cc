@@ -7,12 +7,12 @@
 #include "COM_compile_state.hh"
 #include "COM_context.hh"
 #include "COM_evaluator.hh"
-#include "COM_gpu_material_operation.hh"
 #include "COM_input_single_value_operation.hh"
 #include "COM_node_operation.hh"
 #include "COM_operation.hh"
 #include "COM_result.hh"
 #include "COM_scheduler.hh"
+#include "COM_shader_operation.hh"
 #include "COM_utilities.hh"
 
 namespace blender::realtime_compositor {
@@ -65,18 +65,18 @@ void Evaluator::compile_and_evaluate()
   /* Declare a compile state to use for tracking the state of the compilation. */
   CompileState compile_state(schedule);
 
-  /* Go over the nodes in the schedule, compiling them into either node operations or GPU material
+  /* Go over the nodes in the schedule, compiling them into either node operations or shader
    * operations. */
   for (const DNode &node : schedule) {
-    /* Ask the compile state if now would be a good time to compile the GPU material compile group
-     * given the current node, and if it is, compile and evaluate it. */
-    if (compile_state.should_compile_gpu_material_compile_group(node)) {
-      compile_and_evaluate_gpu_material_compile_group(compile_state);
+    /* Ask the compile state if now would be a good time to compile the shader compile unit given
+     * the current node, and if it is, compile and evaluate it. */
+    if (compile_state.should_compile_shader_compile_unit(node)) {
+      compile_and_evaluate_shader_compile_unit(compile_state);
     }
 
-    /* If the node is a GPU material node, then add it to the GPU material compile group. */
-    if (is_gpu_material_node(node)) {
-      compile_state.add_node_to_gpu_material_compile_group(node);
+    /* If the node is a shader node, then add it to the shader compile unit. */
+    if (is_shader_node(node)) {
+      compile_state.add_node_to_shader_compile_unit(node);
     }
     else {
       /* Otherwise, compile and evaluate the node into a node operation. */
@@ -138,19 +138,19 @@ void Evaluator::map_node_operation_inputs_to_their_results(DNode node,
   }
 }
 
-void Evaluator::compile_and_evaluate_gpu_material_compile_group(CompileState &compile_state)
+void Evaluator::compile_and_evaluate_shader_compile_unit(CompileState &compile_state)
 {
-  /* Compile the GPU material compile group into a GPU Material Operation. */
-  SubSchedule &sub_schedule = compile_state.get_gpu_material_compile_group_sub_schedule();
-  GPUMaterialOperation *operation = new GPUMaterialOperation(context_, sub_schedule);
+  /* Compile the shader compile unit into a shader operation. */
+  SubSchedule &sub_schedule = compile_state.get_shader_compile_unit_sub_schedule();
+  ShaderOperation *operation = new ShaderOperation(context_, sub_schedule);
 
   /* Map each of the nodes in the sub-schedule to the compiled operation. */
   for (DNode node : sub_schedule) {
-    compile_state.map_node_to_gpu_material_operation(node, operation);
+    compile_state.map_node_to_shader_operation(node, operation);
   }
 
   /* Map the inputs of the operation to the results of the outputs they are linked to. */
-  map_gpu_material_operation_inputs_to_their_results(operation, compile_state);
+  map_shader_operation_inputs_to_their_results(operation, compile_state);
 
   /* Add the operation to the operations stream. */
   operations_stream_.append(std::unique_ptr<Operation>(operation));
@@ -161,12 +161,12 @@ void Evaluator::compile_and_evaluate_gpu_material_compile_group(CompileState &co
   /* Evaluate the operation. */
   operation->evaluate();
 
-  /* Clear the GPU material compile group to ready it for tracking the next GPU material. */
-  compile_state.reset_gpu_material_compile_group();
+  /* Clear the shader compile unit to ready it for tracking the next shader operation. */
+  compile_state.reset_shader_compile_unit();
 }
 
-void Evaluator::map_gpu_material_operation_inputs_to_their_results(GPUMaterialOperation *operation,
-                                                                   CompileState &compile_state)
+void Evaluator::map_shader_operation_inputs_to_their_results(ShaderOperation *operation,
+                                                             CompileState &compile_state)
 {
   /* For each input of the operation, retrieve the result of the output linked to it, and map the
    * result to the input. */

@@ -9,35 +9,35 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 #include "COM_utilities.hh"
 
 namespace blender::realtime_compositor {
 
 using namespace nodes::derived_node_tree_types;
 
-GPUMaterialNode::GPUMaterialNode(DNode node) : node_(node)
+ShaderNode::ShaderNode(DNode node) : node_(node)
 {
   populate_inputs();
   populate_outputs();
 }
 
-GPUNodeStack *GPUMaterialNode::get_inputs_array()
+GPUNodeStack *ShaderNode::get_inputs_array()
 {
   return inputs_.data();
 }
 
-GPUNodeStack *GPUMaterialNode::get_outputs_array()
+GPUNodeStack *ShaderNode::get_outputs_array()
 {
   return outputs_.data();
 }
 
-const DNode &GPUMaterialNode::node() const
+const DNode &ShaderNode::node() const
 {
   return node_;
 }
 
-bNode &GPUMaterialNode::bnode() const
+bNode &ShaderNode::bnode() const
 {
   return *node_->bnode();
 }
@@ -105,7 +105,7 @@ static void populate_gpu_node_stack(DSocket socket, GPUNodeStack &stack)
   }
 }
 
-void GPUMaterialNode::populate_inputs()
+void ShaderNode::populate_inputs()
 {
   /* Reserve a stack for each input in addition to an extra stack at the end to mark the end of the
    * array, as this is what the GPU module functions expect. */
@@ -117,7 +117,7 @@ void GPUMaterialNode::populate_inputs()
   }
 }
 
-void GPUMaterialNode::populate_outputs()
+void ShaderNode::populate_outputs()
 {
   /* Reserve a stack for each output in addition to an extra stack at the end to mark the end of
    * the array, as this is what the GPU module functions expect. */

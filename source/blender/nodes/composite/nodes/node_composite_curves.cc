@@ -14,8 +14,8 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
 #include "COM_node_operation.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -134,9 +134,9 @@ static void node_buts_curvevec(uiLayout *layout, bContext *UNUSED(C), PointerRNA
 
 using namespace blender::realtime_compositor;
 
-class VectorCurvesGPUMaterialNode : public GPUMaterialNode {
+class VectorCurvesShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -179,9 +179,9 @@ class VectorCurvesGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new VectorCurvesGPUMaterialNode(node);
+  return new VectorCurvesShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_vector_curves_cc
@@ -198,7 +198,7 @@ void register_node_type_cmp_curve_vec()
   node_type_size(&ntype, 200, 140, 320);
   node_type_init(&ntype, file_ns::node_composit_init_curve_vec);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }
@@ -230,9 +230,9 @@ static void node_composit_init_curve_rgb(bNodeTree *UNUSED(ntree), bNode *node)
 
 using namespace blender::realtime_compositor;
 
-class RGBCurvesGPUMaterialNode : public GPUMaterialNode {
+class RGBCurvesShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -308,9 +308,9 @@ class RGBCurvesGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new RGBCurvesGPUMaterialNode(node);
+  return new RGBCurvesShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_rgb_curves_cc
@@ -326,7 +326,7 @@ void register_node_type_cmp_curve_rgb()
   node_type_size(&ntype, 200, 140, 320);
   node_type_init(&ntype, file_ns::node_composit_init_curve_rgb);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

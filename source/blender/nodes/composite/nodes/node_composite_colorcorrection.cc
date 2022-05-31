@@ -12,7 +12,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -280,9 +280,9 @@ static void node_composit_buts_colorcorrection_ex(uiLayout *layout,
 
 using namespace blender::realtime_compositor;
 
-class ColorCorrectionGPUMaterialNode : public GPUMaterialNode {
+class ColorCorrectionShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -340,9 +340,9 @@ class ColorCorrectionGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new ColorCorrectionGPUMaterialNode(node);
+  return new ColorCorrectionShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_colorcorrection_cc
@@ -361,7 +361,7 @@ void register_node_type_cmp_colorcorrection()
   node_type_init(&ntype, file_ns::node_composit_init_colorcorrection);
   node_type_storage(
       &ntype, "NodeColorCorrection", node_free_standard_storage, node_copy_standard_storage);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

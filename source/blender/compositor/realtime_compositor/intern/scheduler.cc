@@ -70,17 +70,17 @@ using NeededBuffers = Map<DNode, int>;
  * needs the largest number of buffers, because those buffers can be reused by any input node
  * that needs a lesser number of buffers.
  *
- * GPU material nodes, however, are a special case because links between two GPU material nodes
- * inside the same GPU material don't pass a buffer, but a single value in the compiled shader.
- * So for GPU material nodes, only inputs and outputs linked to nodes that are not GPU material
- * nodes should be considered. Note that this might not actually be true, because the compiler may
- * decide to split a GPU material into multiples ones that will pass buffers, but this is not
- * something that can be known at scheduling-time. See the discussion in COM_compile_state.hh,
- * COM_evaluator.hh, and COM_gpu_material_operation.hh for more information. In the node tree shown
- * below, node 4 will have exactly the same number of needed buffers by node 3, because its inputs
- * and outputs are all internally linked in the GPU material.
+ * Shader nodes, however, are a special case because links between two shader nodes inside the same
+ * shader operation don't pass a buffer, but a single value in the compiled shader. So for shader
+ * nodes, only inputs and outputs linked to nodes that are not shader nodes should be considered.
+ * Note that this might not actually be true, because the compiler may decide to split a shader
+ * operation into multiples ones that will pass buffers, but this is not something that can be
+ * known at scheduling-time. See the discussion in COM_compile_state.hh, COM_evaluator.hh, and
+ * COM_shader_operation.hh for more information. In the node tree shown below, node 4 will have
+ * exactly the same number of needed buffers by node 3, because its inputs and outputs are all
+ * internally linked in the shader operation.
  *
- *                                        GPU Material
+ *                                      Shader Operation
  *                   +------------------------------------------------------+
  * .------------.    |  .------------.  .------------.      .------------.  |  .------------.
  * |   Node 1   |    |  |   Node 3   |  |   Node 4   |      |   Node 5   |  |  |   Node 6   |
@@ -168,10 +168,9 @@ static NeededBuffers compute_number_of_needed_buffers(DNode output_node)
         continue;
       }
 
-      /* Since this input is linked, if the link is not between two GPU material nodes, it means
-       * that the node takes a buffer through this input and so we increment the number of input
-       * buffers. */
-      if (!is_gpu_material_node(node) || !is_gpu_material_node(output.node())) {
+      /* Since this input is linked, if the link is not between two shader nodes, it means that the
+       * node takes a buffer through this input and so we increment the number of input buffers. */
+      if (!is_shader_node(node) || !is_shader_node(output.node())) {
         number_of_input_buffers++;
       }
 
@@ -194,10 +193,9 @@ static NeededBuffers compute_number_of_needed_buffers(DNode output_node)
         continue;
       }
 
-      /* If any of the links is not between two GPU material nodes, it means that the node outputs
+      /* If any of the links is not between two shader nodes, it means that the node outputs
        * a buffer through this output and so we increment the number of output buffers. */
-      if (!is_output_linked_to_node_conditioned(output, is_gpu_material_node) ||
-          !is_gpu_material_node(node)) {
+      if (!is_output_linked_to_node_conditioned(output, is_shader_node) || !is_shader_node(node)) {
         number_of_output_buffers++;
       }
     }

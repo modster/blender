@@ -7,7 +7,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -25,9 +25,9 @@ static void cmp_node_separate_xyz_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class SeparateXYZGPUMaterialNode : public GPUMaterialNode {
+class SeparateXYZShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -38,9 +38,9 @@ class SeparateXYZGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new SeparateXYZGPUMaterialNode(node);
+  return new SeparateXYZShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_separate_xyz_cc
@@ -53,7 +53,7 @@ void register_node_type_cmp_separate_xyz()
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPARATE_XYZ, "Separate XYZ", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_separate_xyz_declare;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }
@@ -72,9 +72,9 @@ static void cmp_node_combine_xyz_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class CombineXYZGPUMaterialNode : public GPUMaterialNode {
+class CombineXYZShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -85,9 +85,9 @@ class CombineXYZGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new CombineXYZGPUMaterialNode(node);
+  return new CombineXYZShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_combine_xyz_cc
@@ -100,7 +100,7 @@ void register_node_type_cmp_combine_xyz()
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBINE_XYZ, "Combine XYZ", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_combine_xyz_declare;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

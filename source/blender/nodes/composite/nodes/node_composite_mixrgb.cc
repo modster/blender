@@ -11,7 +11,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -38,9 +38,9 @@ static void cmp_node_mixrgb_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class MixRGBGPUMaterialNode : public GPUMaterialNode {
+class MixRGBShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -128,9 +128,9 @@ class MixRGBGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new MixRGBGPUMaterialNode(node);
+  return new MixRGBShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_mixrgb_cc
@@ -145,7 +145,7 @@ void register_node_type_cmp_mix_rgb()
   ntype.flag |= NODE_PREVIEW;
   ntype.declare = file_ns::cmp_node_mixrgb_declare;
   ntype.labelfunc = node_blend_label;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

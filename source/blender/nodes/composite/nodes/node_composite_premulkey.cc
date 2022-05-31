@@ -10,7 +10,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -33,9 +33,9 @@ static void node_composit_buts_premulkey(uiLayout *layout, bContext *UNUSED(C), 
 
 using namespace blender::realtime_compositor;
 
-class AlphaConvertGPUMaterialNode : public GPUMaterialNode {
+class AlphaConvertShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -58,9 +58,9 @@ class AlphaConvertGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new AlphaConvertGPUMaterialNode(node);
+  return new AlphaConvertShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_premulkey_cc
@@ -74,7 +74,7 @@ void register_node_type_cmp_premulkey()
   cmp_node_type_base(&ntype, CMP_NODE_PREMULKEY, "Alpha Convert", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_premulkey_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_premulkey;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

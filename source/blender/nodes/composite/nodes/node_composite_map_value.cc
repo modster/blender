@@ -12,7 +12,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -58,9 +58,9 @@ static void node_composit_buts_map_value(uiLayout *layout, bContext *UNUSED(C), 
 
 using namespace blender::realtime_compositor;
 
-class MapValueGPUMaterialNode : public GPUMaterialNode {
+class MapValueShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -101,9 +101,9 @@ class MapValueGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new MapValueGPUMaterialNode(node);
+  return new MapValueShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_map_value_cc
@@ -119,7 +119,7 @@ void register_node_type_cmp_map_value()
   ntype.draw_buttons = file_ns::node_composit_buts_map_value;
   node_type_init(&ntype, file_ns::node_composit_init_map_value);
   node_type_storage(&ntype, "TexMapping", node_free_standard_storage, node_copy_standard_storage);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

@@ -10,7 +10,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -58,9 +58,9 @@ static void node_composit_buts_distance_matte(uiLayout *layout,
 
 using namespace blender::realtime_compositor;
 
-class DistanceMatteGPUMaterialNode : public GPUMaterialNode {
+class DistanceMatteShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -113,9 +113,9 @@ class DistanceMatteGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new DistanceMatteGPUMaterialNode(node);
+  return new DistanceMatteShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_distance_matte_cc
@@ -132,7 +132,7 @@ void register_node_type_cmp_distance_matte()
   ntype.flag |= NODE_PREVIEW;
   node_type_init(&ntype, file_ns::node_composit_init_distance_matte);
   node_type_storage(&ntype, "NodeChroma", node_free_standard_storage, node_copy_standard_storage);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

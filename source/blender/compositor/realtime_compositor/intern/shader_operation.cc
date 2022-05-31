@@ -17,18 +17,18 @@
 #include "NOD_node_declaration.hh"
 
 #include "COM_context.hh"
-#include "COM_gpu_material_node.hh"
-#include "COM_gpu_material_operation.hh"
 #include "COM_operation.hh"
 #include "COM_result.hh"
 #include "COM_scheduler.hh"
+#include "COM_shader_node.hh"
+#include "COM_shader_operation.hh"
 #include "COM_utilities.hh"
 
 namespace blender::realtime_compositor {
 
 using namespace nodes::derived_node_tree_types;
 
-GPUMaterialOperation::GPUMaterialOperation(Context &context, SubSchedule &sub_schedule)
+ShaderOperation::ShaderOperation(Context &context, SubSchedule &sub_schedule)
     : Operation(context), sub_schedule_(sub_schedule)
 {
   material_ = GPU_material_from_callbacks(
@@ -37,12 +37,12 @@ GPUMaterialOperation::GPUMaterialOperation(Context &context, SubSchedule &sub_sc
   GPU_material_compile(material_);
 }
 
-GPUMaterialOperation::~GPUMaterialOperation()
+ShaderOperation::~ShaderOperation()
 {
   GPU_material_free_single(material_);
 }
 
-void GPUMaterialOperation::execute()
+void ShaderOperation::execute()
 {
   /* Allocate all the outputs of the operation on its computed domain. */
   const Domain domain = compute_domain();
@@ -66,17 +66,17 @@ void GPUMaterialOperation::execute()
   GPU_shader_unbind();
 }
 
-StringRef GPUMaterialOperation::get_output_identifier_from_output_socket(DOutputSocket output)
+StringRef ShaderOperation::get_output_identifier_from_output_socket(DOutputSocket output)
 {
   return output_sockets_to_output_identifiers_map_.lookup(output);
 }
 
-InputsToLinkedOutputsMap &GPUMaterialOperation::get_inputs_to_linked_outputs_map()
+InputsToLinkedOutputsMap &ShaderOperation::get_inputs_to_linked_outputs_map()
 {
   return inputs_to_linked_outputs_map_;
 }
 
-void GPUMaterialOperation::compute_results_reference_counts(const Schedule &schedule)
+void ShaderOperation::compute_results_reference_counts(const Schedule &schedule)
 {
   for (const OutputSocketsToOutputIdentifiersMap::Item &item :
        output_sockets_to_output_identifiers_map_.items()) {
@@ -88,7 +88,7 @@ void GPUMaterialOperation::compute_results_reference_counts(const Schedule &sche
   }
 }
 
-void GPUMaterialOperation::bind_material_resources(GPUShader *shader)
+void ShaderOperation::bind_material_resources(GPUShader *shader)
 {
   /* Bind the uniform buffer of the material if it exists. It may not exist if the GPU material has
    * no uniforms. */
@@ -107,7 +107,7 @@ void GPUMaterialOperation::bind_material_resources(GPUShader *shader)
   }
 }
 
-void GPUMaterialOperation::bind_inputs(GPUShader *shader)
+void ShaderOperation::bind_inputs(GPUShader *shader)
 {
   for (const GPUMaterialTexture *material_texture : output_to_material_texture_map_.values()) {
     const char *sampler_name = material_texture->sampler_name;
@@ -115,7 +115,7 @@ void GPUMaterialOperation::bind_inputs(GPUShader *shader)
   }
 }
 
-void GPUMaterialOperation::bind_outputs(GPUShader *shader)
+void ShaderOperation::bind_outputs(GPUShader *shader)
 {
   ListBase images = GPU_material_images(material_);
   LISTBASE_FOREACH (GPUMaterialImage *, image, &images) {
@@ -123,31 +123,31 @@ void GPUMaterialOperation::bind_outputs(GPUShader *shader)
   }
 }
 
-void GPUMaterialOperation::setup_material(void *UNUSED(thunk), GPUMaterial *material)
+void ShaderOperation::setup_material(void *UNUSED(thunk), GPUMaterial *material)
 {
   GPU_material_is_compute_set(material, true);
 }
 
-void GPUMaterialOperation::compile_material(void *thunk, GPUMaterial *material)
+void ShaderOperation::compile_material(void *thunk, GPUMaterial *material)
 {
-  GPUMaterialOperation *operation = static_cast<GPUMaterialOperation *>(thunk);
+  ShaderOperation *operation = static_cast<ShaderOperation *>(thunk);
   for (DNode node : operation->sub_schedule_) {
-    /* Instantiate a GPU material node for the node and add it to the gpu_material_nodes_ map. */
-    GPUMaterialNode *gpu_node = node->typeinfo()->get_compositor_gpu_material_node(node);
-    operation->gpu_material_nodes_.add_new(node, std::unique_ptr<GPUMaterialNode>(gpu_node));
+    /* Instantiate a shader node for the node and add it to the shader_nodes_ map. */
+    ShaderNode *shader_node = node->typeinfo()->get_compositor_shader_node(node);
+    operation->shader_nodes_.add_new(node, std::unique_ptr<ShaderNode>(shader_node));
 
-    /* Link the inputs of the material node if needed. */
-    operation->link_material_node_inputs(node, material);
+    /* Link the inputs of the shader node if needed. */
+    operation->link_node_inputs(node, material);
 
     /* Compile the node itself. */
-    gpu_node->compile(material);
+    shader_node->compile(material);
 
-    /* Populate the output results for the material node if needed. */
-    operation->populate_results_for_material_node(node, material);
+    /* Populate the output results for the shader node if needed. */
+    operation->populate_results_for_node(node, material);
   }
 }
 
-void GPUMaterialOperation::link_material_node_inputs(DNode node, GPUMaterial *material)
+void ShaderOperation::link_node_inputs(DNode node, GPUMaterial *material)
 {
   for (const InputSocketRef *input_ref : node->inputs()) {
     const DInputSocket input{node.context(), input_ref};
@@ -159,30 +159,30 @@ void GPUMaterialOperation::link_material_node_inputs(DNode node, GPUMaterial *ma
       continue;
     }
 
-    /* If the origin node is part of the GPU material, then just map the output stack link to the
-     * input stack link. */
+    /* If the origin node is part of the shader operation, then just map the output stack link to
+     * the input stack link. */
     if (sub_schedule_.contains(output.node())) {
-      map_material_node_input(input, output);
+      map_node_input(input, output);
       continue;
     }
 
-    /* Otherwise, the origin node is not part of the GPU material, so an input to the GPU material
+    /* Otherwise, the origin node is not part of the shader operation, so an input to the shader
      * operation must be declared if it wasn't declared for the same output already. */
-    declare_material_input_if_needed(input, output, material);
+    declare_operation_input_if_needed(input, output, material);
 
     /* Link the input to an input loader GPU material node sampling the result of the output. */
     link_material_input_loader(input, output, material);
   }
 }
 
-void GPUMaterialOperation::map_material_node_input(DInputSocket input, DOutputSocket output)
+void ShaderOperation::map_node_input(DInputSocket input, DOutputSocket output)
 {
   /* Get the GPU node stack of the output. */
-  GPUMaterialNode &output_node = *gpu_material_nodes_.lookup(output.node());
+  ShaderNode &output_node = *shader_nodes_.lookup(output.node());
   GPUNodeStack &output_stack = output_node.get_outputs_array()[output->index()];
 
   /* Get the GPU node stack of the input. */
-  GPUMaterialNode &input_node = *gpu_material_nodes_.lookup(input.node());
+  ShaderNode &input_node = *shader_nodes_.lookup(input.node());
   GPUNodeStack &input_stack = input_node.get_inputs_array()[input->index()];
 
   /* Map the output link to the input link. */
@@ -204,9 +204,9 @@ static const char *get_load_function_name(DInputSocket input)
   }
 }
 
-void GPUMaterialOperation::declare_material_input_if_needed(DInputSocket input,
-                                                            DOutputSocket output,
-                                                            GPUMaterial *material)
+void ShaderOperation::declare_operation_input_if_needed(DInputSocket input,
+                                                        DOutputSocket output,
+                                                        GPUMaterial *material)
 {
   /* An input was already declared for that same output, so no need to declare it again. */
   if (output_to_material_texture_map_.contains(output)) {
@@ -228,16 +228,16 @@ void GPUMaterialOperation::declare_material_input_if_needed(DInputSocket input,
   inputs_to_linked_outputs_map_.add_new(identifier, output);
 }
 
-void GPUMaterialOperation::link_material_input_loader(DInputSocket input,
-                                                      DOutputSocket output,
-                                                      GPUMaterial *material)
+void ShaderOperation::link_material_input_loader(DInputSocket input,
+                                                 DOutputSocket output,
+                                                 GPUMaterial *material)
 {
   /* Create a link from the material texture that corresponds to the given output. */
   GPUMaterialTexture *material_texture = output_to_material_texture_map_.lookup(output);
   GPUNodeLink *input_texture_link = GPU_image_from_material_texture(material_texture);
 
   /* Get the node stack of the input. */
-  GPUMaterialNode &node = *gpu_material_nodes_.lookup(input.node());
+  ShaderNode &node = *shader_nodes_.lookup(input.node());
   GPUNodeStack &stack = node.get_inputs_array()[input->index()];
 
   /* Link the input node stack to an input loader sampling the input texture. */
@@ -245,18 +245,18 @@ void GPUMaterialOperation::link_material_input_loader(DInputSocket input,
   GPU_link(material, load_function_name, input_texture_link, &stack.link);
 }
 
-void GPUMaterialOperation::populate_results_for_material_node(DNode node, GPUMaterial *material)
+void ShaderOperation::populate_results_for_node(DNode node, GPUMaterial *material)
 {
   for (const OutputSocketRef *output_ref : node->outputs()) {
     const DOutputSocket output{node.context(), output_ref};
 
-    /* If any of the nodes linked to the output are not part of the GPU material, then an output
-     * result needs to be populated. */
+    /* If any of the nodes linked to the output are not part of the shader operation, then an
+     * output result needs to be populated. */
     const bool need_to_populate_result = is_output_linked_to_node_conditioned(
         output, [&](DNode node) { return !sub_schedule_.contains(node); });
 
     if (need_to_populate_result) {
-      populate_material_result(output, material);
+      populate_operation_result(output, material);
     }
   }
 }
@@ -291,7 +291,7 @@ static eGPUTextureFormat texture_format_from_result_type(ResultType type)
   return GPU_RGBA16F;
 }
 
-void GPUMaterialOperation::populate_material_result(DOutputSocket output, GPUMaterial *material)
+void ShaderOperation::populate_operation_result(DOutputSocket output, GPUMaterial *material)
 {
   /* Construct a result of an appropriate type. */
   const ResultType result_type = get_node_socket_result_type(output.socket_ref());
@@ -312,7 +312,7 @@ void GPUMaterialOperation::populate_material_result(DOutputSocket output, GPUMat
   GPUNodeLink *output_image_link = GPU_image_texture_from_material_image(material_image);
 
   /* Get the node stack of the output. */
-  GPUMaterialNode &node = *gpu_material_nodes_.lookup(output.node());
+  ShaderNode &node = *shader_nodes_.lookup(output.node());
   GPUNodeLink *output_link = node.get_outputs_array()[output->index()].link;
 
   /* Link the output node stack to an output storer storing in the newly added image. */
@@ -320,9 +320,9 @@ void GPUMaterialOperation::populate_material_result(DOutputSocket output, GPUMat
   GPU_link(material, store_function_name, output_image_link, output_link);
 }
 
-void GPUMaterialOperation::generate_material(void *UNUSED(thunk),
-                                             GPUMaterial *UNUSED(material),
-                                             GPUCodegenOutput *code_generator_output)
+void ShaderOperation::generate_material(void *UNUSED(thunk),
+                                        GPUMaterial *UNUSED(material),
+                                        GPUCodegenOutput *code_generator_output)
 {
   gpu::shader::ShaderCreateInfo &info = *reinterpret_cast<gpu::shader::ShaderCreateInfo *>(
       code_generator_output->create_info);

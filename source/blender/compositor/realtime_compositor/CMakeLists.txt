@@ -20,8 +20,6 @@ set(SRC
   intern/conversion_processor_operation.cc
   intern/domain.cc
   intern/evaluator.cc
-  intern/gpu_material_node.cc
-  intern/gpu_material_operation.cc
   intern/input_single_value_operation.cc
   intern/node_operation.cc
   intern/operation.cc
@@ -30,6 +28,8 @@ set(SRC
   intern/reduce_to_single_value_processor_operation.cc
   intern/result.cc
   intern/scheduler.cc
+  intern/shader_node.cc
+  intern/shader_operation.cc
   intern/shader_pool.cc
   intern/texture_pool.cc
   intern/unsupported_node_operation.cc
@@ -40,8 +40,6 @@ set(SRC
   COM_conversion_processor_operation.hh
   COM_domain.hh
   COM_evaluator.hh
-  COM_gpu_material_node.hh
-  COM_gpu_material_operation.hh
   COM_input_descriptor.hh
   COM_input_single_value_operation.hh
   COM_node_operation.hh
@@ -51,6 +49,8 @@ set(SRC
   COM_reduce_to_single_value_processor_operation.hh
   COM_result.hh
   COM_scheduler.hh
+  COM_shader_node.hh
+  COM_shader_operation.hh
   COM_shader_pool.hh
   COM_texture_pool.hh
   COM_unsupported_node_operation.hh

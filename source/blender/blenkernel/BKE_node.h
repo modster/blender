@@ -113,7 +113,7 @@ class MFDataType;
 namespace realtime_compositor {
 class Context;
 class NodeOperation;
-class GPUMaterialNode;
+class ShaderNode;
 }  // namespace realtime_compositor
 }  // namespace blender
 
@@ -131,12 +131,12 @@ using NodeGatherSocketLinkOperationsFunction =
 
 using NodeGetCompositorOperationFunction = blender::realtime_compositor::NodeOperation
     *(*)(blender::realtime_compositor::Context &context, blender::nodes::DNode node);
-using NodeGetCompositorGPUMaterialNodeFunction =
-    blender::realtime_compositor::GPUMaterialNode *(*)(blender::nodes::DNode node);
+using NodeGetCompositorShaderNodeFunction =
+    blender::realtime_compositor::ShaderNode *(*)(blender::nodes::DNode node);
 
 #else
 typedef void *NodeGetCompositorOperationFunction;
-typedef void *NodeGetCompositorGPUMaterialNodeFunction;
+typedef void *NodeGetCompositorShaderNodeFunction;
 typedef void *NodeMultiFunctionBuildFunction;
 typedef void *NodeGeometryExecFunction;
 typedef void *NodeDeclareFunction;
@@ -326,9 +326,9 @@ typedef struct bNodeType {
    * responsibility of the caller. */
   NodeGetCompositorOperationFunction get_compositor_operation;
 
-  /* Get an instance of this node's compositor GPU material node. Freeing the instance is the
+  /* Get an instance of this node's compositor shader node. Freeing the instance is the
    * responsibility of the caller. */
-  NodeGetCompositorGPUMaterialNodeFunction get_compositor_gpu_material_node;
+  NodeGetCompositorShaderNodeFunction get_compositor_shader_node;
 
   /* Build a multi-function for this node. */
   NodeMultiFunctionBuildFunction build_multi_function;

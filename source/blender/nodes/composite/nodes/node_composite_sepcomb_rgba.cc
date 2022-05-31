@@ -7,7 +7,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -28,9 +28,9 @@ static void cmp_node_seprgba_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class SeparateRGBAGPUMaterialNode : public GPUMaterialNode {
+class SeparateRGBAShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -41,9 +41,9 @@ class SeparateRGBAGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new SeparateRGBAGPUMaterialNode(node);
+  return new SeparateRGBAShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_separate_rgba_cc
@@ -56,7 +56,7 @@ void register_node_type_cmp_seprgba()
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPRGBA_LEGACY, "Separate RGBA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_seprgba_declare;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }
@@ -80,9 +80,9 @@ static void cmp_node_combrgba_declare(NodeDeclarationBuilder &b)
 
 using namespace blender::realtime_compositor;
 
-class CombineRGBAGPUMaterialNode : public GPUMaterialNode {
+class CombineRGBAShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -93,9 +93,9 @@ class CombineRGBAGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new CombineRGBAGPUMaterialNode(node);
+  return new CombineRGBAShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_combine_rgba_cc
@@ -108,7 +108,7 @@ void register_node_type_cmp_combrgba()
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBRGBA_LEGACY, "Combine RGBA", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::cmp_node_combrgba_declare;
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

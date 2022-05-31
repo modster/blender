@@ -10,7 +10,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -48,9 +48,9 @@ static void node_composit_buts_invert(uiLayout *layout, bContext *UNUSED(C), Poi
 
 using namespace blender::realtime_compositor;
 
-class InvertGPUMaterialNode : public GPUMaterialNode {
+class InvertShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -80,9 +80,9 @@ class InvertGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new InvertGPUMaterialNode(node);
+  return new InvertShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_invert_cc
@@ -97,7 +97,7 @@ void register_node_type_cmp_invert()
   ntype.declare = file_ns::cmp_node_invert_declare;
   ntype.draw_buttons = file_ns::node_composit_buts_invert;
   node_type_init(&ntype, file_ns::node_composit_init_invert);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

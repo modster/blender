@@ -10,7 +10,7 @@
 
 #include "GPU_material.h"
 
-#include "COM_gpu_material_node.hh"
+#include "COM_shader_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -51,9 +51,9 @@ static void node_composit_buts_alphaover(uiLayout *layout, bContext *UNUSED(C), 
 
 using namespace blender::realtime_compositor;
 
-class AlphaOverGPUMaterialNode : public GPUMaterialNode {
+class AlphaOverShaderNode : public ShaderNode {
  public:
-  using GPUMaterialNode::GPUMaterialNode;
+  using ShaderNode::ShaderNode;
 
   void compile(GPUMaterial *material) override
   {
@@ -90,9 +90,9 @@ class AlphaOverGPUMaterialNode : public GPUMaterialNode {
   }
 };
 
-static GPUMaterialNode *get_compositor_gpu_material_node(DNode node)
+static ShaderNode *get_compositor_shader_node(DNode node)
 {
-  return new AlphaOverGPUMaterialNode(node);
+  return new AlphaOverShaderNode(node);
 }
 
 }  // namespace blender::nodes::node_composite_alpha_over_cc
@@ -109,7 +109,7 @@ void register_node_type_cmp_alphaover()
   node_type_init(&ntype, file_ns::node_alphaover_init);
   node_type_storage(
       &ntype, "NodeTwoFloats", node_free_standard_storage, node_copy_standard_storage);
-  ntype.get_compositor_gpu_material_node = file_ns::get_compositor_gpu_material_node;
+  ntype.get_compositor_shader_node = file_ns::get_compositor_shader_node;
 
   nodeRegisterType(&ntype);
 }

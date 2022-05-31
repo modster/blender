@@ -31,23 +31,22 @@ using InputsToLinkedOutputsMap = Map<StringRef, DOutputSocket>;
 using OutputSocketsToOutputIdentifiersMap = Map<DOutputSocket, StringRef>;
 
 /* ------------------------------------------------------------------------------------------------
- * GPU Material Operation
+ * Shader Operation
  *
  * An operation that compiles a contiguous subset of the node execution schedule into a single
- * GPU shader using the GPU material compiler.
+ * shader using the GPU material compiler.
  *
  * Consider the following node graph with a node execution schedule denoted by the number of each
- * node. The compiler may decide to compile a subset of the execution schedule into a GPU material
- * operation, in this case, the nodes from 3 to 5 were compiled together into a GPU material. See
- * the discussion in COM_evaluator.hh for more information on the compilation process. Each of the
- * nodes inside the sub-schedule implements a GPU Material Node which is instantiated, stored in
- * gpu_material_nodes_, and used during compilation. See the discussion in COM_gpu_material_node.hh
- * for more information. Links that are internal to the GPU material are established between the
- * input and outputs of the GPU material nodes, for instance, the links between nodes 3 <-> 4 and
- * nodes 4 <-> 5. However, links that cross the boundary of the GPU material needs special
- * handling.
+ * node. The compiler may decide to compile a subset of the execution schedule into a shader
+ * operation, in this case, the nodes from 3 to 5 were compiled together into a shader operation.
+ * See the discussion in COM_evaluator.hh for more information on the compilation process. Each of
+ * the nodes inside the sub-schedule implements a Shader Node which is instantiated, stored in
+ * shader_nodes_, and used during compilation. See the discussion in COM_shader_node.hh for more
+ * information. Links that are internal to the shader operation are established between the input
+ * and outputs of the shader nodes, for instance, the links between nodes 3 <-> 4 and nodes 4
+ * <-> 5. However, links that cross the boundary of the shader operation needs special handling.
  *
- *                                        GPU Material
+ *                                        Shader Operation
  *                   +------------------------------------------------------+
  * .------------.    |  .------------.  .------------.      .------------.  |  .------------.
  * |   Node 1   |    |  |   Node 3   |  |   Node 4   |      |   Node 5   |  |  |   Node 6   |
@@ -61,8 +60,8 @@ using OutputSocketsToOutputIdentifiersMap = Map<DOutputSocket, StringRef>;
  * |            |
  * '------------'
  *
- * Links from nodes that are not part of the GPU material to nodes that are part of the GPU
- * material are considered inputs of the operation itself and are declared as such. For instance,
+ * Links from nodes that are not part of the shader operation to nodes that are part of the shader
+ * operation are considered inputs of the operation itself and are declared as such. For instance,
  * the link from node 1 to node 3 is declared as an input to the operation, and the same applies
  * for the links from node 2 to nodes 3 and 5. Note, however, that only one input is declared for
  * each distinct output socket, so both links from node 2 share the same input of the operation.
@@ -72,12 +71,12 @@ using OutputSocketsToOutputIdentifiersMap = Map<DOutputSocket, StringRef>;
  * 2. The newly added texture is mapped to the output socket in output_to_material_texture_map_
  *    to share that same texture for all inputs linked to the same output socket.
  * 3. A texture loader GPU material node that samples the newly added material texture is added and
- *    linked to the GPU input stacks of GPU material nodes that the output socket is linked to.
+ *    linked to the GPU input stacks of shader nodes that the output socket is linked to.
  * 4. The input of the operation is mapped to the output socket to help the compiler in
  *    establishing links between the operations. See the get_inputs_to_linked_outputs_map method.
  *
- * Links from nodes that are part of the GPU material to nodes that are not part of the GPU
- * material are considered outputs of the operation itself and are declared as such. For instance,
+ * Links from nodes that are part of the shader operation to nodes that are not part of the shader
+ * operation are considered outputs of the operation itself and are declared as such. For instance,
  * the link from node 5 to node 6 is declared as an output to the operation. Once an output is
  * declared for an output socket:
  * 1. A material image is added to the GPU material. This image will be bound to the result of
@@ -91,34 +90,34 @@ using OutputSocketsToOutputIdentifiersMap = Map<DOutputSocket, StringRef>;
  * The GPU material is declared as a compute material and its compute source is used to construct a
  * compute shader that is then dispatched during operation evaluation after binding the inputs,
  * outputs, and any necessary resources. */
-class GPUMaterialOperation : public Operation {
+class ShaderOperation : public Operation {
  private:
-  /* The execution sub-schedule that will be compiled into this GPU material operation. */
+  /* The execution sub-schedule that will be compiled into this shader operation. */
   SubSchedule sub_schedule_;
   /* The GPU material backing the operation. This is created and compiled during construction and
    * freed during construction. */
   GPUMaterial *material_;
-  /* A map that associates each node in the execution sub-schedule with an instance of its GPU
-   * material node. */
-  Map<DNode, std::unique_ptr<GPUMaterialNode>> gpu_material_nodes_;
+  /* A map that associates each node in the execution sub-schedule with an instance of its shader
+   * node. */
+  Map<DNode, std::unique_ptr<ShaderNode>> shader_nodes_;
   /* A map that associates the identifier of each input of the operation with the output socket it
    * is linked to. See the above discussion for more information. */
   InputsToLinkedOutputsMap inputs_to_linked_outputs_map_;
   /* A map that associates the output socket that provides the result of an output of the operation
    * with the identifier of that output. See the above discussion for more information. */
   OutputSocketsToOutputIdentifiersMap output_sockets_to_output_identifiers_map_;
-  /* A map that associates the output socket of a node that is not part of the GPU material to the
-   * material texture that was created for it. This is used to share the same material texture with
-   * all inputs that are linked to the same output socket. */
+  /* A map that associates the output socket of a node that is not part of the shader operation to
+   * the material texture that was created for it. This is used to share the same material texture
+   * with all inputs that are linked to the same output socket. */
   Map<DOutputSocket, GPUMaterialTexture *> output_to_material_texture_map_;
 
  public:
   /* Construct and compile a GPU material from the give node execution sub-schedule by calling
    * GPU_material_from_callbacks with the appropriate callbacks. */
-  GPUMaterialOperation(Context &context, SubSchedule &sub_schedule);
+  ShaderOperation(Context &context, SubSchedule &sub_schedule);
 
   /* Free the GPU material. */
-  ~GPUMaterialOperation();
+  ~ShaderOperation();
 
   /* Allocate the output results, bind the shader and all its needed resources, then dispatch the
    * shader. */
@@ -150,13 +149,13 @@ class GPUMaterialOperation : public Operation {
    * given as an argument and assumed to be bound. */
   void bind_material_resources(GPUShader *shader);
 
-  /* Bind the input results of the operation to the appropriate textures in the GPU materials. The
+  /* Bind the input results of the operation to the appropriate textures in the GPU material. The
    * material textures stored in output_to_material_texture_map_ have sampler names that match
    * the identifiers of the operation inputs that they correspond to. The compiled shader of the
    * material is given as an argument and assumed to be bound. */
   void bind_inputs(GPUShader *shader);
 
-  /* Bind the output results of the operation to the appropriate images in the GPU materials. Every
+  /* Bind the output results of the operation to the appropriate images in the GPU material. Every
    * image in the GPU material corresponds to one of the outputs of the operation, an output whose
    * identifier is the name of the image in the GPU material shader. The compiled shader of the
    * material is given as an argument and assumed to be bound. */
@@ -164,62 +163,62 @@ class GPUMaterialOperation : public Operation {
 
   /* A static callback method of interface GPUMaterialSetupFn that is passed to
    * GPU_material_from_callbacks to setup the GPU material. The thunk parameter will be a pointer
-   * to the instance of GPUMaterialOperation that is being compiled. This methods setup the GPU
+   * to the instance of ShaderOperation that is being compiled. This methods setup the GPU
    * material as a compute one. */
   static void setup_material(void *thunk, GPUMaterial *material);
 
   /* A static callback method of interface GPUMaterialCompileFn that is passed to
    * GPU_material_from_callbacks to compile the GPU material. The thunk parameter will be a pointer
-   * to the instance of GPUMaterialOperation that is being compiled. The method goes over the
+   * to the instance of ShaderOperation that is being compiled. The method goes over the
    * execution sub-schedule and does the following for each node:
    *
-   * - Instantiate a GPUMaterialNode from the node and add it to gpu_material_nodes_.
+   * - Instantiate a ShaderNode from the node and add it to shader_nodes_.
    * - Link the inputs of the node if needed. The inputs are either linked to other nodes in the
-   *   GPU material graph or they are exposed as inputs to the GPU material operation itself if
-   *   they are linked to nodes that are not part of the GPU material.
-   * - Call the compile method of the GPU material node to actually add and link the GPU material
-   *   graph nodes.
-   * - If any of the outputs of the node are linked to nodes that are not part of the GPU
-   *   material, they are exposed as outputs to the GPU material operation itself. */
+   *   GPU material graph or they are exposed as inputs to the shader operation itself if they are
+   *   linked to nodes that are not part of the shader operation.
+   * - Call the compile method of the shader node to actually add and link the GPU material graph
+   *   nodes.
+   * - If any of the outputs of the node are linked to nodes that are not part of the shader
+   *   operation, they are exposed as outputs to the shader operation itself. */
   static void compile_material(void *thunk, GPUMaterial *material);
 
   /* Link the inputs of the node if needed. Unlinked inputs are ignored as they will be linked by
-   * the node compile method. If the input is linked to a node that is not part of the GPU
-   * material, the input will be exposed as an input to the GPU material operation and linked to
-   * it. While if the input is linked to a node that is part of the GPU material, then it is linked
+   * the node compile method. If the input is linked to a node that is not part of the shader
+   * operation, the input will be exposed as an input to the shader operation and linked to it.
+   * While if the input is linked to a node that is part of the shader operation, then it is linked
    * to that node in the GPU material node graph. */
-  void link_material_node_inputs(DNode node, GPUMaterial *material);
+  void link_node_inputs(DNode node, GPUMaterial *material);
 
-  /* Given the input of a node that is part of the GPU material which is linked to the given output
-   * of a node that is also part of the GPU material, map the output link of the GPU node stack of
-   * the output to the input link of the GPU node stack of the input. This essentially establishes
-   * the needed links in the GPU material node graph. */
-  void map_material_node_input(DInputSocket input, DOutputSocket output);
+  /* Given the input of a node that is part of the shader operation which is linked to the given
+   * output of a node that is also part of the shader operation, map the output link of the GPU
+   * node stack of the output to the input link of the GPU node stack of the input. This
+   * essentially establishes the needed links in the GPU material node graph. */
+  void map_node_input(DInputSocket input, DOutputSocket output);
 
-  /* Given the input of a node that is part of the GPU material which is linked to the given output
-   * of a node that is not part of the GPU material, declare a new input to the operation and link
-   * it appropriately as detailed in the discussion above. */
-  void declare_material_input_if_needed(DInputSocket input,
-                                        DOutputSocket output,
-                                        GPUMaterial *material);
+  /* Given the input of a node that is part of the shader operation which is linked to the given
+   * output of a node that is not part of the shader operation, declare a new input to the
+   * operation and link it appropriately as detailed in the discussion above. */
+  void declare_operation_input_if_needed(DInputSocket input,
+                                         DOutputSocket output,
+                                         GPUMaterial *material);
 
   /* Link the input node stack corresponding to the given input to an input loader GPU material
    * node sampling the material texture corresponding to the given output. */
   void link_material_input_loader(DInputSocket input, DOutputSocket output, GPUMaterial *material);
 
-  /* Populate the output results of the GPU material operation for outputs of the given node that
-   * are linked to nodes outside of the GPU material. */
-  void populate_results_for_material_node(DNode node, GPUMaterial *material);
+  /* Populate the output results of the shader operation for outputs of the given node that
+   * are linked to nodes outside of the shader operation. */
+  void populate_results_for_node(DNode node, GPUMaterial *material);
 
-  /* Given the output of a node that is part of the GPU material which is linked to an input of a
-   * node that is not part of the GPU material, declare a new output to the operation and link
-   * it appropriately as detailed in the discussion above. */
-  void populate_material_result(DOutputSocket output, GPUMaterial *material);
+  /* Given the output of a node that is part of the shader operation which is linked to an input of
+   * a node that is not part of the shader operation, declare a new output to the operation and
+   * link it appropriately as detailed in the discussion above. */
+  void populate_operation_result(DOutputSocket output, GPUMaterial *material);
 
   /* A static callback method of interface GPUCodegenCallbackFn that is passed to
    * GPU_material_from_callbacks to create the shader create info of the GPU material. The thunk
-   * parameter will be a pointer to the instance of GPUMaterialOperation that is being compiled.
-   * This method setup the shader create info as a compute shader and sets its generate source
+   * parameter will be a pointer to the instance of ShaderOperation that is being compiled.
+   * This method setup the shader create info as a compute shader and sets its generated source
    * based on the GPU material code generator output. */
   static void generate_material(void *thunk,
                                 GPUMaterial *material,
