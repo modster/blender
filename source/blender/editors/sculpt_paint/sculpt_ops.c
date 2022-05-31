@@ -781,8 +781,7 @@ static int sculpt_sample_color_invoke(bContext *C, wmOperator *op, const wmEvent
   }
 
   float color_srgb[3];
-  copy_v3_v3(color_srgb, active_vertex_color);
-  IMB_colormanagement_scene_linear_to_srgb_v3(color_srgb);
+  IMB_colormanagement_scene_linear_to_srgb_v3(color_srgb, active_vertex_color);
   BKE_brush_color_set(scene, brush, color_srgb);
 
   WM_event_add_notifier(C, NC_BRUSH | NA_EDITED, brush);
@@ -1099,7 +1098,7 @@ static void SCULPT_OT_mask_by_color(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Mask by Color";
   ot->idname = "SCULPT_OT_mask_by_color";
-  ot->description = "Creates a mask based on the sculpt vertex colors";
+  ot->description = "Creates a mask based on the active color attribute";
 
   /* api callbacks */
   ot->invoke = sculpt_mask_by_color_invoke;

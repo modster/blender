@@ -87,8 +87,8 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
     /* empty must be here for python, is skipped for UI */
     {SPACE_EMPTY, "EMPTY", ICON_NONE, "Empty", ""},
 
-    /* General */
-    {0, "", ICON_NONE, "General", ""},
+    /* General. */
+    RNA_ENUM_ITEM_HEADING("General", NULL),
     {SPACE_VIEW3D,
      "VIEW_3D",
      ICON_VIEW3D,
@@ -107,8 +107,8 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
     {SPACE_SEQ, "SEQUENCE_EDITOR", ICON_SEQUENCE, "Video Sequencer", "Video editing tools"},
     {SPACE_CLIP, "CLIP_EDITOR", ICON_TRACKER, "Movie Clip Editor", "Motion tracking tools"},
 
-    /* Animation */
-    {0, "", ICON_NONE, "Animation", ""},
+    /* Animation. */
+    RNA_ENUM_ITEM_HEADING("Animation", NULL),
 #if 0
     {SPACE_ACTION,
      "TIMELINE",
@@ -124,8 +124,8 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      "Edit drivers and keyframe interpolation"},
     {SPACE_NLA, "NLA_EDITOR", ICON_NLA, "Nonlinear Animation", "Combine and layer Actions"},
 
-    /* Scripting */
-    {0, "", ICON_NONE, "Scripting", ""},
+    /* Scripting. */
+    RNA_ENUM_ITEM_HEADING("Scripting", NULL),
     {SPACE_TEXT,
      "TEXT_EDITOR",
      ICON_TEXT,
@@ -152,8 +152,8 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      "Global bar at the bottom of the "
      "screen for general status information"},
 
-    /* Data */
-    {0, "", ICON_NONE, "Data", ""},
+    /* Data. */
+    RNA_ENUM_ITEM_HEADING("Data", NULL),
     {SPACE_OUTLINER,
      "OUTLINER",
      ICON_OUTLINER,
@@ -435,28 +435,28 @@ static const EnumPropertyItem rna_enum_studio_light_items[] = {
 };
 
 static const EnumPropertyItem rna_enum_view3dshading_render_pass_type_items[] = {
-    {0, "", ICON_NONE, "General", ""},
+    RNA_ENUM_ITEM_HEADING("General", NULL),
     {EEVEE_RENDER_PASS_COMBINED, "COMBINED", 0, "Combined", ""},
     {EEVEE_RENDER_PASS_EMIT, "EMISSION", 0, "Emission", ""},
     {EEVEE_RENDER_PASS_ENVIRONMENT, "ENVIRONMENT", 0, "Environment", ""},
     {EEVEE_RENDER_PASS_AO, "AO", 0, "Ambient Occlusion", ""},
     {EEVEE_RENDER_PASS_SHADOW, "SHADOW", 0, "Shadow", ""},
 
-    {0, "", ICON_NONE, "Light", ""},
+    RNA_ENUM_ITEM_HEADING("Light", NULL),
     {EEVEE_RENDER_PASS_DIFFUSE_LIGHT, "DIFFUSE_LIGHT", 0, "Diffuse Light", ""},
     {EEVEE_RENDER_PASS_DIFFUSE_COLOR, "DIFFUSE_COLOR", 0, "Diffuse Color", ""},
     {EEVEE_RENDER_PASS_SPECULAR_LIGHT, "SPECULAR_LIGHT", 0, "Specular Light", ""},
     {EEVEE_RENDER_PASS_SPECULAR_COLOR, "SPECULAR_COLOR", 0, "Specular Color", ""},
     {EEVEE_RENDER_PASS_VOLUME_LIGHT, "VOLUME_LIGHT", 0, "Volume Light", ""},
 
-    {0, "", ICON_NONE, "Effects", ""},
+    RNA_ENUM_ITEM_HEADING("Effects", NULL),
     {EEVEE_RENDER_PASS_BLOOM, "BLOOM", 0, "Bloom", ""},
 
-    {0, "", ICON_NONE, "Data", ""},
+    RNA_ENUM_ITEM_HEADING("Data", NULL),
     {EEVEE_RENDER_PASS_NORMAL, "NORMAL", 0, "Normal", ""},
     {EEVEE_RENDER_PASS_MIST, "MIST", 0, "Mist", ""},
 
-    {0, "", ICON_NONE, "Shader AOV", ""},
+    RNA_ENUM_ITEM_HEADING("Shader AOV", NULL),
     {EEVEE_RENDER_PASS_AOV, "AOV", 0, "AOV", ""},
 
     {0, NULL, 0, NULL, NULL},
@@ -1565,7 +1565,7 @@ static int rna_SpaceView3D_icon_from_show_object_viewport_get(PointerRNA *ptr)
                                                     &v3d->object_type_exclude_select);
 }
 
-static char *rna_View3DShading_path(PointerRNA *UNUSED(ptr))
+static char *rna_View3DShading_path(const PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("shading");
 }
@@ -1575,7 +1575,7 @@ static PointerRNA rna_SpaceView3D_overlay_get(PointerRNA *ptr)
   return rna_pointer_inherit_refine(ptr, &RNA_View3DOverlay, ptr->data);
 }
 
-static char *rna_View3DOverlay_path(PointerRNA *UNUSED(ptr))
+static char *rna_View3DOverlay_path(const PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("overlay");
 }
@@ -1587,12 +1587,12 @@ static PointerRNA rna_SpaceImage_overlay_get(PointerRNA *ptr)
   return rna_pointer_inherit_refine(ptr, &RNA_SpaceImageOverlay, ptr->data);
 }
 
-static char *rna_SpaceImageOverlay_path(PointerRNA *UNUSED(ptr))
+static char *rna_SpaceImageOverlay_path(const PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("overlay");
 }
 
-static char *rna_SpaceUVEditor_path(PointerRNA *UNUSED(ptr))
+static char *rna_SpaceUVEditor_path(const PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("uv_editor");
 }
@@ -2024,7 +2024,7 @@ static void rna_SpaceProperties_context_update(Main *UNUSED(bmain),
   }
 }
 
-static int rna_SpaceProperties_tab_search_results_getlength(PointerRNA *ptr,
+static int rna_SpaceProperties_tab_search_results_getlength(const PointerRNA *ptr,
                                                             int length[RNA_MAX_ARRAY_DIMENSION])
 {
   SpaceProperties *sbuts = ptr->data;
@@ -2426,12 +2426,12 @@ static void rna_Sequencer_view_type_update(Main *UNUSED(bmain),
   ED_area_tag_refresh(area);
 }
 
-static char *rna_SpaceSequencerPreviewOverlay_path(PointerRNA *UNUSED(ptr))
+static char *rna_SpaceSequencerPreviewOverlay_path(const PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("preview_overlay");
 }
 
-static char *rna_SpaceSequencerTimelineOverlay_path(PointerRNA *UNUSED(ptr))
+static char *rna_SpaceSequencerTimelineOverlay_path(const PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("timeline_overlay");
 }
@@ -2442,7 +2442,7 @@ static PointerRNA rna_SpaceNode_overlay_get(PointerRNA *ptr)
   return rna_pointer_inherit_refine(ptr, &RNA_SpaceNodeOverlay, ptr->data);
 }
 
-static char *rna_SpaceNodeOverlay_path(PointerRNA *UNUSED(ptr))
+static char *rna_SpaceNodeOverlay_path(const PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("overlay");
 }
@@ -2635,7 +2635,7 @@ static void rna_SpaceClipEditor_view_type_update(Main *UNUSED(bmain),
 
 /* File browser. */
 
-static char *rna_FileSelectParams_path(PointerRNA *UNUSED(ptr))
+static char *rna_FileSelectParams_path(const PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("params");
 }
