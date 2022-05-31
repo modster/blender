@@ -741,7 +741,10 @@ static std::vector<sycl::device> oneapi_available_devices()
 
     for (const sycl::device &device : oneapi_devices) {
       if (allow_all_devices) {
-        available_devices.push_back(device);
+        // still filter out host device if build doesn't support it.
+        if (allow_host || !device.is_host()) {
+          available_devices.push_back(device);
+        }
       }
       else {
         bool filter_out = false;
