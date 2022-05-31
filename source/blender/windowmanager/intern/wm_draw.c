@@ -1062,7 +1062,7 @@ void wm_draw_update(bContext *C)
   GPU_render_begin();
   GPU_render_step();
 
-  BKE_image_free_unused_gpu_textures();
+  BKE_image_free_unused_gpu_textures(bmain);
 
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
 #ifdef WIN32

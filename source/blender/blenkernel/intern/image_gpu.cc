@@ -7,6 +7,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "atomic_ops.h"
+
 #include "BLI_bitmap.h"
 #include "BLI_boxpack_2d.h"
 #include "BLI_linklist.h"
@@ -52,7 +54,8 @@ struct ImageGPUTextureStore {
    public:
     GPUTexture *gputextures[TEXTARGET_COUNT][2];
     struct {
-      bool in_use : 1;
+      bool in_use_gc : 1;
+      bool in_use_bmain : 1;
     } flags;
 
     Entry()
@@ -62,6 +65,8 @@ struct ImageGPUTextureStore {
           gputextures[target][eye] = nullptr;
         }
       }
+      flags.in_use_gc = false;
+      flags.in_use_bmain = false;
     }
 
     Entry(Entry &&other)
@@ -72,7 +77,7 @@ struct ImageGPUTextureStore {
           other.gputextures[target][eye] = nullptr;
         }
       }
-      flags.in_use = other.flags.in_use;
+      flags = other.flags;
     };
 
     virtual ~Entry()
@@ -94,7 +99,7 @@ struct ImageGPUTextureStore {
 
     void tag_used()
     {
-      flags.in_use = true;
+      flags.in_use_gc = true;
     }
 
     void clear()
@@ -114,19 +119,40 @@ struct ImageGPUTextureStore {
   void reset_usage()
   {
     for (Entry &entry : entries.values()) {
-      entry.flags.in_use = false;
+      entry.flags.in_use_gc = false;
     }
   }
 
   void remove_unused()
   {
-    int entries_removed = 0;
     for (auto it : entries.items()) {
-      if (it.value.flags.in_use) {
+      if (it.value.flags.in_use_gc) {
         continue;
       }
       entries.remove(it.key);
-      entries_removed++;
+    }
+  }
+
+  void remove_unused(const Main *bmain)
+  {
+    for (Entry &entry : entries.values()) {
+      entry.flags.in_use_bmain = false;
+    }
+
+    LISTBASE_FOREACH (Image *, image, &bmain->images) {
+      std::string key = create_key(*image);
+      Entry *entry = entries.lookup_ptr(key);
+      if (entry == nullptr) {
+        continue;
+      }
+      entry->flags.in_use_bmain = true;
+    }
+
+    for (auto it : entries.items()) {
+      if (it.value.flags.in_use_bmain) {
+        continue;
+      }
+      entries.remove(it.key);
     }
   }
 
@@ -210,8 +236,6 @@ extern "C" {
 using namespace blender::bke::image::gpu;
 
 /* Prototypes. */
-static void gpu_free_unused_buffers();
-static void image_free_gpu(Image *ima, const bool immediate);
 static void image_update_gputexture_ex(Image *ima,
                                        ImageGPUTextureStore::Entry &entry,
                                        ImageTile *tile,
@@ -520,10 +544,6 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
     return nullptr;
   }
 
-  /* Free any unused GPU textures, since we know we are in a thread with OpenGL
-   * context and might as well ensure we have as much space free as possible. */
-  gpu_free_unused_buffers();
-
   /* Free GPU textures when requesting a different render pass/layer.
    * When `iuser` isn't set (texture painting single image mode) we assume that
    * the current `pass` and `layer` should be 0. */
@@ -646,29 +666,28 @@ GPUTexture *BKE_image_get_gpu_tilemap(Image *image, ImageUser *iuser, ImBuf *ibu
  * In that case we push them into a queue and free the buffers later.
  * \{ */
 
-static LinkNode *gpu_texture_free_queue = nullptr;
-static ThreadMutex gpu_texture_queue_mutex = BLI_MUTEX_INITIALIZER;
+static int32_t free_unused_gpu_textures = false;
 
-static void gpu_free_unused_buffers()
+static void gpu_free_unused_buffers(const Main *bmain)
 {
-  if (gpu_texture_free_queue == nullptr) {
+  BLI_assert(BLI_thread_is_main());
+
+  if (G.is_rendering) {
     return;
   }
 
-  BLI_mutex_lock(&gpu_texture_queue_mutex);
-
-  while (gpu_texture_free_queue != nullptr) {
-    GPUTexture *tex = static_cast<GPUTexture *>(BLI_linklist_pop(&gpu_texture_free_queue));
-    GPU_texture_free(tex);
+  int32_t do_free = atomic_cas_int32(&free_unused_gpu_textures, true, false);
+  if (!do_free) {
+    return;
   }
 
-  BLI_mutex_unlock(&gpu_texture_queue_mutex);
+  g_texture_store.remove_unused(bmain);
 }
 
-void BKE_image_free_unused_gpu_textures()
+void BKE_image_free_unused_gpu_textures(const Main *bmain)
 {
   if (BLI_thread_is_main()) {
-    gpu_free_unused_buffers();
+    gpu_free_unused_buffers(bmain);
   }
 }
 
@@ -678,34 +697,9 @@ void BKE_image_free_unused_gpu_textures()
 /** \name Deletion
  * \{ */
 
-static void image_free_gpu(Image *UNUSED(ima), const bool UNUSED(immediate))
+void BKE_image_free_gputextures(Image *UNUSED(ima))
 {
-// TODO(jbakker)...
-#if 0
-  for (int eye = 0; eye < 2; eye++) {
-    for (int i = 0; i < TEXTARGET_COUNT; i++) {
-      if (ima->gputexture[i][eye] != nullptr) {
-        if (immediate) {
-          GPU_texture_free(ima->gputexture[i][eye]);
-        }
-        else {
-          BLI_mutex_lock(&gpu_texture_queue_mutex);
-          BLI_linklist_prepend(&gpu_texture_free_queue, ima->gputexture[i][eye]);
-          BLI_mutex_unlock(&gpu_texture_queue_mutex);
-        }
-
-        ima->gputexture[i][eye] = nullptr;
-      }
-    }
-  }
-
-  ima->gpuflag &= ~IMA_GPU_MIPMAP_COMPLETE;
-#endif
-}
-
-void BKE_image_free_gputextures(Image *ima)
-{
-  image_free_gpu(ima, BLI_thread_is_main());
+  atomic_store_int32(&free_unused_gpu_textures, true);
 }
 
 void BKE_image_free_all_gputextures(Main *UNUSED(bmain))

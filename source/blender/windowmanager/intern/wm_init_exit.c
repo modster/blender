@@ -541,7 +541,10 @@ void WM_exit_ex(bContext *C, const bool do_python)
   BKE_subdiv_exit();
 
   if (opengl_is_init) {
-    BKE_image_free_unused_gpu_textures();
+    if (C) {
+      Main *bmain = CTX_data_main(C);
+      BKE_image_free_unused_gpu_textures(bmain);
+    }
   }
 
   BKE_blender_free(); /* blender.c, does entire library and spacetypes */

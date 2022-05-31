@@ -525,7 +525,7 @@ void BKE_image_paint_set_mipmap(bool mipmap);
 /**
  * Delayed free of OpenGL buffers by main thread.
  */
-void BKE_image_free_unused_gpu_textures(void);
+void BKE_image_free_unused_gpu_textures(const struct Main *bmain);
 
 struct RenderSlot *BKE_image_add_renderslot(struct Image *ima, const char *name);
 bool BKE_image_remove_renderslot(struct Image *ima, struct ImageUser *iuser, int slot);
