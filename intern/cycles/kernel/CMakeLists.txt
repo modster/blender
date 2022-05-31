@@ -840,6 +840,11 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
     endif()
   else()
     list(APPEND sycl_compiler_flags -fPIC)
+
+    # add $ORIGIN to cycles_kernel_oneapi.so rpath so libsycl.so and
+    # libpi_level_zero.so can be placed next to it and get found.
+    list(APPEND sycl_compiler_flags -Wl,-rpath,'$$ORIGIN')
+
     # The oneAPI distribution calls the compiler "dpcpp" and comes with a script that sets environment variables.
     if(sycl_compiler_compiler_name MATCHES "dpcpp")
       add_custom_command(
