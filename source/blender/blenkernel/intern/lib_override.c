@@ -88,7 +88,9 @@ BLI_INLINE void lib_override_object_posemode_transfer(ID *id_dst, ID *id_src)
 }
 
 /** Get override data for a given ID. Needed because of our beloved shape keys snowflake. */
-BLI_INLINE IDOverrideLibrary *lib_override_get(Main *bmain, ID *id, ID **r_owner_id)
+BLI_INLINE const IDOverrideLibrary *lib_override_get(const Main *bmain,
+                                                     const ID *id,
+                                                     const ID **r_owner_id)
 {
   if (r_owner_id != NULL) {
     *r_owner_id = id;
@@ -105,6 +107,12 @@ BLI_INLINE IDOverrideLibrary *lib_override_get(Main *bmain, ID *id, ID **r_owner
     BLI_assert_msg(0, "IDTypeInfo of liboverride-embedded ID with no owner getter");
   }
   return id->override_library;
+}
+
+BLI_INLINE IDOverrideLibrary *lib_override_get(Main *bmain, ID *id, ID **r_owner_id)
+{
+  return const_cast<IDOverrideLibrary *>(
+      lib_override_get(bmain, id, const_cast<ID **>(r_owner_id)));
 }
 
 IDOverrideLibrary *BKE_lib_override_library_init(ID *local_id, ID *reference_id)
@@ -298,9 +306,9 @@ bool BKE_lib_override_library_is_system_defined(const Main *bmain, const ID *id)
 {
 
   if (ID_IS_OVERRIDE_LIBRARY(id)) {
-    ID *override_owner_id;
+    const ID *override_owner_id;
     /* Cast away const, since the data is not changed. */
-    lib_override_get((Main *)bmain, (ID *)id, &override_owner_id);
+    lib_override_get(bmain, id, &override_owner_id);
     return (override_owner_id->override_library->flag & IDOVERRIDE_LIBRARY_FLAG_SYSTEM_DEFINED) !=
            0;
   }
@@ -950,8 +958,8 @@ static void lib_override_overrides_group_tag_recursive(LibOverrideGroupTagData *
       continue;
     }
 
-    Library *reference_lib = lib_override_get(bmain, id_owner, NULL)->reference->lib;
-    ID *to_id_reference = lib_override_get(bmain, to_id, NULL)->reference;
+    const Library *reference_lib = lib_override_get(bmain, id_owner, NULL)->reference->lib;
+    const ID *to_id_reference = lib_override_get(bmain, to_id, NULL)->reference;
     if (to_id_reference->lib != reference_lib) {
       /* We do not override data-blocks from other libraries, nor do we process them. */
       continue;
@@ -1274,7 +1282,7 @@ static ID *lib_override_root_find(Main *bmain, ID *id, const int curr_level, int
     }
 
     BLI_assert(id->flag & LIB_EMBEDDED_DATA_LIB_OVERRIDE);
-    ID *id_owner;
+    const ID *id_owner;
     int best_level_placeholder = 0;
     lib_override_get(bmain, id, &id_owner);
     return lib_override_root_find(bmain, id_owner, curr_level + 1, &best_level_placeholder);
