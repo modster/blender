@@ -24,12 +24,10 @@ static OneAPIDLLInterface oneapi_dll;
 #endif
 
 #ifdef _WIN32
-#  define LOAD_SYCL_SHARED_LIBRARY() (void *)(LoadLibrary(TEXT("sycl.dll")))
 #  define LOAD_ONEAPI_SHARED_LIBRARY(path) (void *)(LoadLibrary(path))
 #  define FREE_SHARED_LIBRARY(handle) FreeLibrary((HMODULE)handle)
 #  define GET_SHARED_LIBRARY_SYMBOL(handle, name) GetProcAddress((HMODULE)handle, name)
 #elif __linux__
-#  define LOAD_SYCL_SHARED_LIBRARY() dlopen("libsycl.so", RTLD_LAZY)
 #  define LOAD_ONEAPI_SHARED_LIBRARY(path) dlopen(path, RTLD_NOW)
 #  define FREE_SHARED_LIBRARY(handle) dlclose(handle)
 #  define GET_SHARED_LIBRARY_SYMBOL(handle, name) dlsym(handle, name)
@@ -40,15 +38,6 @@ bool device_oneapi_init()
 #if !defined(WITH_ONEAPI)
   return false;
 #else
-  void *lib_handle = LOAD_SYCL_SHARED_LIBRARY();
-
-  // If sycl shared library can't be found, then disable oneAPI rendering completely
-  if (lib_handle == NULL) {
-    VLOG(1) << "oneAPI shared library has not been found, so oneAPI rendering will be disabled";
-    return false;
-  }
-
-  FREE_SHARED_LIBRARY(lib_handle);
 
   string lib_path = path_get("lib");
 #  ifdef _WIN32
@@ -56,7 +45,7 @@ bool device_oneapi_init()
 #  else
   lib_path = path_join(lib_path, "cycles_kernel_oneapi.so");
 #  endif
-  lib_handle = LOAD_ONEAPI_SHARED_LIBRARY(lib_path.c_str());
+  void *lib_handle = LOAD_ONEAPI_SHARED_LIBRARY(lib_path.c_str());
 
   // This shouldn't happens, but still make sense to have a branch for this
   if (lib_handle == NULL) {
