@@ -5,7 +5,7 @@
  * \ingroup cmpnodes
  */
 
-#include "VPC_unsupported_node_operation.hh"
+#include "COM_unsupported_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -25,7 +25,7 @@ static void cmp_node_texture_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Color"));
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 static NodeOperation *get_compositor_operation(Context &context, DNode node)
 {

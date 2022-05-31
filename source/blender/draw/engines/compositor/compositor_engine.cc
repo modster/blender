@@ -16,13 +16,13 @@
 
 #include "IMB_colormanagement.h"
 
-#include "VPC_context.hh"
-#include "VPC_evaluator.hh"
-#include "VPC_texture_pool.hh"
+#include "COM_context.hh"
+#include "COM_evaluator.hh"
+#include "COM_texture_pool.hh"
 
 #include "GPU_texture.h"
 
-namespace blender::viewport_compositor {
+namespace blender::realtime_compositor {
 
 class DRWTexturePool : public TexturePool {
  public:
@@ -119,9 +119,9 @@ class Engine {
   }
 };
 
-}  // namespace blender::viewport_compositor
+}  // namespace blender::realtime_compositor
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 typedef struct CompositorData {
   DrawEngineType *engine_type;

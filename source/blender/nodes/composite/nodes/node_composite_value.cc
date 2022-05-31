@@ -5,7 +5,7 @@
  * \ingroup cmpnodes
  */
 
-#include "VPC_node_operation.hh"
+#include "COM_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -18,7 +18,7 @@ static void cmp_node_value_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("Value")).default_value(0.5f);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class ValueOperation : public NodeOperation {
  public:

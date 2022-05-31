@@ -3,7 +3,7 @@
  * \ingroup cmpnodes
  */
 
-#include "VPC_node_operation.hh"
+#include "COM_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -15,7 +15,7 @@ static void cmp_node_scene_time_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("Frame"));
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class SceneTimeOperation : public NodeOperation {
  public:

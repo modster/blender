@@ -14,8 +14,8 @@
 
 #include "GPU_material.h"
 
-#include "VPC_gpu_material_node.hh"
-#include "VPC_node_operation.hh"
+#include "COM_gpu_material_node.hh"
+#include "COM_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -36,7 +36,7 @@ static void node_composit_init_curves_time(bNodeTree *UNUSED(ntree), bNode *node
   node->storage = BKE_curvemapping_add(1, 0.0f, 0.0f, 1.0f, 1.0f);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class TimeCurveOperation : public NodeOperation {
  public:
@@ -132,7 +132,7 @@ static void node_buts_curvevec(uiLayout *layout, bContext *UNUSED(C), PointerRNA
   uiTemplateCurveMapping(layout, ptr, "mapping", 'v', false, false, false, false);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class VectorCurvesGPUMaterialNode : public GPUMaterialNode {
  public:
@@ -228,7 +228,7 @@ static void node_composit_init_curve_rgb(bNodeTree *UNUSED(ntree), bNode *node)
   node->storage = BKE_curvemapping_add(4, 0.0f, 0.0f, 1.0f, 1.0f);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class RGBCurvesGPUMaterialNode : public GPUMaterialNode {
  public:

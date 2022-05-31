@@ -9,7 +9,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_gpu_material_node.hh"
+#include "COM_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -33,7 +33,7 @@ static void node_composit_init_mode_sepycca(bNodeTree *UNUSED(ntree), bNode *nod
   node->custom1 = 1; /* BLI_YCC_ITU_BT709 */
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class SeparateYCCAGPUMaterialNode : public GPUMaterialNode {
  public:
@@ -119,7 +119,7 @@ static void node_composit_init_mode_combycca(bNodeTree *UNUSED(ntree), bNode *no
   node->custom1 = 1; /* BLI_YCC_ITU_BT709 */
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class CombineYCCAGPUMaterialNode : public GPUMaterialNode {
  public:

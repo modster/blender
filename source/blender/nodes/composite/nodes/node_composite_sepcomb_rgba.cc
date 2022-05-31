@@ -7,7 +7,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_gpu_material_node.hh"
+#include "COM_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -26,7 +26,7 @@ static void cmp_node_seprgba_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("A"));
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class SeparateRGBAGPUMaterialNode : public GPUMaterialNode {
  public:
@@ -78,7 +78,7 @@ static void cmp_node_combrgba_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Image"));
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class CombineRGBAGPUMaterialNode : public GPUMaterialNode {
  public:

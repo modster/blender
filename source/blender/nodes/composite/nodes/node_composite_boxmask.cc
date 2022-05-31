@@ -14,8 +14,8 @@
 
 #include "GPU_shader.h"
 
-#include "VPC_node_operation.hh"
-#include "VPC_utilities.hh"
+#include "COM_node_operation.hh"
+#include "COM_utilities.hh"
 
 #include "node_composite_util.hh"
 
@@ -57,7 +57,7 @@ static void node_composit_buts_boxmask(uiLayout *layout, bContext *UNUSED(C), Po
   uiItemR(layout, ptr, "mask_type", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class BoxMaskOperation : public NodeOperation {
  public:

@@ -14,7 +14,7 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-#include "VPC_unsupported_node_operation.hh"
+#include "COM_unsupported_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -65,7 +65,7 @@ static void node_composit_buts_keying(uiLayout *layout, bContext *UNUSED(C), Poi
   uiItemR(layout, ptr, "blur_post", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 static NodeOperation *get_compositor_operation(Context &context, DNode node)
 {

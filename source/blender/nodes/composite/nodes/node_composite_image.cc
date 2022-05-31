@@ -33,8 +33,8 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
-#include "VPC_node_operation.hh"
-#include "VPC_utilities.hh"
+#include "COM_node_operation.hh"
+#include "COM_utilities.hh"
 
 /* **************** IMAGE (and RenderResult, multilayer image) ******************** */
 
@@ -442,7 +442,7 @@ static void node_composit_copy_image(bNodeTree *UNUSED(dest_ntree),
   }
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class ImageOperation : public NodeOperation {
  public:
@@ -769,7 +769,7 @@ static void node_composit_buts_viewlayers(uiLayout *layout, bContext *C, Pointer
   RNA_string_set(&op_ptr, "scene", scene_name);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class RenderLayerOperation : public NodeOperation {
  public:

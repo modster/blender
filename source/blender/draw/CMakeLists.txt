@@ -23,7 +23,7 @@ set(INC
   ../nodes
   ../render
   ../render/intern
-  ../viewport_compositor
+  ../compositor/realtime_compositor
   ../windowmanager
 
   ../../../intern/atomic
@@ -259,7 +259,7 @@ set(SRC
 set(LIB
   bf_blenkernel
   bf_blenlib
-  bf_viewport_compositor
+  bf_realtime_compositor
   bf_windowmanager
 )
 

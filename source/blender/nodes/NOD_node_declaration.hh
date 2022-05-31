@@ -89,11 +89,11 @@ class SocketDeclaration {
   OutputFieldDependency output_field_dependency_;
 
   /** The priority of the input for determining the domain of the node. See
-   * viewport_compositor::InputDescriptor for more information. */
+   * realtime_compositor::InputDescriptor for more information. */
   int compositor_domain_priority_ = 0;
 
   /** This input expects a single value and can't operate on non-single values. See
-   * viewport_compositor::InputDescriptor for more information. */
+   * realtime_compositor::InputDescriptor for more information. */
   bool compositor_expects_single_value_ = false;
 
   /** Utility method to make the socket available if there is a straightforward way to do so. */
@@ -250,7 +250,7 @@ class SocketDeclarationBuilder : public BaseSocketDeclarationBuilder {
   }
 
   /** The priority of the input for determining the domain of the node. See
-   * viewport_compositor::InputDescriptor for more information. */
+   * realtime_compositor::InputDescriptor for more information. */
   Self &compositor_domain_priority(int priority)
   {
     decl_->compositor_domain_priority_ = priority;
@@ -258,7 +258,7 @@ class SocketDeclarationBuilder : public BaseSocketDeclarationBuilder {
   }
 
   /** This input expects a single value and can't operate on non-single values. See
-   * viewport_compositor::InputDescriptor for more information. */
+   * realtime_compositor::InputDescriptor for more information. */
   Self &compositor_expects_single_value(bool value = true)
   {
     decl_->compositor_expects_single_value_ = value;

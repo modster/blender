@@ -7,7 +7,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_gpu_material_node.hh"
+#include "COM_gpu_material_node.hh"
 
 #include "NOD_math_functions.hh"
 
@@ -37,7 +37,7 @@ static void cmp_node_math_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("Value"));
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class MathGPUMaterialNode : public GPUMaterialNode {
  public:

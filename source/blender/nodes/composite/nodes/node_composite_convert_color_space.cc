@@ -14,7 +14,7 @@
 
 #include "IMB_colormanagement.h"
 
-#include "VPC_unsupported_node_operation.hh"
+#include "COM_unsupported_node_operation.hh"
 
 namespace blender::nodes::node_composite_convert_color_space_cc {
 
@@ -49,7 +49,7 @@ static void node_composit_buts_convert_colorspace(uiLayout *layout,
   uiItemR(layout, ptr, "to_color_space", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 static NodeOperation *get_compositor_operation(Context &context, DNode node)
 {

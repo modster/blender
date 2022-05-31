@@ -12,7 +12,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_gpu_material_node.hh"
+#include "COM_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -48,7 +48,7 @@ static void node_composit_buts_luma_matte(uiLayout *layout, bContext *UNUSED(C),
       col, ptr, "limit_min", UI_ITEM_R_SPLIT_EMPTY_NAME | UI_ITEM_R_SLIDER, nullptr, ICON_NONE);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class LuminanceMatteGPUMaterialNode : public GPUMaterialNode {
  public:

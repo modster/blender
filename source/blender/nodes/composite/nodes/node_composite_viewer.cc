@@ -16,7 +16,7 @@
 #include "GPU_state.h"
 #include "GPU_texture.h"
 
-#include "VPC_node_operation.hh"
+#include "COM_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -60,7 +60,7 @@ static void node_composit_buts_viewer_ex(uiLayout *layout, bContext *UNUSED(C), 
   }
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class ViewerOperation : public NodeOperation {
  public:

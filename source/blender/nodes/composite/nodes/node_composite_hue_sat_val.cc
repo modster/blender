@@ -7,7 +7,7 @@
 
 #include "GPU_material.h"
 
-#include "VPC_gpu_material_node.hh"
+#include "COM_gpu_material_node.hh"
 
 #include "node_composite_util.hh"
 
@@ -47,7 +47,7 @@ static void cmp_node_huesatval_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("Image"));
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class HueSaturationValueGPUMaterialNode : public GPUMaterialNode {
  public:

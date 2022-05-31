@@ -296,7 +296,7 @@ static bool node_poll_cryptomatte(bNodeType *UNUSED(ntype),
   return false;
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 static NodeOperation *get_compositor_operation(Context &context, DNode node)
 {

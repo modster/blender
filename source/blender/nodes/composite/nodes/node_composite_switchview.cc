@@ -11,7 +11,7 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-#include "VPC_node_operation.hh"
+#include "COM_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -142,7 +142,7 @@ static void node_composit_buts_switch_view_ex(uiLayout *layout,
               nullptr);
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class SwitchViewOperation : public NodeOperation {
  public:

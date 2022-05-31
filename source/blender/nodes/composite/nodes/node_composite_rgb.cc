@@ -9,7 +9,7 @@
 
 #include "DNA_node_types.h"
 
-#include "VPC_node_operation.hh"
+#include "COM_node_operation.hh"
 
 #include "node_composite_util.hh"
 
@@ -22,7 +22,7 @@ static void cmp_node_rgb_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Color>(N_("RGBA")).default_value({0.5f, 0.5f, 0.5f, 1.0f});
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class RGBOperation : public NodeOperation {
  public:

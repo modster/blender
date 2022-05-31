@@ -21,8 +21,8 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
-#include "VPC_node_operation.hh"
-#include "VPC_utilities.hh"
+#include "COM_node_operation.hh"
+#include "COM_utilities.hh"
 
 #include "node_composite_util.hh"
 
@@ -89,7 +89,7 @@ static void node_composit_buts_movieclip_ex(uiLayout *layout, bContext *C, Point
   uiTemplateColorspaceSettings(layout, &clipptr, "colorspace_settings");
 }
 
-using namespace blender::viewport_compositor;
+using namespace blender::realtime_compositor;
 
 class MovieClipOperation : public NodeOperation {
  public:

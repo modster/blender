@@ -110,11 +110,11 @@ class GatherLinkSearchOpParams;
 namespace fn {
 class MFDataType;
 }  // namespace fn
-namespace viewport_compositor {
+namespace realtime_compositor {
 class Context;
 class NodeOperation;
 class GPUMaterialNode;
-}  // namespace viewport_compositor
+}  // namespace realtime_compositor
 }  // namespace blender
 
 using CPPTypeHandle = blender::CPPType;
@@ -129,10 +129,10 @@ using SocketGetGeometryNodesCPPValueFunction = void (*)(const struct bNodeSocket
 using NodeGatherSocketLinkOperationsFunction =
     void (*)(blender::nodes::GatherLinkSearchOpParams &params);
 
-using NodeGetCompositorOperationFunction = blender::viewport_compositor::NodeOperation
-    *(*)(blender::viewport_compositor::Context &context, blender::nodes::DNode node);
+using NodeGetCompositorOperationFunction = blender::realtime_compositor::NodeOperation
+    *(*)(blender::realtime_compositor::Context &context, blender::nodes::DNode node);
 using NodeGetCompositorGPUMaterialNodeFunction =
-    blender::viewport_compositor::GPUMaterialNode *(*)(blender::nodes::DNode node);
+    blender::realtime_compositor::GPUMaterialNode *(*)(blender::nodes::DNode node);
 
 #else
 typedef void *NodeGetCompositorOperationFunction;
