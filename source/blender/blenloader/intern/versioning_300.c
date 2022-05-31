@@ -63,15 +63,13 @@
 #include "RNA_prototypes.h"
 
 #include "BLO_readfile.h"
-#include "MEM_guardedalloc.h"
+
 #include "readfile.h"
 
 #include "SEQ_channels.h"
 #include "SEQ_iterator.h"
 #include "SEQ_sequencer.h"
 #include "SEQ_time.h"
-
-#include "RNA_access.h"
 
 #include "versioning_common.h"
 
@@ -1214,6 +1212,15 @@ static bool version_fix_seq_meta_range(Sequence *seq, void *user_data)
   if (seq->type == SEQ_TYPE_META) {
     SEQ_time_update_meta_strip_range(scene, seq);
   }
+  return true;
+}
+
+static bool version_merge_still_offsets(Sequence *seq, void *UNUSED(user_data))
+{
+  seq->startofs -= seq->startstill;
+  seq->endofs -= seq->endstill;
+  seq->startstill = 0;
+  seq->endstill = 0;
   return true;
 }
 
@@ -3043,6 +3050,14 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
           imapf->view = view;
           imapf->tile_number = 1001;
         }
+      }
+    }
+
+    /* Merge still offsets into start/end offsets. */
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      Editing *ed = SEQ_editing_get(scene);
+      if (ed != NULL) {
+        SEQ_for_each_callback(&ed->seqbase, version_merge_still_offsets, NULL);
       }
     }
   }

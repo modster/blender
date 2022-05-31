@@ -97,8 +97,6 @@
 #include "RNA_enum_types.h"
 #include "RNA_types.h"
 
-#include "NOD_shader.h"
-
 #include "IMB_colormanagement.h"
 
 //#include "bmesh_tools.h"
@@ -4084,7 +4082,7 @@ typedef struct {
 
 static void proj_paint_layer_clone_init(ProjPaintState *ps, ProjPaintLayerClone *layer_clone)
 {
-  MLoopUV *mloopuv_clone_base = NULL;
+  const MLoopUV *mloopuv_clone_base = NULL;
 
   /* use clone mtface? */
   if (ps->do_layer_clone) {

@@ -1274,8 +1274,8 @@ static Image *image_open_single(Main *bmain,
       BKE_image_free_views(ima);
     }
 
-    if ((range->length > 1) && (ima->source == IMA_SRC_FILE)) {
-      if (range->udim_tiles.first) {
+    if (ima->source == IMA_SRC_FILE) {
+      if (range->udims_detected && range->udim_tiles.first) {
         ima->source = IMA_SRC_TILED;
         ImageTile *first_tile = ima->tiles.first;
         first_tile->tile_number = range->offset;
@@ -1283,7 +1283,7 @@ static Image *image_open_single(Main *bmain,
           BKE_image_add_tile(ima, POINTER_AS_INT(node->data), NULL);
         }
       }
-      else {
+      else if (range->length > 1) {
         ima->source = IMA_SRC_SEQUENCE;
       }
     }
@@ -1722,19 +1722,20 @@ static ImageSaveData *image_save_as_init(bContext *C, wmOperator *op)
   Image *image = image_from_context(C);
   ImageUser *iuser = image_user_from_context(C);
   Scene *scene = CTX_data_scene(C);
-  const bool save_as_render = (image->source == IMA_SRC_VIEWER);
 
   ImageSaveData *isd = MEM_callocN(sizeof(*isd), __func__);
   isd->image = image;
   isd->iuser = iuser;
 
-  if (!BKE_image_save_options_init(&isd->opts, bmain, scene, image, iuser, true, save_as_render)) {
+  if (!BKE_image_save_options_init(&isd->opts, bmain, scene, image, iuser, true, false)) {
     BKE_image_save_options_free(&isd->opts);
     MEM_freeN(isd);
     return NULL;
   }
 
-  RNA_string_set(op->ptr, "filepath", isd->opts.filepath);
+  if (!RNA_struct_property_is_set(op->ptr, "filepath")) {
+    RNA_string_set(op->ptr, "filepath", isd->opts.filepath);
+  }
 
   /* Enable save_copy by default for render results. */
   if (ELEM(image->type, IMA_TYPE_R_RESULT, IMA_TYPE_COMPOSITE) &&
@@ -1742,7 +1743,9 @@ static ImageSaveData *image_save_as_init(bContext *C, wmOperator *op)
     RNA_boolean_set(op->ptr, "copy", true);
   }
 
-  RNA_boolean_set(op->ptr, "save_as_render", isd->opts.save_as_render);
+  if (!RNA_struct_property_is_set(op->ptr, "save_as_render")) {
+    RNA_boolean_set(op->ptr, "save_as_render", isd->opts.save_as_render);
+  }
 
   /* Show multiview save options only if image has multiviews. */
   PropertyRNA *prop;
@@ -1774,7 +1777,6 @@ static int image_save_as_exec(bContext *C, wmOperator *op)
 
   if (op->customdata) {
     isd = op->customdata;
-    image_save_options_from_op(bmain, &isd->opts, op);
   }
   else {
     isd = image_save_as_init(C, op);
@@ -1782,6 +1784,9 @@ static int image_save_as_exec(bContext *C, wmOperator *op)
       return OPERATOR_CANCELLED;
     }
   }
+
+  image_save_options_from_op(bmain, &isd->opts, op);
+  BKE_image_save_options_update(&isd->opts, isd->image);
 
   save_image_op(bmain, isd->image, isd->iuser, op, &isd->opts);
 
@@ -1794,9 +1799,14 @@ static int image_save_as_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static bool image_save_as_check(bContext *UNUSED(C), wmOperator *op)
+static bool image_save_as_check(bContext *C, wmOperator *op)
 {
+  Main *bmain = CTX_data_main(C);
   ImageSaveData *isd = op->customdata;
+
+  image_save_options_from_op(bmain, &isd->opts, op);
+  BKE_image_save_options_update(&isd->opts, isd->image);
+
   return WM_operator_filesel_ensure_ext_imtype(op, &isd->opts.im_format);
 }
 
@@ -1839,7 +1849,7 @@ static void image_save_as_draw(bContext *UNUSED(C), wmOperator *op)
   ImageSaveData *isd = op->customdata;
   PointerRNA imf_ptr;
   const bool is_multiview = RNA_boolean_get(op->ptr, "show_multiview");
-  const bool use_color_management = RNA_boolean_get(op->ptr, "save_as_render");
+  const bool save_as_render = RNA_boolean_get(op->ptr, "save_as_render");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -1852,7 +1862,14 @@ static void image_save_as_draw(bContext *UNUSED(C), wmOperator *op)
 
   /* image template */
   RNA_pointer_create(NULL, &RNA_ImageFormatSettings, &isd->opts.im_format, &imf_ptr);
-  uiTemplateImageSettings(layout, &imf_ptr, use_color_management);
+  uiTemplateImageSettings(layout, &imf_ptr, save_as_render);
+
+  if (!save_as_render) {
+    PointerRNA linear_settings_ptr = RNA_pointer_get(&imf_ptr, "linear_colorspace_settings");
+    uiLayout *col = uiLayoutColumn(layout, true);
+    uiItemS(col);
+    uiItemR(col, &linear_settings_ptr, "name", 0, IFACE_("Color Space"), ICON_NONE);
+  }
 
   /* multiview template */
   if (is_multiview) {
@@ -1898,16 +1915,19 @@ void IMAGE_OT_save_as(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* properties */
-  RNA_def_boolean(ot->srna,
-                  "save_as_render",
-                  0,
-                  "Save As Render",
-                  "Apply render part of display transform when saving byte image");
-  RNA_def_boolean(ot->srna,
-                  "copy",
-                  0,
-                  "Copy",
-                  "Create a new image file without modifying the current image in blender");
+  PropertyRNA *prop;
+  prop = RNA_def_boolean(ot->srna,
+                         "save_as_render",
+                         0,
+                         "Save As Render",
+                         "Apply render part of display transform when saving byte image");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna,
+                         "copy",
+                         0,
+                         "Copy",
+                         "Create a new image file without modifying the current image in blender");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 
   image_operator_prop_allow_tokens(ot);
   WM_operator_properties_filesel(ot,

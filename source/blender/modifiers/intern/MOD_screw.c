@@ -182,7 +182,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   ScrewModifierData *ltmd = (ScrewModifierData *)md;
   const bool use_render_params = (ctx->flag & MOD_APPLY_RENDER) != 0;
 
-  int *origindex;
   int mpoly_index = 0;
   uint step;
   uint i, j;
@@ -397,7 +396,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     CustomData_add_layer(&result->pdata, CD_ORIGINDEX, CD_CALLOC, NULL, (int)maxPolys);
   }
 
-  origindex = CustomData_get_layer(&result->pdata, CD_ORIGINDEX);
+  int *origindex = CustomData_get_layer(&result->pdata, CD_ORIGINDEX);
 
   CustomData_copy_data(&mesh->vdata, &result->vdata, 0, 0, (int)totvert);
 
@@ -882,10 +881,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       /* set normal */
       if (vert_connect) {
         if (do_normal_create) {
-          /* set the normal now its transformed */
-          float nor_tx[3];
-          mul_v3_m3v3(nor_tx, mat3, vert_connect[j].no);
-          copy_v3_v3(vert_normals_new[mv_new - mvert_new], nor_tx);
+          /* Set the normal now its transformed. */
+          mul_v3_m3v3(vert_normals_new[mv_new - mvert_new], mat3, vert_connect[j].no);
         }
       }
 
